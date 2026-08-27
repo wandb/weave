@@ -118,7 +118,10 @@ from weave.trace_server.query_builder.agent_query_builder import (
 from weave.trace_server.query_builder.agent_stats_query_builder import (
     build_agent_span_stats_query,
 )
-from weave.trace_server.sensitive_data.span_redaction import redact_pii_from_span
+from weave.trace_server.sensitive_data.span_redaction import (
+    redact_pii_from_resource,
+    redact_pii_from_span,
+)
 from weave.trace_server.trace_server_common import (
     AgentFeedbackByTarget,
     group_agent_feedback_by_target,
@@ -837,13 +840,16 @@ class AgentWriteHandler:
         The `messages` search table is populated by a ClickHouse
         materialized view off the spans table (migration 030).
 
-        Every parsed span is redacted before ingest sampling or any storage
-        preparation. When ingest sampling is enabled (rate < 1.0), whole
-        traces are then kept or dropped *before* the expensive
-        blob-strip/extraction steps run, so dropped traces never write Content
-        files. Dropped spans are neither stored nor returned (they never reach
-        the scoring Kafka emit) but still count as accepted — the client sees
-        an ordinary success. See agents/ingest_sampling.py (WB-36877).
+        Every span is parsed and redacted (each shared resource once) before
+        any extraction runs, so a redaction failure rejects the request, as
+        RequestTooLarge for over-deep values, before blob-strip Content
+        writes or inserts happen for any span in it. When ingest sampling is
+        enabled (rate < 1.0), whole traces are then kept or dropped *before*
+        the expensive blob-strip/extraction steps run, so dropped traces
+        never write Content files. Dropped spans are neither stored nor
+        returned (they never reach the scoring Kafka emit) but still count as
+        accepted — the client sees an ordinary success. See
+        agents/ingest_sampling.py (WB-36877).
         """
         span_rows: list[AgentSpanCHInsertable] = []
         accepted = 0
@@ -867,8 +873,9 @@ class AgentWriteHandler:
                 rejected += 1
                 errors.append(str(e))
                 return None
-            # Outside the parse-error handler: a detector failure rejects the
-            # whole request before sampling or any storage preparation.
+            # Outside the parse-error handler: a redaction failure rejects
+            # the whole request (RequestTooLarge for over-deep values) before
+            # sampling or any storage preparation.
             redact_pii_from_span(span, req.sensitive_data_policy)
             return span
 
@@ -913,33 +920,33 @@ class AgentWriteHandler:
             return genai_row
 
         sampling = ingest_sampling.request_config()
-        if not sampling.enabled:
-            # Sampler off (the default): the unmodified single-pass path.
-            for processed_span in req.processed_spans:
-                resource = Resource.from_proto(processed_span.resource_spans.resource)
-                for protobuf_scope_spans in processed_span.resource_spans.scope_spans:
-                    for protobuf_span in protobuf_scope_spans.spans:
-                        span = parse_span(protobuf_span, resource)
-                        if span is None:
-                            continue
-                        row = extract_row(span, processed_span.run_id)
-                        if row is not None:
-                            span_rows.append(row)
-        else:
-            # Pass 1: parse and redact everything, then decide keep/drop per
-            # trace before any blob-strip/extraction work happens.
-            parsed: list[tuple[Span, str | None]] = []
-            byte_sizes: list[int] = []
-            for processed_span in req.processed_spans:
-                resource = Resource.from_proto(processed_span.resource_spans.resource)
-                for protobuf_scope_spans in processed_span.resource_spans.scope_spans:
-                    for protobuf_span in protobuf_scope_spans.spans:
-                        span = parse_span(protobuf_span, resource)
-                        if span is None:
-                            continue
-                        parsed.append((span, processed_span.run_id))
+
+        # Pass 1: parse and redact everything (each shared resource once)
+        # before any extraction, so a redaction failure rejects the request
+        # before blob-strip Content writes happen for sibling spans.
+        parsed: list[tuple[Span, str | None]] = []
+        byte_sizes: list[int] = []
+        for processed_span in req.processed_spans:
+            resource = Resource.from_proto(processed_span.resource_spans.resource)
+            redact_pii_from_resource(resource, req.sensitive_data_policy)
+            for protobuf_scope_spans in processed_span.resource_spans.scope_spans:
+                for protobuf_span in protobuf_scope_spans.spans:
+                    span = parse_span(protobuf_span, resource)
+                    if span is None:
+                        continue
+                    parsed.append((span, processed_span.run_id))
+                    if sampling.enabled:
                         byte_sizes.append(protobuf_span.ByteSize())
 
+        if not sampling.enabled:
+            # Sampler off (the default): extract every parsed span.
+            for span, run_id in parsed:
+                row = extract_row(span, run_id)
+                if row is not None:
+                    span_rows.append(row)
+        else:
+            # Whole traces are kept or dropped per trace before any
+            # blob-strip/extraction work happens.
             decisions = ingest_sampling.decide_spans(
                 sampling, [span for span, _ in parsed], byte_sizes
             )

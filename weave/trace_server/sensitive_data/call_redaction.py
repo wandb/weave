@@ -3,15 +3,31 @@
 from __future__ import annotations
 
 from collections.abc import Callable, Sequence
-from typing import Any, TypeVar, cast
+from typing import Any, TypeVar, cast, overload
 
 from pydantic import BaseModel
 
 from weave.trace_server import trace_server_interface as tsi
+from weave.trace_server.errors import RequestTooLarge
 from weave.trace_server.sensitive_data.policy import SensitiveDataPolicy, pii_enabled
-from weave.trace_server.sensitive_data.walker import redact_pii_value
+from weave.trace_server.sensitive_data.walker import (
+    NESTING_LIMIT_MESSAGE,
+    redact_pii_value,
+)
 
 TModel = TypeVar("TModel", bound=BaseModel)
+
+
+@overload
+def redact_call_start(
+    req: tsi.CallStartReq, policy: SensitiveDataPolicy
+) -> tsi.CallStartReq: ...
+
+
+@overload
+def redact_call_start(
+    req: tsi.CallStartV2Req, policy: SensitiveDataPolicy
+) -> tsi.CallStartV2Req: ...
 
 
 def redact_call_start(
@@ -33,6 +49,18 @@ def redact_call_start(
     return req if start is req.start else req.model_copy(update={"start": start})
 
 
+@overload
+def redact_call_end(
+    req: tsi.CallEndReq, policy: SensitiveDataPolicy
+) -> tsi.CallEndReq: ...
+
+
+@overload
+def redact_call_end(
+    req: tsi.CallEndV2Req, policy: SensitiveDataPolicy
+) -> tsi.CallEndV2Req: ...
+
+
 def redact_call_end(
     req: tsi.CallEndReq | tsi.CallEndV2Req,
     policy: SensitiveDataPolicy,
@@ -42,36 +70,6 @@ def redact_call_end(
         return req
     end = _redact_fields(req.end, ("output", "summary", "exception"))
     return req if end is req.end else req.model_copy(update={"end": end})
-
-
-def redact_call_batch(
-    req: tsi.CallCreateBatchReq,
-    policy: SensitiveDataPolicy,
-) -> tsi.CallCreateBatchReq:
-    """Redact every item in the batch."""
-    if not pii_enabled(policy):
-        return req
-
-    def redact_item(
-        item: tsi.CallBatchStartMode | tsi.CallBatchEndMode,
-    ) -> tsi.CallBatchStartMode | tsi.CallBatchEndMode:
-        redacted_req: (
-            tsi.CallStartReq | tsi.CallStartV2Req | tsi.CallEndReq | tsi.CallEndV2Req
-        )
-        if isinstance(item, tsi.CallBatchStartMode):
-            redacted_req = redact_call_start(item.req, policy)
-        elif isinstance(item, tsi.CallBatchEndMode):
-            redacted_req = redact_call_end(item.req, policy)
-        else:
-            raise TypeError(f"Unknown call batch item type: {type(item).__name__}")
-        return (
-            item
-            if redacted_req is item.req
-            else item.model_copy(update={"req": redacted_req})
-        )
-
-    batch = _redact_sequence(req.batch, redact_item)
-    return req if batch is req.batch else req.model_copy(update={"batch": batch})
 
 
 def redact_calls_complete(
@@ -115,11 +113,14 @@ def redact_call_update(
 
 def _redact_fields(model: TModel, field_names: tuple[str, ...]) -> TModel:
     updates: dict[str, Any] = {}
-    for field_name in field_names:
-        original = getattr(model, field_name)
-        redacted = redact_pii_value(original)
-        if redacted is not original:
-            updates[field_name] = redacted
+    try:
+        for field_name in field_names:
+            original = getattr(model, field_name)
+            redacted = redact_pii_value(original)
+            if redacted is not original:
+                updates[field_name] = redacted
+    except RecursionError as error:
+        raise RequestTooLarge(NESTING_LIMIT_MESSAGE) from error
     return model if not updates else cast(TModel, model.model_copy(update=updates))
 
 

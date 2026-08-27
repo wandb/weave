@@ -2,7 +2,10 @@ from __future__ import annotations
 
 import datetime
 
+import pytest
+
 from weave.trace_server import trace_server_interface as tsi
+from weave.trace_server.errors import RequestTooLarge
 from weave.trace_server.opentelemetry.python_spans import (
     Event,
     Link,
@@ -14,14 +17,16 @@ from weave.trace_server.opentelemetry.python_spans import (
     Resource as SpanResource,
 )
 from weave.trace_server.sensitive_data.call_redaction import (
-    redact_call_batch,
     redact_call_end,
     redact_call_start,
     redact_call_update,
     redact_calls_complete,
 )
 from weave.trace_server.sensitive_data.policy import SensitiveDataPolicy
-from weave.trace_server.sensitive_data.span_redaction import redact_pii_from_span
+from weave.trace_server.sensitive_data.span_redaction import (
+    redact_pii_from_resource,
+    redact_pii_from_span,
+)
 
 NOW = datetime.datetime(2026, 8, 12, tzinfo=datetime.timezone.utc)
 
@@ -50,7 +55,7 @@ def test_call_start_preserves_ref_op_names() -> None:
     assert redacted.start.op_name == "weave:///entity/project/op/my-op:v1"
 
 
-def test_call_end_update_complete_and_batch_redact_content() -> None:
+def test_call_end_update_and_complete_redact_content() -> None:
     end_req = _call_end_req()
     update_req = tsi.CallUpdateReq(
         project_id="ada@example.com/project",
@@ -58,17 +63,10 @@ def test_call_end_update_complete_and_batch_redact_content() -> None:
         display_name="Email ada@example.com",
     )
     complete_req = tsi.CallsUpsertCompleteReq(batch=[_completed_call()])
-    batch_req = tsi.CallCreateBatchReq(
-        batch=[
-            tsi.CallBatchStartMode(req=_call_start_req()),
-            tsi.CallBatchEndMode(req=end_req),
-        ]
-    )
 
     redacted_end = redact_call_end(end_req, SensitiveDataPolicy.PII_V1)
     redacted_update = redact_call_update(update_req, SensitiveDataPolicy.PII_V1)
     redacted_complete = redact_calls_complete(complete_req, SensitiveDataPolicy.PII_V1)
-    redacted_batch = redact_call_batch(batch_req, SensitiveDataPolicy.PII_V1)
 
     assert redacted_end.end.output == {"card": "<CREDIT_CARD>"}
     assert redacted_end.end.summary == {"contact": "<EMAIL_ADDRESS>"}
@@ -79,14 +77,33 @@ def test_call_end_update_complete_and_batch_redact_content() -> None:
     assert redacted_complete.batch[0].inputs == {"email": "<EMAIL_ADDRESS>"}
     assert redacted_complete.batch[0].output == {"card": "<CREDIT_CARD>"}
     assert redacted_complete.batch[0].op_name == "<EMAIL_ADDRESS>"
-    assert redacted_batch.batch[0].req.start.inputs == {"email": "<EMAIL_ADDRESS>"}
-    assert redacted_batch.batch[1].req.end.output == {"card": "<CREDIT_CARD>"}
 
 
 def test_off_policy_skips_the_walker() -> None:
-    req = _call_start_req()
+    start_req = _call_start_req()
+    end_req = _call_end_req()
+    update_req = tsi.CallUpdateReq(
+        project_id="ada@example.com/project",
+        call_id="call-id",
+        display_name="Email ada@example.com",
+    )
+    complete_req = tsi.CallsUpsertCompleteReq(batch=[_completed_call()])
 
-    assert redact_call_start(req, SensitiveDataPolicy.OFF) is req
+    assert redact_call_start(start_req, SensitiveDataPolicy.OFF) is start_req
+    assert redact_call_end(end_req, SensitiveDataPolicy.OFF) is end_req
+    assert redact_call_update(update_req, SensitiveDataPolicy.OFF) is update_req
+    assert redact_calls_complete(complete_req, SensitiveDataPolicy.OFF) is complete_req
+
+
+def test_deep_call_value_raises_request_too_large() -> None:
+    req = _call_start_req()
+    deep: dict[str, object] = {"leaf": "x"}
+    for _ in range(2000):
+        deep = {"k": deep}
+    req.start.inputs = deep
+
+    with pytest.raises(RequestTooLarge, match="nesting limit"):
+        redact_call_start(req, SensitiveDataPolicy.PII_V1)
 
 
 def _call_start_req() -> tsi.CallStartReq:
@@ -169,11 +186,16 @@ def test_redacts_pii_from_every_span_container() -> None:
 
     redact_pii_from_span(span, SensitiveDataPolicy.PII_V1)
 
+    # The shared resource is redacted once per resource-spans group, not here.
+    assert span.resource is not None
+    assert span.resource.attributes == {"service.owner": "ada@example.com"}
+
+    redact_pii_from_resource(span.resource, SensitiveDataPolicy.PII_V1)
+
     assert span.attributes == {
         "gen_ai.prompt": "Email <EMAIL_ADDRESS>",
         "payload": {"image": "data:image/png;base64,QUJD"},
     }
-    assert span.resource is not None
     assert span.resource.attributes == {"service.owner": "<EMAIL_ADDRESS>"}
     assert span.events[0].attributes == {"note": "call <PHONE_NUMBER>"}
     assert span.links[0].attributes == {"context": "ssn <US_SSN>"}
@@ -185,8 +207,35 @@ def test_redacts_pii_from_every_span_container() -> None:
 def test_span_redaction_off_policy_is_a_noop() -> None:
     span = _span_with_pii()
     original_attributes = span.attributes
+    assert span.resource is not None
+    original_resource_attributes = span.resource.attributes
 
     redact_pii_from_span(span, SensitiveDataPolicy.OFF)
+    redact_pii_from_resource(span.resource, SensitiveDataPolicy.OFF)
 
     assert span.attributes is original_attributes
+    assert span.resource.attributes is original_resource_attributes
     assert span.status.message == "card 4111 1111 1111 1111"
+
+
+def test_bytes_attribute_values_pass_through_unscanned() -> None:
+    # pii-v1 scans strings and never decodes payloads: raw bytes values are a
+    # documented boundary (like data URLs), stored base64-encoded in dumps.
+    span = _span_with_pii()
+    payload = b"reach ada@example.com or 4111 1111 1111 1111"
+    span.attributes = {"gen_ai.blob": payload}
+
+    redact_pii_from_span(span, SensitiveDataPolicy.PII_V1)
+
+    assert span.attributes == {"gen_ai.blob": payload}
+
+
+def test_deep_span_value_raises_request_too_large() -> None:
+    span = _span_with_pii()
+    deep: dict[str, object] = {"leaf": "x"}
+    for _ in range(2000):
+        deep = {"k": deep}
+    span.attributes = {"payload": deep}
+
+    with pytest.raises(RequestTooLarge, match="nesting limit"):
+        redact_pii_from_span(span, SensitiveDataPolicy.PII_V1)

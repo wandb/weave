@@ -738,12 +738,21 @@ deterministic.
 - An authorized server route may set `pii-v1` from the owning organization's
   policy. Never populate the field from caller-controlled OTLP content or a
   process environment fallback.
-- Agent OTel ingest applies the policy before credential redaction, blob
-  stripping, derived-column extraction, and insertion. A detector failure
-  rejects the complete request before any insert.
+- Agent OTel ingest parses and redacts every span in the request (each shared
+  resource once) before credential redaction, blob stripping, derived-column
+  extraction, or insertion starts for any of them. A value nested too deeply
+  to scan rejects the complete request as `RequestTooLarge` (HTTP 413), and
+  any other detector failure also fails the whole request, before any Content
+  file write or insert.
 - PII redaction covers span, resource, event, and link attributes plus the
   status message. Span names, event names, IDs, trace state, and timestamps are
-  structural and remain unchanged.
+  structural and remain unchanged: names are low-cardinality grouping keys
+  (they feed the `span_name`, `operation_name`, and `agent_name` columns), so
+  rewriting them would break span grouping and agent identity.
+- `pii-v1` scans strings and never decodes payloads: non-string leaves,
+  including raw bytes values (stored base64-encoded in dumps), pass through
+  unchanged, the same boundary as preserved data URLs and standalone base64
+  strings.
 
 ### Credential-shaped fields in agent span columns
 - The agents OTel ingest calls `redact_credentials_from_span` before

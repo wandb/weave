@@ -18,8 +18,10 @@ from opentelemetry.proto.trace.v1.trace_pb2 import Span as PbSpan
 
 from tests.trace_server.helpers import make_project_id
 from weave.trace_server import trace_server_interface as tsi
+from weave.trace_server.agents import clickhouse as agents_clickhouse
 from weave.trace_server.agents import ingest_sampling
 from weave.trace_server.agents.types import AgentSpansQueryReq, GenAIOTelExportReq
+from weave.trace_server.errors import RequestTooLarge
 from weave.trace_server.opentelemetry.python_spans import Span
 from weave.trace_server.sensitive_data.policy import SensitiveDataPolicy
 
@@ -33,6 +35,9 @@ _PII_CONVERSATION_NAME = "chat with ada@example.com"
 _PII_CONTENT_ATTRS = {
     "gen_ai.conversation.name": _PII_CONVERSATION_NAME,
     "gen_ai.system_instructions": json.dumps(["obey ada@example.com"]),
+    "gen_ai.input.messages": json.dumps(
+        [{"role": "user", "content": "hi from ada@example.com"}]
+    ),
     "gen_ai.output.messages": json.dumps(
         [
             {
@@ -80,14 +85,15 @@ def _pii_proto_span(span_id: bytes) -> PbSpan:
 
 def _export_req(
     project_id: str,
-    span: PbSpan,
+    spans: list[PbSpan],
     policy: SensitiveDataPolicy,
 ) -> GenAIOTelExportReq:
     scope = InstrumentationScope()
     scope.name = "test_instrumentation"
     scope_spans = ScopeSpans()
     scope_spans.scope.CopyFrom(scope)
-    scope_spans.spans.append(span)
+    for span in spans:
+        scope_spans.spans.append(span)
     resource = PbResource()
     kv = KeyValue()
     kv.key = "service.owner"
@@ -125,7 +131,7 @@ def test_pii_policy_redacts_stored_span_details(ch_server) -> None:
     res = ch_server.genai_otel_export(
         _export_req(
             project_id,
-            _pii_proto_span(b"\x41" * 8),
+            [_pii_proto_span(b"\x41" * 8)],
             SensitiveDataPolicy.PII_V1,
         )
     )
@@ -141,6 +147,7 @@ def test_pii_policy_redacts_stored_span_details(ch_server) -> None:
     assert row.status_message == "card <CREDIT_CARD>"
     assert row.conversation_name == "chat with <EMAIL_ADDRESS>"
     assert row.system_instructions == ["obey <EMAIL_ADDRESS>"]
+    assert row.input_messages[0].content == "hi from <EMAIL_ADDRESS>"
     assert row.output_messages[0].content == "reply to <EMAIL_ADDRESS>"
     assert row.reasoning_content == "think <US_SSN>"
     assert row.tool_call_arguments == '{"query": "email <EMAIL_ADDRESS>"}'
@@ -180,7 +187,7 @@ def test_pii_policy_redacts_before_ingest_sampling(
     res = ch_server.genai_otel_export(
         _export_req(
             project_id,
-            _pii_proto_span(b"\x43" * 8),
+            [_pii_proto_span(b"\x43" * 8)],
             SensitiveDataPolicy.PII_V1,
         )
     )
@@ -198,7 +205,7 @@ def test_off_policy_stores_span_values_unchanged(ch_server) -> None:
     res = ch_server.genai_otel_export(
         _export_req(
             project_id,
-            _pii_proto_span(b"\x42" * 8),
+            [_pii_proto_span(b"\x42" * 8)],
             SensitiveDataPolicy.OFF,
         )
     )
@@ -211,3 +218,45 @@ def test_off_policy_stores_span_values_unchanged(ch_server) -> None:
     assert dump["resource"]["attributes"] == {"service": {"owner": _PII_RESOURCE_VALUE}}
     assert row.conversation_name == _PII_CONVERSATION_NAME
     assert row.reasoning_content == "think 123-45-6789"
+
+
+def test_redaction_failure_rejects_request_before_any_side_effect(
+    ch_server, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A span too deep to scan fails the whole request as RequestTooLarge.
+
+    The healthy sibling span parses first, yet extraction (which writes blob
+    Content files) must never start for it: every span is redacted before any
+    extraction begins, so nothing is stored and no side effect happens.
+    """
+    extraction_started = False
+    original_redact_credentials = agents_clickhouse.redact_credentials_from_span
+
+    def observe_extraction(span: Span) -> None:
+        nonlocal extraction_started
+        extraction_started = True
+        original_redact_credentials(span)
+
+    monkeypatch.setattr(
+        agents_clickhouse, "redact_credentials_from_span", observe_extraction
+    )
+
+    poison = _pii_proto_span(b"\x45" * 8)
+    deep_kv = KeyValue()
+    deep_kv.key = ".".join(["k"] * 2000)
+    deep_kv.value.string_value = "x"
+    poison.attributes.append(deep_kv)
+
+    project_id = make_project_id("span_pii_fail_closed")
+    with pytest.raises(RequestTooLarge, match="nesting limit"):
+        ch_server.genai_otel_export(
+            _export_req(
+                project_id,
+                [_pii_proto_span(b"\x44" * 8), poison],
+                SensitiveDataPolicy.PII_V1,
+            )
+        )
+
+    assert not extraction_started
+    stored = ch_server.agent_spans_query(AgentSpansQueryReq(project_id=project_id))
+    assert stored.spans == []
