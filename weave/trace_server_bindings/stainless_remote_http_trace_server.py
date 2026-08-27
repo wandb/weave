@@ -157,8 +157,8 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
 
         req_dict = req.model_dump(**dump_kwargs)
         response = stainless_api(
-            **req_dict,
             extra_headers=self._compose_headers(),
+            **req_dict,
             **extra_kwargs,
         )
         # An empty response schema is generated as a bare `object`: a plain dict.
