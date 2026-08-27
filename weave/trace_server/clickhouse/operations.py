@@ -2,14 +2,10 @@
 
 Each `*_sequence` generator owns everything about a call except the driver
 invocation: settings merge, correlation id, retry policy, span tags and
-logging. It yields the operation to perform, and the runner sends back the
-driver's result or throws the driver's exception in.
+logging. It yields the operation to perform; the runner sends back the driver's
+result or throws its exception in.
 
-`run_sync` and `run_async` are the same loop over different transports, so
-`ClickHouseTraceServer._insert` and `AsyncClickHouseTraceServer._ainsert`
-cannot drift: there is one copy of the semantics and two ways to reach the
-socket. clickhouse-connect solves its own sync/async split the same way, in
-`clickhouse_connect.driver._backend.orchestration`.
+`run_sync` and `run_async` are the same loop over different transports.
 """
 
 from __future__ import annotations
