@@ -32,9 +32,7 @@ class MessageAgentStart(BaseModel):
 class MessageAssistantMessage(BaseModel):
     """Payload for assistant text emitted by an agent or LLM span."""
 
-    text: str
-
-    content_refs: Optional[List[str]] = None
+    content_refs: List[str]
 
     duration_ms: Optional[int] = None
 
@@ -54,6 +52,8 @@ class MessageAssistantMessage(BaseModel):
 
     status: Optional[Literal["UNSET", "OK", "ERROR"]] = None
 
+    text: str
+
     total_cost_usd: Optional[float] = None
 
 
@@ -70,7 +70,7 @@ class MessageContextCompacted(BaseModel):
 class MessageToolCall(BaseModel):
     """Payload for a tool call timeline event."""
 
-    content_refs: Optional[List[str]] = None
+    content_refs: List[str]
 
     duration_ms: Optional[int] = None
 
@@ -86,9 +86,9 @@ class MessageToolCall(BaseModel):
 class MessageUserMessage(BaseModel):
     """Payload for a user prompt in the chat timeline."""
 
-    text: str
+    content_refs: List[str]
 
-    content_refs: Optional[List[str]] = None
+    text: str
 
 
 class Message(BaseModel):
@@ -99,8 +99,6 @@ class Message(BaseModel):
     set. This keeps subtype nullability explicit while preserving a single
     ordered timeline model for callers.
     """
-
-    type: Literal["user_message", "assistant_message", "tool_call", "agent_handoff", "agent_start", "context_compacted"]
 
     agent_handoff: Optional[object] = None
     """Payload for a future agent-to-agent handoff event."""
@@ -129,6 +127,8 @@ class Message(BaseModel):
     tool_call: Optional[MessageToolCall] = None
     """Payload for a tool call timeline event."""
 
+    type: Literal["user_message", "assistant_message", "tool_call", "agent_handoff", "agent_start", "context_compacted"]
+
     user_message: Optional[MessageUserMessage] = None
     """Payload for a user prompt in the chat timeline."""
 
@@ -139,8 +139,6 @@ class AgentTraceChatRes(BaseModel):
     the agent trajectory for a single trace.
     """
 
-    trace_id: str
-
     agent_name: Optional[str] = None
 
     agent_version: Optional[str] = None
@@ -149,7 +147,7 @@ class AgentTraceChatRes(BaseModel):
 
     feedback: Optional[List[Dict[str, object]]] = None
 
-    messages: Optional[List[Message]] = None
+    messages: List[Message]
 
     provider: Optional[str] = None
 
@@ -159,9 +157,9 @@ class AgentTraceChatRes(BaseModel):
 
     status_code: Optional[Literal["UNSET", "OK", "ERROR"]] = None
 
-    total_cache_creation_input_tokens: Optional[int] = None
+    total_cache_creation_input_tokens: int
 
-    total_cache_read_input_tokens: Optional[int] = None
+    total_cache_read_input_tokens: int
 
     total_cost_usd: Optional[float] = None
 
@@ -171,10 +169,12 @@ class AgentTraceChatRes(BaseModel):
     This is not a sum of child span durations.
     """
 
-    total_input_tokens: Optional[int] = None
+    total_input_tokens: int
 
-    total_output_tokens: Optional[int] = None
+    total_output_tokens: int
 
-    total_reasoning_tokens: Optional[int] = None
+    total_reasoning_tokens: int
+
+    trace_id: str
 
     wb_user_id: Optional[str] = None

@@ -1,6 +1,6 @@
 # File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
 
-from typing import List, Optional
+from typing import List
 from typing_extensions import Literal
 
 from ..._models import BaseModel
@@ -23,10 +23,10 @@ class Attribute(BaseModel):
 class SpanCustomAttrsSchemaResponse(BaseModel):
     """Typed custom attribute keys available for spans query/group/stats APIs."""
 
-    attributes: Optional[List[Attribute]] = None
+    attributes: List[Attribute]
 
-    has_more: Optional[bool] = None
+    has_more: bool
 
-    limit: Optional[int] = None
+    limit: int
 
-    offset: Optional[int] = None
+    offset: int

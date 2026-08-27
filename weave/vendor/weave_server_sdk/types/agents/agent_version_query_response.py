@@ -27,18 +27,18 @@ class Version(BaseModel):
 
     span_count: int
 
+    total_cost_usd: Optional[float] = None
+
     total_duration_ms: int
 
     total_input_tokens: int
 
     total_output_tokens: int
 
-    total_cost_usd: Optional[float] = None
-
 
 class AgentVersionQueryResponse(BaseModel):
     """Response containing agent version stats."""
 
-    versions: List[Version]
+    total_count: int
 
-    total_count: Optional[int] = None
+    versions: List[Version]
