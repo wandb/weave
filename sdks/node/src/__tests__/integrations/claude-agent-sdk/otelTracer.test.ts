@@ -45,6 +45,7 @@ import {
 } from '../../genai/common';
 
 const INVOKE = 'invoke_agent';
+const ATTR_TASK_STATUS = 'claude_agent_sdk.task.status';
 
 // ---------------------------------------------------------------------------
 // Typed SDK-message fixtures.
@@ -936,6 +937,7 @@ describe('Claude Agent SDK — OTel tracer', () => {
         outputMessages: span.attributes[ATTR_GEN_AI_OUTPUT_MESSAGES],
         providerName: span.attributes[ATTR_GEN_AI_PROVIDER_NAME],
         statusCode: span.status.code,
+        taskStatus: span.attributes[ATTR_TASK_STATUS],
         toolCallId: span.attributes[ATTR_GEN_AI_TOOL_CALL_ID],
         toolCallResult: span.attributes[ATTR_GEN_AI_TOOL_CALL_RESULT],
       }))
@@ -960,6 +962,7 @@ describe('Claude Agent SDK — OTel tracer', () => {
         outputMessages: outputMessagesJson('Alpha verification finished'),
         providerName: undefined,
         statusCode: SpanStatusCode.UNSET,
+        taskStatus: 'completed',
         toolCallId: undefined,
         toolCallResult: undefined,
       },
@@ -981,6 +984,7 @@ describe('Claude Agent SDK — OTel tracer', () => {
         outputMessages: outputMessagesJson('Beta verification finished'),
         providerName: undefined,
         statusCode: SpanStatusCode.UNSET,
+        taskStatus: 'completed',
         toolCallId: undefined,
         toolCallResult: undefined,
       },
@@ -1156,6 +1160,7 @@ describe('Claude Agent SDK — OTel tracer', () => {
         errorType: span.attributes[ATTR_ERROR_TYPE],
         statusCode: span.status.code,
         statusMessage: span.status.message,
+        taskStatus: span.attributes[ATTR_TASK_STATUS],
         toolCallId: span.attributes[ATTR_GEN_AI_TOOL_CALL_ID],
       }))
     ).toEqual([
@@ -1164,6 +1169,7 @@ describe('Claude Agent SDK — OTel tracer', () => {
         errorType: 'Error',
         statusCode: SpanStatusCode.ERROR,
         statusMessage: 'Subagent crashed',
+        taskStatus: 'failed',
         toolCallId: undefined,
       },
     ]);
@@ -1498,6 +1504,7 @@ describe('Claude Agent SDK — OTel tracer', () => {
           errorType: span.attributes[ATTR_ERROR_TYPE],
           statusCode: span.status.code,
           statusMessage: span.status.message,
+          taskStatus: span.attributes[ATTR_TASK_STATUS],
         }))
     ).toEqual([
       {
@@ -1506,6 +1513,7 @@ describe('Claude Agent SDK — OTel tracer', () => {
         errorType: 'Error',
         statusCode: SpanStatusCode.ERROR,
         statusMessage: 'Remote agent crashed',
+        taskStatus: 'failed',
       },
     ]);
   });
@@ -1611,12 +1619,14 @@ describe('Claude Agent SDK — OTel tracer', () => {
           errorType: span.attributes[ATTR_ERROR_TYPE],
           statusCode: span.status.code,
           statusMessage: span.status.message,
+          taskStatus: span.attributes[ATTR_TASK_STATUS],
         }))
     ).toEqual([
       {
         errorType: 'Error',
         statusCode: SpanStatusCode.ERROR,
         statusMessage: 'Stopped by the user',
+        taskStatus: 'stopped',
       },
     ]);
   });

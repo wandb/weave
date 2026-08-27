@@ -488,6 +488,9 @@ deterministic.
   `async_launched` or `remote_launched` tool result before forwarded child
   messages, then finish via a `task_notification`. Keep one `SubAgent` keyed by
   tool-use ID across turn boundaries until that notification arrives.
+- Record every background `task_notification` status on its `SubAgent` as
+  `claude_agent_sdk.task.status` so `completed`, `failed`, and `stopped` remain
+  distinguishable independently of standard `error.type` metadata.
 - Route a forwarded assistant message to an already-open `SubAgent` before
   creating a `Turn`; background messages can arrive after the root result and
   must not create an empty root turn or consume the next pending input.

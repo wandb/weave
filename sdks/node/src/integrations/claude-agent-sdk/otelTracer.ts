@@ -27,6 +27,7 @@ const AGENT_NAME = 'claude_agent_sdk';
 const PROVIDER_NAME = 'anthropic';
 
 const ATTR_COST_USD = 'claude_agent_sdk.usage.cost_usd';
+const ATTR_TASK_STATUS = 'claude_agent_sdk.task.status';
 
 const CLAUDE_AGENT_SDK_ATTRIBUTES = asOtelAttributes(
   libraryIntegration(AGENT_NAME, {
@@ -718,6 +719,7 @@ export class ClaudeAgentOtelTracer {
       openSubagent.agentId = msg.task_id;
       openSubagent.span.record({agentId: msg.task_id});
     }
+    openSubagent.span.setAttributes({[ATTR_TASK_STATUS]: msg.status});
     if (msg.usage) {
       openSubagent.span.setAttributes({
         [ATTR_GEN_AI_USAGE_TOTAL_TOKENS]: msg.usage.total_tokens,
