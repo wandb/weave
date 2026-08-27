@@ -2,6 +2,7 @@ import base64
 import datetime as dt
 import logging
 import threading
+import time
 import uuid
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone
@@ -9,7 +10,10 @@ from unittest.mock import MagicMock, Mock, patch
 
 import clickhouse_connect
 import pytest
+import urllib3
 from clickhouse_connect.driver.exceptions import DatabaseError, ProgrammingError
+from clickhouse_connect.driver.query import QueryResult
+from clickhouse_connect.driver.summary import QuerySummary
 
 from tests.trace_server.test_project_version import make_project_id
 from weave.trace_server import ch_sentinel_values
@@ -20,6 +24,7 @@ from weave.trace_server.agents.clickhouse import AgentWriteHandler
 from weave.trace_server.agents.schema import AgentSpanCHInsertable
 from weave.trace_server.agents.types import GenAIOTelExportReq, GenAIOTelExportRes
 from weave.trace_server.ch_sentinel_values import EXPIRE_AT_NEVER
+from weave.trace_server.clickhouse import utilities as chts_utilities
 from weave.trace_server.clickhouse.schema_converters import (
     ch_call_to_row,
     ch_complete_call_to_row,
@@ -1283,38 +1288,113 @@ def test_insert_retries_only_invalid_utf8(error):
         assert mock_ch_client.insert.call_count == 1
 
 
-def test_query_id_is_set_on_the_dd_span():
-    """The id is on the span too, so an APM trace can be pivoted to query_log."""
+def test_correlation_id_replaces_a_caller_supplied_log_comment():
+    """The trace server owns `log_comment`: an inherited value could repeat
+    across queries and would silently become the correlation id.
+    """
+    settings = {"log_comment": "some-upstream-annotation"}
+    correlation_id = chts_utilities.set_correlation_id(settings)
+
+    assert correlation_id != "some-upstream-annotation"
+    assert settings["log_comment"] == correlation_id
+    assert uuid.UUID(correlation_id).version == 7
+
+
+def test_one_correlation_id_across_an_insert_retry():
+    """A sanitize-and-retry is one logical write, so both attempts carry the
+    same correlation id while ClickHouse mints a query_id per attempt.
+    """
     mock_ch_client = MagicMock()
-    mock_ch_client.command.return_value = None
-    mock_ch_client.query.return_value = MagicMock(summary={})
+    stamps: list[str] = []
+
+    def capture(*args, **kwargs):
+        stamps.append(kwargs["settings"]["log_comment"])
+        if len(stamps) == 1:
+            raise UnicodeEncodeError("utf-8", "\ud800", 0, 1, "surrogate")
+        return QuerySummary({})
+
+    mock_ch_client.insert.side_effect = capture
+
+    with patch.object(
+        chts.ClickHouseTraceServer, "_mint_client", return_value=mock_ch_client
+    ):
+        server = chts.ClickHouseTraceServer(host="test_host")
+        server._insert("t", data=[["\ud800"]], column_names=["a"])
+
+    assert len(stamps) == 2
+    assert stamps[0] == stamps[1]
+
+
+def test_record_query_id_reads_both_driver_result_types():
+    """`query_id` is a property on QueryResult but a method on QuerySummary, so
+    only `summary` reads the same on both.
+    """
+    assert (
+        chts_utilities.record_query_id(QueryResult(summary={"query_id": "read"}))
+        == "read"
+    )
+    assert (
+        chts_utilities.record_query_id(QuerySummary({"query_id": "write"})) == "write"
+    )
+    assert chts_utilities.record_query_id(QuerySummary({})) is None
+
+
+def test_no_query_id_is_sent_to_clickhouse():
+    """A client-supplied query_id can collide with a running query (code 216),
+    so the server mints it and our own id rides in log_comment.
+    """
+    mock_ch_client = MagicMock()
+    mock_ch_client.query.return_value = QueryResult(summary={"query_id": "server-side"})
+
+    with patch.object(
+        chts.ClickHouseTraceServer, "_mint_client", return_value=mock_ch_client
+    ):
+        server = chts.ClickHouseTraceServer(host="test_host")
+        server._query("SELECT 1", parameters={})
+        server._insert("t", data=[[1]], column_names=["a"])
+
+    query_settings = mock_ch_client.query.call_args.kwargs["settings"]
+    insert_settings = mock_ch_client.insert.call_args.kwargs["settings"]
+    assert "query_id" not in query_settings
+    assert "query_id" not in insert_settings
+    assert query_settings["log_comment"] != insert_settings["log_comment"]
+
+
+def test_correlation_id_and_query_id_are_set_on_the_dd_span():
+    """Both ids are on the span, so an APM trace can be pivoted to query_log."""
+    mock_ch_client = MagicMock()
+    mock_ch_client.query.return_value = QueryResult(summary={"query_id": "server-side"})
     tagged: list[dict] = []
 
     with (
         patch.object(
             chts.ClickHouseTraceServer, "_mint_client", return_value=mock_ch_client
         ),
-        patch.object(chts, "set_current_span_dd_tags", tagged.append),
+        patch.object(chts_utilities, "set_current_span_dd_tags", tagged.append),
     ):
         server = chts.ClickHouseTraceServer(host="test_host")
         server._query("SELECT 1", parameters={})
 
-    sent_id = mock_ch_client.query.call_args.kwargs["settings"]["query_id"]
-    assert {"clickhouse.query_id": sent_id} in tagged
+    correlation_id = mock_ch_client.query.call_args.kwargs["settings"]["log_comment"]
+    assert {"clickhouse.correlation_id": correlation_id} in tagged
+    assert {"clickhouse.query_id": "server-side"} in tagged
 
 
-def _logged_query_id(caplog, message: str) -> str:
-    return next(r.query_id for r in caplog.records if r.message == message)
+def _logged_ids(caplog, message: str) -> tuple[str, str | None]:
+    record = next(r for r in caplog.records if r.message == message)
+    return record.correlation_id, getattr(record, "query_id", None)
 
 
 @pytest.mark.disable_logging_error_check
-def test_query_id_is_logged_on_success_and_failure(caplog):
-    """The minted query_id reaches both log lines, so a failed query is still
-    correlatable with system.query_log.
+def test_correlation_id_is_logged_on_success_and_failure(caplog):
+    """The minted correlation_id reaches both log lines, so a failed query is
+    still correlatable with system.query_log; the query_id only exists once the
+    server has answered.
     """
     mock_ch_client = MagicMock()
-    mock_ch_client.command.return_value = None
-    mock_ch_client.query.return_value = MagicMock(summary={"read_rows": "1"})
+    mock_ch_client.query.return_value = QueryResult(
+        summary={"read_rows": "1", "query_id": "server-side"}
+    )
 
     with patch.object(
         chts.ClickHouseTraceServer, "_mint_client", return_value=mock_ch_client
@@ -1323,15 +1403,15 @@ def test_query_id_is_logged_on_success_and_failure(caplog):
 
         with caplog.at_level(logging.INFO):
             server._query("SELECT 1", parameters={})
-        sent_id = mock_ch_client.query.call_args.kwargs["settings"]["query_id"]
-        assert _logged_query_id(caplog, "clickhouse_query") == sent_id
+        sent_id = mock_ch_client.query.call_args.kwargs["settings"]["log_comment"]
+        assert _logged_ids(caplog, "clickhouse_query") == (sent_id, "server-side")
 
         caplog.clear()
         mock_ch_client.query.side_effect = DatabaseError("boom")
         with caplog.at_level(logging.INFO), pytest.raises(DatabaseError):
             server._query("SELECT 1", parameters={})
-        sent_id = mock_ch_client.query.call_args.kwargs["settings"]["query_id"]
-        assert _logged_query_id(caplog, "clickhouse_query_error") == sent_id
+        sent_id = mock_ch_client.query.call_args.kwargs["settings"]["log_comment"]
+        assert _logged_ids(caplog, "clickhouse_query_error") == (sent_id, None)
 
 
 @pytest.mark.disable_logging_error_check
@@ -1639,6 +1719,59 @@ def test_delete_preserves_version_index_gaps(ch_server):
     by_digest = {o.digest: o for o in non_deleted}
     assert by_digest[digests[0]].version_index == 0
     assert by_digest[digests[2]].version_index == 2
+
+
+@pytest.mark.parametrize("autogenerate_query_id", [True, False])
+def test_resent_request_vs_query_id_autogeneration(
+    ch_server, autogenerate_query_id: bool
+) -> None:
+    """Query-id guard: a client-side query_id is pinned in the request URL above
+    the driver's retry loop, so a resent request hits the still-running original
+    with code 216; with it disabled ClickHouse mints one per attempt and the
+    resend succeeds.
+    """
+    client = clickhouse_connect.get_client(
+        host=ch_server._host,
+        port=ch_server._port,
+        user=ch_server._user,
+        password=ch_server._password,
+        secure=ch_server._port == chts.CLICKHOUSE_SECURE_PORT,
+        pool_mgr=urllib3.PoolManager(maxsize=8, num_pools=4),
+        autogenerate_session_id=False,
+        autogenerate_query_id=autogenerate_query_id,
+    )
+    unpatched = urllib3.PoolManager.request
+
+    def resend_once(self, method, url, **kwargs):
+        """Land a copy of the query first, then let the driver's own copy go."""
+        if b"sleep" not in (kwargs.get("body") or b""):
+            return unpatched(self, method, url, **kwargs)
+
+        landed_first: list = []
+
+        def send_copy() -> None:
+            landed_first.append(unpatched(self, method, url, **kwargs))
+
+        copy = threading.Thread(target=send_copy)
+        copy.start()
+        time.sleep(0.5)
+        try:
+            return unpatched(self, method, url, **kwargs)
+        finally:
+            copy.join()
+            for response in landed_first:
+                response.close()
+
+    try:
+        with patch.object(urllib3.PoolManager, "request", resend_once):
+            if autogenerate_query_id:
+                with pytest.raises(DatabaseError) as exc_info:
+                    client.query("SELECT sleep(2)")
+                assert "QUERY_WITH_SAME_ID_IS_ALREADY_RUNNING" in str(exc_info.value)
+            else:
+                assert client.query("SELECT sleep(2)").result_rows == [(0,)]
+    finally:
+        client.close()
 
 
 @pytest.mark.parametrize("autogenerate_session_id", [True, False])
@@ -2031,7 +2164,7 @@ def test_alias_pointing_at_soft_deleted_version_yields_clean_failure(ch_server):
 
 
 def _turn_ended_span_row() -> AgentSpanCHInsertable:
-    """A finished root span; ScoreAgentSpansEvent.from_row yields a turn_ended event."""
+    """A finished root span with a conversation; both event classes yield a turn_ended event."""
     return AgentSpanCHInsertable(
         project_id="p",
         trace_id="tr",
@@ -2042,6 +2175,7 @@ def _turn_ended_span_row() -> AgentSpanCHInsertable:
         ended_at=dt.datetime(2024, 1, 1, 12, 0, 0),
         agent_name="a",
         operation_name="invoke_agent",
+        conversation_id="c",
     )
 
 

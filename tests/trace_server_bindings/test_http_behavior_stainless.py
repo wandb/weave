@@ -20,6 +20,7 @@ from weave.trace_server_bindings.stainless_remote_http_trace_server import (
     StainlessRemoteHTTPTraceServer,
 )
 from weave.utils.retry import with_retry
+from weave.vendor.weave_server_sdk import APIStatusError
 
 
 @pytest.fixture
@@ -51,8 +52,6 @@ def test_call_start_ok(unbatched_server):
 
 def test_400_no_retry(unbatched_server):
     """Test that 400 errors are not retried."""
-    from weave_server_sdk import APIStatusError
-
     call_id = generate_id()
     error_response = MagicMock()
     error_response.status_code = 400

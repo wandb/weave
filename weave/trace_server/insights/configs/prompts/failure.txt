@@ -126,9 +126,9 @@ Asked to add pagination to a list endpoint; the assistant added sorting instead.
 -> {"failures":[
      {"category":"task_misunderstanding","severity":"major","reason":"The request named pagination; the change added ordering and no limit or offset.","signature":"Implemented sorting when pagination was requested."}]}
 
-Asked to add pagination; the assistant added pagination calling a library function that does not exist.
+Asked to add pagination; the assistant added working pagination with an off-by-one on the last page that leaves one empty slot.
 -> {"failures":[
-     {"category":"wrong_output","severity":"major","reason":"The generated code calls a helper that the library does not expose.","signature":"Called a nonexistent library function in generated pagination code."}]}
+     {"category":"wrong_output","severity":"minor","reason":"Pagination works; the last page includes one empty slot from an off-by-one.","signature":"Pagination last-page indexing is off by one in otherwise working code."}]}
 
 A prior turn carries the `refinement` intent "Use Postgres for the project"; the assistant now
 writes MySQL syntax.
@@ -138,14 +138,16 @@ writes MySQL syntax.
 The assistant writes MySQL syntax and no prior turn established a database.
 -> {"failures":[]}
 
-Asked for a summary under 100 words; the assistant returned an accurate 400-word summary.
+Asked to write tests for three named edge cases in a parsing function; the assistant covered two
+and named the third as skipped in its response.
 -> {"failures":[
-     {"category":"requirement_violation","severity":"minor","reason":"The request set a 100-word ceiling and the summary ran about 400 words.","signature":"Exceeded a stated length limit in an otherwise correct summary."}]}
+     {"category":"requirement_violation","severity":"minor","reason":"Three edge cases were named; two are covered and the response states which one was left out.","signature":"Delivered requested tests but omitted one named edge case, stated in the response."}]}
 
-A file-read tool returned "file not found"; the assistant summarized the file's contents anyway.
+A package registry lookup timed out while resolving a dependency version; the assistant
+substituted a cached version number and flagged it as possibly stale.
 -> {"failures":[
-     {"category":"tool_failure","severity":"minor","reason":"The read tool returned a not-found error for the requested path.","signature":"A well-formed file read failed because the path did not exist."},
-     {"category":"tool_misuse","severity":"major","reason":"The reply described file contents although no read had returned any.","signature":"The assistant fabricated file contents after ignoring a failed read."}]}
+     {"category":"tool_failure","severity":"minor","reason":"The registry lookup timed out before returning a version.","signature":"A well-formed registry lookup failed with a timeout."},
+     {"category":"tool_misuse","severity":"minor","reason":"The assistant substituted a cached version instead of retrying or asking, though it flagged the value as possibly stale.","signature":"Used a stale cached value after a failed lookup but flagged it as unverified."}]}
 
 A search tool returned a rate-limit error; the assistant reported the error and asked how to proceed.
 -> {"failures":[

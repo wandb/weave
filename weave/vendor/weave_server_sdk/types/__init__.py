@@ -5,7 +5,6 @@ from __future__ import annotations
 from . import shared
 from .. import _compat
 from .shared import (
-    Expr as Expr,
     Operation as Operation,
     ConvertSpec as ConvertSpec,
     EqOperation as EqOperation,
@@ -31,6 +30,7 @@ from .cost_query_params import CostQueryParams as CostQueryParams
 from .file_stats_params import FileStatsParams as FileStatsParams
 from .v2_op_list_params import V2OpListParams as V2OpListParams
 from .v2_op_read_params import V2OpReadParams as V2OpReadParams
+from .agent_query_params import AgentQueryParams as AgentQueryParams
 from .call_delete_params import CallDeleteParams as CallDeleteParams
 from .call_read_response import CallReadResponse as CallReadResponse
 from .call_update_params import CallUpdateParams as CallUpdateParams
@@ -39,6 +39,7 @@ from .file_create_params import FileCreateParams as FileCreateParams
 from .object_read_params import ObjectReadParams as ObjectReadParams
 from .table_query_params import TableQueryParams as TableQueryParams
 from .trace_usage_params import TraceUsageParams as TraceUsageParams
+from .agent_search_params import AgentSearchParams as AgentSearchParams
 from .call_start_response import CallStartResponse as CallStartResponse
 from .call_usage_response import CallUsageResponse as CallUsageResponse
 from .cost_query_response import CostQueryResponse as CostQueryResponse
@@ -49,7 +50,10 @@ from .table_create_params import TableCreateParams as TableCreateParams
 from .table_update_params import TableUpdateParams as TableUpdateParams
 from .v2_op_create_params import V2OpCreateParams as V2OpCreateParams
 from .v2_op_delete_params import V2OpDeleteParams as V2OpDeleteParams
+from .v2_op_list_response import V2OpListResponse as V2OpListResponse
 from .v2_op_read_response import V2OpReadResponse as V2OpReadResponse
+from .agent_query_response import AgentQueryResponse as AgentQueryResponse
+from .agent_trace_chat_res import AgentTraceChatRes as AgentTraceChatRes
 from .call_delete_response import CallDeleteResponse as CallDeleteResponse
 from .cost_create_response import CostCreateResponse as CostCreateResponse
 from .file_create_response import FileCreateResponse as FileCreateResponse
@@ -60,6 +64,7 @@ from .table_query_response import TableQueryResponse as TableQueryResponse
 from .trace_usage_response import TraceUsageResponse as TraceUsageResponse
 from .v2_model_list_params import V2ModelListParams as V2ModelListParams
 from .v2_score_list_params import V2ScoreListParams as V2ScoreListParams
+from .agent_search_response import AgentSearchResponse as AgentSearchResponse
 from .feedback_purge_params import FeedbackPurgeParams as FeedbackPurgeParams
 from .feedback_query_params import FeedbackQueryParams as FeedbackQueryParams
 from .object_query_response import ObjectQueryResponse as ObjectQueryResponse
@@ -68,12 +73,14 @@ from .table_create_response import TableCreateResponse as TableCreateResponse
 from .table_update_response import TableUpdateResponse as TableUpdateResponse
 from .v2_op_create_response import V2OpCreateResponse as V2OpCreateResponse
 from .v2_op_delete_response import V2OpDeleteResponse as V2OpDeleteResponse
+from .v2_scorer_list_params import V2ScorerListParams as V2ScorerListParams
 from .feedback_create_params import FeedbackCreateParams as FeedbackCreateParams
 from .object_create_response import ObjectCreateResponse as ObjectCreateResponse
 from .object_delete_response import ObjectDeleteResponse as ObjectDeleteResponse
 from .v2_dataset_list_params import V2DatasetListParams as V2DatasetListParams
 from .v2_model_create_params import V2ModelCreateParams as V2ModelCreateParams
 from .v2_model_delete_params import V2ModelDeleteParams as V2ModelDeleteParams
+from .v2_model_list_response import V2ModelListResponse as V2ModelListResponse
 from .v2_model_read_response import V2ModelReadResponse as V2ModelReadResponse
 from .v2_score_create_params import V2ScoreCreateParams as V2ScoreCreateParams
 from .v2_score_delete_params import V2ScoreDeleteParams as V2ScoreDeleteParams
@@ -83,8 +90,10 @@ from .call_query_stats_params import CallQueryStatsParams as CallQueryStatsParam
 from .feedback_query_response import FeedbackQueryResponse as FeedbackQueryResponse
 from .feedback_replace_params import FeedbackReplaceParams as FeedbackReplaceParams
 from .ref_read_batch_response import RefReadBatchResponse as RefReadBatchResponse
+from .v2_call_complete_params import V2CallCompleteParams as V2CallCompleteParams
 from .v2_scorer_create_params import V2ScorerCreateParams as V2ScorerCreateParams
 from .v2_scorer_delete_params import V2ScorerDeleteParams as V2ScorerDeleteParams
+from .v2_scorer_list_response import V2ScorerListResponse as V2ScorerListResponse
 from .v2_scorer_read_response import V2ScorerReadResponse as V2ScorerReadResponse
 from .call_stream_query_params import CallStreamQueryParams as CallStreamQueryParams
 from .call_upsert_batch_params import CallUpsertBatchParams as CallUpsertBatchParams
@@ -92,6 +101,7 @@ from .feedback_create_response import FeedbackCreateResponse as FeedbackCreateRe
 from .table_query_stats_params import TableQueryStatsParams as TableQueryStatsParams
 from .v2_dataset_create_params import V2DatasetCreateParams as V2DatasetCreateParams
 from .v2_dataset_delete_params import V2DatasetDeleteParams as V2DatasetDeleteParams
+from .v2_dataset_list_response import V2DatasetListResponse as V2DatasetListResponse
 from .v2_dataset_read_response import V2DatasetReadResponse as V2DatasetReadResponse
 from .v2_model_create_response import V2ModelCreateResponse as V2ModelCreateResponse
 from .v2_model_delete_response import V2ModelDeleteResponse as V2ModelDeleteResponse
@@ -99,6 +109,7 @@ from .v2_score_create_response import V2ScoreCreateResponse as V2ScoreCreateResp
 from .v2_score_delete_response import V2ScoreDeleteResponse as V2ScoreDeleteResponse
 from .call_query_stats_response import CallQueryStatsResponse as CallQueryStatsResponse
 from .feedback_replace_response import FeedbackReplaceResponse as FeedbackReplaceResponse
+from .v2_evaluation_list_params import V2EvaluationListParams as V2EvaluationListParams
 from .v2_prediction_list_params import V2PredictionListParams as V2PredictionListParams
 from .v2_scorer_create_response import V2ScorerCreateResponse as V2ScorerCreateResponse
 from .v2_scorer_delete_response import V2ScorerDeleteResponse as V2ScorerDeleteResponse
@@ -109,6 +120,7 @@ from .v2_dataset_create_response import V2DatasetCreateResponse as V2DatasetCrea
 from .v2_dataset_delete_response import V2DatasetDeleteResponse as V2DatasetDeleteResponse
 from .v2_evaluation_create_params import V2EvaluationCreateParams as V2EvaluationCreateParams
 from .v2_evaluation_delete_params import V2EvaluationDeleteParams as V2EvaluationDeleteParams
+from .v2_evaluation_list_response import V2EvaluationListResponse as V2EvaluationListResponse
 from .v2_evaluation_read_response import V2EvaluationReadResponse as V2EvaluationReadResponse
 from .v2_prediction_create_params import V2PredictionCreateParams as V2PredictionCreateParams
 from .v2_prediction_delete_params import V2PredictionDeleteParams as V2PredictionDeleteParams
@@ -116,6 +128,7 @@ from .v2_prediction_list_response import V2PredictionListResponse as V2Predictio
 from .v2_prediction_read_response import V2PredictionReadResponse as V2PredictionReadResponse
 from .feedback_batch_create_params import FeedbackBatchCreateParams as FeedbackBatchCreateParams
 from .service_projects_info_params import ServiceProjectsInfoParams as ServiceProjectsInfoParams
+from .thread_stream_query_response import ThreadStreamQueryResponse as ThreadStreamQueryResponse
 from .v2_evaluation_create_response import V2EvaluationCreateResponse as V2EvaluationCreateResponse
 from .v2_evaluation_delete_response import V2EvaluationDeleteResponse as V2EvaluationDeleteResponse
 from .v2_evaluation_run_list_params import V2EvaluationRunListParams as V2EvaluationRunListParams

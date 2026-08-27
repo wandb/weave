@@ -18,6 +18,8 @@ from .._response import (
     async_to_streamed_response_wrapper,
 )
 from .._base_client import make_request_options
+from .._decoders.jsonl import JSONLDecoder, AsyncJSONLDecoder
+from ..types.thread_stream_query_response import ThreadStreamQueryResponse
 
 __all__ = ["ThreadsResource", "AsyncThreadsResource"]
 
@@ -56,7 +58,7 @@ class ThreadsResource(SyncAPIResource):
         extra_query: Query | None = None,
         extra_body: Body | None = None,
         timeout: float | httpx.Timeout | None | NotGiven = not_given,
-    ) -> object:
+    ) -> JSONLDecoder[ThreadStreamQueryResponse]:
         """
         Threads Query Stream
 
@@ -80,6 +82,7 @@ class ThreadsResource(SyncAPIResource):
 
           timeout: Override the client-level default timeout for this request, in seconds
         """
+        extra_headers = {"Accept": "application/x-ndjson", **(extra_headers or {})}
         return self._post(
             "/threads/stream_query",
             body=maybe_transform(
@@ -95,7 +98,8 @@ class ThreadsResource(SyncAPIResource):
             options=make_request_options(
                 extra_headers=extra_headers, extra_query=extra_query, extra_body=extra_body, timeout=timeout
             ),
-            cast_to=object,
+            cast_to=JSONLDecoder[ThreadStreamQueryResponse],
+            stream=True,
         )
 
 
@@ -133,7 +137,7 @@ class AsyncThreadsResource(AsyncAPIResource):
         extra_query: Query | None = None,
         extra_body: Body | None = None,
         timeout: float | httpx.Timeout | None | NotGiven = not_given,
-    ) -> object:
+    ) -> AsyncJSONLDecoder[ThreadStreamQueryResponse]:
         """
         Threads Query Stream
 
@@ -157,6 +161,7 @@ class AsyncThreadsResource(AsyncAPIResource):
 
           timeout: Override the client-level default timeout for this request, in seconds
         """
+        extra_headers = {"Accept": "application/x-ndjson", **(extra_headers or {})}
         return await self._post(
             "/threads/stream_query",
             body=await async_maybe_transform(
@@ -172,7 +177,8 @@ class AsyncThreadsResource(AsyncAPIResource):
             options=make_request_options(
                 extra_headers=extra_headers, extra_query=extra_query, extra_body=extra_body, timeout=timeout
             ),
-            cast_to=object,
+            cast_to=AsyncJSONLDecoder[ThreadStreamQueryResponse],
+            stream=True,
         )
 
 

@@ -2,13 +2,18 @@
 
 from __future__ import annotations
 
-from typing import Iterable, Optional
-from typing_extensions import Literal, Required, Annotated, TypedDict
+from typing import Union, Iterable, Optional
+from typing_extensions import Literal, Required, Annotated, TypeAlias, TypedDict
 
 from .._types import SequenceNotStr
 from .._utils import PropertyInfo
+from .shared_params.eq_operation import EqOperation
+from .shared_params.gt_operation import GtOperation
+from .shared_params.in_operation import InOperation
+from .shared_params.gte_operation import GteOperation
+from .shared_params.not_operation import NotOperation
 
-__all__ = ["CostQueryParams", "Query", "SortBy"]
+__all__ = ["CostQueryParams", "Query", "QueryExpr", "QueryExprLtOperation", "QueryExprLteOperation", "SortBy"]
 
 
 class CostQueryParams(TypedDict, total=False):
@@ -25,8 +30,46 @@ class CostQueryParams(TypedDict, total=False):
     sort_by: Optional[Iterable[SortBy]]
 
 
+class QueryExprLtOperation(TypedDict, total=False):
+    """Less than comparison.
+
+    Example:
+        ```
+        {"$lt": [{"$getField": "summary.usage.tokens"}, {"$literal": 100}]}
+        ```
+    """
+
+    lt: Required[Annotated[Iterable[object], PropertyInfo(alias="$lt")]]
+
+
+class QueryExprLteOperation(TypedDict, total=False):
+    """Less than or equal comparison.
+
+    Example:
+        ```
+        {"$lte": [{"$getField": "summary.usage.tokens"}, {"$literal": 100}]}
+        ```
+    """
+
+    lte: Required[Annotated[Iterable[object], PropertyInfo(alias="$lte")]]
+
+
+QueryExpr: TypeAlias = Union[
+    "AndOperation",
+    "OrOperation",
+    NotOperation,
+    EqOperation,
+    GtOperation,
+    QueryExprLtOperation,
+    GteOperation,
+    QueryExprLteOperation,
+    InOperation,
+    "ContainsOperation",
+]
+
+
 class Query(TypedDict, total=False):
-    expr: Required[Annotated["Expr", PropertyInfo(alias="$expr")]]
+    expr: Required[Annotated[QueryExpr, PropertyInfo(alias="$expr")]]
     """Logical AND. All conditions must evaluate to true.
 
     Example:
@@ -40,4 +83,6 @@ class SortBy(TypedDict, total=False):
     field: Required[str]
 
 
-from .shared_params.expr import Expr
+from .shared_params.or_operation import OrOperation
+from .shared_params.and_operation import AndOperation
+from .shared_params.contains_operation import ContainsOperation
