@@ -35,13 +35,13 @@ export class Spans extends APIResource {
  * Typed custom attribute keys available for spans query/group/stats APIs.
  */
 export interface SpanCustomAttrsSchemaResponse {
-  attributes?: Array<SpanCustomAttrsSchemaResponse.Attribute>;
+  attributes: Array<SpanCustomAttrsSchemaResponse.Attribute>;
 
-  has_more?: boolean;
+  has_more: boolean;
 
-  limit?: number;
+  limit: number;
 
-  offset?: number;
+  offset: number;
 }
 
 export namespace SpanCustomAttrsSchemaResponse {
@@ -66,11 +66,11 @@ export namespace SpanCustomAttrsSchemaResponse {
  * request specified `group_by`.
  */
 export interface SpanQueryResponse {
-  groups?: Array<SpanQueryResponse.Group>;
+  groups: Array<SpanQueryResponse.Group>;
 
-  spans?: Array<SpanQueryResponse.Span>;
+  spans: Array<SpanQueryResponse.Span>;
 
-  total_count?: number;
+  total_count: number;
 }
 
 export namespace SpanQueryResponse {
@@ -81,32 +81,17 @@ export namespace SpanQueryResponse {
    * remaining fields are a fixed aggregate bundle computed per group.
    */
   export interface Group {
-    agent_names?: Array<string>;
+    agent_names: Array<string>;
 
-    agent_versions?: Array<string>;
+    agent_versions: Array<string>;
 
-    conversation_count?: number;
+    conversation_count: number;
 
-    conversation_names?: Array<string>;
+    conversation_names: Array<string>;
 
-    distributions?: { [key: string]: Group.Distributions };
+    distributions: { [key: string]: Group.Distributions };
 
-    error_count?: number;
-
-    /**
-     * A truncated first/last message snippet for a grouped conversation row.
-     *
-     * `role` is the chat-timeline message type (e.g. "user_message",
-     * "assistant_message") so clients can style it consistently with the full chat
-     * view; `text` is the trimmed, length-capped preview content.
-     */
-    first_message?: Group.FirstMessage | null;
-
-    first_seen?: string | null;
-
-    group_keys?: { [key: string]: string | number | boolean | null };
-
-    invocation_count?: number;
+    error_count: number;
 
     /**
      * A truncated first/last message snippet for a grouped conversation row.
@@ -115,35 +100,50 @@ export namespace SpanQueryResponse {
      * "assistant_message") so clients can style it consistently with the full chat
      * view; `text` is the trimmed, length-capped preview content.
      */
-    last_message?: Group.LastMessage | null;
+    first_message: Group.FirstMessage | null;
 
-    last_seen?: string | null;
+    first_seen: string | null;
 
-    metrics?: { [key: string]: (string & {}) | string | number | boolean | null };
+    group_keys: { [key: string]: string | number | boolean | null };
 
-    provider_names?: Array<string>;
+    invocation_count: number;
 
-    request_models?: Array<string>;
+    /**
+     * A truncated first/last message snippet for a grouped conversation row.
+     *
+     * `role` is the chat-timeline message type (e.g. "user_message",
+     * "assistant_message") so clients can style it consistently with the full chat
+     * view; `text` is the trimmed, length-capped preview content.
+     */
+    last_message: Group.LastMessage | null;
 
-    span_count?: number;
+    last_seen: string | null;
 
-    total_cache_creation_input_tokens?: number;
+    metrics: { [key: string]: (string & {}) | string | number | boolean | null };
 
-    total_cache_read_input_tokens?: number;
+    provider_names: Array<string>;
 
-    total_cost_usd?: number | null;
+    request_models: Array<string>;
 
-    total_duration_ms?: number;
+    span_count: number;
 
-    total_input_cost_usd?: number | null;
+    total_cache_creation_input_tokens: number;
 
-    total_input_tokens?: number;
+    total_cache_read_input_tokens: number;
 
-    total_output_cost_usd?: number | null;
+    total_cost_usd: number | null;
 
-    total_output_tokens?: number;
+    total_duration_ms: number;
 
-    total_reasoning_tokens?: number;
+    total_input_cost_usd: number | null;
+
+    total_input_tokens: number;
+
+    total_output_cost_usd: number | null;
+
+    total_output_tokens: number;
+
+    total_reasoning_tokens: number;
   }
 
   export namespace Group {
@@ -153,23 +153,23 @@ export namespace SpanQueryResponse {
     export interface Distributions {
       alias: string;
 
+      bins: Array<Distributions.Bin>;
+
       key: string;
+
+      missing_count: number;
+
+      other_count: number;
+
+      present_count: number;
 
       source: 'custom_attrs_string' | 'custom_attrs_int' | 'custom_attrs_float' | 'custom_attrs_bool';
 
+      total_count: number;
+
       value_type: 'string' | 'int' | 'float' | 'bool';
 
-      bins?: Array<Distributions.Bin>;
-
-      missing_count?: number;
-
-      other_count?: number;
-
-      present_count?: number;
-
-      total_count?: number;
-
-      values?: Array<Distributions.Value>;
+      values: Array<Distributions.Value>;
     }
 
     export namespace Distributions {
@@ -206,7 +206,7 @@ export namespace SpanQueryResponse {
     export interface FirstMessage {
       role: 'user_message' | 'assistant_message';
 
-      text?: string;
+      text: string;
     }
 
     /**
@@ -219,7 +219,7 @@ export namespace SpanQueryResponse {
     export interface LastMessage {
       role: 'user_message' | 'assistant_message';
 
-      text?: string;
+      text: string;
     }
   }
 
@@ -227,163 +227,163 @@ export namespace SpanQueryResponse {
    * A normalized agent span returned by query APIs.
    */
   export interface Span {
+    agent_description: string | null;
+
+    agent_id: string | null;
+
+    agent_name: string | null;
+
+    agent_version: string | null;
+
+    artifact_refs: Array<string>;
+
+    cache_creation_cost_usd: number | null;
+
+    cache_creation_input_tokens: number | null;
+
+    cache_read_cost_usd: number | null;
+
+    cache_read_input_tokens: number | null;
+
+    compaction_items_after: number | null;
+
+    compaction_items_before: number | null;
+
+    compaction_summary: string | null;
+
+    content_refs: Array<string>;
+
+    conversation_id: string | null;
+
+    conversation_name: string | null;
+
+    custom_attrs_bool: { [key: string]: boolean };
+
+    custom_attrs_float: { [key: string]: number };
+
+    custom_attrs_int: { [key: string]: number };
+
+    custom_attrs_string: { [key: string]: string };
+
+    ended_at: string | null;
+
+    error_type: string | null;
+
+    eval_evaluation_name: string | null;
+
+    eval_example_id: string | null;
+
+    eval_kind: string | null;
+
+    eval_predict_and_score_call_id: string | null;
+
+    eval_row_digest: string | null;
+
+    eval_run_id: string | null;
+
+    eval_trial_index: number | null;
+
+    finish_reasons: Array<string>;
+
+    input_cost_usd: number | null;
+
+    input_messages: Array<Span.InputMessage>;
+
+    input_tokens: number | null;
+
+    object_refs: Array<string>;
+
+    operation_name: string | null;
+
+    output_cost_usd: number | null;
+
+    output_messages: Array<Span.OutputMessage>;
+
+    output_tokens: number | null;
+
+    output_type: string | null;
+
+    parent_call_id: string | null;
+
+    parent_call_trace_id: string | null;
+
+    parent_span_id: string | null;
+
     project_id: string;
+
+    provider_name: string | null;
+
+    raw_span_dump: string | null;
+
+    reasoning_content: string | null;
+
+    reasoning_tokens: number | null;
+
+    request_choice_count: number | null;
+
+    request_frequency_penalty: number | null;
+
+    request_max_tokens: number | null;
+
+    request_model: string | null;
+
+    request_presence_penalty: number | null;
+
+    request_seed: number | null;
+
+    request_stop_sequences: Array<string>;
+
+    request_temperature: number | null;
+
+    request_top_p: number | null;
+
+    response_id: string | null;
+
+    response_model: string | null;
+
+    server_address: string | null;
+
+    server_port: number | null;
 
     span_id: string;
 
+    span_kind: 'UNSPECIFIED' | 'INTERNAL' | 'SERVER' | 'CLIENT' | 'PRODUCER' | 'CONSUMER' | null;
+
+    span_name: string | null;
+
+    started_at: string | null;
+
+    status_code: 'UNSET' | 'OK' | 'ERROR' | null;
+
+    status_message: string | null;
+
+    system_instructions: Array<string>;
+
+    tool_call_arguments: string | null;
+
+    tool_call_id: string | null;
+
+    tool_call_result: string | null;
+
+    tool_definitions: string | null;
+
+    tool_description: string | null;
+
+    tool_name: string | null;
+
+    tool_type: string | null;
+
+    total_cost_usd: number | null;
+
     trace_id: string;
 
-    agent_description?: string | null;
+    wb_run_id: string | null;
 
-    agent_id?: string | null;
+    wb_run_step: number | null;
 
-    agent_name?: string | null;
+    wb_run_step_end: number | null;
 
-    agent_version?: string | null;
-
-    artifact_refs?: Array<string>;
-
-    cache_creation_cost_usd?: number | null;
-
-    cache_creation_input_tokens?: number | null;
-
-    cache_read_cost_usd?: number | null;
-
-    cache_read_input_tokens?: number | null;
-
-    compaction_items_after?: number | null;
-
-    compaction_items_before?: number | null;
-
-    compaction_summary?: string | null;
-
-    content_refs?: Array<string>;
-
-    conversation_id?: string | null;
-
-    conversation_name?: string | null;
-
-    custom_attrs_bool?: { [key: string]: boolean };
-
-    custom_attrs_float?: { [key: string]: number };
-
-    custom_attrs_int?: { [key: string]: number };
-
-    custom_attrs_string?: { [key: string]: string };
-
-    ended_at?: string | null;
-
-    error_type?: string | null;
-
-    eval_evaluation_name?: string | null;
-
-    eval_example_id?: string | null;
-
-    eval_kind?: string | null;
-
-    eval_predict_and_score_call_id?: string | null;
-
-    eval_row_digest?: string | null;
-
-    eval_run_id?: string | null;
-
-    eval_trial_index?: number | null;
-
-    finish_reasons?: Array<string>;
-
-    input_cost_usd?: number | null;
-
-    input_messages?: Array<Span.InputMessage>;
-
-    input_tokens?: number | null;
-
-    object_refs?: Array<string>;
-
-    operation_name?: string | null;
-
-    output_cost_usd?: number | null;
-
-    output_messages?: Array<Span.OutputMessage>;
-
-    output_tokens?: number | null;
-
-    output_type?: string | null;
-
-    parent_call_id?: string | null;
-
-    parent_call_trace_id?: string | null;
-
-    parent_span_id?: string | null;
-
-    provider_name?: string | null;
-
-    raw_span_dump?: string | null;
-
-    reasoning_content?: string | null;
-
-    reasoning_tokens?: number | null;
-
-    request_choice_count?: number | null;
-
-    request_frequency_penalty?: number | null;
-
-    request_max_tokens?: number | null;
-
-    request_model?: string | null;
-
-    request_presence_penalty?: number | null;
-
-    request_seed?: number | null;
-
-    request_stop_sequences?: Array<string>;
-
-    request_temperature?: number | null;
-
-    request_top_p?: number | null;
-
-    response_id?: string | null;
-
-    response_model?: string | null;
-
-    server_address?: string | null;
-
-    server_port?: number | null;
-
-    span_kind?: 'UNSPECIFIED' | 'INTERNAL' | 'SERVER' | 'CLIENT' | 'PRODUCER' | 'CONSUMER' | null;
-
-    span_name?: string | null;
-
-    started_at?: string | null;
-
-    status_code?: 'UNSET' | 'OK' | 'ERROR' | null;
-
-    status_message?: string | null;
-
-    system_instructions?: Array<string>;
-
-    tool_call_arguments?: string | null;
-
-    tool_call_id?: string | null;
-
-    tool_call_result?: string | null;
-
-    tool_definitions?: string | null;
-
-    tool_description?: string | null;
-
-    tool_name?: string | null;
-
-    tool_type?: string | null;
-
-    total_cost_usd?: number | null;
-
-    wb_run_id?: string | null;
-
-    wb_run_step?: number | null;
-
-    wb_run_step_end?: number | null;
-
-    wb_user_id?: string | null;
+    wb_user_id: string | null;
   }
 
   export namespace Span {
@@ -396,13 +396,17 @@ export namespace SpanQueryResponse {
      * - content: plain text for simple messages, or JSON-serialized parts array for
      *   multimodal/structured messages
      * - finish_reason: per-message finish reason (output messages only)
+     *
+     * Serialization JSON Schema marks defaulted fields required. In the public OpenAPI
+     * document this class appears only as an AgentSpanSchema message element. Ingest
+     * validation is unchanged.
      */
     export interface InputMessage {
       content: string;
 
-      finish_reason?: string;
+      finish_reason: string;
 
-      role?: string;
+      role: string;
     }
 
     /**
@@ -414,13 +418,17 @@ export namespace SpanQueryResponse {
      * - content: plain text for simple messages, or JSON-serialized parts array for
      *   multimodal/structured messages
      * - finish_reason: per-message finish reason (output messages only)
+     *
+     * Serialization JSON Schema marks defaulted fields required. In the public OpenAPI
+     * document this class appears only as an AgentSpanSchema message element. Ingest
+     * validation is unchanged.
      */
     export interface OutputMessage {
       content: string;
 
-      finish_reason?: string;
+      finish_reason: string;
 
-      role?: string;
+      role: string;
     }
   }
 }
@@ -429,19 +437,19 @@ export namespace SpanQueryResponse {
  * Response containing chart-ready agent span stats rows.
  */
 export interface SpanStatsResponse {
+  bucket_type: 'time' | 'number';
+
+  columns: Array<SpanStatsResponse.Column>;
+
   end: string;
+
+  granularity: number | null;
+
+  rows: Array<{ [key: string]: (string & {}) | string | number | boolean | null }>;
 
   start: string;
 
   timezone: string;
-
-  bucket_type?: 'time' | 'number';
-
-  columns?: Array<SpanStatsResponse.Column>;
-
-  granularity?: number | null;
-
-  rows?: Array<{ [key: string]: (string & {}) | string | number | boolean | null }>;
 }
 
 export namespace SpanStatsResponse {
@@ -449,15 +457,15 @@ export namespace SpanStatsResponse {
    * Metadata describing one column in an agent span stats result row.
    */
   export interface Column {
+    aggregation: string | null;
+
+    metric: string | null;
+
     name: string;
 
     role: 'time' | 'bucket' | 'group' | 'metric';
 
     value_type: 'datetime' | 'number' | 'boolean' | 'string';
-
-    aggregation?: string | null;
-
-    metric?: string | null;
   }
 }
 

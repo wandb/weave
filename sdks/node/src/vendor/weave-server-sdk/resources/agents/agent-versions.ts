@@ -17,9 +17,9 @@ export class AgentVersions extends APIResource {
  * Response containing agent version stats.
  */
 export interface AgentVersionQueryResponse {
-  versions: Array<AgentVersionQueryResponse.Version>;
+  total_count: number;
 
-  total_count?: number;
+  versions: Array<AgentVersionQueryResponse.Version>;
 }
 
 export namespace AgentVersionQueryResponse {
@@ -43,13 +43,13 @@ export namespace AgentVersionQueryResponse {
 
     span_count: number;
 
+    total_cost_usd: number | null;
+
     total_duration_ms: number;
 
     total_input_tokens: number;
 
     total_output_tokens: number;
-
-    total_cost_usd?: number | null;
   }
 }
 

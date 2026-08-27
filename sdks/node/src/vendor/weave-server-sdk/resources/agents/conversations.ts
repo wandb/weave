@@ -33,26 +33,26 @@ export class Conversations extends APIResource {
 export interface ConversationChatResponse {
   conversation_id: string;
 
-  feedback?: Array<{ [key: string]: unknown }> | null;
+  feedback: Array<{ [key: string]: unknown }> | null;
 
-  has_more?: boolean;
+  has_more: boolean;
 
-  limit?: number;
+  limit: number;
 
-  offset?: number;
+  offset: number;
 
-  total_cost_usd?: number | null;
+  total_cost_usd: number | null;
 
-  total_turns?: number;
+  total_turns: number;
 
-  turns?: Array<AgentsAPI.AgentTraceChatRes>;
+  turns: Array<AgentsAPI.AgentTraceChatRes>;
 }
 
 /**
  * Span sequences + feedback markers, one entry per requested conversation.
  */
 export interface ConversationSpansResponse {
-  conversations?: Array<ConversationSpansResponse.Conversation>;
+  conversations: Array<ConversationSpansResponse.Conversation>;
 }
 
 export namespace ConversationSpansResponse {
@@ -62,9 +62,9 @@ export namespace ConversationSpansResponse {
   export interface Conversation {
     conversation_id: string;
 
-    spans?: Array<Conversation.Span>;
+    spans: Array<Conversation.Span>;
 
-    spans_feedback?: Array<Conversation.SpansFeedback>;
+    spans_feedback: Array<Conversation.SpansFeedback>;
   }
 
   export namespace Conversation {
@@ -99,19 +99,19 @@ export namespace ConversationSpansResponse {
       feedback_type: 'wandb.agent_user_feedback' | 'wandb.agent_monitor';
 
       /**
-       * The turn this feedback is anchored to; None for conversation-level.
-       */
-      trace_id: string | null;
-
-      /**
        * Numeric scorer ratings applied to this feedback.
        */
-      ratings?: Array<SpansFeedback.Rating>;
+      ratings: Array<SpansFeedback.Rating>;
 
       /**
        * Arbitrary descriptive tags applied to this feedback.
        */
-      tags?: Array<string>;
+      tags: Array<string>;
+
+      /**
+       * The turn this feedback is anchored to; None for conversation-level.
+       */
+      trace_id: string | null;
     }
 
     export namespace SpansFeedback {
@@ -119,13 +119,13 @@ export namespace ConversationSpansResponse {
        * One numeric rating (a scorer score) applied to a turn or conversation.
        */
       export interface Rating {
+        confidence: number | null;
+
         name: string;
 
+        reason: string | null;
+
         value: number;
-
-        confidence?: number | null;
-
-        reason?: string | null;
       }
     }
   }
