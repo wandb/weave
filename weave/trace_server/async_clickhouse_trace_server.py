@@ -1,6 +1,6 @@
 """Async layer over `ClickHouseTraceServer`.
 
-Two mechanisms live here, and they are not the same thing:
+Two mechanisms live here:
 
   - `_run_on_ch_executor` hands a *blocking* driver call to a thread pool. The
     caller awaits a thread, not a socket. Every sync `ClickHouseTraceServer`
@@ -8,16 +8,7 @@ Two mechanisms live here, and they are not the same thing:
     whole round-trip.
   - `_aquery` / `_ainsert` / `_acommand` speak HTTP over aiohttp via
     clickhouse-connect's native `AsyncClient`. No pool slot is held while the
-    server works, so read concurrency stops being bounded by pool width.
-
-The native twins share their sync counterparts' protocol rather than restating
-it: `clickhouse.operations` holds the settings merge, correlation id, retry
-policy and logging once, and each server supplies only an `_execute_*` that
-reaches the socket. Behaviour cannot drift between the two.
-
-Deserialization is not on the event loop: clickhouse-connect offloads decompress
-and row-parse to the loop's default executor, so a large result set does not
-stall other coroutines.
+    server works, so concurrency stops being bounded by pool width.
 """
 
 import asyncio
