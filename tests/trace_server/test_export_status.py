@@ -117,7 +117,7 @@ def test_export_status_recovers_job_with_no_memory_state(
         port=clickhouse_trace_server._port,
         user=clickhouse_trace_server._user,
         password=clickhouse_trace_server._password,
-        database=clickhouse_trace_server._database,
+        database=clickhouse_trace_server._config.database,
     )
     fresh_server._file_storage_client = storage_client
     fresh_server._file_storage_client_initialized = True

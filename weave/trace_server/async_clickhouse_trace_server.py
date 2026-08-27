@@ -6,9 +6,9 @@ Two mechanisms live here:
     caller awaits a thread, not a socket. Every sync `ClickHouseTraceServer`
     method is reachable this way, at the cost of one pool slot held for the
     whole round-trip.
-  - `_aquery` / `_ainsert` / `_acommand` speak HTTP over aiohttp via
-    clickhouse-connect's native `AsyncClient`. No pool slot is held while the
-    server works, so concurrency stops being bounded by pool width.
+  - `_aquery` / `_ainsert` / `_acommand` go through `AsyncClickHouseTransport`,
+    which speaks HTTP over aiohttp. No pool slot is held while the server works,
+    so concurrency stops being bounded by pool width.
 """
 
 import asyncio
@@ -18,17 +18,15 @@ from collections.abc import Callable, Sequence
 from concurrent.futures import Executor
 from typing import Any, NamedTuple, TypeVar
 
-import clickhouse_connect
-from clickhouse_connect.driver.asyncclient import AsyncClient
 from clickhouse_connect.driver.query import QueryResult
 from clickhouse_connect.driver.summary import QuerySummary
 
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.agents.clickhouse import AgentWriteHandler
 from weave.trace_server.agents.schema import AgentSpanCHInsertable
-from weave.trace_server.clickhouse import operations as ch_ops
+from weave.trace_server.clickhouse import transport as ch_transport
+from weave.trace_server.clickhouse.transport import AsyncClickHouseTransport
 from weave.trace_server.clickhouse_trace_server_batched import (
-    CLICKHOUSE_SECURE_PORT,
     ClickHouseTraceServer,
     CompletionPrepResult,
 )
@@ -37,12 +35,6 @@ from weave.trace_server.llm_completion import lite_llm_acompletion
 from weave.trace_server.tracing import traced
 
 _T = TypeVar("_T")
-
-# aiohttp connector caps for the native async client. `connector_limit_per_host`
-# is the real concurrency ceiling: weave-trace talks to one host, so this is the
-# async analogue of the thread pool's width.
-ACH_CONNECTOR_LIMIT = 200
-ACH_CONNECTOR_LIMIT_PER_HOST = 100
 
 
 class AsyncClickHouseTraceServer(ClickHouseTraceServer):
@@ -53,9 +45,7 @@ class AsyncClickHouseTraceServer(ClickHouseTraceServer):
     ) -> None:
         super().__init__(host=host, **kwargs)
         self._ch_executor: Executor | None = ch_executor
-        self._ach: AsyncClient | None = None
-        self._ach_loop: asyncio.AbstractEventLoop | None = None
-        self._ach_lock: asyncio.Lock | None = None
+        self._atransport = AsyncClickHouseTransport(self._config)
 
     @tag_db_insert_path("completions_create")
     async def acompletions_create(
@@ -143,47 +133,13 @@ class AsyncClickHouseTraceServer(ClickHouseTraceServer):
 
     # -- Native async transport ------------------------------------------------
 
-    async def ach_client(self) -> AsyncClient:
-        """The aiohttp-backed ClickHouse client for the running loop.
-
-        Keyed by loop because an aiohttp session is bound to the loop that
-        created it. A superseded session is dropped rather than closed: its
-        loop is gone, so there is nothing left to await on.
-        """
-        loop = asyncio.get_running_loop()
-        if self._ach_loop is not loop:
-            self._ach = None
-            self._ach_lock = asyncio.Lock()
-            self._ach_loop = loop
-        if self._ach is None:
-            async with self._ach_lock:
-                if self._ach is None:
-                    self._ach = await self._amint_client()
-        return self._ach
-
-    async def _amint_client(self) -> AsyncClient:
-        """Mirror `_mint_client`'s connection options on the async driver."""
-        client = await clickhouse_connect.get_async_client(
-            host=self._host,
-            port=self._port,
-            username=self._user,
-            password=self._password,
-            secure=self._port == CLICKHOUSE_SECURE_PORT,
-            autogenerate_session_id=False,
-            autogenerate_query_id=False,
-            connector_limit=ACH_CONNECTOR_LIMIT,
-            connector_limit_per_host=ACH_CONNECTOR_LIMIT_PER_HOST,
-        )
-        await client.command(f"CREATE DATABASE IF NOT EXISTS {self._database}")
-        client.database = self._database
-        return client
+    async def astart(self) -> None:
+        """Open the aiohttp session. A worker calls this on startup."""
+        await self._atransport.start()
 
     async def aclose(self) -> None:
         """Drain the aiohttp session. A worker calls this on shutdown."""
-        if self._ach is not None:
-            await self._ach.close()
-            self._ach = None
-            self._ach_loop = None
+        await self._atransport.close()
 
     @traced(name="async_clickhouse_trace_server._aquery")
     async def _aquery(
@@ -193,11 +149,16 @@ class AsyncClickHouseTraceServer(ClickHouseTraceServer):
         column_formats: dict[str, Any] | None = None,
         settings: dict[str, int | str] | None = None,
     ) -> QueryResult:
-        """Native-async twin of `_query`, over the same protocol."""
-        return await ch_ops.run_async(
-            ch_ops.query_sequence(query, parameters, column_formats, settings),
-            self._execute_async,
+        """Native-async twin of `_query`."""
+        prepared = ch_transport.prepare_query(
+            query, parameters, column_formats, settings
         )
+        try:
+            result = await self._atransport.query(prepared)
+        except Exception as e:
+            ch_transport.raise_query_error(prepared, e)
+        ch_transport.record_query_success(prepared, result)
+        return result
 
     @traced(name="async_clickhouse_trace_server._acommand")
     async def _acommand(
@@ -206,11 +167,13 @@ class AsyncClickHouseTraceServer(ClickHouseTraceServer):
         parameters: dict[str, Any] | None = None,
         settings: dict[str, int | str] | None = None,
     ) -> None:
-        """Native-async twin of `_command`, over the same protocol."""
-        return await ch_ops.run_async(
-            ch_ops.command_sequence(command, parameters, settings),
-            self._execute_async,
-        )
+        """Native-async twin of `_command`."""
+        prepared = ch_transport.prepare_command(command, parameters, settings)
+        try:
+            result = await self._atransport.command(prepared)
+        except Exception as e:
+            ch_transport.raise_command_error(prepared, e)
+        ch_transport.record_command_success(prepared, result)
 
     @traced(name="async_clickhouse_trace_server._ainsert")
     async def _ainsert(
@@ -221,45 +184,26 @@ class AsyncClickHouseTraceServer(ClickHouseTraceServer):
         settings: dict[str, Any] | None = None,
         do_sync_insert: bool = False,  # overrides _use_async_insert
     ) -> QuerySummary:
-        """Native-async twin of `_insert`, over the same protocol."""
-        return await ch_ops.run_async(
-            ch_ops.insert_sequence(
-                table,
-                data,
-                column_names,
-                settings,
-                do_sync_insert,
-                use_async_insert=self._use_async_insert,
-                use_replicated_tables=self._use_replicated_tables,
-            ),
-            self._execute_async,
+        """Native-async twin of `_insert`."""
+        prepared = ch_transport.prepare_insert(
+            table,
+            data,
+            column_names,
+            settings,
+            do_sync_insert,
+            use_async_insert=self._use_async_insert,
+            use_replicated_tables=self._use_replicated_tables,
         )
-
-    async def _execute_async(self, operation: ch_ops.Operation) -> Any:
-        """Perform one prepared ClickHouse operation on the aiohttp driver."""
-        client = await self.ach_client()
-        if isinstance(operation, ch_ops.QueryOp):
-            return await client.query(
-                operation.query,
-                parameters=operation.parameters,
-                column_formats=operation.column_formats,
-                use_none=True,
-                settings=operation.settings,
-            )
-        if isinstance(operation, ch_ops.CommandOp):
-            return await client.command(
-                operation.command,
-                parameters=operation.parameters,
-                settings=operation.settings,
-            )
-        if isinstance(operation, ch_ops.InsertOp):
-            return await client.insert(
-                operation.table,
-                data=operation.data,
-                column_names=operation.column_names,
-                settings=operation.settings,
-            )
-        raise TypeError(f"unknown ClickHouse operation: {type(operation).__name__}")
+        sanitized = False
+        while True:
+            try:
+                result = await self._atransport.insert(prepared)
+            except Exception as e:
+                prepared = ch_transport.insert_retry_or_raise(prepared, e, sanitized)
+                sanitized = True
+                continue
+            ch_transport.record_insert_success(prepared, result)
+            return result
 
     async def _run_on_ch_executor(self, fn: Callable[..., _T], *args: object) -> _T:
         """Run `fn(*args)` on `_ch_executor`.

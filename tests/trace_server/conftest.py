@@ -242,7 +242,7 @@ def _ch_session_server(
         f"DROP DATABASE IF EXISTS {management_db}{on_cluster} SYNC"
     )
     ch_server.ch_client.command(f"DROP DATABASE IF EXISTS {unique_db}{on_cluster} SYNC")
-    ch_server._database_ensured = False
+    ch_server._transport._database_ensured = False
 
     def patched_run_migrations():
         migrator = wf_migrator.get_clickhouse_trace_server_migrator(
@@ -253,7 +253,7 @@ def _ch_session_server(
             replicated_cluster=wf_env.wf_clickhouse_replicated_cluster(),
             use_distributed=wf_env.wf_clickhouse_use_distributed_tables(),
         )
-        migrator.apply_migrations(ch_server._database)
+        migrator.apply_migrations(ch_server._config.database)
 
     ch_server._run_migrations = patched_run_migrations  # type: ignore[assignment]
     ch_server._run_migrations()
