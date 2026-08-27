@@ -86,6 +86,7 @@ export type {
   Modality,
   Reasoning,
   Role,
+  SpanEndOptions,
   SubAgent,
   SubAgentInit,
   Tool,

@@ -1,6 +1,6 @@
 # File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
 
-from typing import List, Union, Optional
+from typing import List, Union
 from datetime import datetime
 from typing_extensions import Literal
 
@@ -44,4 +44,4 @@ class AgentSearchResponse(BaseModel):
 
     results: List[Result]
 
-    total_conversations: Optional[int] = None
+    total_conversations: int

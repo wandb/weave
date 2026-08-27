@@ -38,13 +38,13 @@ class ConversationSpan(BaseModel):
 class ConversationSpansFeedbackRating(BaseModel):
     """One numeric rating (a scorer score) applied to a turn or conversation."""
 
-    name: str
-
-    value: float
-
     confidence: Optional[float] = None
 
+    name: str
+
     reason: Optional[str] = None
+
+    value: float
 
 
 class ConversationSpansFeedback(BaseModel):
@@ -56,14 +56,14 @@ class ConversationSpansFeedback(BaseModel):
 
     feedback_type: Literal["wandb.agent_user_feedback", "wandb.agent_monitor"]
 
-    trace_id: Optional[str] = None
-    """The turn this feedback is anchored to; None for conversation-level."""
-
-    ratings: Optional[List[ConversationSpansFeedbackRating]] = None
+    ratings: List[ConversationSpansFeedbackRating]
     """Numeric scorer ratings applied to this feedback."""
 
-    tags: Optional[List[str]] = None
+    tags: List[str]
     """Arbitrary descriptive tags applied to this feedback."""
+
+    trace_id: Optional[str] = None
+    """The turn this feedback is anchored to; None for conversation-level."""
 
 
 class Conversation(BaseModel):
@@ -71,12 +71,12 @@ class Conversation(BaseModel):
 
     conversation_id: str
 
-    spans: Optional[List[ConversationSpan]] = None
+    spans: List[ConversationSpan]
 
-    spans_feedback: Optional[List[ConversationSpansFeedback]] = None
+    spans_feedback: List[ConversationSpansFeedback]
 
 
 class ConversationSpansResponse(BaseModel):
     """Span sequences + feedback markers, one entry per requested conversation."""
 
-    conversations: Optional[List[Conversation]] = None
+    conversations: List[Conversation]
