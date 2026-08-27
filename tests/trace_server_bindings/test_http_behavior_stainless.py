@@ -47,14 +47,21 @@ def test_federated_auth_refreshes_headers(unbatched_server):
 
     credentials = RotatingCredentials()
     unbatched_server.set_auth(credentials)
-    stainless_client = unbatched_server._stainless_client
-    stainless_client.copy = MagicMock(return_value=stainless_client)
-
-    unbatched_server._update_client_headers()
-
-    stainless_client.copy.assert_called_once_with(
-        default_headers={"Authorization": "Bearer token-2"}
+    mock_response = MagicMock()
+    mock_response.model_dump.return_value = {
+        "id": "call-id",
+        "trace_id": "test_trace_id",
+    }
+    unbatched_server._stainless_client.calls.start = MagicMock(
+        return_value=mock_response
     )
+
+    unbatched_server.call_start(tsi.CallStartReq(start=generate_start("call-id")))
+
+    request_headers = unbatched_server._stainless_client.calls.start.call_args.kwargs[
+        "extra_headers"
+    ]
+    assert request_headers == {"Authorization": "Bearer token-2"}
 
 
 def test_set_auth_normalizes_api_key_tuple(unbatched_server):

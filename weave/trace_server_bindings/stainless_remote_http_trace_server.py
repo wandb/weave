@@ -148,8 +148,6 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         Returns:
             Validated response model instance.
         """
-        self._update_client_headers()
-
         dump_kwargs: dict[str, Any] = {"by_alias": True}
         exclude_set = set(extra_kwargs.keys())
         if exclude:
@@ -158,7 +156,11 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
             dump_kwargs["exclude"] = exclude_set
 
         req_dict = req.model_dump(**dump_kwargs)
-        response = stainless_api(**req_dict, **extra_kwargs)
+        response = stainless_api(
+            **req_dict,
+            **extra_kwargs,
+            extra_headers=self._compose_headers(),
+        )
         # An empty response schema is generated as a bare `object`: a plain dict.
         if hasattr(response, "model_dump"):
             response = response.model_dump()
