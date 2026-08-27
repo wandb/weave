@@ -709,6 +709,17 @@ deterministic.
   timing with `LLM.started_at` and an explicit `Tool.started_at` instead of
   keeping contexts open with `ExitStack`.
 
+### PII redaction primitives
+
+- `SensitiveDataPolicy` is a closed `off` or `pii-v1` enum. Unknown values
+  fail instead of falling back to a policy.
+- `redact_pii_value` walks supported trace values copy-on-write, combines
+  credential-key replacement with PII replacement, and never scans dictionary
+  keys. Clean subtrees retain their identity.
+- Complete Weave refs, valid base64 data URLs, and valid standalone base64
+  payloads pass through unchanged. Malformed lookalikes remain eligible for
+  scanning.
+
 ### Credential-shaped fields in client-authored call columns
 
 - The three call converters in `clickhouse/schema_converters.py` run
@@ -724,8 +735,15 @@ deterministic.
 - The walk is copy-on-write and replaces only non-empty strings. Both properties
   are load-bearing — see the module docstring — so keep them if you touch it.
 
-### Credential-shaped fields in agent span columns
+### Agent PII policy
 
+- `GenAIOTelExportReq.sensitive_data_policy` is an internal, omittable,
+  non-nullable field. Omission resolves to `off`.
+- An authorized server route may set `pii-v1` from the owning organization's
+  policy. Never populate the field from caller-controlled OTLP content or a
+  process environment fallback.
+
+### Credential-shaped fields in agent span columns
 - The agents OTel ingest calls `redact_credentials_from_span` before
   `strip_inline_blobs_from_span`, and outside the file-storage guard around it.
   Both are load-bearing — see that function's docstring — so keep the order and

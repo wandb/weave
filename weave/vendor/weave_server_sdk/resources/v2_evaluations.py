@@ -6,7 +6,7 @@ from typing import Dict, Optional
 
 import httpx
 
-from ..types import v2_evaluation_create_params, v2_evaluation_delete_params
+from ..types import v2_evaluation_list_params, v2_evaluation_create_params, v2_evaluation_delete_params
 from .._types import Body, Omit, Query, Headers, NotGiven, SequenceNotStr, omit, not_given
 from .._utils import path_template, maybe_transform, async_maybe_transform
 from .._compat import cached_property
@@ -18,6 +18,8 @@ from .._response import (
     async_to_streamed_response_wrapper,
 )
 from .._base_client import make_request_options
+from .._decoders.jsonl import JSONLDecoder, AsyncJSONLDecoder
+from ..types.v2_evaluation_list_response import V2EvaluationListResponse
 from ..types.v2_evaluation_read_response import V2EvaluationReadResponse
 from ..types.v2_evaluation_create_response import V2EvaluationCreateResponse
 from ..types.v2_evaluation_delete_response import V2EvaluationDeleteResponse
@@ -120,17 +122,23 @@ class V2EvaluationsResource(SyncAPIResource):
         project: str,
         *,
         entity: str,
+        limit: Optional[int] | Omit = omit,
+        offset: Optional[int] | Omit = omit,
         # Use the following arguments if you need to pass additional parameters to the API that aren't available via kwargs.
         # The extra values given here take precedence over values defined on the client or passed to this method.
         extra_headers: Headers | None = None,
         extra_query: Query | None = None,
         extra_body: Body | None = None,
         timeout: float | httpx.Timeout | None | NotGiven = not_given,
-    ) -> object:
+    ) -> JSONLDecoder[V2EvaluationListResponse]:
         """
         List evaluation objects.
 
         Args:
+          limit: Maximum number of evaluations to return
+
+          offset: Number of evaluations to skip
+
           extra_headers: Send extra headers
 
           extra_query: Add additional query parameters to the request
@@ -143,12 +151,24 @@ class V2EvaluationsResource(SyncAPIResource):
             raise ValueError(f"Expected a non-empty value for `entity` but received {entity!r}")
         if not project:
             raise ValueError(f"Expected a non-empty value for `project` but received {project!r}")
+        extra_headers = {"Accept": "application/x-ndjson", **(extra_headers or {})}
         return self._get(
             path_template("/v2/{entity}/{project}/evaluations", entity=entity, project=project),
             options=make_request_options(
-                extra_headers=extra_headers, extra_query=extra_query, extra_body=extra_body, timeout=timeout
+                extra_headers=extra_headers,
+                extra_query=extra_query,
+                extra_body=extra_body,
+                timeout=timeout,
+                query=maybe_transform(
+                    {
+                        "limit": limit,
+                        "offset": offset,
+                    },
+                    v2_evaluation_list_params.V2EvaluationListParams,
+                ),
             ),
-            cast_to=object,
+            cast_to=JSONLDecoder[V2EvaluationListResponse],
+            stream=True,
         )
 
     def delete(
@@ -345,17 +365,23 @@ class AsyncV2EvaluationsResource(AsyncAPIResource):
         project: str,
         *,
         entity: str,
+        limit: Optional[int] | Omit = omit,
+        offset: Optional[int] | Omit = omit,
         # Use the following arguments if you need to pass additional parameters to the API that aren't available via kwargs.
         # The extra values given here take precedence over values defined on the client or passed to this method.
         extra_headers: Headers | None = None,
         extra_query: Query | None = None,
         extra_body: Body | None = None,
         timeout: float | httpx.Timeout | None | NotGiven = not_given,
-    ) -> object:
+    ) -> AsyncJSONLDecoder[V2EvaluationListResponse]:
         """
         List evaluation objects.
 
         Args:
+          limit: Maximum number of evaluations to return
+
+          offset: Number of evaluations to skip
+
           extra_headers: Send extra headers
 
           extra_query: Add additional query parameters to the request
@@ -368,12 +394,24 @@ class AsyncV2EvaluationsResource(AsyncAPIResource):
             raise ValueError(f"Expected a non-empty value for `entity` but received {entity!r}")
         if not project:
             raise ValueError(f"Expected a non-empty value for `project` but received {project!r}")
+        extra_headers = {"Accept": "application/x-ndjson", **(extra_headers or {})}
         return await self._get(
             path_template("/v2/{entity}/{project}/evaluations", entity=entity, project=project),
             options=make_request_options(
-                extra_headers=extra_headers, extra_query=extra_query, extra_body=extra_body, timeout=timeout
+                extra_headers=extra_headers,
+                extra_query=extra_query,
+                extra_body=extra_body,
+                timeout=timeout,
+                query=await async_maybe_transform(
+                    {
+                        "limit": limit,
+                        "offset": offset,
+                    },
+                    v2_evaluation_list_params.V2EvaluationListParams,
+                ),
             ),
-            cast_to=object,
+            cast_to=AsyncJSONLDecoder[V2EvaluationListResponse],
+            stream=True,
         )
 
     async def delete(

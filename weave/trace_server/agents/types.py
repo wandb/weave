@@ -42,6 +42,7 @@ from weave.trace_server.agents.schema import (
 )
 from weave.trace_server.interface.feedback_types import AgentSpanFeedbackType
 from weave.trace_server.interface.query import Query
+from weave.trace_server.sensitive_data.policy import SensitiveDataPolicy
 
 if TYPE_CHECKING:
     from weave.trace_server.trace_server_interface import ProcessedResourceSpans
@@ -1321,6 +1322,7 @@ class GenAIOTelExportReq(BaseModel):
     project_id: str
     wb_user_id: str | None = None
     entity_name: str | None = None
+    sensitive_data_policy: SensitiveDataPolicy = SensitiveDataPolicy.OFF
 
 
 class GenAIOTelExportRes(BaseModel):

@@ -48,6 +48,14 @@ from .trace import (
     TraceResourceWithStreamingResponse,
     AsyncTraceResourceWithStreamingResponse,
 )
+from .agents import (
+    AgentsResource,
+    AsyncAgentsResource,
+    AgentsResourceWithRawResponse,
+    AsyncAgentsResourceWithRawResponse,
+    AgentsResourceWithStreamingResponse,
+    AsyncAgentsResourceWithStreamingResponse,
+)
 from .tables import (
     TablesResource,
     AsyncTablesResource,
@@ -95,6 +103,14 @@ from .services import (
     AsyncServicesResourceWithRawResponse,
     ServicesResourceWithStreamingResponse,
     AsyncServicesResourceWithStreamingResponse,
+)
+from .v2_calls import (
+    V2CallsResource,
+    AsyncV2CallsResource,
+    V2CallsResourceWithRawResponse,
+    AsyncV2CallsResourceWithRawResponse,
+    V2CallsResourceWithStreamingResponse,
+    AsyncV2CallsResourceWithStreamingResponse,
 )
 from .v2_models import (
     V2ModelsResource,
@@ -220,6 +236,12 @@ __all__ = [
     "AsyncThreadsResourceWithRawResponse",
     "ThreadsResourceWithStreamingResponse",
     "AsyncThreadsResourceWithStreamingResponse",
+    "AgentsResource",
+    "AsyncAgentsResource",
+    "AgentsResourceWithRawResponse",
+    "AsyncAgentsResourceWithRawResponse",
+    "AgentsResourceWithStreamingResponse",
+    "AsyncAgentsResourceWithStreamingResponse",
     "V2OpsResource",
     "AsyncV2OpsResource",
     "V2OpsResourceWithRawResponse",
@@ -268,4 +290,10 @@ __all__ = [
     "AsyncV2ScoresResourceWithRawResponse",
     "V2ScoresResourceWithStreamingResponse",
     "AsyncV2ScoresResourceWithStreamingResponse",
+    "V2CallsResource",
+    "AsyncV2CallsResource",
+    "V2CallsResourceWithRawResponse",
+    "AsyncV2CallsResourceWithRawResponse",
+    "V2CallsResourceWithStreamingResponse",
+    "AsyncV2CallsResourceWithStreamingResponse",
 ]

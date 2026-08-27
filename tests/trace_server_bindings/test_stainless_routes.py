@@ -601,6 +601,270 @@ def test_call_start_batch_reads_the_response_list():
     ("method_name", "req", "expected_path", "rows", "expected"),
     [
         pytest.param(
+            "threads_query_stream",
+            tsi.ThreadsQueryReq(project_id=PROJECT),
+            "/threads/stream_query",
+            [
+                {
+                    "thread_id": "t1",
+                    "turn_count": 1,
+                    "start_time": "2026-08-20T00:00:00Z",
+                    "last_updated": "2026-08-20T00:00:00Z",
+                    "first_turn_id": None,
+                    "last_turn_id": None,
+                    "p50_turn_duration_ms": None,
+                    "p99_turn_duration_ms": None,
+                },
+                {
+                    "thread_id": "t2",
+                    "turn_count": 2,
+                    "start_time": "2026-08-20T00:00:00Z",
+                    "last_updated": "2026-08-20T00:00:00Z",
+                    "first_turn_id": None,
+                    "last_turn_id": None,
+                    "p50_turn_duration_ms": None,
+                    "p99_turn_duration_ms": None,
+                },
+            ],
+            [
+                tsi.ThreadSchema(
+                    thread_id="t1",
+                    turn_count=1,
+                    start_time="2026-08-20T00:00:00Z",
+                    last_updated="2026-08-20T00:00:00Z",
+                    first_turn_id=None,
+                    last_turn_id=None,
+                    p50_turn_duration_ms=None,
+                    p99_turn_duration_ms=None,
+                ),
+                tsi.ThreadSchema(
+                    thread_id="t2",
+                    turn_count=2,
+                    start_time="2026-08-20T00:00:00Z",
+                    last_updated="2026-08-20T00:00:00Z",
+                    first_turn_id=None,
+                    last_turn_id=None,
+                    p50_turn_duration_ms=None,
+                    p99_turn_duration_ms=None,
+                ),
+            ],
+            id="threads_query_stream",
+        ),
+        pytest.param(
+            "op_list",
+            tsi.OpListReq(project_id=PROJECT),
+            f"{V2}/ops",
+            [
+                {
+                    "object_id": "op-1",
+                    "digest": "d1",
+                    "version_index": 0,
+                    "created_at": "2026-08-20T00:00:00Z",
+                    "code": "def f(): pass",
+                },
+                {
+                    "object_id": "op-2",
+                    "digest": "d2",
+                    "version_index": 1,
+                    "created_at": "2026-08-20T00:00:00Z",
+                    "code": "def g(): pass",
+                },
+            ],
+            [
+                tsi.OpReadRes(
+                    object_id="op-1",
+                    digest="d1",
+                    version_index=0,
+                    created_at="2026-08-20T00:00:00Z",
+                    code="def f(): pass",
+                ),
+                tsi.OpReadRes(
+                    object_id="op-2",
+                    digest="d2",
+                    version_index=1,
+                    created_at="2026-08-20T00:00:00Z",
+                    code="def g(): pass",
+                ),
+            ],
+            id="op_list",
+        ),
+        pytest.param(
+            "dataset_list",
+            tsi.DatasetListReq(project_id=PROJECT),
+            f"{V2}/datasets",
+            [
+                {
+                    "object_id": "ds-1",
+                    "digest": "d1",
+                    "version_index": 0,
+                    "created_at": "2026-08-20T00:00:00Z",
+                    "name": "ds-1",
+                    "rows": "weave:///entity/project/table/abc123",
+                },
+                {
+                    "object_id": "ds-2",
+                    "digest": "d2",
+                    "version_index": 1,
+                    "created_at": "2026-08-20T00:00:00Z",
+                    "name": "ds-2",
+                    "rows": "weave:///entity/project/table/def456",
+                },
+            ],
+            [
+                tsi.DatasetReadRes(
+                    object_id="ds-1",
+                    digest="d1",
+                    version_index=0,
+                    created_at="2026-08-20T00:00:00Z",
+                    name="ds-1",
+                    rows="weave:///entity/project/table/abc123",
+                ),
+                tsi.DatasetReadRes(
+                    object_id="ds-2",
+                    digest="d2",
+                    version_index=1,
+                    created_at="2026-08-20T00:00:00Z",
+                    name="ds-2",
+                    rows="weave:///entity/project/table/def456",
+                ),
+            ],
+            id="dataset_list",
+        ),
+        pytest.param(
+            "scorer_list",
+            tsi.ScorerListReq(project_id=PROJECT),
+            f"{V2}/scorers",
+            [
+                {
+                    "object_id": "s-1",
+                    "digest": "d1",
+                    "version_index": 0,
+                    "created_at": "2026-08-20T00:00:00Z",
+                    "name": "s-1",
+                    "score_op": "weave:///entity/project/op/s:abc123",
+                },
+                {
+                    "object_id": "s-2",
+                    "digest": "d2",
+                    "version_index": 1,
+                    "created_at": "2026-08-20T00:00:00Z",
+                    "name": "s-2",
+                    "score_op": "weave:///entity/project/op/s:def456",
+                },
+            ],
+            [
+                tsi.ScorerReadRes(
+                    object_id="s-1",
+                    digest="d1",
+                    version_index=0,
+                    created_at="2026-08-20T00:00:00Z",
+                    name="s-1",
+                    score_op="weave:///entity/project/op/s:abc123",
+                ),
+                tsi.ScorerReadRes(
+                    object_id="s-2",
+                    digest="d2",
+                    version_index=1,
+                    created_at="2026-08-20T00:00:00Z",
+                    name="s-2",
+                    score_op="weave:///entity/project/op/s:def456",
+                ),
+            ],
+            id="scorer_list",
+        ),
+        pytest.param(
+            "evaluation_list",
+            tsi.EvaluationListReq(project_id=PROJECT),
+            f"{V2}/evaluations",
+            [
+                {
+                    "object_id": "ev-1",
+                    "digest": "d1",
+                    "version_index": 0,
+                    "created_at": "2026-08-20T00:00:00Z",
+                    "name": "ev-1",
+                    "dataset": "weave:///entity/project/object/ds:abc123",
+                    "scorers": [],
+                    "trials": 1,
+                },
+                {
+                    "object_id": "ev-2",
+                    "digest": "d2",
+                    "version_index": 1,
+                    "created_at": "2026-08-20T00:00:00Z",
+                    "name": "ev-2",
+                    "dataset": "weave:///entity/project/object/ds:def456",
+                    "scorers": [],
+                    "trials": 1,
+                },
+            ],
+            [
+                tsi.EvaluationReadRes(
+                    object_id="ev-1",
+                    digest="d1",
+                    version_index=0,
+                    created_at="2026-08-20T00:00:00Z",
+                    name="ev-1",
+                    dataset="weave:///entity/project/object/ds:abc123",
+                    scorers=[],
+                    trials=1,
+                ),
+                tsi.EvaluationReadRes(
+                    object_id="ev-2",
+                    digest="d2",
+                    version_index=1,
+                    created_at="2026-08-20T00:00:00Z",
+                    name="ev-2",
+                    dataset="weave:///entity/project/object/ds:def456",
+                    scorers=[],
+                    trials=1,
+                ),
+            ],
+            id="evaluation_list",
+        ),
+        pytest.param(
+            "model_list",
+            tsi.ModelListReq(project_id=PROJECT),
+            f"{V2}/models",
+            [
+                {
+                    "object_id": "m-1",
+                    "digest": "d1",
+                    "version_index": 0,
+                    "created_at": "2026-08-20T00:00:00Z",
+                    "name": "m-1",
+                    "source_code": "def f(): pass",
+                },
+                {
+                    "object_id": "m-2",
+                    "digest": "d2",
+                    "version_index": 1,
+                    "created_at": "2026-08-20T00:00:00Z",
+                    "name": "m-2",
+                    "source_code": "def g(): pass",
+                },
+            ],
+            [
+                tsi.ModelReadRes(
+                    object_id="m-1",
+                    digest="d1",
+                    version_index=0,
+                    created_at="2026-08-20T00:00:00Z",
+                    name="m-1",
+                    source_code="def f(): pass",
+                ),
+                tsi.ModelReadRes(
+                    object_id="m-2",
+                    digest="d2",
+                    version_index=1,
+                    created_at="2026-08-20T00:00:00Z",
+                    name="m-2",
+                    source_code="def g(): pass",
+                ),
+            ],
+            id="model_list",
+        ),
+        pytest.param(
             "evaluation_run_list",
             tsi.EvaluationRunListReq(project_id=PROJECT),
             f"{V2}/evaluation_runs",
@@ -711,11 +975,6 @@ def test_file_content_read_keeps_bytes():
             tsi.CompletionsCreateReq(project_id=PROJECT, inputs={"model": "gpt-4o"}),
             id="completions_create_stream",
         ),
-        pytest.param(
-            "file_create",
-            tsi.FileCreateReq(project_id=PROJECT, name="pic.png", content=b"\x89PNG"),
-            id="file_create",
-        ),
     ],
 )
 def test_route_missing_from_the_spec_raises(method_name: str, req: BaseModel):
@@ -726,3 +985,68 @@ def test_route_missing_from_the_spec_raises(method_name: str, req: BaseModel):
         getattr(mock_server.server, method_name)(req)
 
     assert mock_server.requests == []
+
+
+def test_file_create_sends_the_filename():
+    """Test that the upload keeps the filename on the multipart part."""
+    mock_server = _mock_server(httpx.Response(200, json={"digest": "abc123"}))
+
+    res = mock_server.server.file_create(
+        tsi.FileCreateReq(
+            project_id=PROJECT,
+            name="pic.png",
+            content=b"\x89PNG",
+            expected_digest="deadbeef",
+        )
+    )
+
+    assert len(mock_server.requests) == 1
+    assert (mock_server.requests[0].method, mock_server.requests[0].url.path) == (
+        "POST",
+        "/file/create",
+    )
+    assert "multipart/form-data" in mock_server.requests[0].headers["content-type"]
+    body = mock_server.requests[0].content
+    assert b'filename="pic.png"' in body
+    assert b"\x89PNG" in body
+    assert b"deadbeef" in body
+    assert res == tsi.FileCreateRes(digest="abc123")
+
+
+@pytest.mark.parametrize(
+    ("method_name", "req", "expected_path"),
+    [
+        pytest.param(
+            "scorer_list",
+            tsi.ScorerListReq(project_id=PROJECT, limit=10, offset=5),
+            f"{V2}/scorers",
+            id="scorer_list",
+        ),
+        pytest.param(
+            "evaluation_list",
+            tsi.EvaluationListReq(project_id=PROJECT, limit=10, offset=5),
+            f"{V2}/evaluations",
+            id="evaluation_list",
+        ),
+    ],
+)
+def test_list_sends_limit_and_offset(
+    method_name: str, req: BaseModel, expected_path: str
+):
+    """Test that both pagination params reach the query string."""
+    mock_server = _mock_server(
+        httpx.Response(
+            200,
+            content=b"",
+            headers={"content-type": "application/jsonl"},
+        )
+    )
+
+    assert list(getattr(mock_server.server, method_name)(req)) == []
+
+    assert len(mock_server.requests) == 1
+    assert (mock_server.requests[0].method, mock_server.requests[0].url.path) == (
+        "GET",
+        expected_path,
+    )
+    assert dict(mock_server.requests[0].url.params) == {"limit": "10", "offset": "5"}
