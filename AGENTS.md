@@ -102,7 +102,9 @@ Note: the scripts read `modelsBegin.json`/`modelsFinal.json`, which are symlinks
 in from wandb/core rather than depended on because it is not published to PyPI.
 Never edit it by hand — regenerate it in core, then re-run
 `scripts/vendor_weave_server_sdk.py` with `--sdk-output` and `--core`. See
-`weave/vendor/README.md`.
+`weave/vendor/README.md`. The Node SDK copy lives at
+`sdks/node/src/vendor/weave-server-sdk/` and is refreshed the same way with
+`scripts/vendor_node_weave_server_sdk.py`. See `sdks/node/src/vendor/README.md`.
 
 Persisted `AgentDashboard` objects intentionally use a closed, discriminated
 schema. Supported panel variants and their configuration fields must be added
@@ -120,11 +122,9 @@ those representations are consumed by inference and the current UI.
 Inference caches resolved custom-provider configuration per replica, so updates
 may remain stale for up to 60 seconds.
 
-When trace-server request/response models or route schemas change, refresh the API schema used by the Node SDK:
-
-1. From this repo, run `make -C ../../weave-trace export-api-schema` to regenerate the sibling trace service's `openapi.json` from the FastAPI app.
-2. Copy that schema into the tracked Node SDK schema: `cp ../../weave-trace/openapi.json sdks/node/weave.openapi.json`.
-3. Regenerate the TypeScript client from `sdks/node`: `pnpm run generate-api`.
+When trace-server request/response models or route schemas change, regenerate
+the TypeScript client in wandb/core and re-vendor it with
+`scripts/vendor_node_weave_server_sdk.py`. See `sdks/node/src/vendor/README.md`.
 
 Evaluation result rows merge agent span links from two sources: legacy
 `weave.genai_span_ref` call attributes and OTel spans whose promoted

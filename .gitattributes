@@ -2,3 +2,4 @@
 *.jpg binary
 *.gif binary
 weave/vendor/weave_server_sdk/** linguist-generated
+sdks/node/src/vendor/weave-server-sdk/** linguist-generated

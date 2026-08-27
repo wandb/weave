@@ -105,9 +105,7 @@ describe('invoking span', () => {
     // count to move, so after a flush it burns its full 1500ms timeout and logs
     // a warning.
     await requireGlobalClient().flush();
-    const {calls} = await traceServer.calls.callsStreamQueryPost({
-      project_id: TEST_PROJECT,
-    });
+    const calls = traceServer.listCalls(TEST_PROJECT);
     const call = calls.find((c: Call) => c.op_name.includes(opName));
     if (!call) {
       throw new Error(`no stored call for op ${opName}`);

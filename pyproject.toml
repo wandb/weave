@@ -416,7 +416,7 @@ values = ["dev", "final"]
 optional_value = "final"
 
 [tool.typos.files]
-extend-exclude = ["weave/vendor/weave_server_sdk/"]
+extend-exclude = ["weave/vendor/weave_server_sdk/", "sdks/node/src/vendor/weave-server-sdk/"]
 
 [tool.typos.default.extend-words]
 fasion = "fasion" # Wandb lore
