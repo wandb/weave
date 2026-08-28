@@ -33,7 +33,7 @@ export class Conversations extends APIResource {
 export interface ConversationChatResponse {
   conversation_id: string;
 
-  feedback: Array<{ [key: string]: unknown }> | null;
+  feedback: Array<ConversationChatResponse.Feedback> | null;
 
   has_more: boolean;
 
@@ -46,6 +46,50 @@ export interface ConversationChatResponse {
   total_turns: number;
 
   turns: Array<AgentsAPI.AgentTraceChatRes>;
+}
+
+export namespace ConversationChatResponse {
+  /**
+   * Feedback row from the agent chat `include_feedback` projection.
+   *
+   * Field names match FEEDBACK*QUERY_FIELDS. This is not the feedback table row and
+   * not FeedbackCreateReq: project_id and span*\* are not selected.
+   */
+  export interface Feedback {
+    id: string;
+
+    annotation_ref: string | null;
+
+    call_ref: string | null;
+
+    created_at: string | null;
+
+    creator: string | null;
+
+    feedback_type: string;
+
+    payload: { [key: string]: unknown };
+
+    runnable_ref: string | null;
+
+    scorer_rating_confidences: { [key: string]: number };
+
+    scorer_rating_reasons: { [key: string]: string };
+
+    scorer_ratings: { [key: string]: number };
+
+    scorer_tag_confidences: { [key: string]: number };
+
+    scorer_tag_reasons: { [key: string]: string };
+
+    scorer_tags: Array<string>;
+
+    trigger_ref: string | null;
+
+    wb_user_id: string | null;
+
+    weave_ref: string;
+  }
 }
 
 /**
