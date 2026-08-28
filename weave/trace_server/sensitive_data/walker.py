@@ -27,6 +27,8 @@ _DATA_URL_RE = re.compile(
     r"(?P<base64>;base64)?,(?P<data>[^\r\n]*)",
     re.ASCII | re.IGNORECASE,
 )
+# Shared with the call and span adapters' RecursionError translation.
+NESTING_LIMIT_MESSAGE = "Sensitive-data nesting limit exceeded"
 _EXTERNAL_REF_PREFIX = f"{ri.WEAVE_SCHEME}:///"
 _INTERNAL_REF_PREFIX = f"{ri.WEAVE_INTERNAL_SCHEME}:///"
 _PRIVATE_REF_PREFIX = f"{ri.WEAVE_PRIVATE_SCHEME}://///"
@@ -80,7 +82,7 @@ def _redact_json_string(value: str) -> str:
     except ValueError:
         return redact_pii_string(value)
     except RecursionError as error:
-        raise RequestTooLarge("Sensitive-data nesting limit exceeded") from error
+        raise RequestTooLarge(NESTING_LIMIT_MESSAGE) from error
     if not isinstance(parsed, (dict, list, str)):
         return redact_pii_string(value)
     redacted = redact_pii_value(parsed)

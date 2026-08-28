@@ -348,11 +348,13 @@ def test_sampler_off_is_inert(
     )
     assert res.accepted_spans == 2
     assert res.rejected_spans == 3
+    # Parse errors precede extraction errors: all spans parse before any
+    # extraction runs, with or without the sampler.
     assert res.error_message == "; ".join(
         [
             _conflict_error(conflict_a),
-            f"Extraction failed for span {extract_sid.hex()}: TypeError",
             _conflict_error(conflict_b),
+            f"Extraction failed for span {extract_sid.hex()}: TypeError",
         ]
     )
     assert len(_stored_spans(ch_server, project_id)) == 2
