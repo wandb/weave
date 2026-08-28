@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable, Sequence
-from typing import Any, TypeVar, overload
+from typing import Any, TypeVar
 
 from pydantic import BaseModel
 
@@ -16,24 +16,15 @@ from weave.trace_server.sensitive_data.walker import (
 )
 
 TModel = TypeVar("TModel", bound=BaseModel)
-
-
-@overload
-def redact_call_start(
-    req: tsi.CallStartReq, policy: SensitiveDataPolicy
-) -> tsi.CallStartReq: ...
-
-
-@overload
-def redact_call_start(
-    req: tsi.CallStartV2Req, policy: SensitiveDataPolicy
-) -> tsi.CallStartV2Req: ...
+# Constrained so v1 and v2 requests keep their exact type for consumers.
+TCallStartReq = TypeVar("TCallStartReq", tsi.CallStartReq, tsi.CallStartV2Req)
+TCallEndReq = TypeVar("TCallEndReq", tsi.CallEndReq, tsi.CallEndV2Req)
 
 
 def redact_call_start(
-    req: tsi.CallStartReq | tsi.CallStartV2Req,
+    req: TCallStartReq,
     policy: SensitiveDataPolicy,
-) -> tsi.CallStartReq | tsi.CallStartV2Req:
+) -> TCallStartReq:
     """Redact customer-authored fields on a v1 or v2 call start.
 
     ``op_name`` is scanned as content: SDK-written op refs pass through the
@@ -49,22 +40,10 @@ def redact_call_start(
     return req if start is req.start else req.model_copy(update={"start": start})
 
 
-@overload
 def redact_call_end(
-    req: tsi.CallEndReq, policy: SensitiveDataPolicy
-) -> tsi.CallEndReq: ...
-
-
-@overload
-def redact_call_end(
-    req: tsi.CallEndV2Req, policy: SensitiveDataPolicy
-) -> tsi.CallEndV2Req: ...
-
-
-def redact_call_end(
-    req: tsi.CallEndReq | tsi.CallEndV2Req,
+    req: TCallEndReq,
     policy: SensitiveDataPolicy,
-) -> tsi.CallEndReq | tsi.CallEndV2Req:
+) -> TCallEndReq:
     """Redact customer-authored fields on a v1 or v2 call end."""
     if not pii_enabled(policy):
         return req
