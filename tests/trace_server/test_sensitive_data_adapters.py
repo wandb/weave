@@ -154,7 +154,7 @@ def _completed_call() -> tsi.CompletedCallSchemaForInsert:
 def _span_with_pii() -> Span:
     return Span(
         resource=SpanResource(attributes={"service.owner": "ada@example.com"}),
-        name="agents_pii_surface",
+        name="surface for ada@example.com",
         trace_id="a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1",
         span_id="b2b2b2b2b2b2b2b2",
         start_time_unix_nano=1,
@@ -165,7 +165,7 @@ def _span_with_pii() -> Span:
         },
         events=[
             Event(
-                name="exception",
+                name="notify (415) 555-2671",
                 timestamp=1,
                 attributes={"note": "call (415) 555-2671"},
             )
@@ -185,7 +185,7 @@ def _redacted_span(resource_attributes: dict[str, str]) -> Span:
     """The full expected shape of `_span_with_pii()` after redaction."""
     return Span(
         resource=SpanResource(attributes=resource_attributes),
-        name="agents_pii_surface",
+        name="surface for <EMAIL_ADDRESS>",
         trace_id="a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1",
         span_id="b2b2b2b2b2b2b2b2",
         start_time_unix_nano=1,
@@ -196,7 +196,7 @@ def _redacted_span(resource_attributes: dict[str, str]) -> Span:
         },
         events=[
             Event(
-                name="exception",
+                name="notify <PHONE_NUMBER>",
                 timestamp=1,
                 attributes={"note": "call <PHONE_NUMBER>"},
             )

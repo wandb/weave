@@ -63,7 +63,7 @@ _PII_CONTENT_ATTRS = {
 
 def _pii_proto_span(span_id: bytes) -> PbSpan:
     span = PbSpan()
-    span.name = "agents_pii_ingest"
+    span.name = "ingest for ada@example.com"
     span.trace_id = (77).to_bytes(16, "big")
     span.span_id = span_id
     span.start_time_unix_nano = _NOW_NS
@@ -78,6 +78,10 @@ def _pii_proto_span(span_id: bytes) -> PbSpan:
         item.key = key
         item.value.string_value = value
         span.attributes.append(item)
+    event = PbSpan.Event()
+    event.name = "notify (415) 555-2671"
+    event.time_unix_nano = _NOW_NS
+    span.events.append(event)
     span.status.code = 2  # ERROR, so the status message persists
     span.status.message = _PII_STATUS_MESSAGE
     return span
@@ -139,6 +143,9 @@ def test_pii_policy_redacts_stored_span_details(ch_server) -> None:
     assert res.rejected_spans == 0
     row = _stored_span_details(ch_server, project_id)
     dump = json.loads(row.raw_span_dump)
+    assert row.span_name == "ingest for <EMAIL_ADDRESS>"
+    assert dump["name"] == "ingest for <EMAIL_ADDRESS>"
+    assert dump["events"][0]["name"] == "notify <PHONE_NUMBER>"
     assert dump["attributes"]["gen_ai"]["prompt"] == "Email <EMAIL_ADDRESS>"
     assert dump["resource"]["attributes"] == {
         "service": {"owner": "call <PHONE_NUMBER>"}
@@ -213,6 +220,8 @@ def test_off_policy_stores_span_values_unchanged(ch_server) -> None:
     assert res.rejected_spans == 0
     row = _stored_span_details(ch_server, project_id)
     dump = json.loads(row.raw_span_dump)
+    assert row.span_name == "ingest for ada@example.com"
+    assert dump["events"][0]["name"] == "notify (415) 555-2671"
     assert dump["attributes"]["gen_ai"]["prompt"] == _PII_ATTR_VALUE
     assert dump["status"]["message"] == _PII_STATUS_MESSAGE
     assert dump["resource"]["attributes"] == {"service": {"owner": _PII_RESOURCE_VALUE}}

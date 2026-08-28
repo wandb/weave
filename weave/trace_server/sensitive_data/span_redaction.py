@@ -25,17 +25,22 @@ def redact_pii_from_span(span: Span, policy: SensitiveDataPolicy) -> None:
     resource-spans group by ``redact_pii_from_resource``, not per span. Must
     run before ``strip_inline_blobs_from_span`` so values are scanned while
     still inline, and before extraction so derived columns read the redacted
-    span. Span and event names, IDs, trace state, and timestamps are
-    structural and stay unchanged. Non-string leaves (numbers, bools, bytes)
-    pass through: ``pii-v1`` scans strings and never decodes payloads.
+    span. Span and event names are scanned like content, so a PII-bearing
+    name is rewritten even though names feed the ``span_name``,
+    ``operation_name``, and ``agent_name`` grouping columns. IDs, trace
+    state, and timestamps are structural and stay unchanged. Non-string
+    leaves (numbers, bools, bytes) pass through: ``pii-v1`` scans strings and
+    never decodes payloads.
 
     Raises ``RequestTooLarge`` for values nested too deeply to scan.
     """
     if not pii_enabled(policy):
         return
     try:
+        span.name = redact_pii_value(span.name)
         span.attributes = redact_pii_value(span.attributes)
         for event in span.events:
+            event.name = redact_pii_value(event.name)
             event.attributes = redact_pii_value(event.attributes)
         for link in span.links:
             link.attributes = redact_pii_value(link.attributes)

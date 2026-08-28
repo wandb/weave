@@ -744,11 +744,12 @@ deterministic.
   to scan rejects the complete request as `RequestTooLarge` (HTTP 413), and
   any other detector failure also fails the whole request, before any Content
   file write or insert.
-- PII redaction covers span, resource, event, and link attributes plus the
-  status message. Span names, event names, IDs, trace state, and timestamps are
-  structural and remain unchanged: names are low-cardinality grouping keys
-  (they feed the `span_name`, `operation_name`, and `agent_name` columns), so
-  rewriting them would break span grouping and agent identity.
+- PII redaction covers span and event names, span, resource, event, and link
+  attributes, and the status message. Names feed the `span_name`,
+  `operation_name`, and `agent_name` grouping columns, so a PII-bearing name
+  changes grouping and agent identity after redaction; keeping PII out of
+  storage wins over grouping continuity. IDs, trace state, and timestamps are
+  structural and remain unchanged.
 - `pii-v1` scans strings and never decodes payloads: non-string leaves,
   including raw bytes values (stored base64-encoded in dumps), pass through
   unchanged, the same boundary as preserved data URLs and standalone base64
