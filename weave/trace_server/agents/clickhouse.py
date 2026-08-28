@@ -44,6 +44,7 @@ from weave.trace_server.agents.schema import (
 )
 from weave.trace_server.agents.types import (
     AGENT_CUSTOM_ATTR_SOURCE_VALUE_TYPES,
+    AgentChatFeedback,
     AgentConversationChatReq,
     AgentConversationChatRes,
     AgentConversationMessagePreview,
@@ -697,7 +698,9 @@ class AgentQueryHandler:
                     project_id=req.project_id,
                     conversation_ids=[req.conversation_id],
                 )
-                res.feedback = groups.by_conversation_id.get(req.conversation_id, [])
+                res.feedback = _as_agent_chat_feedback(
+                    groups.by_conversation_id.get(req.conversation_id, [])
+                )
             return res
 
         # Group spans by trace_id, preserving insertion order. Weave treats
@@ -739,7 +742,9 @@ class AgentQueryHandler:
                 trace_ids=[t.trace_id for t in turns],
                 span_ids=span_ids,
             )
-            res.feedback = groups.by_conversation_id.get(req.conversation_id, [])
+            res.feedback = _as_agent_chat_feedback(
+                groups.by_conversation_id.get(req.conversation_id, [])
+            )
             for turn in res.turns:
                 _fold_feedback_into_trace_chat(turn, groups)
 
@@ -1048,15 +1053,23 @@ def _build_agent_target_refs(
     return refs
 
 
+def _as_agent_chat_feedback(rows: list[dict[str, Any]]) -> list[AgentChatFeedback]:
+    return [AgentChatFeedback.model_validate(row) for row in rows]
+
+
 def _fold_feedback_into_trace_chat(
     trace_chat: AgentTraceChatRes,
     groups: AgentFeedbackByTarget,
 ) -> None:
     """Fold turn-level and step-level feedback into a trace chat response."""
-    trace_chat.feedback = groups.by_trace_id.get(trace_chat.trace_id, [])
+    trace_chat.feedback = _as_agent_chat_feedback(
+        groups.by_trace_id.get(trace_chat.trace_id, [])
+    )
     for message in trace_chat.messages:
         if message.span_id and message.span_id in groups.by_span_id:
-            message.feedback = groups.by_span_id[message.span_id]
+            message.feedback = _as_agent_chat_feedback(
+                groups.by_span_id[message.span_id]
+            )
 
 
 def _first_cell_int(result: QueryResult) -> int:

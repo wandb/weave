@@ -1094,6 +1094,33 @@ class AgentChatContextCompacted(AgentResponseModel):
     compaction_items_after: int | None = None
 
 
+class AgentChatFeedback(AgentResponseModel):
+    """Feedback row from the agent chat `include_feedback` projection.
+
+    Field names match FEEDBACK_QUERY_FIELDS. This is not the feedback
+    table row and not FeedbackCreateReq: project_id and span_* are not
+    selected.
+    """
+
+    id: str
+    feedback_type: str
+    weave_ref: str
+    payload: dict[str, Any]
+    creator: str | None = None
+    created_at: datetime.datetime | None = None
+    wb_user_id: str | None = None
+    runnable_ref: str | None = None
+    call_ref: str | None = None
+    trigger_ref: str | None = None
+    annotation_ref: str | None = None
+    scorer_tags: list[str] = Field(default_factory=list)
+    scorer_tag_reasons: dict[str, str] = Field(default_factory=dict)
+    scorer_tag_confidences: dict[str, float] = Field(default_factory=dict)
+    scorer_ratings: dict[str, float] = Field(default_factory=dict)
+    scorer_rating_reasons: dict[str, str] = Field(default_factory=dict)
+    scorer_rating_confidences: dict[str, float] = Field(default_factory=dict)
+
+
 class AgentChatMessage(AgentResponseModel):
     """A single element in the structured agent trajectory / chat view.
 
@@ -1142,7 +1169,7 @@ class AgentChatMessage(AgentResponseModel):
             )
         return self
 
-    feedback: list[dict[str, Any]] | None = None
+    feedback: list[AgentChatFeedback] | None = None
 
 
 class AgentTraceChatReq(BaseModel):
@@ -1188,7 +1215,7 @@ class AgentTraceChatRes(AgentResponseModel):
     total_cache_creation_input_tokens: int = 0
     total_cache_read_input_tokens: int = 0
     messages: list[AgentChatMessage] = Field(default_factory=list)
-    feedback: list[dict[str, Any]] | None = None
+    feedback: list[AgentChatFeedback] | None = None
 
 
 class AgentConversationChatReq(BaseModel):
@@ -1232,7 +1259,7 @@ class AgentConversationChatRes(AgentResponseModel):
     # Summed query-time cost (USD) across the returned turns. None when no turn
     # had a priced span.
     total_cost_usd: float | None = None
-    feedback: list[dict[str, Any]] | None = None
+    feedback: list[AgentChatFeedback] | None = None
 
 
 class AgentSchema(AgentResponseModel):
