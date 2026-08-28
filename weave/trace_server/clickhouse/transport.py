@@ -412,7 +412,17 @@ class AsyncClickHouseTransport:
             connector_limit=ACH_CONNECTOR_LIMIT,
             connector_limit_per_host=ACH_CONNECTOR_LIMIT_PER_HOST,
         )
-        await client.command(f"CREATE DATABASE IF NOT EXISTS {self._config.database}")
+        # The session exists before the database does. Anything that stops us
+        # returning it -- a failed CREATE DATABASE, or cancellation -- has to
+        # close it here, or `start()` retries and leaks another connector each
+        # time. BaseException so CancelledError is covered too.
+        try:
+            await client.command(
+                f"CREATE DATABASE IF NOT EXISTS {self._config.database}"
+            )
+        except BaseException:
+            await client.close()
+            raise
         client.database = self._config.database
         return client
 
