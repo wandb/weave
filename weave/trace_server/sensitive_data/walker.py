@@ -18,10 +18,6 @@ from weave.trace_server.sensitive_data.detectors import redact_pii_string
 T = TypeVar("T")
 
 _MAX_STRUCTURE_DEPTH = 200
-_NESTING_ERROR = (
-    f"Request payload nesting exceeds the maximum supported depth of "
-    f"{_MAX_STRUCTURE_DEPTH}."
-)
 
 # Keep these aligned with the standalone-base64 gate in
 # ``base64_content_conversion``. That path considers only strings strictly
@@ -33,6 +29,8 @@ _DATA_URL_RE = re.compile(
     r"(?P<base64>;base64)?,(?P<data>[^\r\n]*)",
     re.ASCII | re.IGNORECASE,
 )
+# Shared with the call and span adapters' RecursionError translation.
+NESTING_LIMIT_MESSAGE = "Sensitive-data nesting limit exceeded"
 _EXTERNAL_REF_PREFIX = f"{ri.WEAVE_SCHEME}:///"
 _INTERNAL_REF_PREFIX = f"{ri.WEAVE_INTERNAL_SCHEME}:///"
 _PRIVATE_REF_PREFIX = f"{ri.WEAVE_PRIVATE_SCHEME}://///"
@@ -67,7 +65,7 @@ def _redact_pii_value(value: T, depth: int) -> T:
 
 def _check_depth(depth: int) -> None:
     if depth > _MAX_STRUCTURE_DEPTH:
-        raise RequestTooLarge(_NESTING_ERROR)
+        raise RequestTooLarge(NESTING_LIMIT_MESSAGE)
 
 
 def _is_json_candidate(value: str) -> bool:
@@ -96,7 +94,7 @@ def _redact_json_string(value: str, depth: int) -> str:
     except ValueError:
         return redact_pii_string(value)
     except RecursionError as error:
-        raise RequestTooLarge(_NESTING_ERROR) from error
+        raise RequestTooLarge(NESTING_LIMIT_MESSAGE) from error
     if not isinstance(parsed, (dict, list, str)):
         return redact_pii_string(value)
     redacted = _redact_pii_value(parsed, depth + 1)

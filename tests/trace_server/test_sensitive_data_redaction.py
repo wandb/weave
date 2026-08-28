@@ -31,9 +31,7 @@ def _assert_nesting_rejected(value: object) -> None:
     with pytest.raises(RequestTooLarge) as exc_info:
         redact_pii_value(value)
 
-    assert str(exc_info.value) == (
-        "Request payload nesting exceeds the maximum supported depth of 200."
-    )
+    assert str(exc_info.value) == "Sensitive-data nesting limit exceeded"
 
 
 def test_redacts_supported_pii_with_typed_markers() -> None:
