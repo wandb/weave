@@ -133,10 +133,6 @@ class AsyncClickHouseTraceServer(ClickHouseTraceServer):
 
     # -- Native async transport ------------------------------------------------
 
-    async def astart(self) -> None:
-        """Open the aiohttp session. A worker calls this on startup."""
-        await self._atransport.start()
-
     async def aclose(self) -> None:
         """Drain the aiohttp session. A worker calls this on shutdown."""
         await self._atransport.close()

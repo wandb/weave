@@ -74,6 +74,25 @@ def drive_both(fail_times=0, error=None):
     return recorded
 
 
+def drive_one(arm, fail_times=0, error=None):
+    """Run the insert through exactly one arm.
+
+    `drive_both` runs sync first and returns both results, which is fine while
+    both succeed -- but on an error path the sync raise means the async arm is
+    never reached. Error tests must drive each arm on its own, or they assert
+    "both paths" while proving one.
+    """
+    if arm == "sync":
+        server = ClickHouseTraceServer(host="test_host", use_async_insert=False)
+        server._use_replicated_tables = True
+        server._transport = RecordingTransport(fail_times, error)
+        return server._insert(TABLE, DATA, COLUMNS)
+    server = AsyncClickHouseTraceServer(host="test_host", use_async_insert=False)
+    server._use_replicated_tables = True
+    server._atransport = RecordingAsyncTransport(fail_times, error)
+    return asyncio.run(server._ainsert(TABLE, DATA, COLUMNS))
+
+
 def stable(settings):
     return {k: v for k, v in settings.items() if k not in PER_CALL_SETTINGS}
 
@@ -107,21 +126,24 @@ def test_both_paths_retry_invalid_utf8_exactly_once():
 
 
 @pytest.mark.disable_logging_error_check
-def test_both_paths_stop_after_a_second_invalid_utf8():
+@pytest.mark.parametrize("arm", ["sync", "async"])
+def test_both_paths_stop_after_a_second_invalid_utf8(arm):
     with pytest.raises(UnicodeEncodeError):
-        drive_both(fail_times=2)
+        drive_one(arm, fail_times=2)
 
 
 @pytest.mark.disable_logging_error_check
-def test_both_paths_propagate_a_non_retryable_error():
+@pytest.mark.parametrize("arm", ["sync", "async"])
+def test_both_paths_propagate_a_non_retryable_error(arm):
     with pytest.raises(RuntimeError, match="driver down"):
-        drive_both(fail_times=1, error=RuntimeError("driver down"))
+        drive_one(arm, fail_times=1, error=RuntimeError("driver down"))
 
 
 @pytest.mark.disable_logging_error_check
-def test_both_paths_convert_an_oversized_insert():
+@pytest.mark.parametrize("arm", ["sync", "async"])
+def test_both_paths_convert_an_oversized_insert(arm):
     with pytest.raises(InsertTooLarge):
-        drive_both(fail_times=1, error=ValueError("negative shift count"))
+        drive_one(arm, fail_times=1, error=ValueError("negative shift count"))
 
 
 def test_async_transport_close_clears_the_session():
