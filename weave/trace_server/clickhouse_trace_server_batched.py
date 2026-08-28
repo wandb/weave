@@ -1856,7 +1856,6 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             unfinished_call_ids=sorted(unfinished_call_ids),
         )
 
-    @traced_generator(name="clickhouse_trace_server_batched.calls_query_stream")
     def _build_calls_query(
         self, req: tsi.CallsQueryReq
     ) -> tuple[CallsQuery, dict[str, Any] | None]:
@@ -1964,6 +1963,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
         return cq, settings
 
+    @traced_generator(name="clickhouse_trace_server_batched.calls_query_stream")
     def calls_query_stream(self, req: tsi.CallsQueryReq) -> Iterator[tsi.CallSchema]:
         """Returns a stream of calls that match the given query."""
         cq, settings = self._build_calls_query(req)
