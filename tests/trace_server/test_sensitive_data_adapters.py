@@ -155,8 +155,8 @@ def _span_with_pii() -> Span:
     return Span(
         resource=SpanResource(attributes={"service.owner": "ada@example.com"}),
         name="agents_pii_surface",
-        trace_id="a1" * 16,
-        span_id="b2" * 8,
+        trace_id="a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1",
+        span_id="b2b2b2b2b2b2b2b2",
         start_time_unix_nano=1,
         end_time_unix_nano=2,
         attributes={
@@ -172,8 +172,8 @@ def _span_with_pii() -> Span:
         ],
         links=[
             Link(
-                trace_id="c3" * 16,
-                span_id="d4" * 8,
+                trace_id="c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3",
+                span_id="d4d4d4d4d4d4d4d4",
                 attributes={"context": "ssn 123-45-6789"},
             )
         ],
@@ -186,8 +186,8 @@ def _redacted_span(resource_attributes: dict[str, str]) -> Span:
     return Span(
         resource=SpanResource(attributes=resource_attributes),
         name="agents_pii_surface",
-        trace_id="a1" * 16,
-        span_id="b2" * 8,
+        trace_id="a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1",
+        span_id="b2b2b2b2b2b2b2b2",
         start_time_unix_nano=1,
         end_time_unix_nano=2,
         attributes={
@@ -203,8 +203,8 @@ def _redacted_span(resource_attributes: dict[str, str]) -> Span:
         ],
         links=[
             Link(
-                trace_id="c3" * 16,
-                span_id="d4" * 8,
+                trace_id="c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3",
+                span_id="d4d4d4d4d4d4d4d4",
                 attributes={"context": "ssn <US_SSN>"},
             )
         ],
