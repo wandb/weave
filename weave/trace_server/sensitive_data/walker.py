@@ -27,8 +27,7 @@ _DATA_URL_RE = re.compile(
     r"(?P<base64>;base64)?,(?P<data>[^\r\n]*)",
     re.ASCII | re.IGNORECASE,
 )
-# Shared with the call/span adapters, which translate the RecursionError a
-# too-deep native structure raises into the same RequestTooLarge.
+# Shared with the call and span adapters' RecursionError translation.
 NESTING_LIMIT_MESSAGE = "Sensitive-data nesting limit exceeded"
 _EXTERNAL_REF_PREFIX = f"{ri.WEAVE_SCHEME}:///"
 _INTERNAL_REF_PREFIX = f"{ri.WEAVE_INTERNAL_SCHEME}:///"

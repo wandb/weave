@@ -245,8 +245,7 @@ def test_span_redaction_off_policy_is_a_noop() -> None:
 
 
 def test_bytes_attribute_values_pass_through_unscanned() -> None:
-    # pii-v1 scans strings and never decodes payloads: raw bytes values are a
-    # documented boundary (like data URLs), stored base64-encoded in dumps.
+    # pii-v1 scans strings only; bytes are a documented pass-through boundary.
     span = _span_with_pii()
     payload = b"reach ada@example.com or 4111 1111 1111 1111"
     span.attributes = {"gen_ai.blob": payload}

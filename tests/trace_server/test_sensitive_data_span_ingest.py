@@ -225,9 +225,8 @@ def test_redaction_failure_rejects_request_before_any_side_effect(
 ) -> None:
     """A span too deep to scan fails the whole request as RequestTooLarge.
 
-    The healthy sibling span parses first, yet extraction (which writes blob
-    Content files) must never start for it: every span is redacted before any
-    extraction begins, so nothing is stored and no side effect happens.
+    Extraction (which writes blob Content files) must never start for the
+    healthy sibling span, and nothing is stored.
     """
     extraction_started = False
     original_redact_credentials = agents_clickhouse.redact_credentials_from_span

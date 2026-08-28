@@ -22,16 +22,14 @@ def redact_pii_from_span(span: Span, policy: SensitiveDataPolicy) -> None:
     owns: its own, its events' and its links' attributes, plus the status
     message, because ``raw_span_dump`` and every attribute-derived column
     read from them. The shared ``Resource`` is redacted once per
-    resource-spans group by ``redact_pii_from_resource``, not here, so a
-    5000-span group scans its resource once instead of 5000 times. Must run
-    before ``strip_inline_blobs_from_span`` so values are scanned while still
-    inline, and before extraction so derived columns read the redacted span.
-    Span and event names, IDs, trace state, and timestamps are structural and
-    stay unchanged. Non-string leaves (numbers, bools, bytes) pass through:
-    ``pii-v1`` scans strings and never decodes payloads.
+    resource-spans group by ``redact_pii_from_resource``, not per span. Must
+    run before ``strip_inline_blobs_from_span`` so values are scanned while
+    still inline, and before extraction so derived columns read the redacted
+    span. Span and event names, IDs, trace state, and timestamps are
+    structural and stay unchanged. Non-string leaves (numbers, bools, bytes)
+    pass through: ``pii-v1`` scans strings and never decodes payloads.
 
-    Raises ``RequestTooLarge`` for values nested too deeply to scan, so the
-    caller rejects the request as a 413 instead of an untyped failure.
+    Raises ``RequestTooLarge`` for values nested too deeply to scan.
     """
     if not pii_enabled(policy):
         return
@@ -52,8 +50,7 @@ def redact_pii_from_resource(
     """Redact the shared ``Resource`` once per resource-spans group.
 
     Every span parsed from one ``ResourceSpans`` holds the same ``Resource``
-    object, so redacting it once here instead of inside the per-span pass
-    avoids rescanning identical attribute values for every span.
+    object, so one pass here avoids rescanning it for every span.
 
     Raises ``RequestTooLarge`` for values nested too deeply to scan.
     """

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable, Sequence
-from typing import Any, TypeVar, cast, overload
+from typing import Any, TypeVar, overload
 
 from pydantic import BaseModel
 
@@ -121,7 +121,7 @@ def _redact_fields(model: TModel, field_names: tuple[str, ...]) -> TModel:
                 updates[field_name] = redacted
     except RecursionError as error:
         raise RequestTooLarge(NESTING_LIMIT_MESSAGE) from error
-    return model if not updates else cast(TModel, model.model_copy(update=updates))
+    return model if not updates else model.model_copy(update=updates)
 
 
 TItem = TypeVar("TItem")

@@ -874,8 +874,7 @@ class AgentWriteHandler:
                 errors.append(str(e))
                 return None
             # Outside the parse-error handler: a redaction failure rejects
-            # the whole request (RequestTooLarge for over-deep values) before
-            # sampling or any storage preparation.
+            # the whole request before sampling or any storage preparation.
             redact_pii_from_span(span, req.sensitive_data_policy)
             return span
 
@@ -921,9 +920,8 @@ class AgentWriteHandler:
 
         sampling = ingest_sampling.request_config()
 
-        # Pass 1: parse and redact everything (each shared resource once)
-        # before any extraction, so a redaction failure rejects the request
-        # before blob-strip Content writes happen for sibling spans.
+        # Pass 1: parse and redact everything, each shared resource once,
+        # before any extraction or blob-strip Content writes.
         parsed: list[tuple[Span, str | None]] = []
         byte_sizes: list[int] = []
         for processed_span in req.processed_spans:
@@ -945,8 +943,6 @@ class AgentWriteHandler:
                 if row is not None:
                     span_rows.append(row)
         else:
-            # Whole traces are kept or dropped per trace before any
-            # blob-strip/extraction work happens.
             decisions = ingest_sampling.decide_spans(
                 sampling, [span for span, _ in parsed], byte_sizes
             )
