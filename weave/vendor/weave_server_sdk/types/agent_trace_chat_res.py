@@ -8,13 +8,58 @@ from .._models import BaseModel
 
 __all__ = [
     "AgentTraceChatRes",
+    "Feedback",
     "Message",
     "MessageAgentStart",
     "MessageAssistantMessage",
     "MessageContextCompacted",
+    "MessageFeedback",
     "MessageToolCall",
     "MessageUserMessage",
 ]
+
+
+class Feedback(BaseModel):
+    """Feedback row from the agent chat `include_feedback` projection.
+
+    Field names match FEEDBACK_QUERY_FIELDS. This is not the feedback
+    table row and not FeedbackCreateReq: project_id and span_* are not
+    selected.
+    """
+
+    id: str
+
+    annotation_ref: Optional[str] = None
+
+    call_ref: Optional[str] = None
+
+    created_at: Optional[datetime] = None
+
+    creator: Optional[str] = None
+
+    feedback_type: str
+
+    payload: Dict[str, object]
+
+    runnable_ref: Optional[str] = None
+
+    scorer_rating_confidences: Dict[str, float]
+
+    scorer_rating_reasons: Dict[str, str]
+
+    scorer_ratings: Dict[str, float]
+
+    scorer_tag_confidences: Dict[str, float]
+
+    scorer_tag_reasons: Dict[str, str]
+
+    scorer_tags: List[str]
+
+    trigger_ref: Optional[str] = None
+
+    wb_user_id: Optional[str] = None
+
+    weave_ref: str
 
 
 class MessageAgentStart(BaseModel):
@@ -67,6 +112,49 @@ class MessageContextCompacted(BaseModel):
     compaction_summary: Optional[str] = None
 
 
+class MessageFeedback(BaseModel):
+    """Feedback row from the agent chat `include_feedback` projection.
+
+    Field names match FEEDBACK_QUERY_FIELDS. This is not the feedback
+    table row and not FeedbackCreateReq: project_id and span_* are not
+    selected.
+    """
+
+    id: str
+
+    annotation_ref: Optional[str] = None
+
+    call_ref: Optional[str] = None
+
+    created_at: Optional[datetime] = None
+
+    creator: Optional[str] = None
+
+    feedback_type: str
+
+    payload: Dict[str, object]
+
+    runnable_ref: Optional[str] = None
+
+    scorer_rating_confidences: Dict[str, float]
+
+    scorer_rating_reasons: Dict[str, str]
+
+    scorer_ratings: Dict[str, float]
+
+    scorer_tag_confidences: Dict[str, float]
+
+    scorer_tag_reasons: Dict[str, str]
+
+    scorer_tags: List[str]
+
+    trigger_ref: Optional[str] = None
+
+    wb_user_id: Optional[str] = None
+
+    weave_ref: str
+
+
 class MessageToolCall(BaseModel):
     """Payload for a tool call timeline event."""
 
@@ -116,7 +204,7 @@ class Message(BaseModel):
     context_compacted: Optional[MessageContextCompacted] = None
     """Payload for a context-window compaction event."""
 
-    feedback: Optional[List[Dict[str, object]]] = None
+    feedback: Optional[List[MessageFeedback]] = None
 
     span_id: Optional[str] = None
 
@@ -145,7 +233,7 @@ class AgentTraceChatRes(BaseModel):
 
     ended_at: Optional[datetime] = None
 
-    feedback: Optional[List[Dict[str, object]]] = None
+    feedback: Optional[List[Feedback]] = None
 
     messages: List[Message]
 
