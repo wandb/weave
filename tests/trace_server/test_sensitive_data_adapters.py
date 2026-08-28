@@ -181,27 +181,53 @@ def _span_with_pii() -> Span:
     )
 
 
+def _redacted_span(resource_attributes: dict[str, str]) -> Span:
+    """The full expected shape of `_span_with_pii()` after redaction."""
+    return Span(
+        resource=SpanResource(attributes=resource_attributes),
+        name="agents_pii_surface",
+        trace_id="a1" * 16,
+        span_id="b2" * 8,
+        start_time_unix_nano=1,
+        end_time_unix_nano=2,
+        attributes={
+            "gen_ai.prompt": "Email <EMAIL_ADDRESS>",
+            "payload": {"image": "data:image/png;base64,QUJD"},
+        },
+        events=[
+            Event(
+                name="exception",
+                timestamp=1,
+                attributes={"note": "call <PHONE_NUMBER>"},
+            )
+        ],
+        links=[
+            Link(
+                trace_id="c3" * 16,
+                span_id="d4" * 8,
+                attributes={"context": "ssn <US_SSN>"},
+            )
+        ],
+        status=Status(code=StatusCode.ERROR, message="card <CREDIT_CARD>"),
+    )
+
+
 def test_redacts_pii_from_every_span_container() -> None:
     span = _span_with_pii()
 
     redact_pii_from_span(span, SensitiveDataPolicy.PII_V1)
 
     # The shared resource is redacted once per resource-spans group, not here.
-    assert span.resource is not None
-    assert span.resource.attributes == {"service.owner": "ada@example.com"}
+    assert span == _redacted_span(
+        resource_attributes={"service.owner": "ada@example.com"}
+    )
 
+    assert span.resource is not None
     redact_pii_from_resource(span.resource, SensitiveDataPolicy.PII_V1)
 
-    assert span.attributes == {
-        "gen_ai.prompt": "Email <EMAIL_ADDRESS>",
-        "payload": {"image": "data:image/png;base64,QUJD"},
-    }
-    assert span.resource.attributes == {"service.owner": "<EMAIL_ADDRESS>"}
-    assert span.events[0].attributes == {"note": "call <PHONE_NUMBER>"}
-    assert span.links[0].attributes == {"context": "ssn <US_SSN>"}
-    assert span.status.message == "card <CREDIT_CARD>"
-    assert span.name == "agents_pii_surface"
-    assert span.span_id == "b2" * 8
+    assert span == _redacted_span(
+        resource_attributes={"service.owner": "<EMAIL_ADDRESS>"}
+    )
 
 
 def test_span_redaction_off_policy_is_a_noop() -> None:
@@ -213,9 +239,9 @@ def test_span_redaction_off_policy_is_a_noop() -> None:
     redact_pii_from_span(span, SensitiveDataPolicy.OFF)
     redact_pii_from_resource(span.resource, SensitiveDataPolicy.OFF)
 
+    assert span == _span_with_pii()
     assert span.attributes is original_attributes
     assert span.resource.attributes is original_resource_attributes
-    assert span.status.message == "card 4111 1111 1111 1111"
 
 
 def test_bytes_attribute_values_pass_through_unscanned() -> None:
