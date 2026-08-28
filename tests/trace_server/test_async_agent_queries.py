@@ -7,17 +7,17 @@ or what comes back -- not that the transport is faster.
 """
 
 from types import SimpleNamespace
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
 from weave.trace_server.agents.clickhouse import (
     AgentQueryHandler,
     search_res_from_rows,
-    ungrouped_spans_res,
 )
 from weave.trace_server.agents.types import (
     AgentGroupByRef,
+    AgentSearchReq,
     AgentSpansQueryReq,
 )
 from weave.trace_server.async_clickhouse_trace_server import AsyncClickHouseTraceServer
@@ -34,13 +34,13 @@ def result(rows, columns):
 
 
 @pytest.mark.asyncio
-async def test_arun_paginated_issues_the_same_two_statements_as_the_sync_pair():
-    """The count and list SQL must match what `_run_paginated` would run."""
+async def test_arun_paginated_issues_the_sync_pair_with_one_param_builder():
+    """Count then page, built by the same builders and bound to one ParamBuilder."""
     req = AgentSpansQueryReq(project_id=PROJECT, limit=5)
-    seen: list[str] = []
+    seen: list[tuple[str, dict]] = []
 
     async def aquery(sql, params):
-        seen.append(sql)
+        seen.append((sql, params))
         return result([[0]], ["c"]) if len(seen) == 1 else result([], [])
 
     handler = AgentQueryHandler(MagicMock(), MagicMock())
@@ -48,31 +48,14 @@ async def test_arun_paginated_issues_the_same_two_statements_as_the_sync_pair():
         make_spans_count_query, make_spans_list_query, req, aquery
     )
 
-    assert total == 0
-    assert rows == []
-    # Same builders, same order: count first, then the page.
+    assert (total, rows) == (0, [])
     assert len(seen) == 2
-    assert "count" in seen[0].lower()
-    assert seen[0] != seen[1]
-
-
-@pytest.mark.asyncio
-async def test_arun_paginated_shares_one_param_builder():
-    """Both statements bind the same parameters, not two divergent sets."""
-    req = AgentSpansQueryReq(project_id=PROJECT, limit=5)
-    params_seen: list[dict] = []
-
-    async def aquery(sql, params):
-        params_seen.append(params)
-        return result([[0]], ["c"])
-
-    handler = AgentQueryHandler(MagicMock(), MagicMock())
-    await handler.arun_paginated(
-        make_spans_count_query, make_spans_list_query, req, aquery
-    )
-
-    assert params_seen[0] == params_seen[1]
-    assert any(PROJECT in str(v) for v in params_seen[0].values())
+    (count_sql, count_params), (list_sql, list_params) = seen
+    assert "count" in count_sql.lower()
+    assert count_sql != list_sql
+    # One builder: both statements bind the same parameters, not two sets.
+    assert count_params == list_params
+    assert any(PROJECT in str(v) for v in count_params.values())
 
 
 @pytest.mark.asyncio
@@ -90,8 +73,12 @@ async def test_aagent_spans_query_refuses_group_by():
 
 
 @pytest.mark.asyncio
-async def test_aagent_search_returns_the_same_shape_as_the_sync_transform():
-    """`aagent_search` reuses `search_res_from_rows`, so rows map identically."""
+async def test_aagent_search_returns_the_shared_transform_output():
+    """`aagent_search` must go through `search_res_from_rows`, not its own mapping.
+
+    The previous version of this test called the transform directly, so it
+    proved nothing about the async endpoint it was named for.
+    """
     rows = [
         {
             "conversation_id": "c-1",
@@ -104,17 +91,14 @@ async def test_aagent_search_returns_the_same_shape_as_the_sync_transform():
             "content_digest": "d-1",
         }
     ]
-    direct = search_res_from_rows(rows)
-    assert direct.total_conversations == 1
-    assert direct.results[0].conversation_id == "c-1"
-    assert direct.results[0].matched_messages[0].span_id == "s-1"
+    server = AsyncClickHouseTraceServer(host="test")
+    with patch.object(
+        AgentQueryHandler, "arun_message_search_query", AsyncMock(return_value=rows)
+    ):
+        res = await server.aagent_search(AgentSearchReq(project_id=PROJECT))
 
-
-def test_ungrouped_spans_res_is_the_shared_transform():
-    """Both paths build the ungrouped response through this one function."""
-    res = ungrouped_spans_res(0, [])
-    assert res.total_count == 0
-    assert res.spans == []
+    assert res == search_res_from_rows(rows)
+    assert res.results[0].matched_messages[0].span_id == "s-1"
 
 
 @pytest.mark.asyncio
