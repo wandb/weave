@@ -57,6 +57,7 @@ from weave.trace_server.query_builder.agent_query_builder import (
     make_spans_count_query,
     make_spans_list_query,
 )
+from weave.trace_server.token_costs import get_cost_result_columns
 from weave.trace_server.tracing import traced
 
 _T = TypeVar("_T")
@@ -283,11 +284,17 @@ class AsyncClickHouseTraceServer(ClickHouseTraceServer):
         cq, settings = await asyncio.to_thread(self._build_calls_query, req)
         pb = ParamBuilder()
         raw_res = await self._aquery(cq.as_sql(pb), pb.get_params(), settings=settings)
-        select_columns = [c.field for c in cq.select_fields]
+        if req.include_costs:
+            # Cost query SELECT adds ORDER BY fields; result columns must match.
+            select_columns = get_cost_result_columns(
+                [c.field for c in cq.select_fields], cq.order_fields
+            )
+        else:
+            select_columns = [c.field for c in cq.select_fields]
         calls = [
             tsi.CallSchema.model_validate(
                 ch_call_dict_to_call_schema_dict(
-                    dict(zip(select_columns, row, strict=False))
+                    dict(zip(select_columns, row, strict=True))
                 )
             )
             for row in raw_res.result_rows
@@ -299,10 +306,14 @@ class AsyncClickHouseTraceServer(ClickHouseTraceServer):
         self, req: tsi.CallsQueryStatsReq
     ) -> tsi.CallsQueryStatsRes:
         """Native-async twin of `calls_query_stats`."""
-        read_table = await asyncio.to_thread(
-            self.table_routing_resolver.resolve_read_table,
-            req.project_id,
-            self.ch_client,
+        # `ch_client` is thread-local and minting one blocks. Resolve it inside
+        # the pool thread: as an argument it would be evaluated on the event
+        # loop, blocking it on first use and then handing one thread's client to
+        # every other thread that runs this concurrently.
+        read_table = await self._run_on_ch_executor(
+            lambda: self.table_routing_resolver.resolve_read_table(
+                req.project_id, self.ch_client
+            )
         )
         pb = ParamBuilder()
         query, columns, settings = build_calls_stats_query(req, pb, read_table)
