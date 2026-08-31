@@ -99,7 +99,7 @@ trace_server = [
   # Redis for optional task tracking and caching
   "redis>=5.0.0",
   "clickhouse_connect>=1.6,<1.7",
-  "sqlparse>=0.5.0,<0.6",
+  "sqlparse>=0.5.0,<0.7",
   "confluent-kafka>=2.9.0",
   "openai>=1.99.9",
   "requests>=2.32.0",
