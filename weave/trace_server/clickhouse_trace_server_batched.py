@@ -249,7 +249,7 @@ from weave.trace_server.model_providers.model_providers import (
 )
 from weave.trace_server.opentelemetry.helpers import AttributePathConflictError
 from weave.trace_server.opentelemetry.python_spans import Resource, Span
-from weave.trace_server.orm import ParamBuilder, Row
+from weave.trace_server.orm import ParamBuilder, PreparedInsert, Row
 from weave.trace_server.parallel_bucket_uploads import (
     BucketUploadBatch,
     file_chunks_for,
@@ -6810,7 +6810,9 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
         return format_feedback_to_res(row)
 
-    def _prepare_feedback_create(self, req: tsi.FeedbackCreateReq):
+    def _prepare_feedback_create(
+        self, req: tsi.FeedbackCreateReq
+    ) -> tuple[PreparedInsert, Row]:
         """Validate and format one feedback row, up to the insert."""
         assert_non_null_wb_user_id(req)
         validate_feedback_create_req(req, self)
