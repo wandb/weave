@@ -612,6 +612,9 @@ deterministic.
 
 ### Python Conversation Turn messages
 
+- Message search returns conversation pages, not raw message-occurrence pages.
+  Keep untagged messages and replayed copies from consuming the SQL limit while
+  preserving occurrence-level retrieval for requests with an empty query.
 - `Turn.messages` stores input messages, while `Turn.output_messages` stores
   the terminal agent response. `Turn.record(messages=..., output_messages=...)`
   replaces the two lists independently.
