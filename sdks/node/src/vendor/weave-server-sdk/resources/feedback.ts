@@ -24,6 +24,22 @@ export class Feedback extends APIResource {
   }
 
   /**
+   * Aggregate typed scorer feedback (tags, ratings) over time buckets.
+   *
+   * @example
+   * ```ts
+   * const response = await client.feedback.aggregate({
+   *   after_ms: 0,
+   *   before_ms: 0,
+   *   project_id: 'entity/project',
+   * });
+   * ```
+   */
+  aggregate(body: FeedbackAggregateParams, options?: RequestOptions): APIPromise<FeedbackAggregateResponse> {
+    return this._client.post('/feedback/aggregate', { body, ...options });
+  }
+
+  /**
    * Add multiple feedback items to calls or objects.
    *
    * @example
@@ -46,6 +62,24 @@ export class Feedback extends APIResource {
     options?: RequestOptions,
   ): APIPromise<FeedbackBatchCreateResponse> {
     return this._client.post('/feedback/batch/create', { body, ...options });
+  }
+
+  /**
+   * Discover feedback payload schema (paths and types) from sample rows.
+   *
+   * @example
+   * ```ts
+   * const response = await client.feedback.payloadSchema({
+   *   project_id: 'project_id',
+   *   start: '2019-12-27T18:11:19.117Z',
+   * });
+   * ```
+   */
+  payloadSchema(
+    body: FeedbackPayloadSchemaParams,
+    options?: RequestOptions,
+  ): APIPromise<FeedbackPayloadSchemaResponse> {
+    return this._client.post('/feedback/payload_schema', { body, ...options });
   }
 
   /**
@@ -94,6 +128,21 @@ export class Feedback extends APIResource {
   replace(body: FeedbackReplaceParams, options?: RequestOptions): APIPromise<FeedbackReplaceResponse> {
     return this._client.post('/feedback/replace', { body, ...options });
   }
+
+  /**
+   * Return aggregated feedback statistics over time buckets.
+   *
+   * @example
+   * ```ts
+   * const response = await client.feedback.stats({
+   *   project_id: 'project_id',
+   *   start: '2019-12-27T18:11:19.117Z',
+   * });
+   * ```
+   */
+  stats(body: FeedbackStatsParams, options?: RequestOptions): APIPromise<FeedbackStatsResponse> {
+    return this._client.post('/feedback/stats', { body, ...options });
+  }
 }
 
 export interface FeedbackCreateResponse {
@@ -104,6 +153,71 @@ export interface FeedbackCreateResponse {
   payload: { [key: string]: unknown };
 
   wb_user_id: string;
+}
+
+/**
+ * Sparse time-series of aggregated scorer feedback (empty buckets omitted).
+ */
+export interface FeedbackAggregateResponse {
+  /**
+   * Resolved inclusive lower bound, unix epoch ms (UTC).
+   */
+  after_ms: number;
+
+  /**
+   * Resolved exclusive upper bound, unix epoch ms (UTC).
+   */
+  before_ms: number;
+
+  buckets?: Array<FeedbackAggregateResponse.Bucket>;
+
+  /**
+   * Time bucket size used (seconds). None when unbucketed.
+   */
+  time_bucket_seconds?: number | null;
+}
+
+export namespace FeedbackAggregateResponse {
+  /**
+   * One (time bucket, group) row of aggregated scorer feedback.
+   */
+  export interface Bucket {
+    /**
+     * Rows that emitted a score (at least one tag or rating). Excludes agent-monitor
+     * rows that scored nothing — use this for score volume.
+     */
+    scored_count: number;
+
+    /**
+     * Number of feedback rows in this bucket/group.
+     */
+    total_count: number;
+
+    /**
+     * Group-by dimension values for this row (e.g. {'scorer_id': '...'}).
+     */
+    group?: { [key: string]: string };
+
+    /**
+     * Number of rows carrying each rating key (e.g. '_rating_').
+     */
+    rating_counts?: { [key: string]: number };
+
+    /**
+     * Sum of each rating key's values; client derives avg = sum/count.
+     */
+    rating_sums?: { [key: string]: number };
+
+    /**
+     * Count of each scorer tag.
+     */
+    tag_counts?: { [key: string]: number };
+
+    /**
+     * Time bucket start, unix epoch ms (UTC). None when unbucketed.
+     */
+    time_bucket_start_ms?: number | null;
+  }
 }
 
 export interface FeedbackBatchCreateResponse {
@@ -119,6 +233,33 @@ export namespace FeedbackBatchCreateResponse {
     payload: { [key: string]: unknown };
 
     wb_user_id: string;
+  }
+}
+
+/**
+ * Response with discovered feedback payload paths and types.
+ */
+export interface FeedbackPayloadSchemaResponse {
+  /**
+   * Discovered leaf paths with inferred value types.
+   */
+  paths?: Array<FeedbackPayloadSchemaResponse.Path>;
+}
+
+export namespace FeedbackPayloadSchemaResponse {
+  /**
+   * Discovered path in feedback payload with inferred type.
+   */
+  export interface Path {
+    /**
+     * Dot path into payload (e.g. 'output.score').
+     */
+    json_path: string;
+
+    /**
+     * Inferred type of value at path.
+     */
+    value_type?: 'numeric' | 'boolean' | 'categorical';
   }
 }
 
@@ -138,6 +279,43 @@ export interface FeedbackReplaceResponse {
   payload: { [key: string]: unknown };
 
   wb_user_id: string;
+}
+
+/**
+ * Response with time-series feedback statistics.
+ */
+export interface FeedbackStatsResponse {
+  /**
+   * Resolved end time (always UTC, regardless of the requested timezone).
+   */
+  end: string;
+
+  /**
+   * Bucket size used (in seconds)
+   */
+  granularity: number;
+
+  /**
+   * Resolved start time (always UTC, regardless of the requested timezone).
+   */
+  start: string;
+
+  /**
+   * Timezone used for bucket alignment
+   */
+  timezone: string;
+
+  /**
+   * Time-bucketed aggregations. Each dict has 'timestamp' (ISO string), 'count'
+   * (int), and '{agg}\_{slug}' keys for each requested metric+aggregation.
+   */
+  buckets?: Array<{ [key: string]: unknown }>;
+
+  /**
+   * Aggregations over the full query window, keyed by metric slug (e.g.
+   * 'output_score'). Each value maps agg name to result.
+   */
+  window_stats?: { [key: string]: { [key: string]: number | null } } | null;
 }
 
 export interface FeedbackCreateParams {
@@ -238,6 +416,71 @@ export interface FeedbackCreateParams {
    * Do not set directly. Server will automatically populate this field.
    */
   wb_user_id?: string | null;
+}
+
+export interface FeedbackAggregateParams {
+  /**
+   * Inclusive lower bound on created_at (milliseconds since epoch).
+   */
+  after_ms: number;
+
+  /**
+   * Exclusive upper bound on created_at (milliseconds since epoch).
+   */
+  before_ms: number;
+
+  project_id: string;
+
+  /**
+   * Filter on feedback_type by prefix
+   */
+  feedback_types?: Array<string>;
+
+  /**
+   * Allowed: ['scorer_id', 'span_agent_name', 'span_agent_version',
+   * 'span_status_code'].
+   */
+  group_by?: Array<'scorer_id' | 'span_agent_name' | 'span_agent_version' | 'span_status_code'>;
+
+  /**
+   * Filter to these monitor ids (exact match; suffix with '\*' for prefix match).
+   */
+  monitor_ids?: Array<string>;
+
+  /**
+   * Include only rows with a rating <= this value
+   */
+  rating_max?: number | null;
+
+  /**
+   * Include only rows with a rating >= this value
+   */
+  rating_min?: number | null;
+
+  /**
+   * Filter to these scorer ids (exact match; suffix with '\*' for prefix match).
+   */
+  scorer_ids?: Array<string>;
+
+  /**
+   * Filter to feedback whose span_agent_name matches any of these (exact).
+   */
+  span_agent_names?: Array<string>;
+
+  /**
+   * Filter by span type (turn vs conversation).
+   */
+  span_types?: Array<'agent_turn' | 'agent_conversation'>;
+
+  /**
+   * Filter to feedback that includes any of the given tags
+   */
+  tags?: Array<string>;
+
+  /**
+   * Time bucket size in seconds, e.g. 3600 for 1h buckets
+   */
+  time_bucket_seconds?: number | null;
 }
 
 export interface FeedbackBatchCreateParams {
@@ -344,6 +587,39 @@ export namespace FeedbackBatchCreateParams {
      */
     wb_user_id?: string | null;
   }
+}
+
+export interface FeedbackPayloadSchemaParams {
+  project_id: string;
+
+  /**
+   * Inclusive start time (UTC, ISO 8601).
+   */
+  start: string;
+
+  /**
+   * Exclusive end time (UTC, ISO 8601). Defaults to now if omitted.
+   */
+  end?: string | null;
+
+  /**
+   * Filter by feedback_type.
+   */
+  feedback_type?: string | null;
+
+  /**
+   * Max distinct trigger_refs to sample when discovering the payload schema. Each
+   * distinct trigger_ref (monitor/source) typically has a fixed payload structure,
+   * so sampling one payload per ref is usually enough to see the full schema. 2 000
+   * covers virtually all real-world projects while keeping the query fast; the hard
+   * cap of 5 000 prevents runaway scans.
+   */
+  sample_limit?: number;
+
+  /**
+   * Filter by trigger_ref (exact or prefix match for all-versions).
+   */
+  trigger_ref?: string | null;
 }
 
 export interface FeedbackPurgeParams {
@@ -562,17 +838,91 @@ export interface FeedbackReplaceParams {
   wb_user_id?: string | null;
 }
 
+export interface FeedbackStatsParams {
+  project_id: string;
+
+  /**
+   * Inclusive start time (UTC, ISO 8601).
+   */
+  start: string;
+
+  /**
+   * Exclusive end time (UTC, ISO 8601). Defaults to now if omitted.
+   */
+  end?: string | null;
+
+  /**
+   * Filter by feedback_type.
+   */
+  feedback_type?: string | null;
+
+  /**
+   * Bucket size in seconds. If omitted, auto-selected based on time range.
+   */
+  granularity?: number | null;
+
+  /**
+   * Metrics to aggregate from payload_dump.
+   */
+  metrics?: Array<FeedbackStatsParams.Metric>;
+
+  /**
+   * IANA timezone for bucket alignment.
+   */
+  timezone?: string;
+
+  /**
+   * Filter by trigger_ref (exact or prefix match for all-versions).
+   */
+  trigger_ref?: string | null;
+}
+
+export namespace FeedbackStatsParams {
+  /**
+   * Specification for a feedback payload metric to aggregate.
+   */
+  export interface Metric {
+    /**
+     * Dot path into payload_dump (e.g. 'output', 'output.score').
+     */
+    json_path: string;
+
+    /**
+     * Aggregation functions to compute. If empty, defaults are chosen based on
+     * value_type: numeric->avg/min/max, boolean->count_true/count_false.
+     */
+    aggregations?: Array<'sum' | 'avg' | 'min' | 'max' | 'count' | 'count_true' | 'count_false'>;
+
+    /**
+     * Percentile values to compute (0–100), e.g. [5, 50, 95]. Only applicable for
+     * numeric value_type fields; ignored for boolean/categorical.
+     */
+    percentiles?: Array<number>;
+
+    /**
+     * Type of value at path. numeric: avg/min/max; boolean: count_true/count_false.
+     */
+    value_type?: 'numeric' | 'boolean' | 'categorical';
+  }
+}
+
 export declare namespace Feedback {
   export {
     type FeedbackCreateResponse as FeedbackCreateResponse,
+    type FeedbackAggregateResponse as FeedbackAggregateResponse,
     type FeedbackBatchCreateResponse as FeedbackBatchCreateResponse,
+    type FeedbackPayloadSchemaResponse as FeedbackPayloadSchemaResponse,
     type FeedbackPurgeResponse as FeedbackPurgeResponse,
     type FeedbackQueryResponse as FeedbackQueryResponse,
     type FeedbackReplaceResponse as FeedbackReplaceResponse,
+    type FeedbackStatsResponse as FeedbackStatsResponse,
     type FeedbackCreateParams as FeedbackCreateParams,
+    type FeedbackAggregateParams as FeedbackAggregateParams,
     type FeedbackBatchCreateParams as FeedbackBatchCreateParams,
+    type FeedbackPayloadSchemaParams as FeedbackPayloadSchemaParams,
     type FeedbackPurgeParams as FeedbackPurgeParams,
     type FeedbackQueryParams as FeedbackQueryParams,
     type FeedbackReplaceParams as FeedbackReplaceParams,
+    type FeedbackStatsParams as FeedbackStatsParams,
   };
 }

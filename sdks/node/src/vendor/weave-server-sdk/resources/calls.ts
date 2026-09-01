@@ -107,6 +107,21 @@ export class Calls extends APIResource {
   }
 
   /**
+   * Call Stats
+   *
+   * @example
+   * ```ts
+   * const response = await client.calls.stats({
+   *   project_id: 'project_id',
+   *   start: '2019-12-27T18:11:19.117Z',
+   * });
+   * ```
+   */
+  stats(body: CallStatsParams, options?: RequestOptions): APIPromise<CallStatsResponse> {
+    return this._client.post('/calls/stats', { body, ...options });
+  }
+
+  /**
    * Calls Query Stream
    *
    * @example
@@ -262,6 +277,43 @@ export interface CallStartResponse {
   id: string;
 
   trace_id: string;
+}
+
+/**
+ * Response containing time-series call statistics.
+ */
+export interface CallStatsResponse {
+  /**
+   * Resolved end time (UTC)
+   */
+  end: string;
+
+  /**
+   * Bucket size used (in seconds)
+   */
+  granularity: number;
+
+  /**
+   * Resolved start time (UTC)
+   */
+  start: string;
+
+  /**
+   * Timezone used for bucket alignment
+   */
+  timezone: string;
+
+  /**
+   * Call-level metrics. Each bucket contains 'timestamp' and aggregated metric
+   * values.
+   */
+  call_buckets?: Array<{ [key: string]: unknown }>;
+
+  /**
+   * Usage metrics by model. Each bucket contains 'timestamp', 'model', and
+   * aggregated metric values.
+   */
+  usage_buckets?: Array<{ [key: string]: unknown }>;
 }
 
 export type CallStreamQueryResponse = unknown;
@@ -534,6 +586,117 @@ export namespace CallStartParams {
      * Do not set directly. Server will automatically populate this field.
      */
     wb_user_id?: string | null;
+  }
+}
+
+export interface CallStatsParams {
+  project_id: string;
+
+  /**
+   * Inclusive start time (UTC, ISO 8601).
+   */
+  start: string;
+
+  /**
+   * Call-level metrics (latency, counts) to compute. Grouped by timestamp only.
+   */
+  call_metrics?: Array<CallStatsParams.CallMetric> | null;
+
+  /**
+   * Exclusive end time (UTC, ISO 8601). Defaults to now if omitted.
+   */
+  end?: string | null;
+
+  filter?: CallStatsParams.Filter | null;
+
+  /**
+   * Bucket size in seconds (e.g., 3600 for 1 hour). If omitted, auto-selected based
+   * on time range. Will be adjusted if it would produce more than 10,000 buckets.
+   */
+  granularity?: number | null;
+
+  /**
+   * IANA timezone for bucket alignment (e.g., 'America/New_York')
+   */
+  timezone?: string;
+
+  /**
+   * Usage metrics (tokens, cost) to compute. Grouped by timestamp and model.
+   */
+  usage_metrics?: Array<CallStatsParams.UsageMetric> | null;
+}
+
+export namespace CallStatsParams {
+  /**
+   * Specification for a call-level metric to aggregate (not grouped by model).
+   */
+  export interface CallMetric {
+    /**
+     * Metric to aggregate.
+     */
+    metric: 'latency_ms' | 'call_count' | 'error_count';
+
+    /**
+     * Basic aggregation functions to apply
+     */
+    aggregations?: Array<'sum' | 'avg' | 'min' | 'max' | 'count' | 'count_true' | 'count_false'>;
+
+    /**
+     * Percentile values to compute (0-100). E.g., [50, 95, 99] for p50, p95, p99
+     */
+    percentiles?: Array<number>;
+  }
+
+  export interface Filter {
+    call_ids?: Array<string> | null;
+
+    input_refs?: Array<string> | null;
+
+    op_names?: Array<string> | null;
+
+    output_refs?: Array<string> | null;
+
+    parent_ids?: Array<string> | null;
+
+    thread_ids?: Array<string> | null;
+
+    trace_ids?: Array<string> | null;
+
+    trace_roots_only?: boolean | null;
+
+    turn_ids?: Array<string> | null;
+
+    wb_run_ids?: Array<string> | null;
+
+    wb_user_ids?: Array<string> | null;
+  }
+
+  /**
+   * Specification for a usage metric to aggregate (grouped by model).
+   */
+  export interface UsageMetric {
+    /**
+     * Metric to aggregate. Token metrics are normalized across providers.
+     */
+    metric:
+      | 'input_tokens'
+      | 'output_tokens'
+      | 'total_tokens'
+      | 'cache_read_input_tokens'
+      | 'cache_creation_input_tokens'
+      | 'input_cost'
+      | 'output_cost'
+      | 'total_cost';
+
+    /**
+     * Basic aggregation functions to apply
+     */
+    aggregations?: Array<'sum' | 'avg' | 'min' | 'max' | 'count' | 'count_true' | 'count_false'>;
+
+    /**
+     * Percentile values to compute (0-100). E.g., [50, 95, 99] for p50, p95, p99
+     */
+    percentiles?: Array<number>;
   }
 }
 
@@ -847,6 +1010,7 @@ export declare namespace Calls {
     type CallQueryStatsResponse as CallQueryStatsResponse,
     type CallReadResponse as CallReadResponse,
     type CallStartResponse as CallStartResponse,
+    type CallStatsResponse as CallStatsResponse,
     type CallStreamQueryResponse as CallStreamQueryResponse,
     type CallUpsertBatchResponse as CallUpsertBatchResponse,
     type CallUsageResponse as CallUsageResponse,
@@ -856,6 +1020,7 @@ export declare namespace Calls {
     type CallQueryStatsParams as CallQueryStatsParams,
     type CallReadParams as CallReadParams,
     type CallStartParams as CallStartParams,
+    type CallStatsParams as CallStatsParams,
     type CallStreamQueryParams as CallStreamQueryParams,
     type CallUpsertBatchParams as CallUpsertBatchParams,
     type CallUsageParams as CallUsageParams,
