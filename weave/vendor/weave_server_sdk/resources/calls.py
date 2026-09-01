@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from typing import Iterable, Optional
+from typing import Union, Iterable, Optional
+from datetime import datetime
 
 import httpx
 
@@ -10,6 +11,7 @@ from ..types import (
     call_end_params,
     call_read_params,
     call_start_params,
+    call_stats_params,
     call_usage_params,
     call_delete_params,
     call_update_params,
@@ -31,6 +33,7 @@ from .._base_client import make_request_options
 from .._decoders.jsonl import JSONLDecoder, AsyncJSONLDecoder
 from ..types.call_read_response import CallReadResponse
 from ..types.call_start_response import CallStartResponse
+from ..types.call_stats_response import CallStatsResponse
 from ..types.call_usage_response import CallUsageResponse
 from ..types.call_delete_response import CallDeleteResponse
 from ..types.call_query_stats_response import CallQueryStatsResponse
@@ -306,6 +309,70 @@ class CallsResource(SyncAPIResource):
                 extra_headers=extra_headers, extra_query=extra_query, extra_body=extra_body, timeout=timeout
             ),
             cast_to=CallStartResponse,
+        )
+
+    def stats(
+        self,
+        *,
+        project_id: str,
+        start: Union[str, datetime],
+        call_metrics: Optional[Iterable[call_stats_params.CallMetric]] | Omit = omit,
+        end: Union[str, datetime, None] | Omit = omit,
+        filter: Optional[call_stats_params.Filter] | Omit = omit,
+        granularity: Optional[int] | Omit = omit,
+        timezone: str | Omit = omit,
+        usage_metrics: Optional[Iterable[call_stats_params.UsageMetric]] | Omit = omit,
+        # Use the following arguments if you need to pass additional parameters to the API that aren't available via kwargs.
+        # The extra values given here take precedence over values defined on the client or passed to this method.
+        extra_headers: Headers | None = None,
+        extra_query: Query | None = None,
+        extra_body: Body | None = None,
+        timeout: float | httpx.Timeout | None | NotGiven = not_given,
+    ) -> CallStatsResponse:
+        """
+        Call Stats
+
+        Args:
+          start: Inclusive start time (UTC, ISO 8601).
+
+          call_metrics: Call-level metrics (latency, counts) to compute. Grouped by timestamp only.
+
+          end: Exclusive end time (UTC, ISO 8601). Defaults to now if omitted.
+
+          granularity: Bucket size in seconds (e.g., 3600 for 1 hour). If omitted, auto-selected based
+              on time range. Will be adjusted if it would produce more than 10,000 buckets.
+
+          timezone: IANA timezone for bucket alignment (e.g., 'America/New_York')
+
+          usage_metrics: Usage metrics (tokens, cost) to compute. Grouped by timestamp and model.
+
+          extra_headers: Send extra headers
+
+          extra_query: Add additional query parameters to the request
+
+          extra_body: Add additional JSON properties to the request
+
+          timeout: Override the client-level default timeout for this request, in seconds
+        """
+        return self._post(
+            "/calls/stats",
+            body=maybe_transform(
+                {
+                    "project_id": project_id,
+                    "start": start,
+                    "call_metrics": call_metrics,
+                    "end": end,
+                    "filter": filter,
+                    "granularity": granularity,
+                    "timezone": timezone,
+                    "usage_metrics": usage_metrics,
+                },
+                call_stats_params.CallStatsParams,
+            ),
+            options=make_request_options(
+                extra_headers=extra_headers, extra_query=extra_query, extra_body=extra_body, timeout=timeout
+            ),
+            cast_to=CallStatsResponse,
         )
 
     def stream_query(
@@ -750,6 +817,70 @@ class AsyncCallsResource(AsyncAPIResource):
             cast_to=CallStartResponse,
         )
 
+    async def stats(
+        self,
+        *,
+        project_id: str,
+        start: Union[str, datetime],
+        call_metrics: Optional[Iterable[call_stats_params.CallMetric]] | Omit = omit,
+        end: Union[str, datetime, None] | Omit = omit,
+        filter: Optional[call_stats_params.Filter] | Omit = omit,
+        granularity: Optional[int] | Omit = omit,
+        timezone: str | Omit = omit,
+        usage_metrics: Optional[Iterable[call_stats_params.UsageMetric]] | Omit = omit,
+        # Use the following arguments if you need to pass additional parameters to the API that aren't available via kwargs.
+        # The extra values given here take precedence over values defined on the client or passed to this method.
+        extra_headers: Headers | None = None,
+        extra_query: Query | None = None,
+        extra_body: Body | None = None,
+        timeout: float | httpx.Timeout | None | NotGiven = not_given,
+    ) -> CallStatsResponse:
+        """
+        Call Stats
+
+        Args:
+          start: Inclusive start time (UTC, ISO 8601).
+
+          call_metrics: Call-level metrics (latency, counts) to compute. Grouped by timestamp only.
+
+          end: Exclusive end time (UTC, ISO 8601). Defaults to now if omitted.
+
+          granularity: Bucket size in seconds (e.g., 3600 for 1 hour). If omitted, auto-selected based
+              on time range. Will be adjusted if it would produce more than 10,000 buckets.
+
+          timezone: IANA timezone for bucket alignment (e.g., 'America/New_York')
+
+          usage_metrics: Usage metrics (tokens, cost) to compute. Grouped by timestamp and model.
+
+          extra_headers: Send extra headers
+
+          extra_query: Add additional query parameters to the request
+
+          extra_body: Add additional JSON properties to the request
+
+          timeout: Override the client-level default timeout for this request, in seconds
+        """
+        return await self._post(
+            "/calls/stats",
+            body=await async_maybe_transform(
+                {
+                    "project_id": project_id,
+                    "start": start,
+                    "call_metrics": call_metrics,
+                    "end": end,
+                    "filter": filter,
+                    "granularity": granularity,
+                    "timezone": timezone,
+                    "usage_metrics": usage_metrics,
+                },
+                call_stats_params.CallStatsParams,
+            ),
+            options=make_request_options(
+                extra_headers=extra_headers, extra_query=extra_query, extra_body=extra_body, timeout=timeout
+            ),
+            cast_to=CallStatsResponse,
+        )
+
     async def stream_query(
         self,
         *,
@@ -945,6 +1076,9 @@ class CallsResourceWithRawResponse:
         self.start = to_raw_response_wrapper(
             calls.start,
         )
+        self.stats = to_raw_response_wrapper(
+            calls.stats,
+        )
         self.stream_query = to_raw_response_wrapper(
             calls.stream_query,
         )
@@ -977,6 +1111,9 @@ class AsyncCallsResourceWithRawResponse:
         )
         self.start = async_to_raw_response_wrapper(
             calls.start,
+        )
+        self.stats = async_to_raw_response_wrapper(
+            calls.stats,
         )
         self.stream_query = async_to_raw_response_wrapper(
             calls.stream_query,
@@ -1011,6 +1148,9 @@ class CallsResourceWithStreamingResponse:
         self.start = to_streamed_response_wrapper(
             calls.start,
         )
+        self.stats = to_streamed_response_wrapper(
+            calls.stats,
+        )
         self.stream_query = to_streamed_response_wrapper(
             calls.stream_query,
         )
@@ -1043,6 +1183,9 @@ class AsyncCallsResourceWithStreamingResponse:
         )
         self.start = async_to_streamed_response_wrapper(
             calls.start,
+        )
+        self.stats = async_to_streamed_response_wrapper(
+            calls.stats,
         )
         self.stream_query = async_to_streamed_response_wrapper(
             calls.stream_query,
