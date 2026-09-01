@@ -87,9 +87,7 @@ def test_clickhouse_batching():
     mock_ch_client.query.return_value.result_rows = []
 
     # Create a ClickHouseTraceServer instance and patch _mint_client
-    with patch.object(
-        SyncClickHouseTransport, "mint", return_value=mock_ch_client
-    ):
+    with patch.object(SyncClickHouseTransport, "mint", return_value=mock_ch_client):
         trace_server = ClickHouseTraceServer(host="test_host")
 
         # Use properly base64 encoded project_id (entity/project format)
@@ -181,9 +179,7 @@ def test_clickhouse_batching_deduplicates_identical_files():
     mock_ch_client.insert.return_value = MagicMock()
     mock_ch_client.query.return_value.result_rows = []
 
-    with patch.object(
-        SyncClickHouseTransport, "mint", return_value=mock_ch_client
-    ):
+    with patch.object(SyncClickHouseTransport, "mint", return_value=mock_ch_client):
         trace_server = ClickHouseTraceServer(host="test_host")
         project_id = base64.b64encode(b"test_entity/test_project").decode("utf-8")
 
@@ -483,9 +479,7 @@ def test_call_start_batch_invalid_trace_id_returns_400():
     mock_query_result = MagicMock()
     mock_query_result.result_rows = [[0, 1]]  # has_complete=0, has_merged=1
 
-    with patch.object(
-        SyncClickHouseTransport, "mint", return_value=mock_ch_client
-    ):
+    with patch.object(SyncClickHouseTransport, "mint", return_value=mock_ch_client):
         trace_server = ClickHouseTraceServer(host="test_host")
         mock_ch_client.query.return_value = mock_query_result
 

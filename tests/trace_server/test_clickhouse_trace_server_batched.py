@@ -56,9 +56,7 @@ def test_clickhouse_storage_size_query_generation():
             autospec=True,
         ) as mock_cq,
         patch.object(chts.ClickHouseTraceServer, "_query_stream") as mock_query_stream,
-        patch.object(
-            chts.SyncClickHouseTransport, "mint", return_value=mock_ch_client
-        ),
+        patch.object(chts.SyncClickHouseTransport, "mint", return_value=mock_ch_client),
     ):
         # Create a mock CallsQuery instance
         mock_calls_query = Mock()
@@ -130,9 +128,7 @@ def test_clickhouse_calls_query_stream_sort_modes(
             autospec=True,
         ) as mock_cq,
         patch.object(chts.ClickHouseTraceServer, "_query_stream") as mock_query_stream,
-        patch.object(
-            chts.SyncClickHouseTransport, "mint", return_value=MagicMock()
-        ),
+        patch.object(chts.SyncClickHouseTransport, "mint", return_value=MagicMock()),
     ):
         mock_calls_query = Mock()
         mock_calls_query.order_fields = []
@@ -639,9 +635,7 @@ def test_completions_create_stream_custom_provider_with_tracking():
         patch(
             "weave.trace_server.clickhouse_trace_server_batched.AgentWriteHandler"
         ) as mock_agent_writer_cls,
-        patch.object(
-            chts.SyncClickHouseTransport, "mint", return_value=mock_ch_client
-        ),
+        patch.object(chts.SyncClickHouseTransport, "mint", return_value=mock_ch_client),
     ):
         mock_agent_writer = MagicMock()
         mock_agent_writer_cls.return_value = mock_agent_writer
@@ -809,9 +803,7 @@ def test_completions_create_stream_multiple_choices():
         patch(
             "weave.trace_server.clickhouse_trace_server_batched.AgentWriteHandler"
         ) as mock_agent_writer_cls,
-        patch.object(
-            chts.SyncClickHouseTransport, "mint", return_value=mock_ch_client
-        ),
+        patch.object(chts.SyncClickHouseTransport, "mint", return_value=mock_ch_client),
     ):
         mock_agent_writer = MagicMock()
         mock_agent_writer_cls.return_value = mock_agent_writer
@@ -909,9 +901,7 @@ def test_completions_create_stream_single_choice_unified_wrapper():
         patch(
             "weave.trace_server.clickhouse_trace_server_batched.AgentWriteHandler"
         ) as mock_agent_writer_cls,
-        patch.object(
-            chts.SyncClickHouseTransport, "mint", return_value=mock_ch_client
-        ),
+        patch.object(chts.SyncClickHouseTransport, "mint", return_value=mock_ch_client),
     ):
         mock_agent_writer = MagicMock()
         mock_agent_writer_cls.return_value = mock_agent_writer
@@ -1367,9 +1357,7 @@ def test_correlation_id_and_query_id_are_set_on_the_dd_span():
     tagged: list[dict] = []
 
     with (
-        patch.object(
-            chts.SyncClickHouseTransport, "mint", return_value=mock_ch_client
-        ),
+        patch.object(chts.SyncClickHouseTransport, "mint", return_value=mock_ch_client),
         patch.object(chts_utilities, "set_current_span_dd_tags", tagged.append),
     ):
         server = chts.ClickHouseTraceServer(host="test_host")
@@ -1506,9 +1494,7 @@ def test_kafka_producer_feature_gate(
     monkeypatch, online_eval, scoring, insights, should_enable
 ):
     mock_producer = MagicMock()
-    monkeypatch.setattr(
-        chts.SyncClickHouseTransport, "mint", lambda self: MagicMock()
-    )
+    monkeypatch.setattr(chts.SyncClickHouseTransport, "mint", lambda self: MagicMock())
     server = chts.ClickHouseTraceServer(host="test_host")
     server._kafka_producer = mock_producer
     monkeypatch.setattr(
@@ -2203,9 +2189,7 @@ def _turn_ended_span_row() -> AgentSpanCHInsertable:
 def test_genai_otel_export_emit_gate(monkeypatch, online_eval, scoring, insights):
     """OTel ingest emits for scoring or Insights, independent of online eval."""
     mock_producer = MagicMock()
-    monkeypatch.setattr(
-        chts.SyncClickHouseTransport, "mint", lambda self: MagicMock()
-    )
+    monkeypatch.setattr(chts.SyncClickHouseTransport, "mint", lambda self: MagicMock())
     server = chts.ClickHouseTraceServer(host="test_host")
     server._kafka_producer = mock_producer
 
