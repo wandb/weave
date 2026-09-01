@@ -4039,7 +4039,13 @@ class CallStatsRes(BaseModel):
 
 
 class LLMAggregatedUsage(BaseModel):
-    """Aggregated usage metrics for a specific LLM."""
+    """Aggregated usage metrics for a specific LLM.
+
+    Constructor defaults stay for Python callers. Serialization JSON Schema
+    marks those fields required so OpenAPI matches the JSON FastAPI sends.
+    """
+
+    model_config = ConfigDict(json_schema_serialization_defaults_required=True)
 
     requests: int = 0
     prompt_tokens: int = 0
@@ -4091,6 +4097,8 @@ class TraceUsageReq(BaseModelStrict):
 class TraceUsageRes(BaseModel):
     """Response with per-call usage metrics (each includes descendant contributions)."""
 
+    model_config = ConfigDict(json_schema_serialization_defaults_required=True)
+
     # Mapping from call_id to usage metrics (own + descendants)
     call_usage: dict[str, dict[str, LLMAggregatedUsage]] = Field(default_factory=dict)
     # Unique IDs of calls in the result set that have not ended yet.
@@ -4127,6 +4135,8 @@ class CallsUsageReq(BaseModelStrict):
 
 class CallsUsageRes(BaseModel):
     """Response with aggregated usage metrics per root call."""
+
+    model_config = ConfigDict(json_schema_serialization_defaults_required=True)
 
     # Mapping from root call_id to aggregated usage metrics (root + descendants)
     call_usage: dict[str, dict[str, LLMAggregatedUsage]] = Field(default_factory=dict)
