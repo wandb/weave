@@ -322,7 +322,7 @@ class SyncClickHouseTransport:
         `send_receive_timeout` overrides the HTTP read timeout (migration clients
         need to outlast replicated-DDL propagation); None keeps the library default.
         """
-        optional_kwargs: dict[str, int] = {}
+        optional_kwargs: dict[str, Any] = {}
         if send_receive_timeout is not None:
             optional_kwargs["send_receive_timeout"] = send_receive_timeout
         client = clickhouse_connect.get_client(
