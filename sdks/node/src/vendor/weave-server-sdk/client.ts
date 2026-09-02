@@ -26,6 +26,8 @@ import {
   CallQueryStatsResponse,
   CallReadParams,
   CallReadResponse,
+  CallScoreParams,
+  CallScoreResponse,
   CallStartParams,
   CallStartResponse,
   CallStatsParams,
@@ -49,6 +51,15 @@ import {
   CostQueryResponse,
   Costs,
 } from './resources/costs';
+import {
+  EvaluationEvaluateModelParams,
+  EvaluationEvaluateModelResponse,
+  EvaluationRescoreParams,
+  EvaluationRescoreResponse,
+  EvaluationStatusParams,
+  EvaluationStatusResponse,
+  Evaluations,
+} from './resources/evaluations';
 import {
   Feedback,
   FeedbackAggregateParams,
@@ -77,6 +88,7 @@ import {
   FileStatsResponse,
   Files,
 } from './resources/files';
+import { ImageCreateParams, ImageCreateResponse, Images } from './resources/images';
 import { Otel, OtelExportResponse } from './resources/otel';
 import { RefReadBatchParams, RefReadBatchResponse, Refs } from './resources/refs';
 import {
@@ -115,6 +127,11 @@ import {
   V2DatasetReadResponse,
   V2Datasets,
 } from './resources/v2-datasets';
+import {
+  V2EvalResultQueryParams,
+  V2EvalResultQueryResponse,
+  V2EvalResults,
+} from './resources/v2-eval-results';
 import {
   V2EvaluationRunCreateParams,
   V2EvaluationRunCreateResponse,
@@ -174,6 +191,7 @@ import {
   V2PredictionReadResponse,
   V2Predictions,
 } from './resources/v2-predictions';
+import { V2RuntimeApplyParams, V2RuntimeApplyResponse, V2Runtimes } from './resources/v2-runtimes';
 import {
   V2ScorerCreateParams,
   V2ScorerCreateResponse,
@@ -204,6 +222,21 @@ import {
   AgentTraceChatRes,
   Agents,
 } from './resources/agents/agents';
+import {
+  AnnotationQueueCreateParams,
+  AnnotationQueueCreateResponse,
+  AnnotationQueueDeleteParams,
+  AnnotationQueueDeleteResponse,
+  AnnotationQueueQueryParams,
+  AnnotationQueueReadParams,
+  AnnotationQueueReadResponse,
+  AnnotationQueueSchema,
+  AnnotationQueueStatsParams,
+  AnnotationQueueStatsResponse,
+  AnnotationQueueUpdateParams,
+  AnnotationQueueUpdateResponse,
+  AnnotationQueues,
+} from './resources/annotation-queues/annotation-queues';
 import {
   ObjectCreateParams,
   ObjectCreateResponse,
@@ -963,6 +996,9 @@ export class WeaveTrace {
   trace: API.Trace = new API.Trace(this);
   threads: API.Threads = new API.Threads(this);
   agents: API.Agents = new API.Agents(this);
+  annotationQueues: API.AnnotationQueues = new API.AnnotationQueues(this);
+  evaluations: API.Evaluations = new API.Evaluations(this);
+  images: API.Images = new API.Images(this);
   v2Ops: API.V2Ops = new API.V2Ops(this);
   v2Scorers: API.V2Scorers = new API.V2Scorers(this);
   v2Datasets: API.V2Datasets = new API.V2Datasets(this);
@@ -972,6 +1008,8 @@ export class WeaveTrace {
   v2Predictions: API.V2Predictions = new API.V2Predictions(this);
   v2Scores: API.V2Scores = new API.V2Scores(this);
   v2Calls: API.V2Calls = new API.V2Calls(this);
+  v2Runtimes: API.V2Runtimes = new API.V2Runtimes(this);
+  v2EvalResults: API.V2EvalResults = new API.V2EvalResults(this);
 }
 
 WeaveTrace.Services = Services;
@@ -986,6 +1024,9 @@ WeaveTrace.Otel = Otel;
 WeaveTrace.Trace = Trace;
 WeaveTrace.Threads = Threads;
 WeaveTrace.Agents = Agents;
+WeaveTrace.AnnotationQueues = AnnotationQueues;
+WeaveTrace.Evaluations = Evaluations;
+WeaveTrace.Images = Images;
 WeaveTrace.V2Ops = V2Ops;
 WeaveTrace.V2Scorers = V2Scorers;
 WeaveTrace.V2Datasets = V2Datasets;
@@ -995,6 +1036,8 @@ WeaveTrace.V2EvaluationRuns = V2EvaluationRuns;
 WeaveTrace.V2Predictions = V2Predictions;
 WeaveTrace.V2Scores = V2Scores;
 WeaveTrace.V2Calls = V2Calls;
+WeaveTrace.V2Runtimes = V2Runtimes;
+WeaveTrace.V2EvalResults = V2EvalResults;
 
 export declare namespace WeaveTrace {
   export type RequestOptions = Opts.RequestOptions;
@@ -1014,6 +1057,7 @@ export declare namespace WeaveTrace {
     type CallEndResponse as CallEndResponse,
     type CallQueryStatsResponse as CallQueryStatsResponse,
     type CallReadResponse as CallReadResponse,
+    type CallScoreResponse as CallScoreResponse,
     type CallStartResponse as CallStartResponse,
     type CallStatsResponse as CallStatsResponse,
     type CallStreamQueryResponse as CallStreamQueryResponse,
@@ -1024,6 +1068,7 @@ export declare namespace WeaveTrace {
     type CallEndParams as CallEndParams,
     type CallQueryStatsParams as CallQueryStatsParams,
     type CallReadParams as CallReadParams,
+    type CallScoreParams as CallScoreParams,
     type CallStartParams as CallStartParams,
     type CallStatsParams as CallStatsParams,
     type CallStreamQueryParams as CallStreamQueryParams,
@@ -1126,6 +1171,38 @@ export declare namespace WeaveTrace {
     type AgentSearchResponse as AgentSearchResponse,
     type AgentQueryParams as AgentQueryParams,
     type AgentSearchParams as AgentSearchParams,
+  };
+
+  export {
+    AnnotationQueues as AnnotationQueues,
+    type AnnotationQueueSchema as AnnotationQueueSchema,
+    type AnnotationQueueCreateResponse as AnnotationQueueCreateResponse,
+    type AnnotationQueueUpdateResponse as AnnotationQueueUpdateResponse,
+    type AnnotationQueueDeleteResponse as AnnotationQueueDeleteResponse,
+    type AnnotationQueueReadResponse as AnnotationQueueReadResponse,
+    type AnnotationQueueStatsResponse as AnnotationQueueStatsResponse,
+    type AnnotationQueueCreateParams as AnnotationQueueCreateParams,
+    type AnnotationQueueUpdateParams as AnnotationQueueUpdateParams,
+    type AnnotationQueueDeleteParams as AnnotationQueueDeleteParams,
+    type AnnotationQueueQueryParams as AnnotationQueueQueryParams,
+    type AnnotationQueueReadParams as AnnotationQueueReadParams,
+    type AnnotationQueueStatsParams as AnnotationQueueStatsParams,
+  };
+
+  export {
+    Evaluations as Evaluations,
+    type EvaluationEvaluateModelResponse as EvaluationEvaluateModelResponse,
+    type EvaluationRescoreResponse as EvaluationRescoreResponse,
+    type EvaluationStatusResponse as EvaluationStatusResponse,
+    type EvaluationEvaluateModelParams as EvaluationEvaluateModelParams,
+    type EvaluationRescoreParams as EvaluationRescoreParams,
+    type EvaluationStatusParams as EvaluationStatusParams,
+  };
+
+  export {
+    Images as Images,
+    type ImageCreateResponse as ImageCreateResponse,
+    type ImageCreateParams as ImageCreateParams,
   };
 
   export {
@@ -1232,6 +1309,18 @@ export declare namespace WeaveTrace {
     V2Calls as V2Calls,
     type V2CallCompleteResponse as V2CallCompleteResponse,
     type V2CallCompleteParams as V2CallCompleteParams,
+  };
+
+  export {
+    V2Runtimes as V2Runtimes,
+    type V2RuntimeApplyResponse as V2RuntimeApplyResponse,
+    type V2RuntimeApplyParams as V2RuntimeApplyParams,
+  };
+
+  export {
+    V2EvalResults as V2EvalResults,
+    type V2EvalResultQueryResponse as V2EvalResultQueryResponse,
+    type V2EvalResultQueryParams as V2EvalResultQueryParams,
   };
 
   export type AndOperation = API.AndOperation;

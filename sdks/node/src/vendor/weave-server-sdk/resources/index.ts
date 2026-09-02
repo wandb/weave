@@ -10,12 +10,28 @@ export {
   type AgentSearchParams,
 } from './agents/agents';
 export {
+  AnnotationQueues,
+  type AnnotationQueueSchema,
+  type AnnotationQueueCreateResponse,
+  type AnnotationQueueUpdateResponse,
+  type AnnotationQueueDeleteResponse,
+  type AnnotationQueueReadResponse,
+  type AnnotationQueueStatsResponse,
+  type AnnotationQueueCreateParams,
+  type AnnotationQueueUpdateParams,
+  type AnnotationQueueDeleteParams,
+  type AnnotationQueueQueryParams,
+  type AnnotationQueueReadParams,
+  type AnnotationQueueStatsParams,
+} from './annotation-queues/annotation-queues';
+export {
   Calls,
   type CallUpdateResponse,
   type CallDeleteResponse,
   type CallEndResponse,
   type CallQueryStatsResponse,
   type CallReadResponse,
+  type CallScoreResponse,
   type CallStartResponse,
   type CallStatsResponse,
   type CallStreamQueryResponse,
@@ -26,6 +42,7 @@ export {
   type CallEndParams,
   type CallQueryStatsParams,
   type CallReadParams,
+  type CallScoreParams,
   type CallStartParams,
   type CallStatsParams,
   type CallStreamQueryParams,
@@ -41,6 +58,15 @@ export {
   type CostPurgeParams,
   type CostQueryParams,
 } from './costs';
+export {
+  Evaluations,
+  type EvaluationEvaluateModelResponse,
+  type EvaluationRescoreResponse,
+  type EvaluationStatusResponse,
+  type EvaluationEvaluateModelParams,
+  type EvaluationRescoreParams,
+  type EvaluationStatusParams,
+} from './evaluations';
 export {
   Feedback,
   type FeedbackCreateResponse,
@@ -69,6 +95,7 @@ export {
   type FileContentParams,
   type FileStatsParams,
 } from './files';
+export { Images, type ImageCreateResponse, type ImageCreateParams } from './images';
 export {
   Objects,
   type ObjectCreateResponse,
@@ -118,6 +145,11 @@ export {
   type V2DatasetDeleteParams,
   type V2DatasetReadParams,
 } from './v2-datasets';
+export {
+  V2EvalResults,
+  type V2EvalResultQueryResponse,
+  type V2EvalResultQueryParams,
+} from './v2-eval-results';
 export {
   V2EvaluationRuns,
   type V2EvaluationRunCreateResponse,
@@ -177,6 +209,7 @@ export {
   type V2PredictionFinishParams,
   type V2PredictionReadParams,
 } from './v2-predictions';
+export { V2Runtimes, type V2RuntimeApplyResponse, type V2RuntimeApplyParams } from './v2-runtimes';
 export {
   V2Scorers,
   type V2ScorerCreateResponse,

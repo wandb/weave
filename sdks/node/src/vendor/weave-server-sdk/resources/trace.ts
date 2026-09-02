@@ -18,35 +18,38 @@ export class Trace extends APIResource {
  * Response with per-call usage metrics (each includes descendant contributions).
  */
 export interface TraceUsageResponse {
-  call_usage?: { [key: string]: { [key: string]: TraceUsageResponse.LLMAggregatedUsage } };
+  call_usage: { [key: string]: { [key: string]: TraceUsageResponse.LLMAggregatedUsage } };
 
-  unfinished_call_ids?: Array<string>;
+  unfinished_call_ids: Array<string>;
 }
 
 export namespace TraceUsageResponse {
   /**
    * Aggregated usage metrics for a specific LLM.
+   *
+   * Constructor defaults stay for Python callers. Serialization JSON Schema marks
+   * those fields required so OpenAPI matches the JSON FastAPI sends.
    */
   export interface LLMAggregatedUsage {
-    cache_creation_input_tokens?: number;
+    cache_creation_input_tokens: number;
 
-    cache_creation_input_tokens_total_cost?: number | null;
+    cache_creation_input_tokens_total_cost: number | null;
 
-    cache_read_input_tokens?: number;
+    cache_read_input_tokens: number;
 
-    cache_read_input_tokens_total_cost?: number | null;
+    cache_read_input_tokens_total_cost: number | null;
 
-    completion_tokens?: number;
+    completion_tokens: number;
 
-    completion_tokens_total_cost?: number | null;
+    completion_tokens_total_cost: number | null;
 
-    prompt_tokens?: number;
+    prompt_tokens: number;
 
-    prompt_tokens_total_cost?: number | null;
+    prompt_tokens_total_cost: number | null;
 
-    requests?: number;
+    requests: number;
 
-    total_tokens?: number;
+    total_tokens: number;
   }
 }
 

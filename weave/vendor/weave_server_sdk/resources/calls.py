@@ -10,6 +10,7 @@ import httpx
 from ..types import (
     call_end_params,
     call_read_params,
+    call_score_params,
     call_start_params,
     call_stats_params,
     call_usage_params,
@@ -277,6 +278,55 @@ class CallsResource(SyncAPIResource):
                 extra_headers=extra_headers, extra_query=extra_query, extra_body=extra_body, timeout=timeout
             ),
             cast_to=CallReadResponse,
+        )
+
+    def score(
+        self,
+        *,
+        call_ids: SequenceNotStr[str],
+        project_id: str,
+        scorer_refs: SequenceNotStr[str],
+        wb_user_id: Optional[str] | Omit = omit,
+        # Use the following arguments if you need to pass additional parameters to the API that aren't available via kwargs.
+        # The extra values given here take precedence over values defined on the client or passed to this method.
+        extra_headers: Headers | None = None,
+        extra_query: Query | None = None,
+        extra_body: Body | None = None,
+        timeout: float | httpx.Timeout | None | NotGiven = not_given,
+    ) -> object:
+        """
+        Calls Score
+
+        Args:
+          call_ids: List of call IDs to score
+
+          scorer_refs: List of scorer refs to apply
+
+          wb_user_id: Do not set directly. Server will automatically populate this field.
+
+          extra_headers: Send extra headers
+
+          extra_query: Add additional query parameters to the request
+
+          extra_body: Add additional JSON properties to the request
+
+          timeout: Override the client-level default timeout for this request, in seconds
+        """
+        return self._post(
+            "/calls/score",
+            body=maybe_transform(
+                {
+                    "call_ids": call_ids,
+                    "project_id": project_id,
+                    "scorer_refs": scorer_refs,
+                    "wb_user_id": wb_user_id,
+                },
+                call_score_params.CallScoreParams,
+            ),
+            options=make_request_options(
+                extra_headers=extra_headers, extra_query=extra_query, extra_body=extra_body, timeout=timeout
+            ),
+            cast_to=object,
         )
 
     def start(
@@ -785,6 +835,55 @@ class AsyncCallsResource(AsyncAPIResource):
             cast_to=CallReadResponse,
         )
 
+    async def score(
+        self,
+        *,
+        call_ids: SequenceNotStr[str],
+        project_id: str,
+        scorer_refs: SequenceNotStr[str],
+        wb_user_id: Optional[str] | Omit = omit,
+        # Use the following arguments if you need to pass additional parameters to the API that aren't available via kwargs.
+        # The extra values given here take precedence over values defined on the client or passed to this method.
+        extra_headers: Headers | None = None,
+        extra_query: Query | None = None,
+        extra_body: Body | None = None,
+        timeout: float | httpx.Timeout | None | NotGiven = not_given,
+    ) -> object:
+        """
+        Calls Score
+
+        Args:
+          call_ids: List of call IDs to score
+
+          scorer_refs: List of scorer refs to apply
+
+          wb_user_id: Do not set directly. Server will automatically populate this field.
+
+          extra_headers: Send extra headers
+
+          extra_query: Add additional query parameters to the request
+
+          extra_body: Add additional JSON properties to the request
+
+          timeout: Override the client-level default timeout for this request, in seconds
+        """
+        return await self._post(
+            "/calls/score",
+            body=await async_maybe_transform(
+                {
+                    "call_ids": call_ids,
+                    "project_id": project_id,
+                    "scorer_refs": scorer_refs,
+                    "wb_user_id": wb_user_id,
+                },
+                call_score_params.CallScoreParams,
+            ),
+            options=make_request_options(
+                extra_headers=extra_headers, extra_query=extra_query, extra_body=extra_body, timeout=timeout
+            ),
+            cast_to=object,
+        )
+
     async def start(
         self,
         *,
@@ -1073,6 +1172,9 @@ class CallsResourceWithRawResponse:
         self.read = to_raw_response_wrapper(
             calls.read,
         )
+        self.score = to_raw_response_wrapper(
+            calls.score,
+        )
         self.start = to_raw_response_wrapper(
             calls.start,
         )
@@ -1108,6 +1210,9 @@ class AsyncCallsResourceWithRawResponse:
         )
         self.read = async_to_raw_response_wrapper(
             calls.read,
+        )
+        self.score = async_to_raw_response_wrapper(
+            calls.score,
         )
         self.start = async_to_raw_response_wrapper(
             calls.start,
@@ -1145,6 +1250,9 @@ class CallsResourceWithStreamingResponse:
         self.read = to_streamed_response_wrapper(
             calls.read,
         )
+        self.score = to_streamed_response_wrapper(
+            calls.score,
+        )
         self.start = to_streamed_response_wrapper(
             calls.start,
         )
@@ -1180,6 +1288,9 @@ class AsyncCallsResourceWithStreamingResponse:
         )
         self.read = async_to_streamed_response_wrapper(
             calls.read,
+        )
+        self.score = async_to_streamed_response_wrapper(
+            calls.score,
         )
         self.start = async_to_streamed_response_wrapper(
             calls.start,
