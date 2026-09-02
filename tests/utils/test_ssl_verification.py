@@ -90,7 +90,7 @@ class TestInternalApiSslVerify:
         with (
             patch("gql.Client", return_value=mock_client),
             patch(
-                "weave.compat.wandb.wandb_thin.internal_api.get_wandb_api_context",
+                "weave.compat.wandb.wandb_thin.internal_api.get_wandb_auth_context",
                 return_value=None,
             ),
             patch.dict(
@@ -119,7 +119,7 @@ class TestInternalApiSslVerify:
         with (
             patch("gql.Client", return_value=mock_client),
             patch(
-                "weave.compat.wandb.wandb_thin.internal_api.get_wandb_api_context",
+                "weave.compat.wandb.wandb_thin.internal_api.get_wandb_auth_context",
                 return_value=None,
             ),
             patch.dict(

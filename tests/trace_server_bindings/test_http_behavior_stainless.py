@@ -21,12 +21,54 @@ from weave.trace_server_bindings.stainless_remote_http_trace_server import (
 )
 from weave.utils.retry import with_retry
 from weave.vendor.weave_server_sdk import APIStatusError
+from weave.wandb_interface.auth import ApiKeyCredentials, WandbCredentials
 
 
 @pytest.fixture
 def unbatched_server():
     """Create a StainlessRemoteHTTPTraceServer instance without batching for testing."""
     return StainlessRemoteHTTPTraceServer("http://example.com")
+
+
+def test_federated_auth_refreshes_headers(unbatched_server):
+    class RotatingCredentials(WandbCredentials):
+        def __init__(self) -> None:
+            self.request_count = 0
+
+        def authorization_header(self) -> str:
+            self.request_count += 1
+            return f"Bearer token-{self.request_count}"
+
+        def bearer_token(self) -> str:
+            return "unused"
+
+        def wal_seed(self) -> str:
+            return "stable"
+
+    credentials = RotatingCredentials()
+    unbatched_server.set_auth(credentials)
+    mock_response = MagicMock()
+    mock_response.model_dump.return_value = {
+        "id": "call-id",
+        "trace_id": "test_trace_id",
+    }
+    unbatched_server._stainless_client.calls.start = MagicMock(
+        return_value=mock_response
+    )
+
+    unbatched_server.call_start(tsi.CallStartReq(start=generate_start("call-id")))
+
+    request_headers = unbatched_server._stainless_client.calls.start.call_args.kwargs[
+        "extra_headers"
+    ]
+    assert request_headers == {"Authorization": "Bearer token-2"}
+
+
+def test_set_auth_normalizes_api_key_tuple(unbatched_server):
+    unbatched_server.set_auth(("api", "secret"))
+
+    assert isinstance(unbatched_server._credentials, ApiKeyCredentials)
+    assert unbatched_server._credentials.api_key == "secret"
 
 
 def test_call_start_ok(unbatched_server):

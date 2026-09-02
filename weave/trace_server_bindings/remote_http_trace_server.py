@@ -47,6 +47,7 @@ from weave.utils import http_requests
 from weave.utils.project_id import from_project_id
 from weave.utils.retry import get_current_retry_id, with_retry
 from weave.wandb_interface import project_creator
+from weave.wandb_interface.auth import WandbCredentials
 
 logger = logging.getLogger(__name__)
 
@@ -66,7 +67,7 @@ class RemoteHTTPTraceServer(TraceServerClientInterface):
         should_batch: bool = False,
         *,
         remote_request_bytes_limit: int = REMOTE_REQUEST_BYTES_LIMIT,
-        auth: tuple[str, str] | None = None,
+        auth: WandbCredentials | None = None,
         extra_headers: dict[str, str] | None = None,
     ):
         super().__init__()
@@ -94,7 +95,7 @@ class RemoteHTTPTraceServer(TraceServerClientInterface):
                 max_queue_size=max_calls_queue_size(),
                 enable_disk_fallback=should_enable_disk_fallback(),
             )
-        self._auth: tuple[str, str] | None = auth
+        self._auth: httpx.Auth | None = auth.httpx_auth() if auth is not None else None
         self._extra_headers: dict[str, str] | None = extra_headers
         self.remote_request_bytes_limit = remote_request_bytes_limit
 
@@ -111,8 +112,8 @@ class RemoteHTTPTraceServer(TraceServerClientInterface):
     def from_env(cls, should_batch: bool = False) -> Self:
         return cls(weave_trace_server_url(), should_batch)
 
-    def set_auth(self, auth: tuple[str, str]) -> None:
-        self._auth = auth
+    def set_auth(self, auth: WandbCredentials | None) -> None:
+        self._auth = auth.httpx_auth() if auth is not None else None
 
     def _build_dynamic_request_headers(
         self, trace_id: str | None = None
