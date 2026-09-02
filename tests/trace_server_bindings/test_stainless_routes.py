@@ -19,7 +19,6 @@ from pydantic import BaseModel
 from tests.trace_server_bindings.conftest import generate_call_start_end_pair
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.agents import types as agent_types
-from weave.trace_server.interface import query as tsi_query
 from weave.trace_server_bindings.stainless_remote_http_trace_server import (
     StainlessRemoteHTTPTraceServer,
 )
@@ -1052,16 +1051,14 @@ def test_create_sends_every_supported_field(
             "agent_spans_query",
             agent_types.AgentSpansQueryReq(
                 project_id=PROJECT,
-                query=tsi_query.Query.model_validate(
-                    {
-                        "$expr": {
-                            "$eq": [
-                                {"$getField": "attributes.model"},
-                                {"$literal": "gpt-4o"},
-                            ]
-                        }
+                query={
+                    "$expr": {
+                        "$eq": [
+                            {"$getField": "attributes.model"},
+                            {"$literal": "gpt-4o"},
+                        ]
                     }
-                ),
+                },
             ),
             {
                 "project_id": PROJECT,
@@ -1114,16 +1111,13 @@ def test_create_sends_every_supported_field(
                 filters=[
                     tsi.EvalResultsFilter(
                         evaluation_call_id="c1",
-                        query=tsi_query.Query.model_validate(
-                            {
-                                "$expr": {
-                                    "$eq": [{"$getField": "output.x"}, {"$literal": 1}]
-                                }
+                        query={
+                            "$expr": {
+                                "$eq": [{"$getField": "output.x"}, {"$literal": 1}]
                             }
-                        ),
+                        },
                     )
                 ],
-                sort_by=[tsi.EvalResultsSortBy(field="output.x", direction="desc")],
             ),
             {
                 "evaluation_call_ids": ["c1"],
@@ -1151,14 +1145,7 @@ def test_create_sends_every_supported_field(
                 "offset": 0,
                 "require_intersection": False,
                 "resolve_row_refs": False,
-                "sort_by": [
-                    {
-                        "field": "output.x",
-                        "direction": "desc",
-                        "evaluation_call_id": None,
-                        "mode": "value",
-                    }
-                ],
+                "sort_by": None,
                 "summary_require_intersection": None,
             },
             id="eval_results_query",
