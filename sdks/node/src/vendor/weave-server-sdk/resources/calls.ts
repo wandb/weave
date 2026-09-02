@@ -87,6 +87,22 @@ export class Calls extends APIResource {
   }
 
   /**
+   * Calls Score
+   *
+   * @example
+   * ```ts
+   * const response = await client.calls.score({
+   *   call_ids: ['string'],
+   *   project_id: 'project_id',
+   *   scorer_refs: ['string'],
+   * });
+   * ```
+   */
+  score(body: CallScoreParams, options?: RequestOptions): APIPromise<unknown> {
+    return this._client.post('/calls/score', { body, ...options });
+  }
+
+  /**
    * Call Start
    *
    * @example
@@ -273,6 +289,15 @@ export namespace CallReadResponse {
   }
 }
 
+/**
+ * Empty response for calls_score.
+ *
+ * Defined as a model (rather than returning None) to follow the convention used
+ * throughout this interface and to allow fields to be added later without a
+ * breaking change.
+ */
+export type CallScoreResponse = unknown;
+
 export interface CallStartResponse {
   id: string;
 
@@ -334,35 +359,38 @@ export namespace CallUpsertBatchResponse {
  * Response with aggregated usage metrics per root call.
  */
 export interface CallUsageResponse {
-  call_usage?: { [key: string]: { [key: string]: CallUsageResponse.LLMAggregatedUsage } };
+  call_usage: { [key: string]: { [key: string]: CallUsageResponse.LLMAggregatedUsage } };
 
-  unfinished_call_ids?: Array<string>;
+  unfinished_call_ids: Array<string>;
 }
 
 export namespace CallUsageResponse {
   /**
    * Aggregated usage metrics for a specific LLM.
+   *
+   * Constructor defaults stay for Python callers. Serialization JSON Schema marks
+   * those fields required so OpenAPI matches the JSON FastAPI sends.
    */
   export interface LLMAggregatedUsage {
-    cache_creation_input_tokens?: number;
+    cache_creation_input_tokens: number;
 
-    cache_creation_input_tokens_total_cost?: number | null;
+    cache_creation_input_tokens_total_cost: number | null;
 
-    cache_read_input_tokens?: number;
+    cache_read_input_tokens: number;
 
-    cache_read_input_tokens_total_cost?: number | null;
+    cache_read_input_tokens_total_cost: number | null;
 
-    completion_tokens?: number;
+    completion_tokens: number;
 
-    completion_tokens_total_cost?: number | null;
+    completion_tokens_total_cost: number | null;
 
-    prompt_tokens?: number;
+    prompt_tokens: number;
 
-    prompt_tokens_total_cost?: number | null;
+    prompt_tokens_total_cost: number | null;
 
-    requests?: number;
+    requests: number;
 
-    total_tokens?: number;
+    total_tokens: number;
   }
 }
 
@@ -546,6 +574,25 @@ export interface CallReadParams {
   include_storage_size?: boolean | null;
 
   include_total_storage_size?: boolean | null;
+}
+
+export interface CallScoreParams {
+  /**
+   * List of call IDs to score
+   */
+  call_ids: Array<string>;
+
+  project_id: string;
+
+  /**
+   * List of scorer refs to apply
+   */
+  scorer_refs: Array<string>;
+
+  /**
+   * Do not set directly. Server will automatically populate this field.
+   */
+  wb_user_id?: string | null;
 }
 
 export interface CallStartParams {
@@ -1009,6 +1056,7 @@ export declare namespace Calls {
     type CallEndResponse as CallEndResponse,
     type CallQueryStatsResponse as CallQueryStatsResponse,
     type CallReadResponse as CallReadResponse,
+    type CallScoreResponse as CallScoreResponse,
     type CallStartResponse as CallStartResponse,
     type CallStatsResponse as CallStatsResponse,
     type CallStreamQueryResponse as CallStreamQueryResponse,
@@ -1019,6 +1067,7 @@ export declare namespace Calls {
     type CallEndParams as CallEndParams,
     type CallQueryStatsParams as CallQueryStatsParams,
     type CallReadParams as CallReadParams,
+    type CallScoreParams as CallScoreParams,
     type CallStartParams as CallStartParams,
     type CallStatsParams as CallStatsParams,
     type CallStreamQueryParams as CallStreamQueryParams,
