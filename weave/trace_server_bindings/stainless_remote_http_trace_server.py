@@ -1381,72 +1381,6 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         for item in response:
             yield tsi.ThreadSchema.model_validate(item.model_dump())
 
-    @validate_call
-    def evaluate_model(self, req: tsi.EvaluateModelReq) -> tsi.EvaluateModelRes:
-        """Evaluate model.
-
-        Args:
-            req: Evaluate model request.
-
-        Returns:
-            Evaluate model response.
-        """
-        return self._stainless_request(
-            req,
-            tsi.EvaluateModelRes,
-            self._stainless_client.evaluations.evaluate_model,
-        )
-
-    @validate_call
-    def evaluation_status(
-        self, req: tsi.EvaluationStatusReq
-    ) -> tsi.EvaluationStatusRes:
-        """Get evaluation status.
-
-        Args:
-            req: Evaluation status request.
-
-        Returns:
-            Evaluation status response.
-        """
-        return self._stainless_request(
-            req,
-            tsi.EvaluationStatusRes,
-            self._stainless_client.evaluations.status,
-        )
-
-    @validate_call
-    def rescore(self, req: tsi.RescoreReq) -> tsi.RescoreRes:
-        """Rescore an existing evaluation run with different scorers.
-
-        Args:
-            req: Rescore request.
-
-        Returns:
-            Rescore response.
-        """
-        return self._stainless_request(
-            req,
-            tsi.RescoreRes,
-            self._stainless_client.evaluations.rescore,
-        )
-
-    @validate_call
-    def calls_score(self, req: tsi.CallsScoreReq) -> tsi.CallsScoreRes:
-        """Score calls.
-
-        Args:
-            req: Calls score request.
-
-        Returns:
-            Calls score response.
-        """
-        return self._stainless_request(
-            req,
-            tsi.CallsScoreRes,
-            self._stainless_client.calls.score,
-        )
-
     # Annotation Queue API
     @validate_call
     def annotation_queue_create(
@@ -1614,6 +1548,72 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
             exclude={"wb_user_id"},
         )
 
+    @validate_call
+    def evaluate_model(self, req: tsi.EvaluateModelReq) -> tsi.EvaluateModelRes:
+        """Evaluate model.
+
+        Args:
+            req: Evaluate model request.
+
+        Returns:
+            Evaluate model response.
+        """
+        return self._stainless_request(
+            req,
+            tsi.EvaluateModelRes,
+            self._stainless_client.evaluations.evaluate_model,
+        )
+
+    @validate_call
+    def evaluation_status(
+        self, req: tsi.EvaluationStatusReq
+    ) -> tsi.EvaluationStatusRes:
+        """Get evaluation status.
+
+        Args:
+            req: Evaluation status request.
+
+        Returns:
+            Evaluation status response.
+        """
+        return self._stainless_request(
+            req,
+            tsi.EvaluationStatusRes,
+            self._stainless_client.evaluations.status,
+        )
+
+    @validate_call
+    def rescore(self, req: tsi.RescoreReq) -> tsi.RescoreRes:
+        """Rescore an existing evaluation run with different scorers.
+
+        Args:
+            req: Rescore request.
+
+        Returns:
+            Rescore response.
+        """
+        return self._stainless_request(
+            req,
+            tsi.RescoreRes,
+            self._stainless_client.evaluations.rescore,
+        )
+
+    @validate_call
+    def calls_score(self, req: tsi.CallsScoreReq) -> tsi.CallsScoreRes:
+        """Score calls.
+
+        Args:
+            req: Calls score request.
+
+        Returns:
+            Calls score response.
+        """
+        return self._stainless_request(
+            req,
+            tsi.CallsScoreRes,
+            self._stainless_client.calls.score,
+        )
+
     # === Object APIs ===
 
     @validate_call
@@ -1775,7 +1775,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
     def custom_runtime_apply(
         self, req: tsi.CustomRuntimeApplyReq
     ) -> tsi.CustomRuntimeApplyRes:
-        """Create or replace a custom runtime configuration.
+        """Apply custom runtime.
 
         Args:
             req: Custom runtime apply request.
@@ -2334,7 +2334,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
     def eval_results_query(
         self, req: tsi.EvalResultsQueryReq
     ) -> tsi.EvalResultsQueryRes:
-        """Read grouped evaluation result rows for one or more evaluations.
+        """Query eval results.
 
         Args:
             req: Eval results query request.
