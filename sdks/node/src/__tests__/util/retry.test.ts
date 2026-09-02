@@ -62,4 +62,45 @@ describe('retry', () => {
     expect(mockFetch).toHaveBeenCalledTimes(2);
     expect(response).toEqual(mockSuccess);
   });
+
+  test('429 with a long Retry-After is treated as quota exhaustion and not retried', async () => {
+    const mockRateLimited = {
+      ok: false,
+      status: 429,
+      headers: {get: (name: string) => (name === 'retry-after' ? '600' : null)},
+    } as unknown as Response;
+    const mockFetch = jest.fn(() => Promise.resolve(mockRateLimited));
+    global.fetch = mockFetch;
+    const fetchWithRetry = createFetchWithRetry({
+      baseDelay,
+      maxDelay: 5000,
+      retryOnStatus: (status: number) => status === 429,
+    });
+
+    const response = await fetchWithRetry('https://api.test.com');
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+    expect(response).toEqual(mockRateLimited);
+  });
+
+  test('429 with a short Retry-After is retried using that delay', async () => {
+    const mockRateLimited = {
+      ok: false,
+      status: 429,
+      headers: {get: (name: string) => (name === 'retry-after' ? '0' : null)},
+    } as unknown as Response;
+    const mockFetch = jest
+      .fn()
+      .mockResolvedValueOnce(mockRateLimited)
+      .mockResolvedValue(mockSuccess);
+    global.fetch = mockFetch;
+    const fetchWithRetry = createFetchWithRetry({
+      baseDelay,
+      maxDelay: 5000,
+      retryOnStatus: (status: number) => status === 429,
+    });
+
+    const response = await fetchWithRetry('https://api.test.com');
+    expect(mockFetch).toHaveBeenCalledTimes(2);
+    expect(response).toEqual(mockSuccess);
+  });
 });
