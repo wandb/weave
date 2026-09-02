@@ -371,7 +371,7 @@ def should_use_accumulator(inputs: dict) -> bool:
         # This is very critical. When `"X-Stainless-Raw-Response` is true, the response
         # is an APIResponse object. This is very hard to mock/patch for the streaming use
         # case, so we don't even try.
-        and not inputs.get("extra_headers", {}).get("X-Stainless-Raw-Response")
+        and not (inputs.get("extra_headers") or {}).get("X-Stainless-Raw-Response")
         == "true"
     )
 
