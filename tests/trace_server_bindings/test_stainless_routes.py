@@ -19,7 +19,7 @@ from pydantic import BaseModel
 from tests.trace_server_bindings.conftest import generate_call_start_end_pair
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.agents import types as agent_types
-from weave.trace_server.interface import query
+from weave.trace_server.interface import query as tsi_query
 from weave.trace_server_bindings.stainless_remote_http_trace_server import (
     StainlessRemoteHTTPTraceServer,
 )
@@ -863,148 +863,6 @@ def test_annotation_queue_read_and_delete_send_project_id_in_the_query(
 
 
 @pytest.mark.parametrize(
-    ("method_name", "req", "expected_body"),
-    [
-        pytest.param(
-            "image_create",
-            tsi.ImageGenerationCreateReq(
-                project_id=PROJECT,
-                inputs={"model": "dall-e-3", "prompt": "a cat"},
-                wb_user_id="user-id",
-            ),
-            {
-                "project_id": PROJECT,
-                "inputs": {"model": "dall-e-3", "prompt": "a cat", "n": None},
-                "track_llm_call": True,
-                "wb_user_id": "user-id",
-            },
-            id="image_create",
-        ),
-        pytest.param(
-            "call_stats",
-            tsi.CallStatsReq(
-                project_id=PROJECT, start=START, end=END, granularity=3600
-            ),
-            {
-                "project_id": PROJECT,
-                "start": "2026-08-20T00:00:00+00:00",
-                "end": "2026-08-21T00:00:00+00:00",
-                "granularity": 3600,
-                "usage_metrics": None,
-                "call_metrics": None,
-                "filter": None,
-                "timezone": "UTC",
-            },
-            id="call_stats",
-        ),
-        pytest.param(
-            "annotation_queue_create",
-            tsi.AnnotationQueueCreateReq(
-                project_id=PROJECT,
-                name="my-queue",
-                description="notes",
-                scorer_refs=["weave:///entity/project/object/s:abc123"],
-                wb_user_id="user-id",
-            ),
-            {
-                "project_id": PROJECT,
-                "name": "my-queue",
-                "description": "notes",
-                "scorer_refs": ["weave:///entity/project/object/s:abc123"],
-                "wb_user_id": "user-id",
-            },
-            id="annotation_queue_create",
-        ),
-        pytest.param(
-            "custom_runtime_apply",
-            tsi.CustomRuntimeApplyReq(
-                project_id=PROJECT,
-                runtime_name="my-runtime",
-                base_url="http://example.com",
-                runtime_ids=[tsi.CustomRuntimeID(id="my-model")],
-                wb_user_id="user-id",
-            ),
-            {
-                "base_url": "http://example.com",
-                "runtime_ids": [{"id": "my-model", "max_tokens": 4096}],
-                "api_key_secret": None,
-                "headers": {},
-            },
-            id="custom_runtime_apply",
-        ),
-        pytest.param(
-            "eval_results_query",
-            tsi.EvalResultsQueryReq(
-                project_id=PROJECT,
-                evaluation_call_ids=["c1"],
-                filters=[
-                    tsi.EvalResultsFilter(
-                        evaluation_call_id="c1",
-                        query=tsi.Query(
-                            expr_=query.EqOperation(
-                                eq_=(
-                                    query.GetFieldOperator(get_field_="output.x"),
-                                    query.LiteralOperation(literal_=1),
-                                )
-                            )
-                        ),
-                    )
-                ],
-                sort_by=[tsi.EvalResultsSortBy(field="output.x", direction="desc")],
-            ),
-            {
-                "evaluation_call_ids": ["c1"],
-                "evaluation_run_ids": None,
-                "filter_logic_operator": "or",
-                "filters": [
-                    {
-                        "evaluation_call_id": "c1",
-                        "query": {
-                            "$expr": {
-                                "$eq": [
-                                    {"$getField": "output.x"},
-                                    {"$literal": 1},
-                                ]
-                            }
-                        },
-                    }
-                ],
-                "include_costs": False,
-                "include_predict_and_score_children": True,
-                "include_raw_data_rows": False,
-                "include_rows": True,
-                "include_summary": False,
-                "limit": None,
-                "offset": 0,
-                "require_intersection": False,
-                "resolve_row_refs": False,
-                "sort_by": [
-                    {
-                        "field": "output.x",
-                        "direction": "desc",
-                        "evaluation_call_id": None,
-                        "mode": "value",
-                    }
-                ],
-                "summary_require_intersection": None,
-            },
-            id="eval_results_query",
-        ),
-    ],
-)
-def test_route_sends_every_supported_field(
-    method_name: str, req: BaseModel, expected_body: dict
-):
-    """Test that the fields the route accepts reach the wire under their aliases."""
-    mock_server = _mock_server(httpx.Response(200, json=V1_RESPONSE))
-
-    getattr(mock_server.server, method_name)(req)
-
-    assert len(mock_server.requests) == 1
-    assert json.loads(mock_server.requests[0].content) == expected_body
-
-
-@pytest.mark.parametrize(
     ("method_name", "req", "expected_path"),
     [
         pytest.param(
@@ -1135,6 +993,210 @@ def test_create_sends_every_supported_field(
 
     assert len(mock_server.requests) == 1
     assert json.loads(mock_server.requests[0].content) == expected_body
+
+
+@pytest.mark.parametrize(
+    ("method_name", "req", "expected_body"),
+    [
+        pytest.param(
+            "image_create",
+            tsi.ImageGenerationCreateReq(
+                project_id=PROJECT,
+                inputs={"model": "dall-e-3", "prompt": "a cat"},
+                wb_user_id="user-id",
+            ),
+            {
+                "project_id": PROJECT,
+                "inputs": {"model": "dall-e-3", "prompt": "a cat", "n": None},
+                "track_llm_call": True,
+                "wb_user_id": "user-id",
+            },
+            id="image_create",
+        ),
+        pytest.param(
+            "call_stats",
+            tsi.CallStatsReq(
+                project_id=PROJECT, start=START, end=END, granularity=3600
+            ),
+            {
+                "project_id": PROJECT,
+                "start": "2026-08-20T00:00:00+00:00",
+                "end": "2026-08-21T00:00:00+00:00",
+                "granularity": 3600,
+                "usage_metrics": None,
+                "call_metrics": None,
+                "filter": None,
+                "timezone": "UTC",
+            },
+            id="call_stats",
+        ),
+        pytest.param(
+            "annotation_queue_create",
+            tsi.AnnotationQueueCreateReq(
+                project_id=PROJECT,
+                name="my-queue",
+                description="notes",
+                scorer_refs=["weave:///entity/project/object/s:abc123"],
+                wb_user_id="user-id",
+            ),
+            {
+                "project_id": PROJECT,
+                "name": "my-queue",
+                "description": "notes",
+                "scorer_refs": ["weave:///entity/project/object/s:abc123"],
+                "wb_user_id": "user-id",
+            },
+            id="annotation_queue_create",
+        ),
+        pytest.param(
+            "agent_spans_query",
+            agent_types.AgentSpansQueryReq(
+                project_id=PROJECT,
+                query=tsi_query.Query.model_validate(
+                    {
+                        "$expr": {
+                            "$eq": [
+                                {"$getField": "attributes.model"},
+                                {"$literal": "gpt-4o"},
+                            ]
+                        }
+                    }
+                ),
+            ),
+            {
+                "project_id": PROJECT,
+                "query": {
+                    "$expr": {
+                        "$eq": [
+                            {"$getField": "attributes.model"},
+                            {"$literal": "gpt-4o"},
+                        ]
+                    }
+                },
+                "custom_attr_columns": [],
+                "group_by": None,
+                "group_distributions": [],
+                "group_filters": [],
+                "include_costs": False,
+                "include_details": False,
+                "limit": 100,
+                "measures": [],
+                "offset": 0,
+                "signal_filters": None,
+                "sort_by": None,
+                "started_after": None,
+                "started_before": None,
+            },
+            id="agent_spans_query",
+        ),
+        pytest.param(
+            "custom_runtime_apply",
+            tsi.CustomRuntimeApplyReq(
+                project_id=PROJECT,
+                runtime_name="my-runtime",
+                base_url="http://example.com",
+                runtime_ids=[tsi.CustomRuntimeID(id="my-model")],
+                wb_user_id="user-id",
+            ),
+            {
+                "base_url": "http://example.com",
+                "runtime_ids": [{"id": "my-model", "max_tokens": 4096}],
+                "api_key_secret": None,
+                "headers": {},
+            },
+            id="custom_runtime_apply",
+        ),
+        pytest.param(
+            "eval_results_query",
+            tsi.EvalResultsQueryReq(
+                project_id=PROJECT,
+                evaluation_call_ids=["c1"],
+                filters=[
+                    tsi.EvalResultsFilter(
+                        evaluation_call_id="c1",
+                        query=tsi_query.Query.model_validate(
+                            {
+                                "$expr": {
+                                    "$eq": [{"$getField": "output.x"}, {"$literal": 1}]
+                                }
+                            }
+                        ),
+                    )
+                ],
+                sort_by=[tsi.EvalResultsSortBy(field="output.x", direction="desc")],
+            ),
+            {
+                "evaluation_call_ids": ["c1"],
+                "evaluation_run_ids": None,
+                "filter_logic_operator": "or",
+                "filters": [
+                    {
+                        "evaluation_call_id": "c1",
+                        "query": {
+                            "$expr": {
+                                "$eq": [
+                                    {"$getField": "output.x"},
+                                    {"$literal": 1},
+                                ]
+                            }
+                        },
+                    }
+                ],
+                "include_costs": False,
+                "include_predict_and_score_children": True,
+                "include_raw_data_rows": False,
+                "include_rows": True,
+                "include_summary": False,
+                "limit": None,
+                "offset": 0,
+                "require_intersection": False,
+                "resolve_row_refs": False,
+                "sort_by": [
+                    {
+                        "field": "output.x",
+                        "direction": "desc",
+                        "evaluation_call_id": None,
+                        "mode": "value",
+                    }
+                ],
+                "summary_require_intersection": None,
+            },
+            id="eval_results_query",
+        ),
+    ],
+)
+def test_route_sends_every_supported_field(
+    method_name: str, req: BaseModel, expected_body: dict
+):
+    """Test that the fields the route accepts reach the wire under their aliases."""
+    mock_server = _mock_server(httpx.Response(200, json=V1_RESPONSE))
+
+    getattr(mock_server.server, method_name)(req)
+
+    assert len(mock_server.requests) == 1
+    assert json.loads(mock_server.requests[0].content) == expected_body
+
+
+def test_stream_route_sends_every_supported_field():
+    """Test that the stream route, which dumps its own request, sends every field."""
+    mock_server = _mock_server(
+        httpx.Response(200, content=b"", headers={"content-type": "application/jsonl"})
+    )
+
+    list(
+        mock_server.server.annotation_queues_query_stream(
+            tsi.AnnotationQueuesQueryReq(project_id=PROJECT)
+        )
+    )
+
+    assert len(mock_server.requests) == 1
+    assert json.loads(mock_server.requests[0].content) == {
+        "project_id": PROJECT,
+        "limit": None,
+        "offset": None,
+        "name": None,
+        "sort_by": None,
+    }
 
 
 def test_call_end_reads_an_empty_response_body():
