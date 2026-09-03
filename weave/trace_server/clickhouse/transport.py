@@ -1,14 +1,10 @@
 """ClickHouse connection config, transports, and the call logic they share.
 
-`ClickHouseConfig` is the connection. `SyncClickHouseTransport` and
-`AsyncClickHouseTransport` are the two ways to run a call against it: the
-blocking driver on a thread-local client, and clickhouse-connect's aiohttp
-`AsyncClient` bound to one event loop.
-
-Everything a call does apart from the driver invocation — settings merge,
-correlation id, logging, error mapping, the insert retry decision — lives in the
-`prepare_*` / `record_*` / `raise_*` functions below, which both transports'
-callers share.
+`SyncClickHouseTransport` runs the blocking driver on a thread-local client;
+`AsyncClickHouseTransport` runs clickhouse-connect's aiohttp `AsyncClient` on one
+event loop. Everything else a call does -- settings, correlation id, logging,
+error mapping, the insert retry decision -- lives in the `prepare_*` / `record_*`
+/ `raise_*` functions, which both transports' callers share.
 """
 
 from __future__ import annotations
@@ -22,6 +18,7 @@ from dataclasses import dataclass, replace
 from typing import Any, NoReturn
 
 import clickhouse_connect
+import urllib3
 from clickhouse_connect.driver.asyncclient import AsyncClient
 from clickhouse_connect.driver.client import Client as CHClient
 from clickhouse_connect.driver.query import QueryResult
@@ -52,8 +49,8 @@ CLICKHOUSE_SECURE_PORT = 8443
 # aiohttp connector caps for the native async client. `connector_limit_per_host`
 # is the real concurrency ceiling: weave-trace talks to one host, so this is the
 # async analogue of the thread pool's width.
-ACH_CONNECTOR_LIMIT = 200
-ACH_CONNECTOR_LIMIT_PER_HOST = 100
+ASYNC_CH_CONNECTOR_LIMIT = 200
+ASYNC_CH_CONNECTOR_LIMIT_PER_HOST = 100
 
 
 @dataclass(frozen=True)
@@ -102,6 +99,196 @@ class PreparedInsert:
     correlation_id: str
     started: float
     async_insert: bool
+
+
+# --- Transports -------------------------------------------------------------
+
+
+def ensure_database(client: CHClient, database: str) -> None:
+    """Provisioning, not transport: both transports call it once on connect."""
+    client.command(f"CREATE DATABASE IF NOT EXISTS {database}")
+
+
+async def aensure_database(client: AsyncClient, database: str) -> None:
+    await client.command(f"CREATE DATABASE IF NOT EXISTS {database}")
+
+
+class SyncClickHouseTransport:
+    """The blocking driver, one client per thread over a shared pool manager.
+
+    Per-thread because the driver refuses concurrent queries on one client.
+    """
+
+    def __init__(self, config: ClickHouseConfig, pool_mgr: urllib3.PoolManager) -> None:
+        self._config = config
+        self._pool_mgr = pool_mgr
+        self._thread_local = threading.local()
+        self._init_lock = threading.Lock()
+        self._database_ensured = False
+
+    @property
+    def client(self) -> CHClient:
+        if not hasattr(self._thread_local, "client"):
+            self._thread_local.client = self.mint()
+        return self._thread_local.client
+
+    def mint(self, send_receive_timeout: int | None = None) -> CHClient:
+        """Create a new client on the shared pool manager.
+
+        `send_receive_timeout` raises the HTTP read timeout for migration clients,
+        which must outlast replicated-DDL propagation.
+        """
+        optional_kwargs: dict[str, Any] = {}
+        if send_receive_timeout is not None:
+            optional_kwargs["send_receive_timeout"] = send_receive_timeout
+        client = clickhouse_connect.get_client(
+            host=self._config.host,
+            port=self._config.port,
+            user=self._config.user,
+            password=self._config.password,
+            secure=self._config.secure,
+            pool_mgr=self._pool_mgr,
+            # Both default True and collide under load: session ids with
+            # SESSION_IS_LOCKED (#6655), query ids with
+            # QUERY_WITH_SAME_ID_IS_ALREADY_RUNNING on a resend (#7787).
+            autogenerate_session_id=False,
+            autogenerate_query_id=False,
+            **optional_kwargs,
+        )
+        self._ensure_database_once(client)
+        client.database = self._config.database
+        return client
+
+    def _ensure_database_once(self, client: CHClient) -> None:
+        """`mint` runs per thread; the database only has to be created once."""
+        if self._database_ensured:
+            return
+        with self._init_lock:
+            if self._database_ensured:
+                return
+            ensure_database(client, self._config.database)
+            self._database_ensured = True
+
+    def query(self, prepared: PreparedQuery) -> QueryResult:
+        return self.client.query(
+            prepared.query,
+            parameters=prepared.parameters,
+            column_formats=prepared.column_formats,
+            use_none=True,
+            settings=prepared.settings,
+        )
+
+    def query_stream(self, prepared: PreparedQuery) -> Any:
+        """The driver's row-stream context manager, unwrapped by the caller."""
+        return self.client.query_rows_stream(
+            prepared.query,
+            parameters=prepared.parameters,
+            column_formats=prepared.column_formats,
+            use_none=True,
+            settings=prepared.settings,
+        )
+
+    def command(self, prepared: PreparedCommand) -> Any:
+        return self.client.command(
+            prepared.command,
+            parameters=prepared.parameters,
+            settings=prepared.settings,
+        )
+
+    def insert(self, prepared: PreparedInsert) -> QuerySummary:
+        return self.client.insert(
+            prepared.table,
+            data=prepared.data,
+            column_names=prepared.column_names,
+            settings=prepared.settings,
+        )
+
+
+class AsyncClickHouseTransport:
+    """clickhouse-connect's aiohttp `AsyncClient`.
+
+    Start, use and close it on one event loop: an aiohttp session belongs to the
+    loop that opened it. That is the caller's invariant to keep; one worker owns
+    one loop and one transport.
+    """
+
+    def __init__(self, config: ClickHouseConfig) -> None:
+        self._config = config
+        self._client: AsyncClient | None = None
+        self._lock = asyncio.Lock()
+
+    async def start(self) -> AsyncClient:
+        """Open the session if it is not open yet, and return it.
+
+        Locked because concurrent first calls would otherwise each connect.
+        """
+        if self._client is not None:
+            return self._client
+        async with self._lock:
+            if self._client is None:
+                self._client = await self._connect()
+            return self._client
+
+    async def _connect(self) -> AsyncClient:
+        client = await clickhouse_connect.get_async_client(
+            host=self._config.host,
+            port=self._config.port,
+            username=self._config.user,
+            password=self._config.password,
+            secure=self._config.secure,
+            autogenerate_session_id=False,
+            autogenerate_query_id=False,
+            connector_limit=ASYNC_CH_CONNECTOR_LIMIT,
+            connector_limit_per_host=ASYNC_CH_CONNECTOR_LIMIT_PER_HOST,
+        )
+        # The session exists before the database does. Anything that stops us
+        # returning it -- a failed CREATE DATABASE, or cancellation -- has to
+        # close it here, or `start()` retries and leaks another connector each
+        # time. BaseException so CancelledError is covered too.
+        try:
+            await aensure_database(client, self._config.database)
+        except BaseException:
+            await client.close()
+            raise
+        client.database = self._config.database
+        return client
+
+    async def close(self) -> None:
+        """Drain the aiohttp session. Workers call this on shutdown."""
+        async with self._lock:
+            if self._client is not None:
+                await self._client.close()
+                self._client = None
+
+    async def query(self, prepared: PreparedQuery) -> QueryResult:
+        client = await self.start()
+        return await client.query(
+            prepared.query,
+            parameters=prepared.parameters,
+            column_formats=prepared.column_formats,
+            use_none=True,
+            settings=prepared.settings,
+        )
+
+    async def command(self, prepared: PreparedCommand) -> Any:
+        client = await self.start()
+        return await client.command(
+            prepared.command,
+            parameters=prepared.parameters,
+            settings=prepared.settings,
+        )
+
+    async def insert(self, prepared: PreparedInsert) -> QuerySummary:
+        client = await self.start()
+        return await client.insert(
+            prepared.table,
+            data=prepared.data,
+            column_names=prepared.column_names,
+            settings=prepared.settings,
+        )
+
+
+# --- Shared call logic ------------------------------------------------------
 
 
 def _elapsed_ms(started: float) -> float:
@@ -154,6 +341,41 @@ def raise_query_error(prepared: PreparedQuery, error: Exception) -> NoReturn:
         },
     )
     # always raises, optionally with custom error class
+    handle_clickhouse_query_error(error)
+    raise error
+
+
+def record_stream_success(
+    prepared: PreparedQuery, summary: Any, query_id: str | None
+) -> None:
+    logger.info(
+        "clickhouse_stream_query",
+        extra={
+            "trace_duration_ms": _elapsed_ms(prepared.started),
+            "query": prepared.query,
+            "parameters": prepared.parameters,
+            "summary": summary,
+            "query_id": query_id,
+            "correlation_id": prepared.correlation_id,
+        },
+    )
+
+
+def raise_stream_error(
+    prepared: PreparedQuery, error: Exception, query_id: str | None
+) -> NoReturn:
+    logger.exception(
+        "clickhouse_stream_query_error",
+        extra={
+            "trace_duration_ms": _elapsed_ms(prepared.started),
+            "error_str": str(error),
+            "query": prepared.query,
+            "parameters": prepared.parameters,
+            "query_id": query_id,
+            "correlation_id": prepared.correlation_id,
+        },
+    )
+    # always raises, optionally with a custom error class
     handle_clickhouse_query_error(error)
     raise error
 
@@ -287,175 +509,3 @@ def insert_retry_or_raise(
         error, prepared.table, prepared.data, prepared.correlation_id
     )
     raise error
-
-
-# --- Transports -------------------------------------------------------------
-
-
-class SyncClickHouseTransport:
-    """The blocking driver, one client per thread over a shared pool manager.
-
-    Per-thread because the driver refuses concurrent queries on one client.
-    """
-
-    def __init__(self, config: ClickHouseConfig, pool_mgr: Any) -> None:
-        self._config = config
-        self._pool_mgr = pool_mgr
-        self._thread_local = threading.local()
-        self._init_lock = threading.Lock()
-        self._database_ensured = False
-
-    @property
-    def client(self) -> CHClient:
-        if not hasattr(self._thread_local, "client"):
-            self._thread_local.client = self.mint()
-        return self._thread_local.client
-
-    def mint(self, send_receive_timeout: int | None = None) -> CHClient:
-        """Create a new client on the shared pool manager.
-
-        autogenerate_session_id=False: weave-trace uses no session features,
-        and the default collides on overlapping queries with SESSION_IS_LOCKED
-        (code 373). See PR #6655.
-        autogenerate_query_id=False: the default collides on a resent request
-        with QUERY_WITH_SAME_ID_IS_ALREADY_RUNNING (code 216). See PR #7787.
-        `send_receive_timeout` overrides the HTTP read timeout (migration clients
-        need to outlast replicated-DDL propagation); None keeps the library default.
-        """
-        optional_kwargs: dict[str, Any] = {}
-        if send_receive_timeout is not None:
-            optional_kwargs["send_receive_timeout"] = send_receive_timeout
-        client = clickhouse_connect.get_client(
-            host=self._config.host,
-            port=self._config.port,
-            user=self._config.user,
-            password=self._config.password,
-            secure=self._config.secure,
-            pool_mgr=self._pool_mgr,
-            autogenerate_session_id=False,
-            autogenerate_query_id=False,
-            **optional_kwargs,
-        )
-        self._ensure_database(client)
-        client.database = self._config.database
-        return client
-
-    def _ensure_database(self, client: CHClient) -> None:
-        """Run CREATE DATABASE IF NOT EXISTS once per process."""
-        if self._database_ensured:
-            return
-        with self._init_lock:
-            if self._database_ensured:
-                return
-            client.command(f"CREATE DATABASE IF NOT EXISTS {self._config.database}")
-            self._database_ensured = True
-
-    def query(self, prepared: PreparedQuery) -> QueryResult:
-        return self.client.query(
-            prepared.query,
-            parameters=prepared.parameters,
-            column_formats=prepared.column_formats,
-            use_none=True,
-            settings=prepared.settings,
-        )
-
-    def command(self, prepared: PreparedCommand) -> Any:
-        return self.client.command(
-            prepared.command,
-            parameters=prepared.parameters,
-            settings=prepared.settings,
-        )
-
-    def insert(self, prepared: PreparedInsert) -> QuerySummary:
-        return self.client.insert(
-            prepared.table,
-            data=prepared.data,
-            column_names=prepared.column_names,
-            settings=prepared.settings,
-        )
-
-
-class AsyncClickHouseTransport:
-    """clickhouse-connect's aiohttp `AsyncClient`.
-
-    Start, use and close it on one event loop: an aiohttp session belongs to the
-    loop that opened it. That is the caller's invariant to keep; one worker owns
-    one loop and one transport.
-    """
-
-    def __init__(self, config: ClickHouseConfig) -> None:
-        self._config = config
-        self._client: AsyncClient | None = None
-        self._lock = asyncio.Lock()
-
-    async def start(self) -> AsyncClient:
-        """Open the session if it is not open yet, and return it.
-
-        Locked because concurrent first calls would otherwise each connect.
-        """
-        if self._client is not None:
-            return self._client
-        async with self._lock:
-            if self._client is None:
-                self._client = await self._connect()
-            return self._client
-
-    async def _connect(self) -> AsyncClient:
-        client = await clickhouse_connect.get_async_client(
-            host=self._config.host,
-            port=self._config.port,
-            username=self._config.user,
-            password=self._config.password,
-            secure=self._config.secure,
-            autogenerate_session_id=False,
-            autogenerate_query_id=False,
-            connector_limit=ACH_CONNECTOR_LIMIT,
-            connector_limit_per_host=ACH_CONNECTOR_LIMIT_PER_HOST,
-        )
-        # The session exists before the database does. Anything that stops us
-        # returning it -- a failed CREATE DATABASE, or cancellation -- has to
-        # close it here, or `start()` retries and leaks another connector each
-        # time. BaseException so CancelledError is covered too.
-        try:
-            await client.command(
-                f"CREATE DATABASE IF NOT EXISTS {self._config.database}"
-            )
-        except BaseException:
-            await client.close()
-            raise
-        client.database = self._config.database
-        return client
-
-    async def close(self) -> None:
-        """Drain the aiohttp session. Workers call this on shutdown."""
-        async with self._lock:
-            if self._client is not None:
-                await self._client.close()
-                self._client = None
-
-    async def query(self, prepared: PreparedQuery) -> QueryResult:
-        client = await self.start()
-        return await client.query(
-            prepared.query,
-            parameters=prepared.parameters,
-            column_formats=prepared.column_formats,
-            use_none=True,
-            settings=prepared.settings,
-        )
-
-    async def command(self, prepared: PreparedCommand) -> Any:
-        client = await self.start()
-        return await client.command(
-            prepared.command,
-            parameters=prepared.parameters,
-            settings=prepared.settings,
-        )
-
-    async def insert(self, prepared: PreparedInsert) -> QuerySummary:
-        client = await self.start()
-        return await client.insert(
-            prepared.table,
-            data=prepared.data,
-            column_names=prepared.column_names,
-            settings=prepared.settings,
-        )

@@ -63,7 +63,7 @@ def ch_keeper_server(worker_id):
 def ch_client(ch_keeper_server):
     """Create a clickhouse_connect client and track databases for cleanup."""
     host, port = ch_keeper_server
-    # Mirror production _mint_client kwargs (cosmetic; migrator is single-threaded).
+    # Mirror production SyncClickHouseTransport.mint kwargs (cosmetic; migrator is single-threaded).
     client = clickhouse_connect.get_client(
         host=host, port=port, autogenerate_session_id=False
     )

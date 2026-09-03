@@ -15,12 +15,11 @@ from clickhouse_connect.driver.summary import QuerySummary
 from weave.trace_server.async_clickhouse_trace_server import (
     AsyncClickHouseTraceServer,
 )
-from weave.trace_server.clickhouse.transport import (
-    AsyncClickHouseTransport,
-    ClickHouseConfig,
-)
+from weave.trace_server.clickhouse import transport as ch_transport
+from weave.trace_server.clickhouse.transport import AsyncClickHouseTransport
 from weave.trace_server.clickhouse_trace_server_batched import ClickHouseTraceServer
 from weave.trace_server.errors import InsertTooLarge
+from weave.trace_server.ids import generate_id
 
 TABLE = "intent_signatures"
 COLUMNS = ["project_id"]
@@ -127,37 +126,62 @@ def test_both_paths_retry_invalid_utf8_exactly_once():
 
 @pytest.mark.disable_logging_error_check
 @pytest.mark.parametrize("arm", ["sync", "async"])
-def test_both_paths_stop_after_a_second_invalid_utf8(arm):
-    with pytest.raises(UnicodeEncodeError):
-        drive_one(arm, fail_times=2)
+@pytest.mark.parametrize(
+    ("fail_times", "error", "expected"),
+    [
+        # A second invalid-utf8 failure is not retried again.
+        (2, None, UnicodeEncodeError),
+        (1, RuntimeError("driver down"), RuntimeError),
+        # ValueError, but the oversized-insert one: mapped, not propagated.
+        (1, ValueError("negative shift count"), InsertTooLarge),
+    ],
+)
+def test_both_paths_raise_the_same_way(arm, fail_times, error, expected):
+    with pytest.raises(expected):
+        drive_one(arm, fail_times=fail_times, error=error)
 
 
-@pytest.mark.disable_logging_error_check
-@pytest.mark.parametrize("arm", ["sync", "async"])
-def test_both_paths_propagate_a_non_retryable_error(arm):
-    with pytest.raises(RuntimeError, match="driver down"):
-        drive_one(arm, fail_times=1, error=RuntimeError("driver down"))
+@pytest.mark.asyncio
+async def test_async_transport_round_trips_against_clickhouse(ch_server) -> None:
+    """The parity tests above stub the transport, so nothing there ever reaches a
+    real `AsyncClient`. This drives every method on the real thing: `start`
+    (which runs CREATE DATABASE), `command`, `insert`, `query`, `close`.
+    """
+    transport = AsyncClickHouseTransport(ch_server._config)
+    table = f"transport_round_trip_{generate_id()[:8]}"
 
+    # Outside the try: a failed `start` closes its own client and leaves nothing
+    # to clean up.
+    client = await transport.start()
+    assert client.database == ch_server._config.database
 
-@pytest.mark.disable_logging_error_check
-@pytest.mark.parametrize("arm", ["sync", "async"])
-def test_both_paths_convert_an_oversized_insert(arm):
-    with pytest.raises(InsertTooLarge):
-        drive_one(arm, fail_times=1, error=ValueError("negative shift count"))
-
-
-def test_async_transport_close_clears_the_session():
-    transport = AsyncClickHouseTransport(ClickHouseConfig(host="test_host"))
-    closed = []
-
-    class FakeClient:
-        async def close(self):
-            closed.append(True)
-
-    async def run():
-        transport._client = FakeClient()
+    try:
+        await transport.command(
+            ch_transport.prepare_command(
+                f"CREATE TABLE {table} (project_id String) ENGINE = Memory", {}, None
+            )
+        )
+        summary = await transport.insert(
+            ch_transport.prepare_insert(
+                table,
+                data=[["p1"], ["p2"]],
+                column_names=["project_id"],
+                settings=None,
+                use_async_insert=False,
+                use_replicated_tables=False,
+            )
+        )
+        assert summary is not None
+        result = await transport.query(
+            ch_transport.prepare_query(
+                f"SELECT project_id FROM {table} ORDER BY project_id", {}, None, None
+            )
+        )
+        assert [row[0] for row in result.result_rows] == ["p1", "p2"]
+    finally:
+        await transport.command(
+            ch_transport.prepare_command(f"DROP TABLE IF EXISTS {table}", {}, None)
+        )
         await transport.close()
 
-    asyncio.run(run())
-    assert closed == [True]
     assert transport._client is None

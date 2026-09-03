@@ -86,7 +86,6 @@ def test_clickhouse_batching():
     # MagicMock is truthy, so get_project_data_residence() returns BOTH, which is incorrect, mock it
     mock_ch_client.query.return_value.result_rows = []
 
-    # Create a ClickHouseTraceServer instance and patch _mint_client
     with patch.object(SyncClickHouseTransport, "mint", return_value=mock_ch_client):
         trace_server = ClickHouseTraceServer(host="test_host")
 

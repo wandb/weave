@@ -5,7 +5,6 @@ import datetime
 import json
 import logging
 import threading
-import time
 from collections import defaultdict
 from collections.abc import Callable, Iterator, Sequence
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -195,7 +194,6 @@ from weave.trace_server.errors import (
     ObjectNameTypeCollision,
     RefObjectsNotFoundError,
     RequestTooLarge,
-    handle_clickhouse_query_error,
 )
 from weave.trace_server.feedback import (
     TABLE_FEEDBACK,
@@ -7472,7 +7470,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 req.project_id, self.ch_client
             )
         job_id = export.start_export(
-            lambda: self._mint_client(
+            lambda: self._transport.mint(
                 send_receive_timeout=export.EXPORT_MAX_EXECUTION_SECONDS
             ),
             self.file_storage_client,
@@ -7496,10 +7494,6 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
     def ch_client(self) -> CHClient:
         """This thread's blocking ClickHouse client."""
         return self._transport.client
-
-    def _mint_client(self, send_receive_timeout: int | None = None) -> CHClient:
-        """A fresh blocking client, for callers that need their own timeout."""
-        return self._transport.mint(send_receive_timeout)
 
     def _insert_call_batch(
         self,
@@ -7586,7 +7580,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         logger.info("Running migrations")
         migration_timeout = ch_settings.MIGRATION_CLIENT_SEND_RECEIVE_TIMEOUT_SEC
         migrator = wf_migrator.get_clickhouse_trace_server_migrator(
-            self._mint_client(send_receive_timeout=migration_timeout),
+            self._transport.mint(send_receive_timeout=migration_timeout),
             replicated=wf_env.wf_clickhouse_replicated(),
             replicated_path=wf_env.wf_clickhouse_replicated_path(),
             replicated_cluster=wf_env.wf_clickhouse_replicated_cluster(),
@@ -7594,7 +7588,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             # Mint the heartbeat's client like the primary so it inherits
             # secure/pool/db settings (raw env would drop `secure=`).
             heartbeat_client_factory=partial(
-                self._mint_client, send_receive_timeout=migration_timeout
+                self._transport.mint, send_receive_timeout=migration_timeout
             ),
         )
         migrator.apply_migrations(self._config.database)
@@ -7611,51 +7605,17 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         prepared = ch_transport.prepare_query(
             query, parameters, column_formats, settings
         )
-        correlation_id = prepared.correlation_id
-        parameters = prepared.parameters
-
-        summary = None
         query_id = None
-        start = prepared.started
         try:
-            with self.ch_client.query_rows_stream(
-                query,
-                parameters=parameters,
-                column_formats=column_formats,
-                use_none=True,
-                settings=prepared.settings,
-            ) as stream:
+            with self._transport.query_stream(prepared) as stream:
+                summary = None
                 if isinstance(stream.source, QueryResult):
                     summary = stream.source.summary
                     query_id = record_query_id(stream.source)
-                duration_ms = round((time.monotonic() - start) * 1000, 1)
-                logger.info(
-                    "clickhouse_stream_query",
-                    extra={
-                        "trace_duration_ms": duration_ms,
-                        "query": query,
-                        "parameters": parameters,
-                        "summary": summary,
-                        "query_id": query_id,
-                        "correlation_id": correlation_id,
-                    },
-                )
+                ch_transport.record_stream_success(prepared, summary, query_id)
                 yield from stream
         except Exception as e:
-            duration_ms = round((time.monotonic() - start) * 1000, 1)
-            logger.exception(
-                "clickhouse_stream_query_error",
-                extra={
-                    "trace_duration_ms": duration_ms,
-                    "error_str": str(e),
-                    "query": query,
-                    "parameters": parameters,
-                    "query_id": query_id,
-                    "correlation_id": correlation_id,
-                },
-            )
-            # always raises, optionally with custom error class
-            handle_clickhouse_query_error(e)
+            ch_transport.raise_stream_error(prepared, e, query_id)
 
     @traced(name="clickhouse_trace_server_batched._query")
     def _query(

@@ -246,7 +246,7 @@ def _ch_session_server(
 
     def patched_run_migrations():
         migrator = wf_migrator.get_clickhouse_trace_server_migrator(
-            ch_server._mint_client(),
+            ch_server._transport.mint(),
             management_db=management_db,
             replicated=wf_env.wf_clickhouse_replicated(),
             replicated_path=wf_env.wf_clickhouse_replicated_path(),
