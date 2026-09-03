@@ -8,6 +8,7 @@ the default one.
 
 from __future__ import annotations
 
+import datetime
 import json
 from dataclasses import dataclass
 
@@ -17,6 +18,7 @@ from pydantic import BaseModel
 
 from tests.trace_server_bindings.conftest import generate_call_start_end_pair
 from weave.trace_server import trace_server_interface as tsi
+from weave.trace_server.agents import types as agent_types
 from weave.trace_server_bindings.stainless_remote_http_trace_server import (
     StainlessRemoteHTTPTraceServer,
 )
@@ -25,6 +27,8 @@ from weave.vendor.weave_server_sdk import Client as StainlessClient
 BASE_URL = "http://example.com"
 PROJECT = "entity/project"
 V2 = "/v2/entity/project"
+START = datetime.datetime(2026, 8, 20, tzinfo=datetime.timezone.utc)
+END = datetime.datetime(2026, 8, 21, tzinfo=datetime.timezone.utc)
 
 V2_RESPONSE = {
     "code": "def f(): pass",
@@ -52,6 +56,87 @@ V2_RESPONSE = {
     "trials": 1,
     "value": None,
     "version_index": 0,
+}
+
+QUEUE = {
+    "id": "q1",
+    "project_id": PROJECT,
+    "name": "my-queue",
+    "description": "",
+    "scorer_refs": [],
+    "created_at": "2026-08-20T00:00:00Z",
+    "created_by": "user-id",
+    "updated_at": "2026-08-20T00:00:00Z",
+}
+
+ITEM = {
+    "id": "i1",
+    "queue_id": "q1",
+    "project_id": PROJECT,
+    "call_id": "c1",
+    "call_op_name": "my-op",
+    "call_trace_id": "t1",
+    "call_started_at": "2026-08-20T00:00:00Z",
+    "display_fields": [],
+    "annotation_state": "unstarted",
+    "created_at": "2026-08-20T00:00:00Z",
+    "created_by": "user-id",
+    "updated_at": "2026-08-20T00:00:00Z",
+}
+
+V1_RESPONSE = {
+    "added_count": 0,
+    "after_ms": 0,
+    "agents": [],
+    "attributes": [],
+    "base_url": "http://example.com",
+    "before_ms": 1,
+    "bucket_type": "time",
+    "buckets": [],
+    "call_buckets": [],
+    "call_id": "c1",
+    "columns": [],
+    "conversation_id": "conv1",
+    "conversations": [],
+    "duplicates": 0,
+    "end": "2026-08-20T00:00:00Z",
+    "evaluation_run_id": "run-id",
+    "granularity": 86400,
+    "groups": [],
+    "has_more": False,
+    "headers": {},
+    "id": "q1",
+    "item": ITEM,
+    "items": [],
+    "limit": 0,
+    "messages": [],
+    "name": "my-runtime",
+    "offset": 0,
+    "paths": [],
+    "queue": QUEUE,
+    "response": {},
+    "results": [],
+    "rows": [],
+    "runtime_ids": [],
+    "spans": [],
+    "start": "2026-08-20T00:00:00Z",
+    "stats": [],
+    "status": {"code": "not_found"},
+    "timezone": "UTC",
+    "total_cache_creation_input_tokens": 0,
+    "total_cache_read_input_tokens": 0,
+    "total_conversations": 0,
+    "total_count": 0,
+    "total_input_tokens": 0,
+    "total_output_tokens": 0,
+    "total_reasoning_tokens": 0,
+    "total_rows": 0,
+    "total_turns": 0,
+    "trace_id": "t1",
+    "turns": [],
+    "usage_buckets": [],
+    "versions": [],
+    "warnings": [],
 }
 
 
@@ -306,6 +391,260 @@ def test_v2_method_reaches_its_flat_route(
 
 
 @pytest.mark.parametrize(
+    ("method_name", "req", "expected_method", "expected_path", "res_type"),
+    [
+        pytest.param(
+            "agent_spans_query",
+            agent_types.AgentSpansQueryReq(project_id=PROJECT),
+            "POST",
+            "/agents/spans/query",
+            agent_types.AgentSpansQueryRes,
+            id="agent_spans_query",
+        ),
+        pytest.param(
+            "agent_traces_chat",
+            agent_types.AgentTraceChatReq(project_id=PROJECT, trace_id="t1"),
+            "POST",
+            "/agents/traces/chat",
+            agent_types.AgentTraceChatRes,
+            id="agent_traces_chat",
+        ),
+        pytest.param(
+            "agent_conversation_chat",
+            agent_types.AgentConversationChatReq(
+                project_id=PROJECT, conversation_id="conv1"
+            ),
+            "POST",
+            "/agents/conversations/chat",
+            agent_types.AgentConversationChatRes,
+            id="agent_conversation_chat",
+        ),
+        pytest.param(
+            "agent_conversation_spans",
+            agent_types.AgentConversationSpansReq(project_id=PROJECT),
+            "POST",
+            "/agents/conversations/spans",
+            agent_types.AgentConversationSpansRes,
+            id="agent_conversation_spans",
+        ),
+        pytest.param(
+            "agent_agents_query",
+            agent_types.AgentsQueryReq(project_id=PROJECT),
+            "POST",
+            "/agents/query",
+            agent_types.AgentsQueryRes,
+            id="agent_agents_query",
+        ),
+        pytest.param(
+            "agent_versions_query",
+            agent_types.AgentVersionsQueryReq(
+                project_id=PROJECT, agent_name="my-agent"
+            ),
+            "POST",
+            "/agents/agent-versions/query",
+            agent_types.AgentVersionsQueryRes,
+            id="agent_versions_query",
+        ),
+        pytest.param(
+            "agent_spans_stats",
+            agent_types.AgentSpanStatsReq(
+                project_id=PROJECT,
+                start=START,
+                end=END,
+                metrics=[
+                    agent_types.AgentSpanStatsMetricSpec(
+                        alias="input_tokens",
+                        value_type="number",
+                        value=agent_types.AgentSpanValueRef(
+                            source="field", key="usage.input_tokens"
+                        ),
+                        aggregations=["sum"],
+                    )
+                ],
+            ),
+            "POST",
+            "/agents/spans/stats",
+            agent_types.AgentSpanStatsRes,
+            id="agent_spans_stats",
+        ),
+        pytest.param(
+            "agent_custom_attrs_schema",
+            agent_types.AgentCustomAttrsSchemaReq(project_id=PROJECT),
+            "POST",
+            "/agents/spans/custom-attrs/schema",
+            agent_types.AgentCustomAttrsSchemaRes,
+            id="agent_custom_attrs_schema",
+        ),
+        pytest.param(
+            "agent_search",
+            agent_types.AgentSearchReq(project_id=PROJECT),
+            "POST",
+            "/agents/search",
+            agent_types.AgentSearchRes,
+            id="agent_search",
+        ),
+        pytest.param(
+            "call_stats",
+            tsi.CallStatsReq(project_id=PROJECT, start=START, end=END),
+            "POST",
+            "/calls/stats",
+            tsi.CallStatsRes,
+            id="call_stats",
+        ),
+        pytest.param(
+            "feedback_stats",
+            tsi.FeedbackStatsReq(project_id=PROJECT, start=START, end=END),
+            "POST",
+            "/feedback/stats",
+            tsi.FeedbackStatsRes,
+            id="feedback_stats",
+        ),
+        pytest.param(
+            "feedback_aggregate",
+            tsi.FeedbackAggregateReq(project_id=PROJECT, after_ms=0, before_ms=1),
+            "POST",
+            "/feedback/aggregate",
+            tsi.FeedbackAggregateRes,
+            id="feedback_aggregate",
+        ),
+        pytest.param(
+            "feedback_payload_schema",
+            tsi.FeedbackPayloadSchemaReq(project_id=PROJECT, start=START, end=END),
+            "POST",
+            "/feedback/payload_schema",
+            tsi.FeedbackPayloadSchemaRes,
+            id="feedback_payload_schema",
+        ),
+        pytest.param(
+            "image_create",
+            tsi.ImageGenerationCreateReq(
+                project_id=PROJECT, inputs={"model": "dall-e-3", "prompt": "a cat"}
+            ),
+            "POST",
+            "/image/create",
+            tsi.ImageGenerationCreateRes,
+            id="image_create",
+        ),
+        pytest.param(
+            "evaluate_model",
+            tsi.EvaluateModelReq(
+                project_id=PROJECT,
+                evaluation_ref="weave:///entity/project/object/ev:abc123",
+                model_ref="weave:///entity/project/object/m:abc123",
+            ),
+            "POST",
+            "/evaluations/evaluate_model",
+            tsi.EvaluateModelRes,
+            id="evaluate_model",
+        ),
+        pytest.param(
+            "evaluation_status",
+            tsi.EvaluationStatusReq(project_id=PROJECT, call_id="c1"),
+            "POST",
+            "/evaluations/status",
+            tsi.EvaluationStatusRes,
+            id="evaluation_status",
+        ),
+        pytest.param(
+            "rescore",
+            tsi.RescoreReq(
+                project_id=PROJECT,
+                source_evaluation_run_id="run-id",
+                scorer_refs=["weave:///entity/project/object/s:abc123"],
+            ),
+            "POST",
+            "/evaluations/rescore",
+            tsi.RescoreRes,
+            id="rescore",
+        ),
+        pytest.param(
+            "calls_score",
+            tsi.CallsScoreReq(
+                project_id=PROJECT,
+                call_ids=["c1"],
+                scorer_refs=["weave:///entity/project/object/s:abc123"],
+            ),
+            "POST",
+            "/calls/score",
+            tsi.CallsScoreRes,
+            id="calls_score",
+        ),
+        pytest.param(
+            "annotation_queue_create",
+            tsi.AnnotationQueueCreateReq(
+                project_id=PROJECT, name="my-queue", scorer_refs=[]
+            ),
+            "POST",
+            "/annotation_queues",
+            tsi.AnnotationQueueCreateRes,
+            id="annotation_queue_create",
+        ),
+        pytest.param(
+            "annotation_queue_read",
+            tsi.AnnotationQueueReadReq(project_id=PROJECT, queue_id="q1"),
+            "GET",
+            "/annotation_queues/q1",
+            tsi.AnnotationQueueReadRes,
+            id="annotation_queue_read",
+        ),
+        pytest.param(
+            "annotation_queue_items_query",
+            tsi.AnnotationQueueItemsQueryReq(project_id=PROJECT, queue_id="q1"),
+            "POST",
+            "/annotation_queues/q1/items/query",
+            tsi.AnnotationQueueItemsQueryRes,
+            id="annotation_queue_items_query",
+        ),
+        pytest.param(
+            "annotation_queues_stats",
+            tsi.AnnotationQueuesStatsReq(project_id=PROJECT, queue_ids=["q1"]),
+            "POST",
+            "/annotation_queues/stats",
+            tsi.AnnotationQueuesStatsRes,
+            id="annotation_queues_stats",
+        ),
+        pytest.param(
+            "custom_runtime_apply",
+            tsi.CustomRuntimeApplyReq(
+                project_id=PROJECT,
+                runtime_name="my-runtime",
+                base_url="http://example.com",
+                runtime_ids=[],
+            ),
+            "PUT",
+            f"{V2}/runtimes/my-runtime",
+            tsi.CustomRuntimeApplyRes,
+            id="custom_runtime_apply",
+        ),
+        pytest.param(
+            "eval_results_query",
+            tsi.EvalResultsQueryReq(project_id=PROJECT, evaluation_call_ids=["c1"]),
+            "POST",
+            f"{V2}/eval_results/query",
+            tsi.EvalResultsQueryRes,
+            id="eval_results_query",
+        ),
+    ],
+)
+def test_route_reaches_its_path(
+    method_name: str,
+    req: BaseModel,
+    expected_method: str,
+    expected_path: str,
+    res_type: type[BaseModel],
+):
+    """Test that a bound method reaches its route and parses the response back."""
+    mock_server = _mock_server(httpx.Response(200, json=V1_RESPONSE))
+
+    res = getattr(mock_server.server, method_name)(req)
+
+    assert [(r.method, r.url.path) for r in mock_server.requests] == [
+        (expected_method, expected_path)
+    ]
+    assert isinstance(res, res_type)
+
+
+@pytest.mark.parametrize(
     ("method_name", "req", "expected_method", "expected_path", "expected_body"),
     [
         pytest.param(
@@ -416,6 +755,110 @@ def test_tag_and_alias_list_omits_wb_user_id(
         expected_path,
     )
     assert dict(mock_server.requests[0].url.params) == {"project_id": PROJECT}
+
+
+@pytest.mark.parametrize(
+    ("method_name", "req", "expected_method", "expected_path", "expected_body"),
+    [
+        pytest.param(
+            "annotation_queue_update",
+            tsi.AnnotationQueueUpdateReq(
+                project_id=PROJECT, queue_id="q1", wb_user_id="user-id"
+            ),
+            "PUT",
+            "/annotation_queues/q1",
+            {
+                "project_id": PROJECT,
+                "name": None,
+                "description": None,
+                "scorer_refs": None,
+            },
+            id="annotation_queue_update",
+        ),
+        pytest.param(
+            "annotation_queue_add_calls",
+            tsi.AnnotationQueueAddCallsReq(
+                project_id=PROJECT,
+                queue_id="q1",
+                call_ids=["c1"],
+                display_fields=[],
+                wb_user_id="user-id",
+            ),
+            "POST",
+            "/annotation_queues/q1/items",
+            {"project_id": PROJECT, "call_ids": ["c1"], "display_fields": []},
+            id="annotation_queue_add_calls",
+        ),
+        pytest.param(
+            "annotator_queue_items_progress_update",
+            tsi.AnnotatorQueueItemsProgressUpdateReq(
+                project_id=PROJECT,
+                queue_id="q1",
+                item_id="i1",
+                annotation_state="completed",
+                wb_user_id="user-id",
+            ),
+            "POST",
+            "/annotation_queues/q1/items/i1/progress",
+            {"project_id": PROJECT, "annotation_state": "completed"},
+            id="annotator_queue_items_progress_update",
+        ),
+    ],
+)
+def test_annotation_queue_method_omits_wb_user_id(
+    method_name: str,
+    req: BaseModel,
+    expected_method: str,
+    expected_path: str,
+    expected_body: dict,
+):
+    """Test that the server-populated wb_user_id stays out of the request."""
+    mock_server = _mock_server(httpx.Response(200, json=V1_RESPONSE))
+
+    getattr(mock_server.server, method_name)(req)
+
+    assert len(mock_server.requests) == 1
+    assert (mock_server.requests[0].method, mock_server.requests[0].url.path) == (
+        expected_method,
+        expected_path,
+    )
+    assert json.loads(mock_server.requests[0].content) == expected_body
+
+
+@pytest.mark.parametrize(
+    ("method_name", "req", "expected_method"),
+    [
+        pytest.param(
+            "annotation_queue_read",
+            tsi.AnnotationQueueReadReq(project_id=PROJECT, queue_id="q1"),
+            "GET",
+            id="annotation_queue_read",
+        ),
+        pytest.param(
+            "annotation_queue_delete",
+            tsi.AnnotationQueueDeleteReq(
+                project_id=PROJECT, queue_id="q1", wb_user_id="user-id"
+            ),
+            "DELETE",
+            id="annotation_queue_delete",
+        ),
+    ],
+)
+def test_annotation_queue_read_and_delete_send_project_id_in_the_query(
+    method_name: str, req: BaseModel, expected_method: str
+):
+    """Test that a bodyless annotation queue route carries project_id in the query."""
+    mock_server = _mock_server(httpx.Response(200, json=V1_RESPONSE))
+
+    getattr(mock_server.server, method_name)(req)
+
+    assert len(mock_server.requests) == 1
+    assert (mock_server.requests[0].method, mock_server.requests[0].url.path) == (
+        expected_method,
+        "/annotation_queues/q1",
+    )
+    assert dict(mock_server.requests[0].url.params) == {"project_id": PROJECT}
+    assert mock_server.requests[0].content == b""
 
 
 @pytest.mark.parametrize(
@@ -549,6 +992,198 @@ def test_create_sends_every_supported_field(
 
     assert len(mock_server.requests) == 1
     assert json.loads(mock_server.requests[0].content) == expected_body
+
+
+@pytest.mark.parametrize(
+    ("method_name", "req", "expected_body"),
+    [
+        pytest.param(
+            "image_create",
+            tsi.ImageGenerationCreateReq(
+                project_id=PROJECT,
+                inputs={"model": "dall-e-3", "prompt": "a cat"},
+                wb_user_id="user-id",
+            ),
+            {
+                "project_id": PROJECT,
+                "inputs": {"model": "dall-e-3", "prompt": "a cat", "n": None},
+                "track_llm_call": True,
+                "wb_user_id": "user-id",
+            },
+            id="image_create",
+        ),
+        pytest.param(
+            "call_stats",
+            tsi.CallStatsReq(
+                project_id=PROJECT, start=START, end=END, granularity=3600
+            ),
+            {
+                "project_id": PROJECT,
+                "start": "2026-08-20T00:00:00+00:00",
+                "end": "2026-08-21T00:00:00+00:00",
+                "granularity": 3600,
+                "usage_metrics": None,
+                "call_metrics": None,
+                "filter": None,
+                "timezone": "UTC",
+            },
+            id="call_stats",
+        ),
+        pytest.param(
+            "annotation_queue_create",
+            tsi.AnnotationQueueCreateReq(
+                project_id=PROJECT,
+                name="my-queue",
+                description="notes",
+                scorer_refs=["weave:///entity/project/object/s:abc123"],
+                wb_user_id="user-id",
+            ),
+            {
+                "project_id": PROJECT,
+                "name": "my-queue",
+                "description": "notes",
+                "scorer_refs": ["weave:///entity/project/object/s:abc123"],
+                "wb_user_id": "user-id",
+            },
+            id="annotation_queue_create",
+        ),
+        pytest.param(
+            "agent_spans_query",
+            agent_types.AgentSpansQueryReq(
+                project_id=PROJECT,
+                query={
+                    "$expr": {
+                        "$eq": [
+                            {"$getField": "attributes.model"},
+                            {"$literal": "gpt-4o"},
+                        ]
+                    }
+                },
+            ),
+            {
+                "project_id": PROJECT,
+                "query": {
+                    "$expr": {
+                        "$eq": [
+                            {"$getField": "attributes.model"},
+                            {"$literal": "gpt-4o"},
+                        ]
+                    }
+                },
+                "custom_attr_columns": [],
+                "group_by": None,
+                "group_distributions": [],
+                "group_filters": [],
+                "include_costs": False,
+                "include_details": False,
+                "limit": 100,
+                "measures": [],
+                "offset": 0,
+                "signal_filters": None,
+                "sort_by": None,
+                "started_after": None,
+                "started_before": None,
+            },
+            id="agent_spans_query",
+        ),
+        pytest.param(
+            "custom_runtime_apply",
+            tsi.CustomRuntimeApplyReq(
+                project_id=PROJECT,
+                runtime_name="my-runtime",
+                base_url="http://example.com",
+                runtime_ids=[tsi.CustomRuntimeID(id="my-model")],
+                wb_user_id="user-id",
+            ),
+            {
+                "base_url": "http://example.com",
+                "runtime_ids": [{"id": "my-model", "max_tokens": 4096}],
+                "api_key_secret": None,
+                "headers": {},
+            },
+            id="custom_runtime_apply",
+        ),
+        pytest.param(
+            "eval_results_query",
+            tsi.EvalResultsQueryReq(
+                project_id=PROJECT,
+                evaluation_call_ids=["c1"],
+                filters=[
+                    tsi.EvalResultsFilter(
+                        evaluation_call_id="c1",
+                        query={
+                            "$expr": {
+                                "$eq": [{"$getField": "output.x"}, {"$literal": 1}]
+                            }
+                        },
+                    )
+                ],
+            ),
+            {
+                "evaluation_call_ids": ["c1"],
+                "evaluation_run_ids": None,
+                "filter_logic_operator": "or",
+                "filters": [
+                    {
+                        "evaluation_call_id": "c1",
+                        "query": {
+                            "$expr": {
+                                "$eq": [
+                                    {"$getField": "output.x"},
+                                    {"$literal": 1},
+                                ]
+                            }
+                        },
+                    }
+                ],
+                "include_costs": False,
+                "include_predict_and_score_children": True,
+                "include_raw_data_rows": False,
+                "include_rows": True,
+                "include_summary": False,
+                "limit": None,
+                "offset": 0,
+                "require_intersection": False,
+                "resolve_row_refs": False,
+                "sort_by": None,
+                "summary_require_intersection": None,
+            },
+            id="eval_results_query",
+        ),
+    ],
+)
+def test_route_sends_every_supported_field(
+    method_name: str, req: BaseModel, expected_body: dict
+):
+    """Test that the fields the route accepts reach the wire under their aliases."""
+    mock_server = _mock_server(httpx.Response(200, json=V1_RESPONSE))
+
+    getattr(mock_server.server, method_name)(req)
+
+    assert len(mock_server.requests) == 1
+    assert json.loads(mock_server.requests[0].content) == expected_body
+
+
+def test_stream_route_sends_every_supported_field():
+    """Test that the stream route, which dumps its own request, sends every field."""
+    mock_server = _mock_server(
+        httpx.Response(200, content=b"", headers={"content-type": "application/jsonl"})
+    )
+
+    list(
+        mock_server.server.annotation_queues_query_stream(
+            tsi.AnnotationQueuesQueryReq(project_id=PROJECT)
+        )
+    )
+
+    assert len(mock_server.requests) == 1
+    assert json.loads(mock_server.requests[0].content) == {
+        "project_id": PROJECT,
+        "limit": None,
+        "offset": None,
+        "name": None,
+        "sort_by": None,
+    }
 
 
 def test_call_end_reads_an_empty_response_body():
@@ -914,6 +1549,17 @@ def test_call_start_batch_reads_the_response_list():
             ],
             id="score_list",
         ),
+        pytest.param(
+            "annotation_queues_query_stream",
+            tsi.AnnotationQueuesQueryReq(project_id=PROJECT),
+            "/annotation_queues/query",
+            [QUEUE, {**QUEUE, "id": "q2"}],
+            [
+                tsi.AnnotationQueueSchema.model_validate(QUEUE),
+                tsi.AnnotationQueueSchema.model_validate({**QUEUE, "id": "q2"}),
+            ],
+            id="annotation_queues_query_stream",
+        ),
     ],
 )
 def test_typed_stream_reads_one_item_per_line(
@@ -955,6 +1601,23 @@ def test_file_content_read_keeps_bytes():
     assert len(mock_server.requests) == 1
     assert mock_server.requests[0].url.path == "/file/content"
     assert res.content == content
+
+
+def test_custom_runtime_name_keeps_its_colon():
+    """Test that a runtime name reaches the path without percent-encoding."""
+    mock_server = _mock_server(httpx.Response(200, json=V1_RESPONSE))
+
+    mock_server.server.custom_runtime_apply(
+        tsi.CustomRuntimeApplyReq(
+            project_id=PROJECT,
+            runtime_name="foo:bar",
+            base_url="http://example.com",
+            runtime_ids=[],
+        )
+    )
+
+    assert len(mock_server.requests) == 1
+    assert mock_server.requests[0].url.raw_path.endswith(b"/runtimes/foo:bar")
 
 
 @pytest.mark.parametrize(
