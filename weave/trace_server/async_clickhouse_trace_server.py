@@ -49,7 +49,10 @@ from weave.trace_server.clickhouse_trace_server_batched import (
     calls_stats_res,
 )
 from weave.trace_server.datadog import tag_db_insert_path
-from weave.trace_server.errors import GroupedQueryNotSupportedAsync
+from weave.trace_server.errors import (
+    GroupedQueryNotSupportedAsync,
+    HydratedQueryNotSupportedAsync,
+)
 from weave.trace_server.feedback import TABLE_FEEDBACK, format_feedback_to_res
 from weave.trace_server.llm_completion import lite_llm_acompletion
 from weave.trace_server.orm import ParamBuilder
@@ -278,9 +281,7 @@ class AsyncClickHouseTraceServer(ClickHouseTraceServer):
         stay on `calls_query_stream`.
         """
         if req.expand_columns or req.include_feedback:
-            raise ValueError(
-                "acalls_query does not hydrate refs or feedback; use calls_query"
-            )
+            raise HydratedQueryNotSupportedAsync()
         cq, settings = await asyncio.to_thread(self._build_calls_query, req)
         pb = ParamBuilder()
         raw_res = await self._aquery(cq.as_sql(pb), pb.get_params(), settings=settings)

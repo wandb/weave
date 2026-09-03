@@ -18,6 +18,7 @@ from weave.trace_server.calls_query_builder.calls_query_builder import (
     CallsMergedField,
     OrderField,
 )
+from weave.trace_server.errors import HydratedQueryNotSupportedAsync
 from weave.trace_server.token_costs import get_cost_result_columns
 
 PROJECT = "UHJvamVjdEludGVybmFsSWQ6MQ=="
@@ -110,3 +111,17 @@ def test_acalls_query_maps_columns_the_way_sync_does(include_costs: bool):
     with pytest.raises(_Captured) as exc:
         asyncio.run(run())
     assert exc.value.columns == expected
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "kwargs",
+    [{"expand_columns": ["inputs.x"]}, {"include_feedback": True}],
+)
+async def test_acalls_query_refuses_hydration(kwargs):
+    """Hydration issues further reads per batch and stays on the sync path."""
+    server = AsyncClickHouseTraceServer(host="test")
+    req = tsi.CallsQueryReq(project_id="entity/project", **kwargs)
+
+    with pytest.raises(HydratedQueryNotSupportedAsync):
+        await server.acalls_query(req)
