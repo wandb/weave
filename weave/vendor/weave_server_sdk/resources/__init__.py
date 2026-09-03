@@ -144,6 +144,14 @@ from .v2_scorers import (
     V2ScorersResourceWithStreamingResponse,
     AsyncV2ScorersResourceWithStreamingResponse,
 )
+from .completions import (
+    CompletionsResource,
+    AsyncCompletionsResource,
+    CompletionsResourceWithRawResponse,
+    AsyncCompletionsResourceWithRawResponse,
+    CompletionsResourceWithStreamingResponse,
+    AsyncCompletionsResourceWithStreamingResponse,
+)
 from .evaluations import (
     EvaluationsResource,
     AsyncEvaluationsResource,
@@ -270,6 +278,12 @@ __all__ = [
     "AsyncTraceResourceWithRawResponse",
     "TraceResourceWithStreamingResponse",
     "AsyncTraceResourceWithStreamingResponse",
+    "CompletionsResource",
+    "AsyncCompletionsResource",
+    "CompletionsResourceWithRawResponse",
+    "AsyncCompletionsResourceWithRawResponse",
+    "CompletionsResourceWithStreamingResponse",
+    "AsyncCompletionsResourceWithStreamingResponse",
     "ThreadsResource",
     "AsyncThreadsResource",
     "ThreadsResourceWithRawResponse",

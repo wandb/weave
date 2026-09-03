@@ -42,6 +42,7 @@ import {
   CallUsageResponse,
   Calls,
 } from './resources/calls';
+import { CompletionCreateParams, CompletionCreateResponse, Completions } from './resources/completions';
 import {
   CostCreateParams,
   CostCreateResponse,
@@ -994,6 +995,7 @@ export class WeaveTrace {
   feedback: API.Feedback = new API.Feedback(this);
   otel: API.Otel = new API.Otel(this);
   trace: API.Trace = new API.Trace(this);
+  completions: API.Completions = new API.Completions(this);
   threads: API.Threads = new API.Threads(this);
   agents: API.Agents = new API.Agents(this);
   annotationQueues: API.AnnotationQueues = new API.AnnotationQueues(this);
@@ -1022,6 +1024,7 @@ WeaveTrace.Costs = Costs;
 WeaveTrace.Feedback = Feedback;
 WeaveTrace.Otel = Otel;
 WeaveTrace.Trace = Trace;
+WeaveTrace.Completions = Completions;
 WeaveTrace.Threads = Threads;
 WeaveTrace.Agents = Agents;
 WeaveTrace.AnnotationQueues = AnnotationQueues;
@@ -1156,6 +1159,12 @@ export declare namespace WeaveTrace {
     Trace as Trace,
     type TraceUsageResponse as TraceUsageResponse,
     type TraceUsageParams as TraceUsageParams,
+  };
+
+  export {
+    Completions as Completions,
+    type CompletionCreateResponse as CompletionCreateResponse,
+    type CompletionCreateParams as CompletionCreateParams,
   };
 
   export {

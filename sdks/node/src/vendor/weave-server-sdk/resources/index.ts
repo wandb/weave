@@ -49,6 +49,7 @@ export {
   type CallUpsertBatchParams,
   type CallUsageParams,
 } from './calls';
+export { Completions, type CompletionCreateResponse, type CompletionCreateParams } from './completions';
 export {
   Costs,
   type CostCreateResponse,
