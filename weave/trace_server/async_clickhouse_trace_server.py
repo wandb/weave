@@ -42,6 +42,7 @@ from weave.trace_server.clickhouse_trace_server_batched import (
     CompletionPrepResult,
 )
 from weave.trace_server.datadog import tag_db_insert_path
+from weave.trace_server.errors import GroupedQueryNotSupportedAsync
 from weave.trace_server.feedback import TABLE_FEEDBACK, format_feedback_to_res
 from weave.trace_server.llm_completion import lite_llm_acompletion
 from weave.trace_server.query_builder.agent_query_builder import (
@@ -227,9 +228,7 @@ class AsyncClickHouseTraceServer(ClickHouseTraceServer):
         `agent_spans_query`.
         """
         if req.group_by:
-            raise ValueError(
-                "aagent_spans_query does not support group_by; use agent_spans_query"
-            )
+            raise GroupedQueryNotSupportedAsync()
         handler = AgentQueryHandler(self._query, self.feedback_query)
         total, rows = await handler.arun_paginated(
             make_spans_count_query, make_spans_list_query, req, self._aquery
