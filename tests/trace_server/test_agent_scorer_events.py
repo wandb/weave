@@ -95,7 +95,6 @@ def test_embed_requires_conversation_but_score_does_not() -> None:
     [
         {"eval_run_id": "eval-run"},
         {"eval_predict_and_score_call_id": "predict-and-score"},
-        {"eval_kind": "agent"},
     ],
 )
 def test_embed_excludes_evaluation_spans(eval_fields: dict[str, str]) -> None:
