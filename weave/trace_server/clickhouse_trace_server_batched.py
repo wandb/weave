@@ -6,7 +6,7 @@ import json
 import logging
 import threading
 from collections import defaultdict
-from collections.abc import Callable, Iterator, Sequence
+from collections.abc import Callable, Iterable, Iterator, Sequence
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from contextlib import contextmanager
 from functools import partial
@@ -391,7 +391,9 @@ _CALLS_COMPLETE_SENTINEL_COLUMNS: list[tuple[int, str]] = [
 ]
 
 
-def calls_stats_res(raw_res: QueryResult, columns: list[str]) -> tsi.CallsQueryStatsRes:
+def calls_stats_res(
+    raw_res: QueryResult, columns: Iterable[str]
+) -> tsi.CallsQueryStatsRes:
     """Stats row -> response, shared by the sync and async paths."""
     res_dict = (
         dict(zip(columns, raw_res.result_rows[0], strict=False))
