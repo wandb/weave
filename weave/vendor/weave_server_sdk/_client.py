@@ -55,6 +55,7 @@ if TYPE_CHECKING:
         v2_models,
         v2_scores,
         v2_scorers,
+        completions,
         evaluations,
         v2_datasets,
         v2_runtimes,
@@ -80,6 +81,7 @@ if TYPE_CHECKING:
     from .resources.v2_models import V2ModelsResource, AsyncV2ModelsResource
     from .resources.v2_scores import V2ScoresResource, AsyncV2ScoresResource
     from .resources.v2_scorers import V2ScorersResource, AsyncV2ScorersResource
+    from .resources.completions import CompletionsResource, AsyncCompletionsResource
     from .resources.evaluations import EvaluationsResource, AsyncEvaluationsResource
     from .resources.v2_datasets import V2DatasetsResource, AsyncV2DatasetsResource
     from .resources.v2_runtimes import V2RuntimesResource, AsyncV2RuntimesResource
@@ -238,6 +240,12 @@ class WeaveTrace(SyncAPIClient):
         from .resources.trace import TraceResource
 
         return TraceResource(self)
+
+    @cached_property
+    def completions(self) -> CompletionsResource:
+        from .resources.completions import CompletionsResource
+
+        return CompletionsResource(self)
 
     @cached_property
     def threads(self) -> ThreadsResource:
@@ -588,6 +596,12 @@ class AsyncWeaveTrace(AsyncAPIClient):
         return AsyncTraceResource(self)
 
     @cached_property
+    def completions(self) -> AsyncCompletionsResource:
+        from .resources.completions import AsyncCompletionsResource
+
+        return AsyncCompletionsResource(self)
+
+    @cached_property
     def threads(self) -> AsyncThreadsResource:
         from .resources.threads import AsyncThreadsResource
 
@@ -866,6 +880,12 @@ class WeaveTraceWithRawResponse:
         return TraceResourceWithRawResponse(self._client.trace)
 
     @cached_property
+    def completions(self) -> completions.CompletionsResourceWithRawResponse:
+        from .resources.completions import CompletionsResourceWithRawResponse
+
+        return CompletionsResourceWithRawResponse(self._client.completions)
+
+    @cached_property
     def threads(self) -> threads.ThreadsResourceWithRawResponse:
         from .resources.threads import ThreadsResourceWithRawResponse
 
@@ -1027,6 +1047,12 @@ class AsyncWeaveTraceWithRawResponse:
         from .resources.trace import AsyncTraceResourceWithRawResponse
 
         return AsyncTraceResourceWithRawResponse(self._client.trace)
+
+    @cached_property
+    def completions(self) -> completions.AsyncCompletionsResourceWithRawResponse:
+        from .resources.completions import AsyncCompletionsResourceWithRawResponse
+
+        return AsyncCompletionsResourceWithRawResponse(self._client.completions)
 
     @cached_property
     def threads(self) -> threads.AsyncThreadsResourceWithRawResponse:
@@ -1192,6 +1218,12 @@ class WeaveTraceWithStreamedResponse:
         return TraceResourceWithStreamingResponse(self._client.trace)
 
     @cached_property
+    def completions(self) -> completions.CompletionsResourceWithStreamingResponse:
+        from .resources.completions import CompletionsResourceWithStreamingResponse
+
+        return CompletionsResourceWithStreamingResponse(self._client.completions)
+
+    @cached_property
     def threads(self) -> threads.ThreadsResourceWithStreamingResponse:
         from .resources.threads import ThreadsResourceWithStreamingResponse
 
@@ -1353,6 +1385,12 @@ class AsyncWeaveTraceWithStreamedResponse:
         from .resources.trace import AsyncTraceResourceWithStreamingResponse
 
         return AsyncTraceResourceWithStreamingResponse(self._client.trace)
+
+    @cached_property
+    def completions(self) -> completions.AsyncCompletionsResourceWithStreamingResponse:
+        from .resources.completions import AsyncCompletionsResourceWithStreamingResponse
+
+        return AsyncCompletionsResourceWithStreamingResponse(self._client.completions)
 
     @cached_property
     def threads(self) -> threads.AsyncThreadsResourceWithStreamingResponse:

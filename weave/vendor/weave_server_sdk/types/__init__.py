@@ -106,6 +106,7 @@ from .v2_scorer_list_response import V2ScorerListResponse as V2ScorerListRespons
 from .v2_scorer_read_response import V2ScorerReadResponse as V2ScorerReadResponse
 from .call_stream_query_params import CallStreamQueryParams as CallStreamQueryParams
 from .call_upsert_batch_params import CallUpsertBatchParams as CallUpsertBatchParams
+from .completion_create_params import CompletionCreateParams as CompletionCreateParams
 from .evaluation_status_params import EvaluationStatusParams as EvaluationStatusParams
 from .feedback_create_response import FeedbackCreateResponse as FeedbackCreateResponse
 from .table_query_stats_params import TableQueryStatsParams as TableQueryStatsParams
@@ -127,6 +128,7 @@ from .v2_runtime_apply_response import V2RuntimeApplyResponse as V2RuntimeApplyR
 from .v2_scorer_create_response import V2ScorerCreateResponse as V2ScorerCreateResponse
 from .v2_scorer_delete_response import V2ScorerDeleteResponse as V2ScorerDeleteResponse
 from .call_upsert_batch_response import CallUpsertBatchResponse as CallUpsertBatchResponse
+from .completion_create_response import CompletionCreateResponse as CompletionCreateResponse
 from .evaluation_status_response import EvaluationStatusResponse as EvaluationStatusResponse
 from .table_query_stats_response import TableQueryStatsResponse as TableQueryStatsResponse
 from .thread_stream_query_params import ThreadStreamQueryParams as ThreadStreamQueryParams
