@@ -13,14 +13,13 @@ from collections.abc import Sequence
 from typing import Any, TypeVar, cast
 
 import sqlparse
-from clickhouse_connect.driver.client import Client as CHClient
-from clickhouse_connect.driver.exceptions import DatabaseError
+from clickhouse_connect.driver.query import QueryResult
 from clickhouse_connect.driver.summary import QuerySummary
 
-from weave.trace_server import clickhouse_trace_server_settings as ch_settings
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.datadog import set_current_span_dd_tags
 from weave.trace_server.errors import InsertTooLarge
+from weave.trace_server.ids import generate_id
 from weave.trace_server.kafka import KafkaProducer
 from weave.trace_server.tracing import traced
 
@@ -292,54 +291,40 @@ def convert_to_insert_too_large(e: Exception) -> Exception:
     return e
 
 
-def should_retry_empty_query(e: Exception, table: str, attempt: int) -> bool:
-    """Check if we should retry an empty query error. Logs warning if retrying.
+def set_correlation_id(settings: dict[str, Any]) -> str:
+    """Stamp our own id on a ClickHouse call via `log_comment` and return it.
 
-    Attempts to fix a longstanding "Empty query" error that intermittently
-    occurs during ClickHouse inserts. This happens when clickhouse-connect's
-    internal serialization generator gets exhausted during an HTTP connection
-    retry (after CH Cloud's keep-alive timeout causes a connection reset).
+    We never send a `query_id`: the driver reuses the URL across its internal
+    retries, and a client-supplied id that the server has already registered
+    fails with QUERY_WITH_SAME_ID_IS_ALREADY_RUNNING. ClickHouse mints the
+    query_id per attempt; `log_comment` carries ours and is queryable in
+    system.query_log without a uniqueness constraint.
     """
-    is_empty_query = isinstance(e, DatabaseError) and "Empty query" in str(e)
-    should_retry = is_empty_query and attempt < ch_settings.INSERT_MAX_RETRIES - 1
-    if should_retry:
-        logger.warning(
-            "clickhouse_insert_empty_query_retry",
-            extra={
-                "table": table,
-                "attempt": attempt + 1,
-                "max_retries": ch_settings.INSERT_MAX_RETRIES,
-            },
-        )
-    return should_retry
+    correlation_id = generate_id()
+    settings["log_comment"] = correlation_id
+    set_current_span_dd_tags({"clickhouse.correlation_id": correlation_id})
+    return correlation_id
 
 
-def insert_with_empty_query_retry(
-    ch_client: CHClient,
-    table: str,
-    data: Sequence[Sequence[Any]],
-    column_names: list[str],
-    settings: dict[str, Any] | None = None,
-) -> QuerySummary:
-    """Insert rows, retrying ClickHouse "Empty query" errors with a fresh generator.
+def record_query_id(result: QueryResult | QuerySummary) -> str | None:
+    """Tag the span with the server-minted query_id off a driver result.
 
-    The shared insert primitive: `_insert` and direct `ch_client.insert` callers
-    (agent spans, ttl settings) all route through this so the empty-query retry
-    lives in one place.
+    Read through `summary`, the accessor both types share and where the driver
+    stores the `X-ClickHouse-Query-Id` response header: `query_id` itself is a
+    property on QueryResult but a plain method on QuerySummary. It is absent on
+    a summary the driver built without a response.
     """
-    for attempt in range(ch_settings.INSERT_MAX_RETRIES):
-        try:
-            return ch_client.insert(
-                table, data=data, column_names=column_names, settings=settings
-            )
-        except DatabaseError as e:
-            if should_retry_empty_query(e, table, attempt):
-                continue
-            raise
+    query_id = result.summary.get("query_id") or None
+    if query_id:
+        set_current_span_dd_tags({"clickhouse.query_id": query_id})
+    return query_id
 
 
 def log_and_raise_insert_error(
-    e: Exception, table: str, data: Sequence[Sequence[Any]]
+    e: Exception,
+    table: str,
+    data: Sequence[Sequence[Any]],
+    correlation_id: str,
 ) -> None:
     """Log insert error with data size info and re-raise."""
     data_bytes = sum(num_bytes(row) for row in data)
@@ -348,6 +333,7 @@ def log_and_raise_insert_error(
         extra={
             "error_str": str(e),
             "table": table,
+            "correlation_id": correlation_id,
             "data_len": len(data),
             "data_bytes": data_bytes,
         },

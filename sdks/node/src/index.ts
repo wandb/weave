@@ -16,7 +16,7 @@ export type {
   HTTPValidationError,
   Query,
   SortBy,
-} from './generated/traceServerApi';
+} from './traceServerTypes';
 export type {Settings} from './settings';
 export type {
   Agent,
@@ -86,6 +86,7 @@ export type {
   Modality,
   Reasoning,
   Role,
+  SpanEndOptions,
   SubAgent,
   SubAgentInit,
   Tool,

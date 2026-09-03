@@ -346,6 +346,70 @@ def test_chat_view_aggregates_cost() -> None:
     assert res.total_cost_usd == pytest.approx(0.033)
 
 
+def test_chat_view_carries_root_facts_and_token_totals() -> None:
+    """One read gives a consumer the turn root's facts and the trace's usage.
+
+    Both exist so a consumer needing the turn's identity, clock, or token counts
+    reads them here instead of paying a second query over the same spans, so the
+    numbers have to match what those queries return.
+    """
+    started = datetime.datetime(2026, 3, 4, 5, tzinfo=datetime.timezone.utc)
+    spans = [
+        _span(
+            span_id="agent",
+            operation_name="invoke_agent",
+            agent_name="my-bot",
+            output_messages=[{"role": "assistant", "content": "done"}],
+            input_tokens=10,
+            started_at=started,
+            ended_at=started + datetime.timedelta(seconds=90),
+            wb_user_id="user-root",
+        ),
+        _span(
+            span_id="llm-1",
+            parent_span_id="agent",
+            input_tokens=100,
+            output_tokens=20,
+            reasoning_tokens=5,
+            cache_creation_input_tokens=8,
+            cache_read_input_tokens=64,
+            started_at=started + datetime.timedelta(seconds=1),
+            wb_user_id="user-child",
+        ),
+        _span(span_id="llm-2", parent_span_id="agent", input_tokens=200),
+    ]
+
+    res = build_trace_chat(spans, "trace-tokens")
+
+    # Sourced from the root span, not the first or last span read back: a child
+    # starts later, ends earlier, and here carries a different identity.
+    assert (res.started_at, res.ended_at, res.wb_user_id, res.agent_name) == (
+        started,
+        started + datetime.timedelta(seconds=90),
+        "user-root",
+        "my-bot",
+    )
+    # The root's own 10 is counted, matching `sum(input_tokens)` over the trace.
+    # A subtree walk would drop it or, on a root that mirrors its children,
+    # count those children twice.
+    assert (
+        res.total_input_tokens,
+        res.total_output_tokens,
+        res.total_reasoning_tokens,
+        res.total_cache_creation_input_tokens,
+        res.total_cache_read_input_tokens,
+    ) == (310, 20, 5, 8, 64)
+
+    # An empty trace has no root to source, and zero usage rather than None:
+    # usage is a stored count, unlike cost.
+    empty = build_trace_chat([], "trace-empty")
+    assert (empty.started_at, empty.wb_user_id, empty.total_input_tokens) == (
+        None,
+        None,
+        0,
+    )
+
+
 def test_chat_view_cost_none_when_unpriced() -> None:
     """With no priced spans, costs stay None (unknown), not 0."""
     spans = [

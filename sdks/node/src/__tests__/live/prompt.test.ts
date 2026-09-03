@@ -1,11 +1,13 @@
 import {MessagesPrompt, StringPrompt} from '../../prompt';
 import {init} from '../../clientApi';
+import {createTraceServerClient} from '../../traceServerClient';
 import {WandbServerApi} from 'weave/wandb/wandbServerApi';
-import {Api as TraceServerApi} from '../../generated/traceServerApi';
+import {stainlessPromise} from '../helpers/stainlessPromise';
 
 jest.mock('../../wandb/wandbServerApi');
-
-jest.mock('../../generated/traceServerApi');
+jest.mock('../../traceServerClient', () => ({
+  createTraceServerClient: jest.fn(),
+}));
 
 describe('Prompt', () => {
   test('should format a string prompt', async () => {
@@ -28,26 +30,22 @@ describe('MessagesPrompt', () => {
 });
 
 describe('Prompt persistence', () => {
-  const mockObjCreateObjCreatePost = jest.fn();
+  const mockCreate = jest.fn();
 
   beforeEach(() => {
-    // Mock WandbServerApi
     (WandbServerApi as jest.Mock).mockImplementation(() => ({
       defaultEntityName: jest.fn().mockResolvedValue('test-entity'),
     }));
   });
 
   test('should persist a string prompt', async () => {
-    // Mock TraceServerApi
-    (TraceServerApi as jest.Mock).mockImplementation(() => ({
-      obj: {
-        objCreateObjCreatePost: mockObjCreateObjCreatePost.mockResolvedValue({
-          data: {
-            digest: 'test-digest',
-          },
-        }),
-        objReadObjReadPost: jest.fn().mockResolvedValue({
-          data: {
+    (createTraceServerClient as jest.Mock).mockImplementation(() => ({
+      objects: {
+        create: mockCreate.mockReturnValue(
+          stainlessPromise({digest: 'test-digest'})
+        ),
+        read: jest.fn().mockReturnValue(
+          stainlessPromise({
             obj: {
               object_id: 'StringPrompt',
               val: {
@@ -57,8 +55,8 @@ describe('Prompt persistence', () => {
                 content: 'Hello, {name}!',
               },
             },
-          },
-        }),
+          })
+        ),
       },
     }));
 
@@ -76,7 +74,7 @@ describe('Prompt persistence', () => {
       'weave:///test-entity/test-project/object/test-prompt:test-digest'
     );
 
-    expect(mockObjCreateObjCreatePost).toHaveBeenCalledWith({
+    expect(mockCreate).toHaveBeenCalledWith({
       obj: {
         project_id: 'test-entity/test-project',
         object_id: 'test-prompt',
@@ -97,16 +95,13 @@ describe('Prompt persistence', () => {
   });
 
   test('should persist a messages prompt', async () => {
-    // Mock TraceServerApi
-    (TraceServerApi as jest.Mock).mockImplementation(() => ({
-      obj: {
-        objCreateObjCreatePost: mockObjCreateObjCreatePost.mockResolvedValue({
-          data: {
-            digest: 'test-digest',
-          },
-        }),
-        objReadObjReadPost: jest.fn().mockResolvedValue({
-          data: {
+    (createTraceServerClient as jest.Mock).mockImplementation(() => ({
+      objects: {
+        create: mockCreate.mockReturnValue(
+          stainlessPromise({digest: 'test-digest'})
+        ),
+        read: jest.fn().mockReturnValue(
+          stainlessPromise({
             obj: {
               object_id: 'MessagesPrompt',
               val: {
@@ -116,8 +111,8 @@ describe('Prompt persistence', () => {
                 messages: [{role: 'user', content: 'Hello, {name}!'}],
               },
             },
-          },
-        }),
+          })
+        ),
       },
     }));
     const client = await init('test-project');
@@ -132,7 +127,7 @@ describe('Prompt persistence', () => {
       'weave:///test-entity/test-project/object/MessagesPrompt:test-digest'
     );
 
-    expect(mockObjCreateObjCreatePost).toHaveBeenCalledWith({
+    expect(mockCreate).toHaveBeenCalledWith({
       obj: {
         project_id: 'test-entity/test-project',
         object_id: 'MessagesPrompt',
@@ -157,7 +152,6 @@ describe('Prompt persistence', () => {
 
 describe('Prompt.get static methods', () => {
   beforeEach(() => {
-    // Mock WandbServerApi
     (WandbServerApi as jest.Mock).mockImplementation(() => ({
       defaultEntityName: jest.fn().mockResolvedValue('test-entity'),
     }));
@@ -168,11 +162,10 @@ describe('Prompt.get static methods', () => {
     const name = 'test-prompt';
     const description = 'A test prompt';
 
-    // Mock TraceServerApi
-    (TraceServerApi as jest.Mock).mockImplementation(() => ({
-      obj: {
-        objReadObjReadPost: jest.fn().mockResolvedValue({
-          data: {
+    (createTraceServerClient as jest.Mock).mockImplementation(() => ({
+      objects: {
+        read: jest.fn().mockReturnValue(
+          stainlessPromise({
             obj: {
               object_id: name,
               val: {
@@ -184,8 +177,8 @@ describe('Prompt.get static methods', () => {
                 description,
               },
             },
-          },
-        }),
+          })
+        ),
       },
     }));
 
@@ -195,9 +188,7 @@ describe('Prompt.get static methods', () => {
       `weave:///test-entity/test-project/object/${name}:abc123`
     );
 
-    // Verify type
     expect(prompt).toBeInstanceOf(StringPrompt);
-    // Verify properties
     expect(prompt.content).toBe(content);
     expect(prompt.name).toBe(name);
     expect(prompt.description).toBe(description);
@@ -208,11 +199,10 @@ describe('Prompt.get static methods', () => {
     const name = 'test-messages-prompt';
     const description = 'A test messages prompt';
 
-    // Mock TraceServerApi
-    (TraceServerApi as jest.Mock).mockImplementation(() => ({
-      obj: {
-        objReadObjReadPost: jest.fn().mockResolvedValue({
-          data: {
+    (createTraceServerClient as jest.Mock).mockImplementation(() => ({
+      objects: {
+        read: jest.fn().mockReturnValue(
+          stainlessPromise({
             obj: {
               object_id: name,
               val: {
@@ -224,8 +214,8 @@ describe('Prompt.get static methods', () => {
                 description,
               },
             },
-          },
-        }),
+          })
+        ),
       },
     }));
 
@@ -235,9 +225,7 @@ describe('Prompt.get static methods', () => {
       `weave:///test-entity/test-project/object/${name}:def456`
     );
 
-    // Verify type
     expect(prompt).toBeInstanceOf(MessagesPrompt);
-    // Verify properties
     expect(prompt.messages).toEqual(messages);
     expect(prompt.name).toBe(name);
     expect(prompt.description).toBe(description);

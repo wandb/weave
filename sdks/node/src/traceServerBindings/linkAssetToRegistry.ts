@@ -1,5 +1,5 @@
-import {ContentType} from '../generated/traceServerApi';
-import type {Api as TraceServerApi} from '../generated/traceServerApi';
+import {asHttpResponse} from '../httpResponse';
+import type {WeaveTrace} from '../vendor/weave-server-sdk';
 
 export const LINK_TO_REGISTRY_PATH = '/link_to_registry';
 
@@ -28,20 +28,14 @@ export interface LinkAssetToRegistryRes {
  * @throws Error if the trace server returns invalid JSON.
  */
 export async function linkAssetToRegistry(
-  traceServerApi: TraceServerApi<unknown>,
+  traceServerApi: WeaveTrace,
   req: LinkAssetToRegistryReq
 ): Promise<LinkAssetToRegistryRes> {
-  const response = await traceServerApi.request<
-    LinkAssetToRegistryRes,
-    unknown
-  >({
-    path: LINK_TO_REGISTRY_PATH,
-    method: 'POST',
-    body: req,
-    secure: true,
-    type: ContentType.Json,
-    format: 'json',
-  });
+  const response = await asHttpResponse<LinkAssetToRegistryRes>(
+    traceServerApi.post<LinkAssetToRegistryRes>(LINK_TO_REGISTRY_PATH, {
+      body: req,
+    })
+  );
 
   if (response.data == null || typeof response.data !== 'object') {
     throw new Error('Trace server returned invalid JSON');

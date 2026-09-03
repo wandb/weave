@@ -42,7 +42,6 @@ dependencies = [
   "click",                                # Used for terminal/stdio printing
   "gql[httpx]>=3.0.0",                    # Used exclusively in wandb_api.py; httpx is used for HTTP requests throughout the codebase
   "jsonschema>=4.23.0",                   # Used by scorers for field validation
-  "pyyaml>=6.0",                          # Used to load the checked-in insights configs
   "diskcache-weave==5.6.3.post1",         # Used for data caching; patched fork fixes CVE https://github.com/grantjenks/python-diskcache/issues/357
   "tzdata; platform_system == 'Windows'", # Required for timezone support on Windows
   "cachetools>=6.2.4",                    # Used for TTLCache in call_batch_processor
@@ -95,12 +94,16 @@ trace_server = [
   "litellm>=1.36.1,<1.82.7",
   # OTEL trace support
   "opentelemetry-proto>=1.28.0",
-  "opentelemetry-semantic-conventions-ai>=0.4.3",
-  "openinference-semantic-conventions>=0.1.17",
   # For emoji shortcode support in Feedback
   "emoji>=2.12.1",
   # Redis for optional task tracking and caching
   "redis>=5.0.0",
+  "clickhouse_connect>=1.6,<1.7",
+  "sqlparse>=0.5.0,<0.6",
+  "confluent-kafka>=2.9.0",
+  "openai>=1.99.9",
+  "requests>=2.32.0",
+  "urllib3>=2.0.0",
 ]
 video_support = ["moviepy<=1.0.3"]
 anthropic = ["anthropic>=0.18.0"]
@@ -172,6 +175,7 @@ scorers = [
 notdiamond = [
   "notdiamond>=1.3.0,<1.4.0; platform_python_implementation != 'PyPy'",
   "pandas>=2.0.0",
+  "pyyaml>=6.0",                          # custom_router_test.py loads a router config
 ]
 openai = ["openai>=1.99.9"]
 openai_agents = ["openai-agents>=0.0.4"]
@@ -371,8 +375,14 @@ module = "weave.*"
 disallow_untyped_defs = true
 disallow_untyped_calls = true
 
+# `exclude` above only skips directory crawling. Now that weave imports the
+# vendored SDK, mypy follows that import and checks the generated tree anyway.
+[[tool.mypy.overrides]]
+module = "weave.vendor.weave_server_sdk.*"
+ignore_errors = true
+
 [tool.bumpversion]
-current_version = "0.53.7-dev0"
+current_version = "0.53.9-dev0"
 parse = """(?x)
     (?P<major>0|[1-9]\\d*)\\.
     (?P<minor>0|[1-9]\\d*)\\.
@@ -406,7 +416,7 @@ values = ["dev", "final"]
 optional_value = "final"
 
 [tool.typos.files]
-extend-exclude = ["weave/vendor/weave_server_sdk/"]
+extend-exclude = ["weave/vendor/weave_server_sdk/", "sdks/node/src/vendor/weave-server-sdk/"]
 
 [tool.typos.default.extend-words]
 fasion = "fasion" # Wandb lore
@@ -428,27 +438,11 @@ dev = [
   "ty>=0.0.2",
   "import-linter>=2.0",
 ]
-trace_server = [
-  # Same dependencies as the trace_server optional dependency, but as a dependency group for tests
-  # BYOB - S3
-  "boto3>=1.34.0",
-  # BYOB - Azure
-  "azure-identity>=1.25.0,<2.0.0",
-  "azure-storage-blob>=12.24.0,<12.26.0",
-  # BYOB - GCP
-  "google-cloud-storage>=2.7.0",
-  # LLM Support
-  "litellm>=1.36.1,<1.82.7",
-  # OTEL trace support
-  "opentelemetry-proto>=1.12.0",
-  "opentelemetry-semantic-conventions-ai>=0.4.3",
-  "openinference-semantic-conventions>=0.1.17",
-  # For emoji shortcode support in Feedback
-  "emoji>=2.12.1",
-]
 trace_server_tests = [
   # BYOB - S3
   "moto[s3]>=5.0.0",
+  "opentelemetry-semantic-conventions-ai>=0.4.3",
+  "openinference-semantic-conventions>=0.1.17",
 ]
 autogen_tests = [
   "autogen-agentchat>=0.5.7; python_version >= '3.10'",
@@ -470,9 +464,7 @@ test = [
   "pytest-rerunfailures>=14.0",
   "pytest-timeout>=2.3.1",
   "pytest-shard==0.1.2",
-  "clickhouse_connect==0.11.0",
   "fastapi>=0.110.0",
-  "sqlparse==0.5.0",
   "rich",
 
   # Integration Tests

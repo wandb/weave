@@ -1,5 +1,5 @@
 import {getGlobalClient} from './clientApi';
-import {type CallSchema} from './generated/traceServerApi';
+import {type CallSchema} from './traceServerTypes';
 
 const MAX_DISPLAY_NAME_LENGTH = 1000;
 

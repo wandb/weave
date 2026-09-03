@@ -1,3 +1,4 @@
+import {asHttpResponse} from './httpResponse';
 import {parseTableRefUri} from './uriParser';
 
 export class TableRef {
@@ -76,12 +77,11 @@ export class Table<R extends TableRow = TableRow> {
     const {requireGlobalClient} = await import('./clientApi');
     const client = requireGlobalClient();
 
-    // Fetch table data from server
-    const response = await client.traceServerApi.table.tableQueryTableQueryPost(
-      {
+    const response = await asHttpResponse(
+      client.traceServerApi.tables.query({
         project_id: tableRef.projectId,
         digest: tableRef.digest,
-      }
+      })
     );
 
     // Convert to rows with __savedRef

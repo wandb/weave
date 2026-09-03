@@ -12,6 +12,7 @@ from pydantic import ValidationError
 from weave.chat import completions as completions_module
 from weave.chat.completions import Completions
 from weave.trace.weave_client import WeaveClient
+from weave.wandb_interface.auth import ApiKeyCredentials
 
 
 def _client() -> WeaveClient:
@@ -68,7 +69,11 @@ def _install_mock_transport(monkeypatch, handler) -> list[httpx.Client]:
         "Client",
         client_factory,
     )
-    monkeypatch.setattr(completions_module, "get_wandb_api_context", lambda: "key")
+    monkeypatch.setattr(
+        completions_module,
+        "get_wandb_auth_context",
+        lambda: ApiKeyCredentials("key"),
+    )
     return clients
 
 

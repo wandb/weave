@@ -8,6 +8,10 @@ vcr.requestMasker = req => {
   req.headers['authorization'] = 'masked';
 };
 
+// Stainless probes `fetch('data:,')` to detect the Response constructor
+// while building multipart bodies. That is not an HTTP call.
+vcr.requestPassThrough = req => req.url.startsWith('data:');
+
 const UUID_V7 =
   /[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[0-9a-f]{4}-[0-9a-f]{12}/g;
 
@@ -69,9 +73,43 @@ function normalizeMultipartBoundary(req: HttpRequest): HttpRequest {
   };
 }
 
+/** Filename and extra digest field differ from the old swagger client; they are not load-bearing for cassette identity. */
+function normalizeMultipartFileParts(req: HttpRequest): HttpRequest {
+  if (!req.headers['content-type']?.startsWith('multipart/form-data')) {
+    return req;
+  }
+  let body = req.body ?? '';
+  body = body.replace(/filename="[^"]*"/g, 'filename="<FILE>"');
+  body = body.replace(/Content-Type: [^\r]*\r\n/g, '');
+  body = body.replace(
+    /--<BOUNDARY>\r\nContent-Disposition: form-data; name="expected_digest"[\s\S]*?(?=--<BOUNDARY>)/g,
+    ''
+  );
+  return {...req, body};
+}
+
+const MATCHED_HEADERS = new Set([
+  'authorization',
+  'user-agent',
+  'content-type',
+  'x-weave-client-capabilities',
+]);
+
+function keepMatchedHeaders(req: HttpRequest): HttpRequest {
+  const headers: Record<string, string> = {};
+  for (const [key, value] of Object.entries(req.headers)) {
+    if (MATCHED_HEADERS.has(key.toLowerCase())) {
+      headers[key.toLowerCase()] = value;
+    }
+  }
+  return {...req, headers};
+}
+
 function normalizeRequest(req: HttpRequest): HttpRequest {
   return [
+    keepMatchedHeaders,
     normalizeMultipartBoundary,
+    normalizeMultipartFileParts,
     normalizeVolatileBodyFields,
     normalizeUserAgentVersion,
   ].reduce((req, normalizer) => normalizer(req), req);

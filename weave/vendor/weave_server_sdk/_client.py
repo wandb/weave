@@ -43,18 +43,26 @@ if TYPE_CHECKING:
         costs,
         files,
         trace,
+        agents,
+        images,
         tables,
         v2_ops,
         objects,
         threads,
         feedback,
         services,
+        v2_calls,
         v2_models,
         v2_scores,
         v2_scorers,
+        completions,
+        evaluations,
         v2_datasets,
+        v2_runtimes,
         v2_evaluations,
         v2_predictions,
+        v2_eval_results,
+        annotation_queues,
         v2_evaluation_runs,
     )
     from .resources.otel import OtelResource, AsyncOtelResource
@@ -63,19 +71,27 @@ if TYPE_CHECKING:
     from .resources.costs import CostsResource, AsyncCostsResource
     from .resources.files import FilesResource, AsyncFilesResource
     from .resources.trace import TraceResource, AsyncTraceResource
+    from .resources.images import ImagesResource, AsyncImagesResource
     from .resources.tables import TablesResource, AsyncTablesResource
     from .resources.v2_ops import V2OpsResource, AsyncV2OpsResource
     from .resources.threads import ThreadsResource, AsyncThreadsResource
     from .resources.feedback import FeedbackResource, AsyncFeedbackResource
     from .resources.services import ServicesResource, AsyncServicesResource
+    from .resources.v2_calls import V2CallsResource, AsyncV2CallsResource
     from .resources.v2_models import V2ModelsResource, AsyncV2ModelsResource
     from .resources.v2_scores import V2ScoresResource, AsyncV2ScoresResource
     from .resources.v2_scorers import V2ScorersResource, AsyncV2ScorersResource
+    from .resources.completions import CompletionsResource, AsyncCompletionsResource
+    from .resources.evaluations import EvaluationsResource, AsyncEvaluationsResource
     from .resources.v2_datasets import V2DatasetsResource, AsyncV2DatasetsResource
+    from .resources.v2_runtimes import V2RuntimesResource, AsyncV2RuntimesResource
+    from .resources.agents.agents import AgentsResource, AsyncAgentsResource
     from .resources.v2_evaluations import V2EvaluationsResource, AsyncV2EvaluationsResource
     from .resources.v2_predictions import V2PredictionsResource, AsyncV2PredictionsResource
     from .resources.objects.objects import ObjectsResource, AsyncObjectsResource
+    from .resources.v2_eval_results import V2EvalResultsResource, AsyncV2EvalResultsResource
     from .resources.v2_evaluation_runs import V2EvaluationRunsResource, AsyncV2EvaluationRunsResource
+    from .resources.annotation_queues.annotation_queues import AnnotationQueuesResource, AsyncAnnotationQueuesResource
 
 __all__ = [
     "Timeout",
@@ -226,10 +242,40 @@ class WeaveTrace(SyncAPIClient):
         return TraceResource(self)
 
     @cached_property
+    def completions(self) -> CompletionsResource:
+        from .resources.completions import CompletionsResource
+
+        return CompletionsResource(self)
+
+    @cached_property
     def threads(self) -> ThreadsResource:
         from .resources.threads import ThreadsResource
 
         return ThreadsResource(self)
+
+    @cached_property
+    def agents(self) -> AgentsResource:
+        from .resources.agents import AgentsResource
+
+        return AgentsResource(self)
+
+    @cached_property
+    def annotation_queues(self) -> AnnotationQueuesResource:
+        from .resources.annotation_queues import AnnotationQueuesResource
+
+        return AnnotationQueuesResource(self)
+
+    @cached_property
+    def evaluations(self) -> EvaluationsResource:
+        from .resources.evaluations import EvaluationsResource
+
+        return EvaluationsResource(self)
+
+    @cached_property
+    def images(self) -> ImagesResource:
+        from .resources.images import ImagesResource
+
+        return ImagesResource(self)
 
     @cached_property
     def v2_ops(self) -> V2OpsResource:
@@ -280,6 +326,24 @@ class WeaveTrace(SyncAPIClient):
         return V2ScoresResource(self)
 
     @cached_property
+    def v2_calls(self) -> V2CallsResource:
+        from .resources.v2_calls import V2CallsResource
+
+        return V2CallsResource(self)
+
+    @cached_property
+    def v2_runtimes(self) -> V2RuntimesResource:
+        from .resources.v2_runtimes import V2RuntimesResource
+
+        return V2RuntimesResource(self)
+
+    @cached_property
+    def v2_eval_results(self) -> V2EvalResultsResource:
+        from .resources.v2_eval_results import V2EvalResultsResource
+
+        return V2EvalResultsResource(self)
+
+    @cached_property
     def with_raw_response(self) -> WeaveTraceWithRawResponse:
         return WeaveTraceWithRawResponse(self)
 
@@ -290,7 +354,7 @@ class WeaveTrace(SyncAPIClient):
     @property
     @override
     def qs(self) -> Querystring:
-        return Querystring(array_format="comma")
+        return Querystring(array_format="repeat")
 
     @property
     @override
@@ -532,10 +596,40 @@ class AsyncWeaveTrace(AsyncAPIClient):
         return AsyncTraceResource(self)
 
     @cached_property
+    def completions(self) -> AsyncCompletionsResource:
+        from .resources.completions import AsyncCompletionsResource
+
+        return AsyncCompletionsResource(self)
+
+    @cached_property
     def threads(self) -> AsyncThreadsResource:
         from .resources.threads import AsyncThreadsResource
 
         return AsyncThreadsResource(self)
+
+    @cached_property
+    def agents(self) -> AsyncAgentsResource:
+        from .resources.agents import AsyncAgentsResource
+
+        return AsyncAgentsResource(self)
+
+    @cached_property
+    def annotation_queues(self) -> AsyncAnnotationQueuesResource:
+        from .resources.annotation_queues import AsyncAnnotationQueuesResource
+
+        return AsyncAnnotationQueuesResource(self)
+
+    @cached_property
+    def evaluations(self) -> AsyncEvaluationsResource:
+        from .resources.evaluations import AsyncEvaluationsResource
+
+        return AsyncEvaluationsResource(self)
+
+    @cached_property
+    def images(self) -> AsyncImagesResource:
+        from .resources.images import AsyncImagesResource
+
+        return AsyncImagesResource(self)
 
     @cached_property
     def v2_ops(self) -> AsyncV2OpsResource:
@@ -586,6 +680,24 @@ class AsyncWeaveTrace(AsyncAPIClient):
         return AsyncV2ScoresResource(self)
 
     @cached_property
+    def v2_calls(self) -> AsyncV2CallsResource:
+        from .resources.v2_calls import AsyncV2CallsResource
+
+        return AsyncV2CallsResource(self)
+
+    @cached_property
+    def v2_runtimes(self) -> AsyncV2RuntimesResource:
+        from .resources.v2_runtimes import AsyncV2RuntimesResource
+
+        return AsyncV2RuntimesResource(self)
+
+    @cached_property
+    def v2_eval_results(self) -> AsyncV2EvalResultsResource:
+        from .resources.v2_eval_results import AsyncV2EvalResultsResource
+
+        return AsyncV2EvalResultsResource(self)
+
+    @cached_property
     def with_raw_response(self) -> AsyncWeaveTraceWithRawResponse:
         return AsyncWeaveTraceWithRawResponse(self)
 
@@ -596,7 +708,7 @@ class AsyncWeaveTrace(AsyncAPIClient):
     @property
     @override
     def qs(self) -> Querystring:
-        return Querystring(array_format="comma")
+        return Querystring(array_format="repeat")
 
     @property
     @override
@@ -768,10 +880,40 @@ class WeaveTraceWithRawResponse:
         return TraceResourceWithRawResponse(self._client.trace)
 
     @cached_property
+    def completions(self) -> completions.CompletionsResourceWithRawResponse:
+        from .resources.completions import CompletionsResourceWithRawResponse
+
+        return CompletionsResourceWithRawResponse(self._client.completions)
+
+    @cached_property
     def threads(self) -> threads.ThreadsResourceWithRawResponse:
         from .resources.threads import ThreadsResourceWithRawResponse
 
         return ThreadsResourceWithRawResponse(self._client.threads)
+
+    @cached_property
+    def agents(self) -> agents.AgentsResourceWithRawResponse:
+        from .resources.agents import AgentsResourceWithRawResponse
+
+        return AgentsResourceWithRawResponse(self._client.agents)
+
+    @cached_property
+    def annotation_queues(self) -> annotation_queues.AnnotationQueuesResourceWithRawResponse:
+        from .resources.annotation_queues import AnnotationQueuesResourceWithRawResponse
+
+        return AnnotationQueuesResourceWithRawResponse(self._client.annotation_queues)
+
+    @cached_property
+    def evaluations(self) -> evaluations.EvaluationsResourceWithRawResponse:
+        from .resources.evaluations import EvaluationsResourceWithRawResponse
+
+        return EvaluationsResourceWithRawResponse(self._client.evaluations)
+
+    @cached_property
+    def images(self) -> images.ImagesResourceWithRawResponse:
+        from .resources.images import ImagesResourceWithRawResponse
+
+        return ImagesResourceWithRawResponse(self._client.images)
 
     @cached_property
     def v2_ops(self) -> v2_ops.V2OpsResourceWithRawResponse:
@@ -820,6 +962,24 @@ class WeaveTraceWithRawResponse:
         from .resources.v2_scores import V2ScoresResourceWithRawResponse
 
         return V2ScoresResourceWithRawResponse(self._client.v2_scores)
+
+    @cached_property
+    def v2_calls(self) -> v2_calls.V2CallsResourceWithRawResponse:
+        from .resources.v2_calls import V2CallsResourceWithRawResponse
+
+        return V2CallsResourceWithRawResponse(self._client.v2_calls)
+
+    @cached_property
+    def v2_runtimes(self) -> v2_runtimes.V2RuntimesResourceWithRawResponse:
+        from .resources.v2_runtimes import V2RuntimesResourceWithRawResponse
+
+        return V2RuntimesResourceWithRawResponse(self._client.v2_runtimes)
+
+    @cached_property
+    def v2_eval_results(self) -> v2_eval_results.V2EvalResultsResourceWithRawResponse:
+        from .resources.v2_eval_results import V2EvalResultsResourceWithRawResponse
+
+        return V2EvalResultsResourceWithRawResponse(self._client.v2_eval_results)
 
 
 class AsyncWeaveTraceWithRawResponse:
@@ -889,10 +1049,40 @@ class AsyncWeaveTraceWithRawResponse:
         return AsyncTraceResourceWithRawResponse(self._client.trace)
 
     @cached_property
+    def completions(self) -> completions.AsyncCompletionsResourceWithRawResponse:
+        from .resources.completions import AsyncCompletionsResourceWithRawResponse
+
+        return AsyncCompletionsResourceWithRawResponse(self._client.completions)
+
+    @cached_property
     def threads(self) -> threads.AsyncThreadsResourceWithRawResponse:
         from .resources.threads import AsyncThreadsResourceWithRawResponse
 
         return AsyncThreadsResourceWithRawResponse(self._client.threads)
+
+    @cached_property
+    def agents(self) -> agents.AsyncAgentsResourceWithRawResponse:
+        from .resources.agents import AsyncAgentsResourceWithRawResponse
+
+        return AsyncAgentsResourceWithRawResponse(self._client.agents)
+
+    @cached_property
+    def annotation_queues(self) -> annotation_queues.AsyncAnnotationQueuesResourceWithRawResponse:
+        from .resources.annotation_queues import AsyncAnnotationQueuesResourceWithRawResponse
+
+        return AsyncAnnotationQueuesResourceWithRawResponse(self._client.annotation_queues)
+
+    @cached_property
+    def evaluations(self) -> evaluations.AsyncEvaluationsResourceWithRawResponse:
+        from .resources.evaluations import AsyncEvaluationsResourceWithRawResponse
+
+        return AsyncEvaluationsResourceWithRawResponse(self._client.evaluations)
+
+    @cached_property
+    def images(self) -> images.AsyncImagesResourceWithRawResponse:
+        from .resources.images import AsyncImagesResourceWithRawResponse
+
+        return AsyncImagesResourceWithRawResponse(self._client.images)
 
     @cached_property
     def v2_ops(self) -> v2_ops.AsyncV2OpsResourceWithRawResponse:
@@ -941,6 +1131,24 @@ class AsyncWeaveTraceWithRawResponse:
         from .resources.v2_scores import AsyncV2ScoresResourceWithRawResponse
 
         return AsyncV2ScoresResourceWithRawResponse(self._client.v2_scores)
+
+    @cached_property
+    def v2_calls(self) -> v2_calls.AsyncV2CallsResourceWithRawResponse:
+        from .resources.v2_calls import AsyncV2CallsResourceWithRawResponse
+
+        return AsyncV2CallsResourceWithRawResponse(self._client.v2_calls)
+
+    @cached_property
+    def v2_runtimes(self) -> v2_runtimes.AsyncV2RuntimesResourceWithRawResponse:
+        from .resources.v2_runtimes import AsyncV2RuntimesResourceWithRawResponse
+
+        return AsyncV2RuntimesResourceWithRawResponse(self._client.v2_runtimes)
+
+    @cached_property
+    def v2_eval_results(self) -> v2_eval_results.AsyncV2EvalResultsResourceWithRawResponse:
+        from .resources.v2_eval_results import AsyncV2EvalResultsResourceWithRawResponse
+
+        return AsyncV2EvalResultsResourceWithRawResponse(self._client.v2_eval_results)
 
 
 class WeaveTraceWithStreamedResponse:
@@ -1010,10 +1218,40 @@ class WeaveTraceWithStreamedResponse:
         return TraceResourceWithStreamingResponse(self._client.trace)
 
     @cached_property
+    def completions(self) -> completions.CompletionsResourceWithStreamingResponse:
+        from .resources.completions import CompletionsResourceWithStreamingResponse
+
+        return CompletionsResourceWithStreamingResponse(self._client.completions)
+
+    @cached_property
     def threads(self) -> threads.ThreadsResourceWithStreamingResponse:
         from .resources.threads import ThreadsResourceWithStreamingResponse
 
         return ThreadsResourceWithStreamingResponse(self._client.threads)
+
+    @cached_property
+    def agents(self) -> agents.AgentsResourceWithStreamingResponse:
+        from .resources.agents import AgentsResourceWithStreamingResponse
+
+        return AgentsResourceWithStreamingResponse(self._client.agents)
+
+    @cached_property
+    def annotation_queues(self) -> annotation_queues.AnnotationQueuesResourceWithStreamingResponse:
+        from .resources.annotation_queues import AnnotationQueuesResourceWithStreamingResponse
+
+        return AnnotationQueuesResourceWithStreamingResponse(self._client.annotation_queues)
+
+    @cached_property
+    def evaluations(self) -> evaluations.EvaluationsResourceWithStreamingResponse:
+        from .resources.evaluations import EvaluationsResourceWithStreamingResponse
+
+        return EvaluationsResourceWithStreamingResponse(self._client.evaluations)
+
+    @cached_property
+    def images(self) -> images.ImagesResourceWithStreamingResponse:
+        from .resources.images import ImagesResourceWithStreamingResponse
+
+        return ImagesResourceWithStreamingResponse(self._client.images)
 
     @cached_property
     def v2_ops(self) -> v2_ops.V2OpsResourceWithStreamingResponse:
@@ -1062,6 +1300,24 @@ class WeaveTraceWithStreamedResponse:
         from .resources.v2_scores import V2ScoresResourceWithStreamingResponse
 
         return V2ScoresResourceWithStreamingResponse(self._client.v2_scores)
+
+    @cached_property
+    def v2_calls(self) -> v2_calls.V2CallsResourceWithStreamingResponse:
+        from .resources.v2_calls import V2CallsResourceWithStreamingResponse
+
+        return V2CallsResourceWithStreamingResponse(self._client.v2_calls)
+
+    @cached_property
+    def v2_runtimes(self) -> v2_runtimes.V2RuntimesResourceWithStreamingResponse:
+        from .resources.v2_runtimes import V2RuntimesResourceWithStreamingResponse
+
+        return V2RuntimesResourceWithStreamingResponse(self._client.v2_runtimes)
+
+    @cached_property
+    def v2_eval_results(self) -> v2_eval_results.V2EvalResultsResourceWithStreamingResponse:
+        from .resources.v2_eval_results import V2EvalResultsResourceWithStreamingResponse
+
+        return V2EvalResultsResourceWithStreamingResponse(self._client.v2_eval_results)
 
 
 class AsyncWeaveTraceWithStreamedResponse:
@@ -1131,10 +1387,40 @@ class AsyncWeaveTraceWithStreamedResponse:
         return AsyncTraceResourceWithStreamingResponse(self._client.trace)
 
     @cached_property
+    def completions(self) -> completions.AsyncCompletionsResourceWithStreamingResponse:
+        from .resources.completions import AsyncCompletionsResourceWithStreamingResponse
+
+        return AsyncCompletionsResourceWithStreamingResponse(self._client.completions)
+
+    @cached_property
     def threads(self) -> threads.AsyncThreadsResourceWithStreamingResponse:
         from .resources.threads import AsyncThreadsResourceWithStreamingResponse
 
         return AsyncThreadsResourceWithStreamingResponse(self._client.threads)
+
+    @cached_property
+    def agents(self) -> agents.AsyncAgentsResourceWithStreamingResponse:
+        from .resources.agents import AsyncAgentsResourceWithStreamingResponse
+
+        return AsyncAgentsResourceWithStreamingResponse(self._client.agents)
+
+    @cached_property
+    def annotation_queues(self) -> annotation_queues.AsyncAnnotationQueuesResourceWithStreamingResponse:
+        from .resources.annotation_queues import AsyncAnnotationQueuesResourceWithStreamingResponse
+
+        return AsyncAnnotationQueuesResourceWithStreamingResponse(self._client.annotation_queues)
+
+    @cached_property
+    def evaluations(self) -> evaluations.AsyncEvaluationsResourceWithStreamingResponse:
+        from .resources.evaluations import AsyncEvaluationsResourceWithStreamingResponse
+
+        return AsyncEvaluationsResourceWithStreamingResponse(self._client.evaluations)
+
+    @cached_property
+    def images(self) -> images.AsyncImagesResourceWithStreamingResponse:
+        from .resources.images import AsyncImagesResourceWithStreamingResponse
+
+        return AsyncImagesResourceWithStreamingResponse(self._client.images)
 
     @cached_property
     def v2_ops(self) -> v2_ops.AsyncV2OpsResourceWithStreamingResponse:
@@ -1183,6 +1469,24 @@ class AsyncWeaveTraceWithStreamedResponse:
         from .resources.v2_scores import AsyncV2ScoresResourceWithStreamingResponse
 
         return AsyncV2ScoresResourceWithStreamingResponse(self._client.v2_scores)
+
+    @cached_property
+    def v2_calls(self) -> v2_calls.AsyncV2CallsResourceWithStreamingResponse:
+        from .resources.v2_calls import AsyncV2CallsResourceWithStreamingResponse
+
+        return AsyncV2CallsResourceWithStreamingResponse(self._client.v2_calls)
+
+    @cached_property
+    def v2_runtimes(self) -> v2_runtimes.AsyncV2RuntimesResourceWithStreamingResponse:
+        from .resources.v2_runtimes import AsyncV2RuntimesResourceWithStreamingResponse
+
+        return AsyncV2RuntimesResourceWithStreamingResponse(self._client.v2_runtimes)
+
+    @cached_property
+    def v2_eval_results(self) -> v2_eval_results.AsyncV2EvalResultsResourceWithStreamingResponse:
+        from .resources.v2_eval_results import AsyncV2EvalResultsResourceWithStreamingResponse
+
+        return AsyncV2EvalResultsResourceWithStreamingResponse(self._client.v2_eval_results)
 
 
 Client = WeaveTrace

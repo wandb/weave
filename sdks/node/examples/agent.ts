@@ -99,7 +99,7 @@ async function executeToolCalls(
       tool.end({result});
     } catch (error) {
       const cause = error instanceof Error ? error : new Error(String(error));
-      tool.end({error: cause, errorType: cause.name});
+      tool.end({error: cause});
       throw error;
     }
   }

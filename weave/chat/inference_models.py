@@ -10,7 +10,7 @@ from weave.chat.types.models import (
 )
 from weave.trace.settings import http_timeout
 from weave.trace_server.constants import INFERENCE_HOST
-from weave.wandb_interface.context import get_wandb_api_context
+from weave.wandb_interface.context import get_wandb_auth_context
 
 if TYPE_CHECKING:
     from weave.trace.weave_client import WeaveClient
@@ -26,11 +26,11 @@ class InferenceModels:
         self._client = client
 
     def list(self) -> ModelsResponse:
-        api_key = get_wandb_api_context()
-        if not api_key:
+        credentials = get_wandb_auth_context()
+        if credentials is None:
             raise ValueError("No API key found")
         headers = {
-            "Authorization": f"Bearer {api_key}",
+            "Authorization": f"Bearer {credentials.bearer_token()}",
             "OpenAI-Project": f"{self._client.entity}/{self._client.project}",
             "Content-Type": "application/json",
         }

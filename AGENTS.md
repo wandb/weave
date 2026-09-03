@@ -90,6 +90,18 @@ for backward compatibility. When neither is configured, it uses
 links use an account-key SAS for explicit credentials and a user-delegation SAS
 for workload identity.
 
+### W&B authentication
+
+The Python SDK resolves either an API key or a federated identity token through
+`weave/wandb_interface/auth.py`. Federated identity uses
+`WANDB_IDENTITY_TOKEN_FILE`, exchanges the assertion at the W&B
+`/oidc/token` endpoint, caches access tokens under
+`WANDB_CREDENTIALS_FILE`, and applies Bearer auth to every W&B and Weave
+transport. Failed token exchanges are cached in-process for 30 seconds to
+prevent request traffic from repeatedly calling an unavailable token endpoint.
+If the credentials file is not writable, the exchanged token remains cached
+in-process and credential persistence emits one warning per credentials object.
+
 ## Generated Files — Do Not Hand-Edit
 
 `weave/trace_server/model_providers/model_providers.json` and `weave/trace_server/costs/cost_checkpoint.json` are generated. Never edit them by hand — regenerate with `make update_model_providers` / `make update_costs` (see `weave/Makefile`).
@@ -102,7 +114,9 @@ Note: the scripts read `modelsBegin.json`/`modelsFinal.json`, which are symlinks
 in from wandb/core rather than depended on because it is not published to PyPI.
 Never edit it by hand — regenerate it in core, then re-run
 `scripts/vendor_weave_server_sdk.py` with `--sdk-output` and `--core`. See
-`weave/vendor/README.md`.
+`weave/vendor/README.md`. The Node SDK copy lives at
+`sdks/node/src/vendor/weave-server-sdk/` and is refreshed the same way with
+`scripts/vendor_node_weave_server_sdk.py`. See `sdks/node/src/vendor/README.md`.
 
 Persisted `AgentDashboard` objects intentionally use a closed, discriminated
 schema. Supported panel variants and their configuration fields must be added
@@ -120,11 +134,9 @@ those representations are consumed by inference and the current UI.
 Inference caches resolved custom-provider configuration per replica, so updates
 may remain stale for up to 60 seconds.
 
-When trace-server request/response models or route schemas change, refresh the API schema used by the Node SDK:
-
-1. From this repo, run `make -C ../../weave-trace export-api-schema` to regenerate the sibling trace service's `openapi.json` from the FastAPI app.
-2. Copy that schema into the tracked Node SDK schema: `cp ../../weave-trace/openapi.json sdks/node/weave.openapi.json`.
-3. Regenerate the TypeScript client from `sdks/node`: `pnpm run generate-api`.
+When trace-server request/response models or route schemas change, regenerate
+the TypeScript client in wandb/core and re-vendor it with
+`scripts/vendor_node_weave_server_sdk.py`. See `sdks/node/src/vendor/README.md`.
 
 Evaluation result rows merge agent span links from two sources: legacy
 `weave.genai_span_ref` call attributes and OTel spans whose promoted
@@ -464,6 +476,11 @@ deterministic.
   `Tool` and `SubAgent` do not use ambient state.
 - Keep response models on child `chat` spans; use `setAttributes()` for fields
   without typed `record()` methods.
+- Every TypeScript GenAI span handle supports
+  `recordError(error)` to mark a failure without ending the span; terminal
+  failures can use `end({error})`. The SDK derives `error.type` from
+  `error.name`. After `recordError()`, close with `end()` without passing the
+  same error again.
 - `Turn` and `SubAgent` are logical in-process `invoke_agent` spans: emit
   `SpanKind.INTERNAL` and do not set `gen_ai.provider.name`; provider identity
   belongs on child model spans.
@@ -474,7 +491,7 @@ deterministic.
   `tool_result`.
 - `Tool` accepts JSON-compatible arguments and results. It records strings
   as-is and serializes structured values for OTel attributes. Prefer
-  `Tool.end({result, error, errorType})`; mutable `Tool.result` remains only for
+  `Tool.end({result, error})`; mutable `Tool.result` remains only for
   backward compatibility.
 - Agent span list queries omit heavy message, tool-payload, and raw-span fields;
   use an `AgentSpansQueryReq` with `include_details=True` when validating stored
@@ -483,6 +500,9 @@ deterministic.
   `async_launched` or `remote_launched` tool result before forwarded child
   messages, then finish via a `task_notification`. Keep one `SubAgent` keyed by
   tool-use ID across turn boundaries until that notification arrives.
+- Record every background `task_notification` status on its `SubAgent` as
+  `claude_agent_sdk.task.status` so `completed`, `failed`, and `stopped` remain
+  distinguishable independently of standard `error.type` metadata.
 - Route a forwarded assistant message to an already-open `SubAgent` before
   creating a `Turn`; background messages can arrive after the root result and
   must not create an empty root turn or consume the next pending input.
@@ -718,6 +738,17 @@ deterministic.
   timing with `LLM.started_at` and an explicit `Tool.started_at` instead of
   keeping contexts open with `ExitStack`.
 
+### PII redaction primitives
+
+- `SensitiveDataPolicy` is a closed `off` or `pii-v1` enum. Unknown values
+  fail instead of falling back to a policy.
+- `redact_pii_value` walks supported trace values copy-on-write, combines
+  credential-key replacement with PII replacement, and never scans dictionary
+  keys. Clean subtrees retain their identity.
+- Complete Weave refs, valid base64 data URLs, and valid standalone base64
+  payloads pass through unchanged. Malformed lookalikes remain eligible for
+  scanning.
+
 ### Credential-shaped fields in client-authored call columns
 
 - The three call converters in `clickhouse/schema_converters.py` run
@@ -733,8 +764,28 @@ deterministic.
 - The walk is copy-on-write and replaces only non-empty strings. Both properties
   are load-bearing — see the module docstring — so keep them if you touch it.
 
-### Credential-shaped fields in agent span columns
+### Agent PII policy
 
+- `GenAIOTelExportReq.sensitive_data_policy` is an internal, omittable,
+  non-nullable field. Omission resolves to `off`.
+- An authorized server route may set `pii-v1` from the owning organization's
+  policy. Never populate the field from caller-controlled OTLP content or a
+  process environment fallback.
+- Agent OTel ingest parses and redacts every span (each shared resource once)
+  before credential redaction, blob stripping, derived-column extraction, or
+  insertion starts for any of them. A redaction failure rejects the whole
+  request before any Content file write or insert; a value nested too deeply
+  to scan is rejected as `RequestTooLarge` (HTTP 413).
+- PII redaction covers span and event names, all four attribute containers,
+  and the status message. Names feed the `span_name`, `operation_name`, and
+  `agent_name` grouping columns, so a PII-bearing name changes grouping and
+  agent identity; redaction wins that trade-off. IDs, trace state, and
+  timestamps are structural and remain unchanged.
+- `pii-v1` scans strings and never decodes payloads: non-string leaves,
+  including raw bytes (stored base64-encoded in dumps), pass through
+  unchanged, like the preserved data URLs and standalone base64.
+
+### Credential-shaped fields in agent span columns
 - The agents OTel ingest calls `redact_credentials_from_span` before
   `strip_inline_blobs_from_span`, and outside the file-storage guard around it.
   Both are load-bearing — see that function's docstring — so keep the order and

@@ -96,12 +96,12 @@ def test_agent_traces_chat_folds_turn_and_step_feedback(ch_server):
 
     assert res.feedback is not None
     assert len(res.feedback) == 1
-    assert res.feedback[0]["payload"] == {"emoji": "👍"}
+    assert res.feedback[0].payload == {"emoji": "👍"}
 
     step_msgs = [m for m in res.messages if m.span_id == child_span_id and m.feedback]
     assert len(step_msgs) == 1
     assert step_msgs[0].feedback is not None
-    assert step_msgs[0].feedback[0]["payload"] == {"emoji": "🔥"}
+    assert step_msgs[0].feedback[0].payload == {"emoji": "🔥"}
 
 
 def test_agent_traces_chat_include_feedback_false_leaves_feedback_fields_none(
@@ -174,15 +174,15 @@ def test_agent_conversation_chat_folds_conversation_turn_and_step_feedback(ch_se
 
     assert res.feedback is not None
     assert len(res.feedback) == 1
-    assert res.feedback[0]["payload"] == {"emoji": "💬"}
+    assert res.feedback[0].payload == {"emoji": "💬"}
 
     assert len(res.turns) == 1
     turn = res.turns[0]
     assert turn.feedback is not None
     assert len(turn.feedback) == 1
-    assert turn.feedback[0]["payload"] == {"emoji": "👍"}
+    assert turn.feedback[0].payload == {"emoji": "👍"}
 
     step_msgs = [m for m in turn.messages if m.span_id == child_span_id and m.feedback]
     assert len(step_msgs) == 1
     assert step_msgs[0].feedback is not None
-    assert step_msgs[0].feedback[0]["payload"] == {"emoji": "🔥"}
+    assert step_msgs[0].feedback[0].payload == {"emoji": "🔥"}

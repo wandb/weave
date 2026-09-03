@@ -1,6 +1,5 @@
 # File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
 
-from .expr import Expr as Expr
 from .operation import Operation as Operation
 from .convert_spec import ConvertSpec as ConvertSpec
 from .eq_operation import EqOperation as EqOperation

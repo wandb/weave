@@ -150,15 +150,7 @@ def _is_transient_ch_error(exc: BaseException) -> bool:
     """Check if a ClickHouse error is a known transient replication error."""
     if not isinstance(exc, DatabaseError):
         return False
-    # clickhouse-connect >= 1.3 sets an int `code`; older clickhouse-connect
-    # versions need the regex fallback.
-    code = getattr(exc, "code", None)
-    if isinstance(code, int):
-        return code in _TRANSIENT_CH_ERROR_CODES
-    match = re.search(r"Code:\s*(\d+)", str(exc))
-    if match is None:
-        return False
-    return int(match.group(1)) in _TRANSIENT_CH_ERROR_CODES
+    return exc.code in _TRANSIENT_CH_ERROR_CODES
 
 
 # These settings are only used when `replicated` mode is enabled for
@@ -195,6 +187,10 @@ ID_SHARDED_TABLES: dict[str, str] = {
     # nearest-neighbor search and clustering do not fan out across shards.
     "intent_signatures": "project_id",
     "failure_signatures": "project_id",
+    "signature_cluster_runs": "project_id",
+    "signature_clusters": "project_id",
+    "signature_cluster_assignments": "project_id",
+    "signature_cluster_assignments_by_conversation": "project_id",
     # Keep each agent aggregate on one shard. Shard versions by the same key so
     # "versions for agent" queries have the same locality as the agent row.
     "agents": "project_id, agent_name",

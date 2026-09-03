@@ -1018,6 +1018,13 @@ def test_create_distributed_table_sql_id_sharded():
         ("agent_versions", "sipHash64(project_id, agent_name)"),
         ("intent_signatures", "sipHash64(project_id)"),
         ("failure_signatures", "sipHash64(project_id)"),
+        ("signature_cluster_runs", "sipHash64(project_id)"),
+        ("signature_clusters", "sipHash64(project_id)"),
+        ("signature_cluster_assignments", "sipHash64(project_id)"),
+        (
+            "signature_cluster_assignments_by_conversation",
+            "sipHash64(project_id)",
+        ),
         (
             "conversation_tags",
             "sipHash64(project_id, conversation_id, trace_id, tag)",
@@ -1801,12 +1808,14 @@ def test_run_ddl_with_retry(mock_sleep, mock_costs):
     error_517 = DatabaseError(
         "Code: 517. DB::Exception: Looks like this replica doesn't catchup "
         "with latest ALTER query updates: metadata version on replica is 2, "
-        "while common metadata is 3. (CANNOT_ASSIGN_ALTER)"
+        "while common metadata is 3. (CANNOT_ASSIGN_ALTER)",
+        code=517,
     )
     error_999 = DatabaseError(
         "Code: 999. Coordination::Exception: Coordination error: "
         "Connection loss, path /clickhouse/task_queue/ddl/query-. "
-        "(KEEPER_EXCEPTION)"
+        "(KEEPER_EXCEPTION)",
+        code=999,
     )
 
     # Succeeds immediately on clean call
@@ -1850,32 +1859,12 @@ def test_run_ddl_with_retry(mock_sleep, mock_costs):
 
 
 def test_is_transient_ch_error():
-    """Verify transient error detection from ClickHouse DatabaseError messages."""
-    assert _is_transient_ch_error(DatabaseError("Code: 517. DB::Exception: ..."))
-    assert _is_transient_ch_error(
-        DatabaseError(
-            "Code: 999. Coordination::Exception: Coordination error: "
-            "Connection loss, path /clickhouse/task_queue/ddl/query-. "
-            "(KEEPER_EXCEPTION)"
-        )
-    )
-    assert not _is_transient_ch_error(DatabaseError("Code: 62. DB::Exception: ..."))
-    assert not _is_transient_ch_error(DatabaseError("some other error"))
-    assert not _is_transient_ch_error(DatabaseError(""))
+    """Verify transient error detection from the DatabaseError `code` attribute."""
+    assert _is_transient_ch_error(DatabaseError("replica sync pending", code=517))
+    assert not _is_transient_ch_error(DatabaseError("syntax error", code=62))
+    # `code` is None on transport errors, so the lookup must not raise.
+    assert not _is_transient_ch_error(DatabaseError("transport failure"))
     assert not _is_transient_ch_error(ConnectionError("not a db error"))
-
-    # clickhouse-connect >= 1.3 sets an int `code`.
-    coded = DatabaseError("replica sync pending")
-    coded.code = 999
-    assert _is_transient_ch_error(coded)
-    coded.code = 62
-    assert not _is_transient_ch_error(coded)
-    # A non-int code attr falls back to message parsing.
-    coded.code = "999"
-    assert not _is_transient_ch_error(DatabaseError("no code here"))
-    coded_msg = DatabaseError("Code: 517. DB::Exception: ...")
-    coded_msg.code = None
-    assert _is_transient_ch_error(coded_msg)
 
 
 def test_split_migration_sql() -> None:

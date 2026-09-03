@@ -1,13 +1,16 @@
 import {init, requireGlobalClient, login} from '../clientApi';
 import {getWandbConfigs} from '../wandb/settings';
 import {WandbServerApi} from '../wandb/wandbServerApi';
-import {Api as TraceServerApi} from '../generated/traceServerApi';
+import {createTraceServerClient} from '../traceServerClient';
 import {Netrc} from '../utils/netrc';
 import {CLIENT_CAPABILITIES, CLIENT_CAPABILITIES_HEADER} from '../constants';
+import {stainlessPromise} from './helpers/stainlessPromise';
 
 jest.mock('../wandb/wandbServerApi');
 jest.mock('../wandb/settings');
-jest.mock('../generated/traceServerApi');
+jest.mock('../traceServerClient', () => ({
+  createTraceServerClient: jest.fn(),
+}));
 jest.mock('../utils/netrc');
 
 describe('Client API', () => {
@@ -17,7 +20,6 @@ describe('Client API', () => {
     jest.clearAllMocks();
     process.env = {...originalEnv};
 
-    // Mock getWandbConfigs
     (getWandbConfigs as jest.Mock).mockReturnValue({
       apiKey: 'mock-api-key',
       baseUrl: 'https://api.wandb.ai',
@@ -26,19 +28,16 @@ describe('Client API', () => {
       host: 'api.wandb.ai',
     });
 
-    // Mock WandbServerApi
     (WandbServerApi as jest.Mock).mockImplementation(() => ({
       defaultEntityName: jest.fn().mockResolvedValue('test-entity'),
     }));
 
-    // Mock TraceServerApi
-    (TraceServerApi as jest.Mock).mockImplementation(() => ({
-      health: {
-        readRootHealthGet: jest.fn().mockResolvedValue({}),
+    (createTraceServerClient as jest.Mock).mockImplementation(() => ({
+      services: {
+        healthCheck: jest.fn().mockReturnValue(stainlessPromise({})),
       },
     }));
 
-    // Mock Netrc
     (Netrc as jest.Mock).mockImplementation(() => ({
       entries: new Map(),
       setEntry: jest.fn(),
@@ -80,12 +79,10 @@ describe('Client API', () => {
     test('sends the client-capability header on the ingest client', async () => {
       await init('test-project');
 
-      expect(TraceServerApi).toHaveBeenCalledWith(
+      expect(createTraceServerClient).toHaveBeenCalledWith(
         expect.objectContaining({
-          baseApiParams: expect.objectContaining({
-            headers: expect.objectContaining({
-              [CLIENT_CAPABILITIES_HEADER]: CLIENT_CAPABILITIES,
-            }),
+          defaultHeaders: expect.objectContaining({
+            [CLIENT_CAPABILITIES_HEADER]: CLIENT_CAPABILITIES,
           }),
         })
       );
@@ -133,9 +130,9 @@ describe('Client API', () => {
     });
 
     test('throws error if connection verification fails', async () => {
-      (TraceServerApi as jest.Mock).mockImplementation(() => ({
-        health: {
-          readRootHealthGet: jest
+      (createTraceServerClient as jest.Mock).mockImplementation(() => ({
+        services: {
+          healthCheck: jest
             .fn()
             .mockRejectedValue(new Error('Connection failed')),
         },
