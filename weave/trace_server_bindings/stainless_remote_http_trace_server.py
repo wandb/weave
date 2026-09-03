@@ -1295,8 +1295,10 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         Returns:
             Completions create response.
         """
-        raise NotImplementedError(
-            "completions_create is not yet implemented in stainless client"
+        return self._stainless_request(
+            req,
+            tsi.CompletionsCreateRes,
+            self._stainless_client.completions.create,
         )
 
     @validate_call
