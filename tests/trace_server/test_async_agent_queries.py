@@ -21,6 +21,7 @@ from weave.trace_server.agents.types import (
     AgentSpansQueryReq,
 )
 from weave.trace_server.async_clickhouse_trace_server import AsyncClickHouseTraceServer
+from weave.trace_server.errors import GroupedQueryNotSupportedAsync
 from weave.trace_server.query_builder.agent_query_builder import (
     make_spans_count_query,
     make_spans_list_query,
@@ -68,7 +69,7 @@ async def test_aagent_spans_query_refuses_group_by():
         limit=1,
     )
 
-    with pytest.raises(ValueError, match="does not support group_by"):
+    with pytest.raises(GroupedQueryNotSupportedAsync):
         await server.aagent_spans_query(req)
 
 

@@ -48,6 +48,35 @@ class InvalidRequest(Error):
     pass
 
 
+class GroupedQueryNotSupportedAsync(InvalidRequest):
+    """Raised when the async agent-spans endpoint receives a grouped request.
+
+    Grouped queries need per-group hydration reads that only the sync
+    `agent_spans_query` knows how to issue, so the async twin refuses rather
+    than return a partial result.
+    """
+
+    def __init__(self) -> None:
+        super().__init__(
+            "aagent_spans_query does not support group_by; "
+            "use agent_spans_query for grouped requests."
+        )
+
+
+class HydratedQueryNotSupportedAsync(InvalidRequest):
+    """Raised when the async calls endpoint is asked to hydrate.
+
+    Ref expansion and feedback hydration issue further reads per batch, which
+    only `calls_query_stream` knows how to issue.
+    """
+
+    def __init__(self) -> None:
+        super().__init__(
+            "acalls_query does not hydrate refs or feedback; "
+            "use calls_query for hydrated requests."
+        )
+
+
 class ObjectNameTypeCollision(InvalidRequest):
     """Raised when obj_create targets an object_id already bound to a different base_object_class.
 
