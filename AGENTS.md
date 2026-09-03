@@ -361,6 +361,14 @@ pnpm exec tsx examples/claudeAgents.ts
 - Include meaningful error messages
 - Add error handling tests
 
+### Online-evaluation event ordering
+
+Call-ended Kafka records are a notification that the corresponding source call
+is durable in ClickHouse. `confluent_kafka.Producer.produce()` can deliver from
+its background thread immediately, so deferring only `flush()` does not enforce
+that invariant. Any ClickHouse batch path must stage call-ended event metadata
+and invoke `produce()` only after the call insert succeeds.
+
 ### Integration Testing
 
 - Since autopatching was removed from `weave.init()`, integration tests must explicitly patch their integrations

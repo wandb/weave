@@ -1486,6 +1486,40 @@ def test_call_batch_flushes_kafka_once_not_per_call_end(server_with_mock_kafka):
     mock_producer.flush.assert_called_once()
 
 
+def test_call_batch_publishes_kafka_only_after_clickhouse_insert(
+    server_with_mock_kafka,
+):
+    """A background producer must not expose an event before its call is durable."""
+    server, mock_producer = server_with_mock_kafka
+
+    def assert_no_early_publish(*_args, **_kwargs):
+        mock_producer.produce_call_end.assert_not_called()
+        return MagicMock()
+
+    server.ch_client.insert.side_effect = assert_no_early_publish
+
+    with server.call_batch():
+        server.call_end(_make_call_end_req())
+        mock_producer.produce_call_end.assert_not_called()
+
+    mock_producer.produce_call_end.assert_called_once()
+    mock_producer.flush.assert_called_once()
+
+
+@pytest.mark.disable_logging_error_check
+def test_call_batch_does_not_publish_kafka_when_clickhouse_insert_fails(
+    server_with_mock_kafka,
+):
+    server, mock_producer = server_with_mock_kafka
+    server.ch_client.insert.side_effect = _MockInsertError("Connection refused")
+
+    with pytest.raises(_MockInsertError), server.call_batch():
+        server.call_end(_make_call_end_req())
+
+    mock_producer.produce_call_end.assert_not_called()
+    mock_producer.flush.assert_not_called()
+
+
 @pytest.mark.disable_logging_error_check
 def test_file_batch_clears_on_insert_failure():
     """Verify _file_batch is cleared even when insert fails."""

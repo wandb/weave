@@ -433,12 +433,15 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
     def __del__(self) -> None:
         """Flush batches and the Kafka producer on cleanup."""
-        if (
-            self._call_batch
-            or self._calls_complete_batch
-            or self._file_batch
-            or self._content_obj_batch
-            or self._bucket_uploads
+        if any(
+            (
+                self._call_batch,
+                self._calls_complete_batch,
+                self._file_batch,
+                self._content_obj_batch,
+                self._bucket_uploads,
+                self._call_end_event_batch,
+            )
         ):
             try:
                 self._flush_all_batches_in_order()
@@ -450,6 +453,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 self._calls_complete_batch = []
                 self._content_obj_batch = []
                 self._bucket_uploads = BucketUploadBatch()
+                self._call_end_event_batch = []
                 self._flush_immediately = True
 
         # Always drain remaining kafka messages at shutdown.
@@ -518,6 +522,18 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
     @_content_obj_batch.setter
     def _content_obj_batch(self, value: list[tsi.ObjSchemaForInsert]) -> None:
         self._thread_local.content_obj_batch = value
+
+    @property
+    def _call_end_event_batch(self) -> list[tuple[str, str, datetime.datetime]]:
+        if not hasattr(self._thread_local, "call_end_event_batch"):
+            self._thread_local.call_end_event_batch = []
+        return self._thread_local.call_end_event_batch
+
+    @_call_end_event_batch.setter
+    def _call_end_event_batch(
+        self, value: list[tuple[str, str, datetime.datetime]]
+    ) -> None:
+        self._thread_local.call_end_event_batch = value
 
     @classmethod
     def from_env(cls, use_async_insert: bool = True, **kwargs: Any) -> Self:
@@ -896,6 +912,30 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             # Non-blocking flush to avoid convoy effect — see KafkaProducer.produce_call_end.
             producer.flush(timeout=0)
 
+    def _publish_call_end_after_insert(
+        self,
+        project_id: str,
+        call_id: str,
+        ended_at: datetime.datetime,
+    ) -> None:
+        """Publish now, or stage until the enclosing ClickHouse batch commits.
+
+        ``confluent_kafka.Producer.produce`` is asynchronous, but its background
+        thread may deliver immediately; delaying only ``flush`` does not preserve
+        ClickHouse-before-Kafka ordering. Batch callers therefore stage event
+        metadata and publish it only after all call inserts return successfully.
+        """
+        if not self._flush_immediately:
+            self._call_end_event_batch.append((project_id, call_id, ended_at))
+            return
+        maybe_enqueue_minimal_call_end(
+            self.kafka_producer,
+            project_id,
+            call_id,
+            ended_at,
+            True,
+        )
+
     @contextmanager
     def call_batch(self) -> Iterator[None]:
         """Batch call operations and flush them all at the end."""
@@ -911,6 +951,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             self._calls_complete_batch = []
             self._content_obj_batch = []
             self._bucket_uploads = BucketUploadBatch()
+            self._call_end_event_batch = []
             self._flush_immediately = True
 
     def _flush_all_batches_in_order(self) -> None:
@@ -954,8 +995,22 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             logger.exception("Failed to flush calls")
             raise
 
+        # Publish only after the call rows are durable. Calling produce() while
+        # building the batch is unsafe: librdkafka can deliver from its
+        # background thread before ClickHouse has flushed.
+        call_end_events = self._call_end_event_batch
+        self._call_end_event_batch = []
+
         # Catch and continue on fail
         try:
+            for project_id, call_id, ended_at in call_end_events:
+                maybe_enqueue_minimal_call_end(
+                    self.kafka_producer,
+                    project_id,
+                    call_id,
+                    ended_at,
+                    False,
+                )
             self._flush_kafka_producer()
         except Exception:
             logger.exception("Failed to flush kafka producer")
@@ -1153,12 +1208,10 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         self._insert_call(ch_call)
 
         if publish:
-            maybe_enqueue_minimal_call_end(
-                self.kafka_producer,
+            self._publish_call_end_after_insert(
                 req.end.project_id,
                 req.end.id,
                 req.end.ended_at,
-                self._flush_immediately,
             )
 
         # Returns the id of the newly created call
@@ -1223,8 +1276,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 else:
                     self._insert_call_to_v1(ch_call)
 
-                maybe_enqueue_minimal_call_end(
-                    self.kafka_producer,
+                self._publish_call_end_after_insert(
                     processed_complete_call.project_id,
                     processed_complete_call.id,
                     processed_complete_call.ended_at,
@@ -1359,12 +1411,10 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             if self._flush_immediately:
                 self._flush_calls()
 
-        maybe_enqueue_minimal_call_end(
-            self.kafka_producer,
+        self._publish_call_end_after_insert(
             req.end.project_id,
             req.end.id,
             req.end.ended_at,
-            self._flush_immediately,
         )
 
         return tsi.CallEndV2Res()
