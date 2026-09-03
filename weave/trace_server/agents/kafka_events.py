@@ -51,7 +51,7 @@ class _AgentSpansEvent(BaseModel):
         """
         if cls.requires_conversation and not row.conversation_id:
             return None
-        if cls.excludes_evaluations and _has_evaluation_link(row):
+        if cls.excludes_evaluations and _is_evaluation(row):
             return None
         event_type: AgentSpanOpName | None = None
         # A span with no parent is assumed to represent the end of a turn
@@ -104,7 +104,7 @@ class EmbedAgentSpansEvent(_AgentSpansEvent):
             logger.exception("Failed to emit EmbedAgentSpansEvent")
 
 
-def _has_evaluation_link(row: AgentSpanCHInsertable) -> bool:
+def _is_evaluation(row: AgentSpanCHInsertable) -> bool:
     # Eval span processors write both IDs before optional display metadata.
     # Either surviving an attribute limit still identifies evaluation work.
     return bool(row.eval_run_id or row.eval_predict_and_score_call_id)
