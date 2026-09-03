@@ -50,6 +50,7 @@ def test_from_row() -> None:
         parent_span_id=None,
         conversation_id="c",
         operation_name="invoke_agent",
+        started_at=_STARTED_AT,
     )
     # The row itself carries no entity, so an unstamped event has none: consumers
     # that route by entity have to treat that as unroutable, not as allowed.

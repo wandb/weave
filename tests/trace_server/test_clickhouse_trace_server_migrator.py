@@ -1749,6 +1749,14 @@ def test_index_operations_only_on_local_tables_distributed(distributed_migrator)
             "ALTER TABLE calls_merged DROP INDEX IF EXISTS idx_sortable_datetime",
             "ALTER TABLE calls_merged_local ON CLUSTER test_cluster DROP INDEX IF EXISTS idx_sortable_datetime",
         ),
+        (
+            "ALTER TABLE failure_signatures ADD INDEX IF NOT EXISTS idx_current_trace_id current_trace_id TYPE bloom_filter(0.01) GRANULARITY 1",
+            "ALTER TABLE failure_signatures_local ON CLUSTER test_cluster ADD INDEX IF NOT EXISTS idx_current_trace_id current_trace_id TYPE bloom_filter(0.01) GRANULARITY 1",
+        ),
+        (
+            "ALTER TABLE failure_signatures DROP INDEX IF EXISTS idx_current_trace_id",
+            "ALTER TABLE failure_signatures_local ON CLUSTER test_cluster DROP INDEX IF EXISTS idx_current_trace_id",
+        ),
     ]
 
     for command, expected_local_sql in test_cases:

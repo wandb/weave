@@ -677,6 +677,7 @@ _SIGNATURE_TABLES = [
         [
             ("idx_affected_trace_ids", "affected_trace_ids"),
             ("idx_conversation_id", "conversation_id"),
+            ("idx_current_trace_id", "current_trace_id"),
         ],
     ),
 ]

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+from datetime import datetime
 from typing import TYPE_CHECKING, ClassVar
 
 from pydantic import BaseModel
@@ -87,8 +88,19 @@ class ScoreAgentSpansEvent(_AgentSpansEvent):
 class EmbedAgentSpansEvent(_AgentSpansEvent):
     """Trigger event for Agent Insights embedding."""
 
+    started_at: datetime | None = None
+
     # Insights only judges turns with real conversation semantics.
     requires_conversation: ClassVar[bool] = True
+
+    @classmethod
+    def from_row(
+        cls, row: AgentSpanCHInsertable, entity_name: str | None = None
+    ) -> Self | None:
+        event = super().from_row(row, entity_name)
+        if event is None:
+            return None
+        return event.model_copy(update={"started_at": row.started_at})
 
     def emit(self, producer: KafkaProducer | None) -> None:
         """Produce this event for Agent Insights without raising."""

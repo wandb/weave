@@ -1916,6 +1916,21 @@ def make_conversation_chat_spans_query(
     cid = pb.add(req.conversation_id, param_type="String")
     limit_slot = pb.add(req.limit, param_type="UInt64")
     offset_slot = pb.add(req.offset, param_type="UInt64")
+    started_at_slot = (
+        pb.add(req.started_at_gte, param_type="DateTime64(6)")
+        if req.started_at_gte is not None
+        else None
+    )
+    turn_time_filter = (
+        f"\n              AND started_at >= {started_at_slot}"
+        if started_at_slot is not None
+        else ""
+    )
+    span_time_filter = (
+        f"\n          AND s.started_at >= {started_at_slot}"
+        if started_at_slot is not None
+        else ""
+    )
     # Always cost-augmented so the multi-turn chat view can render per-message
     # and per-turn cost; bounded to one conversation's turns, so cheap.
     source = cost_augmented_source_sql(pb, req.project_id)
@@ -1927,7 +1942,7 @@ def make_conversation_chat_spans_query(
             SELECT trace_id, min(started_at) AS turn_started_at
             FROM spans
             WHERE {_project_filter_sql("project_id", pid)}
-              AND conversation_id = {cid}
+              AND conversation_id = {cid}{turn_time_filter}
             GROUP BY trace_id
             ORDER BY turn_started_at DESC, trace_id DESC
             LIMIT {limit_slot} OFFSET {offset_slot}
@@ -1937,7 +1952,7 @@ def make_conversation_chat_spans_query(
         INNER JOIN turn_page t ON s.trace_id = t.trace_id
         WHERE {_project_filter_sql("s.project_id", pid)}
           AND s.trace_id IN (SELECT trace_id FROM turn_page)
-          AND s.conversation_id IN ({cid}, '')
+          AND s.conversation_id IN ({cid}, ''){span_time_filter}
         ORDER BY t.turn_started_at ASC, t.trace_id ASC, s.started_at ASC
     """
 
@@ -1948,12 +1963,22 @@ def make_conversation_chat_turns_count_query(
     """Count distinct trace_id turns in a conversation."""
     pid = pb.add(req.project_id, param_type="String")
     cid = pb.add(req.conversation_id, param_type="String")
+    started_at_slot = (
+        pb.add(req.started_at_gte, param_type="DateTime64(6)")
+        if req.started_at_gte is not None
+        else None
+    )
+    time_filter = (
+        f"\n              AND s.started_at >= {started_at_slot}"
+        if started_at_slot is not None
+        else ""
+    )
     return f"""
         SELECT count() FROM (
             SELECT trace_id
             FROM spans s
             WHERE {_project_filter_sql("s.project_id", pid)}
-              AND s.conversation_id = {cid}
+              AND s.conversation_id = {cid}{time_filter}
             GROUP BY trace_id
         )
     """
