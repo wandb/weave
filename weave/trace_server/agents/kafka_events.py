@@ -90,6 +90,18 @@ class EmbedAgentSpansEvent(_AgentSpansEvent):
     # Insights only judges turns with real conversation semantics.
     requires_conversation: ClassVar[bool] = True
 
+    @classmethod
+    def from_row(
+        cls, row: AgentSpanCHInsertable, entity_name: str | None = None
+    ) -> Self | None:
+        """Return an Insights event unless the span belongs to an evaluation."""
+        if _is_evaluation_span(row):
+            return None
+
+        event = super().from_row(row, entity_name)
+
+        return event
+
     def emit(self, producer: KafkaProducer | None) -> None:
         """Produce this event for Agent Insights without raising."""
         if producer is None:
@@ -98,3 +110,7 @@ class EmbedAgentSpansEvent(_AgentSpansEvent):
             producer.produce_embed_agent_spans(self)
         except Exception:
             logger.exception("Failed to emit EmbedAgentSpansEvent")
+
+
+def _is_evaluation_span(row: AgentSpanCHInsertable) -> bool:
+    return bool(row.eval_run_id or row.eval_predict_and_score_call_id or row.eval_kind)
