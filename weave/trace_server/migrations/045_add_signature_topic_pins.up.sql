@@ -15,6 +15,9 @@ CREATE TABLE IF NOT EXISTS signature_topic_pins
     -- under it instead of being renamed, and a rebase decision is reviewable against it.
     anchor_label String DEFAULT '',
     anchor_description String DEFAULT '',
+    -- `signature_clusters.centroid` of that cluster. A claiming cluster's centroid must sit
+    -- within the configured cosine distance of it, whatever its member overlap says.
+    anchor_centroid Array(Float32) DEFAULT [],
     -- When the user pinned or last rebased. Distinct from `inserted_at`, which versions
     -- the row: a retried write of the same rebase keeps one `pinned_at`.
     pinned_at DateTime64(6, 'UTC'),
