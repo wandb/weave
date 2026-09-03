@@ -98,7 +98,7 @@ trace_server = [
   "emoji>=2.12.1",
   # Redis for optional task tracking and caching
   "redis>=5.0.0",
-  "clickhouse_connect>=1.6,<1.7",
+  "clickhouse_connect>=1.6,<1.8",
   "sqlparse>=0.5.0,<0.6",
   "confluent-kafka>=2.9.0",
   "openai>=1.99.9",
