@@ -11,8 +11,10 @@ CREATE TABLE IF NOT EXISTS signature_topic_pins
     -- when it was pinned. Reconciliation scores against this as well as the previous run,
     -- which is what bounds how far a pinned topic drifts from what the user pinned.
     anchor_members Array(UUID),
-    -- The label those members carried, so a rebase decision is reviewable.
+    -- The name those members carried. A pin that reattaches after a dormant run resumes
+    -- under it instead of being renamed, and a rebase decision is reviewable against it.
     anchor_label String DEFAULT '',
+    anchor_description String DEFAULT '',
     -- When the user pinned or last rebased. Distinct from `inserted_at`, which versions
     -- the row: a retried write of the same rebase keeps one `pinned_at`.
     pinned_at DateTime64(6, 'UTC'),
