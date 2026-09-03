@@ -516,6 +516,14 @@ def test_v2_method_reaches_its_flat_route(
             id="feedback_payload_schema",
         ),
         pytest.param(
+            "completions_create",
+            tsi.CompletionsCreateReq(project_id=PROJECT, inputs={"model": "gpt-4o"}),
+            "POST",
+            "/completions/create",
+            tsi.CompletionsCreateRes,
+            id="completions_create",
+        ),
+        pytest.param(
             "image_create",
             tsi.ImageGenerationCreateReq(
                 project_id=PROJECT, inputs={"model": "dall-e-3", "prompt": "a cat"}
@@ -997,6 +1005,57 @@ def test_create_sends_every_supported_field(
 @pytest.mark.parametrize(
     ("method_name", "req", "expected_body"),
     [
+        pytest.param(
+            "completions_create",
+            tsi.CompletionsCreateReq(
+                project_id=PROJECT,
+                inputs={"model": "gpt-4o", "messages": [{"role": "user"}]},
+                wb_user_id="user-id",
+            ),
+            {
+                "project_id": PROJECT,
+                "inputs": {
+                    "model": "gpt-4o",
+                    "messages": [{"role": "user"}],
+                    "timeout": None,
+                    "temperature": None,
+                    "top_p": None,
+                    "n": None,
+                    "stop": None,
+                    "max_completion_tokens": None,
+                    "max_tokens": None,
+                    "modalities": None,
+                    "presence_penalty": None,
+                    "frequency_penalty": None,
+                    "stream": None,
+                    "logit_bias": None,
+                    "user": None,
+                    "response_format": None,
+                    "seed": None,
+                    "tools": None,
+                    "tool_choice": None,
+                    "logprobs": None,
+                    "top_logprobs": None,
+                    "parallel_tool_calls": None,
+                    "reasoning_effort": None,
+                    "extra_headers": None,
+                    "functions": None,
+                    "function_call": None,
+                    "api_version": None,
+                    "prompt": None,
+                    "template_vars": None,
+                    "vertex_credentials": None,
+                },
+                "wb_user_id": "user-id",
+                "track_llm_call": True,
+                "trace_id": None,
+                "parent_id": None,
+                "conversation_id": None,
+                "conversation_name": None,
+                "source": None,
+            },
+            id="completions_create",
+        ),
         pytest.param(
             "image_create",
             tsi.ImageGenerationCreateReq(
@@ -1623,11 +1682,6 @@ def test_custom_runtime_name_keeps_its_colon():
 @pytest.mark.parametrize(
     ("method_name", "req"),
     [
-        pytest.param(
-            "completions_create",
-            tsi.CompletionsCreateReq(project_id=PROJECT, inputs={"model": "gpt-4o"}),
-            id="completions_create",
-        ),
         pytest.param(
             "project_stats",
             tsi.ProjectStatsReq(project_id=PROJECT),
