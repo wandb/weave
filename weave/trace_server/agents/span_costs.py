@@ -161,17 +161,25 @@ def cost_select_exprs(
 
     Cost formulas mirror the calls path (`token_costs._build_cost_summary_dump_snippet`):
     cached input tokens are billed at the cache rate, so they are subtracted
-    from the regular input-token cost. Reasoning tokens are not priced
-    separately — providers fold them into `output_tokens` — matching the
-    calls behavior. When no price matched, every cost column is NULL.
+    from the regular input-token cost. Some producers report uncached input
+    separately even though the OTel convention requires an inclusive total.
+    When the cache count exceeds the reported input count, treat input as the
+    uncached count so malformed historical spans cannot produce negative costs.
+    Reasoning tokens are not priced separately — providers fold them into
+    `output_tokens` — matching the calls behavior. When no price matched, every
+    cost column is NULL.
     """
     matched = f"{price_alias}.{_PRICE_MATCHED} = 1"
     s = span_alias
     p = price_alias
-    input_cost_usd = (
-        f"({s}.input_tokens - {s}.cache_read_input_tokens "
-        f"- {s}.cache_creation_input_tokens) * {p}.prompt_token_cost"
+    cache_input_tokens = (
+        f"({s}.cache_read_input_tokens + {s}.cache_creation_input_tokens)"
     )
+    uncached_input_tokens = (
+        f"if({s}.input_tokens >= {cache_input_tokens}, "
+        f"{s}.input_tokens - {cache_input_tokens}, {s}.input_tokens)"
+    )
+    input_cost_usd = f"({uncached_input_tokens}) * {p}.prompt_token_cost"
     output_cost_usd = f"{s}.output_tokens * {p}.completion_token_cost"
     cache_read_cost_usd = (
         f"{s}.cache_read_input_tokens * {p}.cache_read_input_token_cost"
