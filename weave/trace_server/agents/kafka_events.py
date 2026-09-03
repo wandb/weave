@@ -37,8 +37,9 @@ class _AgentSpansEvent(BaseModel):
     parent_span_id: str | None
     conversation_id: str | None
 
-    # Subclasses set this to require a non-empty `conversation_id` on the row.
+    # Subclasses declare source-row requirements next to their event type.
     requires_conversation: ClassVar[bool] = False
+    excludes_evaluations: ClassVar[bool] = False
 
     @classmethod
     def from_row(
@@ -49,6 +50,8 @@ class _AgentSpansEvent(BaseModel):
         Currently only "turn_ended" is supported, but the interface is designed to support multiple types.
         """
         if cls.requires_conversation and not row.conversation_id:
+            return None
+        if cls.excludes_evaluations and _is_evaluation(row):
             return None
         event_type: AgentSpanOpName | None = None
         # A span with no parent is assumed to represent the end of a turn
@@ -87,8 +90,9 @@ class ScoreAgentSpansEvent(_AgentSpansEvent):
 class EmbedAgentSpansEvent(_AgentSpansEvent):
     """Trigger event for Agent Insights embedding."""
 
-    # Insights only judges turns with real conversation semantics.
+    # Insights needs a conversation and never judges evaluation traffic.
     requires_conversation: ClassVar[bool] = True
+    excludes_evaluations: ClassVar[bool] = True
 
     def emit(self, producer: KafkaProducer | None) -> None:
         """Produce this event for Agent Insights without raising."""
@@ -98,3 +102,9 @@ class EmbedAgentSpansEvent(_AgentSpansEvent):
             producer.produce_embed_agent_spans(self)
         except Exception:
             logger.exception("Failed to emit EmbedAgentSpansEvent")
+
+
+def _is_evaluation(row: AgentSpanCHInsertable) -> bool:
+    # Eval span processors write both IDs before optional display metadata.
+    # Either surviving an attribute limit still identifies evaluation work.
+    return bool(row.eval_run_id or row.eval_predict_and_score_call_id)

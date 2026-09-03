@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import datetime
 
+import pytest
+
 from weave.trace_server.agents.kafka_events import (
     EmbedAgentSpansEvent,
     ScoreAgentSpansEvent,
@@ -86,3 +88,30 @@ def test_embed_requires_conversation_but_score_does_not() -> None:
     score_event = ScoreAgentSpansEvent.from_row(no_convo_row, "acme")
     assert score_event is not None
     assert score_event.conversation_id is None
+
+
+@pytest.mark.parametrize(
+    "eval_fields",
+    [
+        {"eval_run_id": "eval-run"},
+        {"eval_predict_and_score_call_id": "predict-and-score"},
+    ],
+)
+def test_embed_excludes_evaluation_spans(eval_fields: dict[str, str]) -> None:
+    """Evaluation roots still score but never feed Insights embedding."""
+    eval_row = AgentSpanCHInsertable(
+        project_id="p",
+        trace_id="tr",
+        span_id="root",
+        parent_span_id="",
+        span_name="root",
+        status_code="OK",
+        started_at=_STARTED_AT,
+        ended_at=_ENDED_AT,
+        conversation_id="c",
+        operation_name="invoke_agent",
+        **eval_fields,
+    )
+
+    assert ScoreAgentSpansEvent.from_row(eval_row, "acme") is not None
+    assert EmbedAgentSpansEvent.from_row(eval_row, "acme") is None
