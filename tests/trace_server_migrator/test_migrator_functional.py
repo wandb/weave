@@ -1038,6 +1038,17 @@ def test_signature_cluster_tables_schema_and_retry(ch_client):
                     "Enum8('pending' = 1, 'running' = 2, 'succeeded' = 3, "
                     "'failed' = 4, 'canceled' = 5)",
                 ),
+                ("signature_count", "UInt64"),
+                ("cluster_count", "UInt32"),
+                ("noise_count", "UInt64"),
+                ("skipped_generation_count", "UInt64"),
+                ("truncated", "Bool"),
+                (
+                    "failure_code",
+                    "Nullable(Enum8('no_signatures' = 1, "
+                    "'insufficient_signatures' = 2, 'inference_unavailable' = 3, "
+                    "'storage_unavailable' = 4, 'internal' = 5))",
+                ),
                 ("started_at", "DateTime64(6, 'UTC')"),
                 ("completed_at", "DateTime64(6, 'UTC')"),
                 ("inserted_at", "DateTime64(6, 'UTC')"),
