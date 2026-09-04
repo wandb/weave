@@ -1927,6 +1927,39 @@ def test_feedback_query_contains_numeric_literal(client) -> None:
     assert res.result[0]["payload"]["dataset_id_str"] == "94"
 
 
+@pytest.mark.parametrize("bad_value", ["T00:00:00Z", "not-a-timestamp", ""])
+def test_feedback_query_rejects_unparseable_created_at_filter(
+    client: WeaveClient, bad_value: str
+) -> None:
+    """A malformed created_at datetime filter is a 400, not an opaque CH 500."""
+    project_id = client.project_id
+    client.server.feedback_create(
+        FeedbackCreateReq(
+            project_id=project_id,
+            weave_ref=f"weave:///{project_id}/call/call_id_789",
+            feedback_type="wandb.reaction.1",
+            payload={"emoji": "👍"},
+        )
+    )
+
+    with pytest.raises(InvalidRequest):
+        client.server.feedback_query(
+            FeedbackQueryReq(
+                project_id=project_id,
+                query=Query(
+                    **{
+                        "$expr": {
+                            "$lt": [
+                                {"$getField": "created_at"},
+                                {"$literal": bad_value},
+                            ]
+                        }
+                    }
+                ),
+            )
+        )
+
+
 def test_feedback_query_typed_payload_filters(client: WeaveClient) -> None:
     """Regression for WB-33832: /feedback/query 500s on typed payload literals.
 
