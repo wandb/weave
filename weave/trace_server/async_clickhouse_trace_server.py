@@ -35,20 +35,32 @@ from weave.trace_server.agents.types import (
     AgentSpansQueryReq,
     AgentSpansQueryRes,
 )
+from weave.trace_server.calls_query_builder.calls_query_builder import (
+    build_calls_stats_query,
+)
 from weave.trace_server.clickhouse import transport as ch_transport
+from weave.trace_server.clickhouse.schema_converters import (
+    ch_call_dict_to_call_schema_dict,
+)
 from weave.trace_server.clickhouse.transport import AsyncClickHouseTransport
 from weave.trace_server.clickhouse_trace_server_batched import (
     ClickHouseTraceServer,
     CompletionPrepResult,
+    calls_stats_res,
 )
 from weave.trace_server.datadog import tag_db_insert_path
-from weave.trace_server.errors import GroupedQueryNotSupportedAsync
+from weave.trace_server.errors import (
+    GroupedQueryNotSupportedAsync,
+    HydratedQueryNotSupportedAsync,
+)
 from weave.trace_server.feedback import TABLE_FEEDBACK, format_feedback_to_res
 from weave.trace_server.llm_completion import lite_llm_acompletion
+from weave.trace_server.orm import ParamBuilder
 from weave.trace_server.query_builder.agent_query_builder import (
     make_spans_count_query,
     make_spans_list_query,
 )
+from weave.trace_server.token_costs import get_cost_result_columns
 from weave.trace_server.tracing import traced
 
 _T = TypeVar("_T")
@@ -258,6 +270,56 @@ class AsyncClickHouseTraceServer(ClickHouseTraceServer):
             do_sync_insert=True,
         )
         return format_feedback_to_res(row)
+
+    # -- Calls reads over the native transport ---------------------------------
+
+    @traced(name="async_clickhouse_trace_server.acalls_query")
+    async def acalls_query(self, req: tsi.CallsQueryReq) -> tsi.CallsQueryRes:
+        """Native-async twin of `calls_query`, for the unhydrated shape.
+
+        Ref expansion and feedback hydration issue further reads per batch and
+        stay on `calls_query_stream`.
+        """
+        if req.expand_columns or req.include_feedback:
+            raise HydratedQueryNotSupportedAsync()
+        cq, settings = await asyncio.to_thread(self._build_calls_query, req)
+        pb = ParamBuilder()
+        raw_res = await self._aquery(cq.as_sql(pb), pb.get_params(), settings=settings)
+        if req.include_costs:
+            # Cost query SELECT adds ORDER BY fields; result columns must match.
+            select_columns = get_cost_result_columns(
+                [c.field for c in cq.select_fields], cq.order_fields
+            )
+        else:
+            select_columns = [c.field for c in cq.select_fields]
+        calls = [
+            tsi.CallSchema.model_validate(
+                ch_call_dict_to_call_schema_dict(
+                    dict(zip(select_columns, row, strict=True))
+                )
+            )
+            for row in raw_res.result_rows
+        ]
+        return tsi.CallsQueryRes(calls=calls)
+
+    @traced(name="async_clickhouse_trace_server.acalls_query_stats")
+    async def acalls_query_stats(
+        self, req: tsi.CallsQueryStatsReq
+    ) -> tsi.CallsQueryStatsRes:
+        """Native-async twin of `calls_query_stats`."""
+        # `ch_client` is thread-local and minting one blocks. Resolve it inside
+        # the pool thread: as an argument it would be evaluated on the event
+        # loop, blocking it on first use and then handing one thread's client to
+        # every other thread that runs this concurrently.
+        read_table = await self._run_on_ch_executor(
+            lambda: self.table_routing_resolver.resolve_read_table(
+                req.project_id, self.ch_client
+            )
+        )
+        pb = ParamBuilder()
+        query, columns, settings = build_calls_stats_query(req, pb, read_table)
+        raw_res = await self._aquery(query, pb.get_params(), settings=settings or None)
+        return calls_stats_res(raw_res, columns)
 
     async def _run_on_ch_executor(self, fn: Callable[..., _T], *args: object) -> _T:
         """Run `fn(*args)` on `_ch_executor`.
