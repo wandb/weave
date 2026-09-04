@@ -5,7 +5,6 @@ import datetime
 import json
 import logging
 import threading
-import time
 from collections import defaultdict
 from collections.abc import Callable, Iterator, Sequence
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -14,7 +13,6 @@ from functools import partial
 from typing import Any, NamedTuple, TypeVar, cast
 from zoneinfo import ZoneInfo
 
-import clickhouse_connect
 from cachetools import TTLCache
 from clickhouse_connect import common as ch_common
 from clickhouse_connect.driver.client import Client as CHClient
@@ -120,6 +118,7 @@ from weave.trace_server.calls_query_builder.usage_query_builder import (
     build_usage_query,
 )
 from weave.trace_server.ch_sentinel_values import SENTINEL_EPOCH
+from weave.trace_server.clickhouse import transport as ch_transport
 from weave.trace_server.clickhouse.schema_converters import (
     ch_call_dict_to_call_schema_dict,
     ch_call_to_row,
@@ -133,21 +132,21 @@ from weave.trace_server.clickhouse.schema_converters import (
     start_call_insertable_to_complete_start,
     start_end_calls_to_ch_complete_insertable,
 )
+from weave.trace_server.clickhouse.transport import (
+    CLICKHOUSE_DEFAULT_PORT,
+    ClickHouseConfig,
+    SyncClickHouseTransport,
+)
 from weave.trace_server.clickhouse.utilities import (
     any_value_to_dump,
-    convert_to_insert_too_large,
     datetime_to_microseconds,
     dict_value_to_dump,
     ensure_datetimes_have_tz,
     ensure_datetimes_have_tz_strict,
     find_call_descendants,
-    log_and_raise_insert_error,
     maybe_enqueue_minimal_call_end,
     num_bytes,
-    process_parameters,
     record_query_id,
-    sanitize_invalid_utf8_surrogates,
-    set_correlation_id,
     started_at_gte_query,
     string_to_int_in_range,
 )
@@ -179,7 +178,6 @@ from weave.trace_server.constants import (
 )
 from weave.trace_server.custom_runtime import apply_custom_runtime
 from weave.trace_server.datadog import (
-    record_db_insert,
     set_current_span_dd_tags,
     set_root_span_dd_tags,
     tag_db_insert_path,
@@ -196,7 +194,6 @@ from weave.trace_server.errors import (
     ObjectNameTypeCollision,
     RefObjectsNotFoundError,
     RequestTooLarge,
-    handle_clickhouse_query_error,
 )
 from weave.trace_server.feedback import (
     TABLE_FEEDBACK,
@@ -356,9 +353,6 @@ _CallReqT = TypeVar(
 CH_POOL_MAX_CONNECTIONS = 50
 CH_POOL_COUNT = 2
 
-# ClickHouse port defaults
-CLICKHOUSE_DEFAULT_PORT = 8123
-CLICKHOUSE_SECURE_PORT = 8443
 
 # Op ref cache: in-memory TTL cache for resolved op refs
 OP_REF_CACHE_MAX_SIZE = 50_000
@@ -411,11 +405,14 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
     ):
         super().__init__()
         self._thread_local = threading.local()
-        self._host = host
-        self._port = port
-        self._user = user
-        self._password = password
-        self._database = database
+        self._config = ClickHouseConfig(
+            host=host,
+            port=port,
+            user=user,
+            password=password,
+            database=database,
+        )
+        self._transport = SyncClickHouseTransport(self._config, _CH_POOL_MANAGER)
         self._use_async_insert = use_async_insert
         self._use_replicated_tables = wf_env.wf_clickhouse_replicated()
         self._model_to_provider_info_map = read_model_to_provider_info_map()
@@ -430,7 +427,6 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         )
         self._op_ref_cache_lock = threading.Lock()
         self._placeholder_file_projects: set[str] = set()
-        self._database_ensured = False
 
         if wf_env.wf_clickhouse_disable_lightweight_update():
             logger.warning(
@@ -7474,7 +7470,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 req.project_id, self.ch_client
             )
         job_id = export.start_export(
-            lambda: self._mint_client(
+            lambda: self._transport.mint(
                 send_receive_timeout=export.EXPORT_MAX_EXECUTION_SECONDS
             ),
             self.file_storage_client,
@@ -7496,53 +7492,8 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
     # Private Methods
     @property
     def ch_client(self) -> CHClient:
-        """Returns a thread-local clickhouse client.
-
-        Each thread gets its own client instance; all clients share the
-        same underlying connection pool via _CH_POOL_MANAGER.
-        """
-        if not hasattr(self._thread_local, "ch_client"):
-            self._thread_local.ch_client = self._mint_client()
-        return self._thread_local.ch_client
-
-    def _ensure_database(self, client: CHClient) -> None:
-        """Run CREATE DATABASE IF NOT EXISTS once per process."""
-        if self._database_ensured:
-            return
-        with self._init_lock:
-            if self._database_ensured:
-                return
-            client.command(f"CREATE DATABASE IF NOT EXISTS {self._database}")
-            self._database_ensured = True
-
-    def _mint_client(self, send_receive_timeout: int | None = None) -> CHClient:
-        """Create a new ClickHouse client using the shared pool manager.
-
-        autogenerate_session_id=False: weave-trace uses no session features,
-        and the default collides on overlapping queries with SESSION_IS_LOCKED
-        (code 373). See PR #6655.
-        autogenerate_query_id=False: the default collides on a resent request
-        with QUERY_WITH_SAME_ID_IS_ALREADY_RUNNING (code 216). See PR #7787.
-        `send_receive_timeout` overrides the HTTP read timeout (migration clients
-        need to outlast replicated-DDL propagation); None keeps the library default.
-        """
-        optional_kwargs: dict[str, int] = {}
-        if send_receive_timeout is not None:
-            optional_kwargs["send_receive_timeout"] = send_receive_timeout
-        client = clickhouse_connect.get_client(
-            host=self._host,
-            port=self._port,
-            user=self._user,
-            password=self._password,
-            secure=self._port == CLICKHOUSE_SECURE_PORT,
-            pool_mgr=_CH_POOL_MANAGER,
-            autogenerate_session_id=False,
-            autogenerate_query_id=False,
-            **optional_kwargs,
-        )
-        self._ensure_database(client)
-        client.database = self._database
-        return client
+        """This thread's blocking ClickHouse client."""
+        return self._transport.client
 
     def _insert_call_batch(
         self,
@@ -7629,7 +7580,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         logger.info("Running migrations")
         migration_timeout = ch_settings.MIGRATION_CLIENT_SEND_RECEIVE_TIMEOUT_SEC
         migrator = wf_migrator.get_clickhouse_trace_server_migrator(
-            self._mint_client(send_receive_timeout=migration_timeout),
+            self._transport.mint(send_receive_timeout=migration_timeout),
             replicated=wf_env.wf_clickhouse_replicated(),
             replicated_path=wf_env.wf_clickhouse_replicated_path(),
             replicated_cluster=wf_env.wf_clickhouse_replicated_cluster(),
@@ -7637,10 +7588,10 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             # Mint the heartbeat's client like the primary so it inherits
             # secure/pool/db settings (raw env would drop `secure=`).
             heartbeat_client_factory=partial(
-                self._mint_client, send_receive_timeout=migration_timeout
+                self._transport.mint, send_receive_timeout=migration_timeout
             ),
         )
-        migrator.apply_migrations(self._database)
+        migrator.apply_migrations(self._config.database)
 
     @traced_generator(name="clickhouse_trace_server_batched._query_stream")
     def _query_stream(
@@ -7651,52 +7602,20 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         settings: dict[str, int | str] | None = None,
     ) -> Iterator[tuple]:
         """Streams the results of a query from the database."""
-        merged = ch_settings.merge_default_query_settings(settings)
-        correlation_id = set_correlation_id(merged)
-
-        summary = None
+        prepared = ch_transport.prepare_query(
+            query, parameters, column_formats, settings
+        )
         query_id = None
-        parameters = process_parameters(parameters)
-        start = time.monotonic()
         try:
-            with self.ch_client.query_rows_stream(
-                query,
-                parameters=parameters,
-                column_formats=column_formats,
-                use_none=True,
-                settings=merged,
-            ) as stream:
+            with self._transport.query_stream(prepared) as stream:
+                summary = None
                 if isinstance(stream.source, QueryResult):
                     summary = stream.source.summary
                     query_id = record_query_id(stream.source)
-                duration_ms = round((time.monotonic() - start) * 1000, 1)
-                logger.info(
-                    "clickhouse_stream_query",
-                    extra={
-                        "trace_duration_ms": duration_ms,
-                        "query": query,
-                        "parameters": parameters,
-                        "summary": summary,
-                        "query_id": query_id,
-                        "correlation_id": correlation_id,
-                    },
-                )
+                ch_transport.record_stream_success(prepared, summary, query_id)
                 yield from stream
         except Exception as e:
-            duration_ms = round((time.monotonic() - start) * 1000, 1)
-            logger.exception(
-                "clickhouse_stream_query_error",
-                extra={
-                    "trace_duration_ms": duration_ms,
-                    "error_str": str(e),
-                    "query": query,
-                    "parameters": parameters,
-                    "query_id": query_id,
-                    "correlation_id": correlation_id,
-                },
-            )
-            # always raises, optionally with custom error class
-            handle_clickhouse_query_error(e)
+            ch_transport.raise_stream_error(prepared, e, query_id)
 
     @traced(name="clickhouse_trace_server_batched._query")
     def _query(
@@ -7707,48 +7626,15 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         settings: dict[str, int | str] | None = None,
     ) -> QueryResult:
         """Directly queries the database and returns the result."""
-        merged = ch_settings.merge_default_query_settings(settings)
-        correlation_id = set_correlation_id(merged)
-
-        parameters = process_parameters(parameters)
-        start = time.monotonic()
-        try:
-            res = self.ch_client.query(
-                query,
-                parameters=parameters,
-                column_formats=column_formats,
-                use_none=True,
-                settings=merged,
-            )
-        except Exception as e:
-            duration_ms = round((time.monotonic() - start) * 1000, 1)
-            logger.exception(
-                "clickhouse_query_error",
-                extra={
-                    "trace_duration_ms": duration_ms,
-                    "error_str": str(e),
-                    "query": query,
-                    "parameters": parameters,
-                    "correlation_id": correlation_id,
-                },
-            )
-            # always raises, optionally with custom error class
-            handle_clickhouse_query_error(e)
-            return None
-
-        duration_ms = round((time.monotonic() - start) * 1000, 1)
-        logger.info(
-            "clickhouse_query",
-            extra={
-                "trace_duration_ms": duration_ms,
-                "query": query,
-                "parameters": parameters,
-                "summary": res.summary,
-                "query_id": record_query_id(res),
-                "correlation_id": correlation_id,
-            },
+        prepared = ch_transport.prepare_query(
+            query, parameters, column_formats, settings
         )
-        return res
+        try:
+            result = self._transport.query(prepared)
+        except Exception as e:
+            ch_transport.raise_query_error(prepared, e)
+        ch_transport.record_query_success(prepared, result)
+        return result
 
     @traced(name="clickhouse_trace_server_batched._command")
     def _command(
@@ -7764,46 +7650,12 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             parameters: Optional dictionary of query parameters.
             settings: Optional dictionary of ClickHouse settings (overrides defaults).
         """
-        merged = ch_settings.merge_default_command_settings(settings)
-        correlation_id = set_correlation_id(merged)
-
-        processed_params = process_parameters(parameters) if parameters else None
-        start = time.monotonic()
+        prepared = ch_transport.prepare_command(command, parameters, settings)
         try:
-            result = self.ch_client.command(
-                command,
-                parameters=processed_params,
-                settings=merged,
-            )
+            result = self._transport.command(prepared)
         except Exception as e:
-            duration_ms = round((time.monotonic() - start) * 1000, 1)
-            logger.exception(
-                "clickhouse_command_error",
-                extra={
-                    "trace_duration_ms": duration_ms,
-                    "error_str": str(e),
-                    "command": command,
-                    "parameters": processed_params,
-                    "correlation_id": correlation_id,
-                },
-            )
-            handle_clickhouse_query_error(e)
-            return
-
-        duration_ms = round((time.monotonic() - start) * 1000, 1)
-        # command() also returns scalars, which carry no query_id.
-        query_id = record_query_id(result) if isinstance(result, QuerySummary) else None
-        logger.info(
-            "clickhouse_command",
-            extra={
-                "trace_duration_ms": duration_ms,
-                "command": command,
-                "parameters": processed_params,
-                "query_id": query_id,
-                "correlation_id": correlation_id,
-            },
-        )
-        return
+            ch_transport.raise_command_error(prepared, e)
+        ch_transport.record_command_success(prepared, result)
 
     @traced(name="clickhouse_trace_server_batched._insert")
     def _insert(
@@ -7814,77 +7666,25 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         settings: dict[str, Any] | None = None,
         do_sync_insert: bool = False,  # overrides _use_async_insert
     ) -> QuerySummary:
-        record_db_insert(table=table, count=len(data))
-        set_current_span_dd_tags(
-            {
-                "clickhouse_trace_server_batched._insert.table": table,
-            }
+        prepared = ch_transport.prepare_insert(
+            table,
+            data,
+            column_names,
+            settings,
+            do_sync_insert,
+            use_async_insert=self._use_async_insert,
+            use_replicated_tables=self._use_replicated_tables,
         )
-        set_root_span_dd_tags(
-            {
-                "weave_trace_server.insert.table": table,
-                "weave_trace_server.insert.row_count": len(data),
-            }
-        )
-
-        async_insert = self._use_async_insert and not do_sync_insert
-        if async_insert:
-            settings = ch_settings.update_settings_for_async_insert(settings)
-            set_current_span_dd_tags(
-                {
-                    "clickhouse_trace_server_batched._insert.async_insert": True,
-                }
-            )
-
-        # Replicated/distributed engines block-dedup byte-identical inserts;
-        # a unique token opts out (non-replicated CH Cloud is unaffected).
-        if self._use_replicated_tables:
-            settings = {**(settings or {}), "insert_deduplication_token": generate_id()}
-
-        start = time.monotonic()
-        sanitized_invalid_utf8 = False
-        # At most two attempts: the original, plus one retry after sanitizing
-        # invalid client UTF-8.
-        settings = dict(settings or {})
-        # One correlation id covers both attempts: it is the same logical write.
-        correlation_id = set_correlation_id(settings)
-        for _ in range(2):
+        sanitized = False
+        while True:
             try:
-                result = self.ch_client.insert(
-                    table, data=data, column_names=column_names, settings=settings
-                )
-
-            # Invalid client Unicode: sanitize the batch and retry once.
-            except UnicodeEncodeError as e:
-                if sanitized_invalid_utf8:
-                    log_and_raise_insert_error(e, table, data, correlation_id)
-                sanitized_invalid_utf8 = True
-                data = sanitize_invalid_utf8_surrogates(data)
-                continue
-
-            # InsertTooLarge: raise immediately, no retry
-            except ValueError as e:
-                converted = convert_to_insert_too_large(e)
-                log_and_raise_insert_error(converted, table, data, correlation_id)
-
-            # All other errors (including exhausted empty-query retries): no retry
+                result = self._transport.insert(prepared)
             except Exception as e:
-                log_and_raise_insert_error(e, table, data, correlation_id)
-
-            else:
-                duration_ms = round((time.monotonic() - start) * 1000, 1)
-                logger.info(
-                    "clickhouse_insert",
-                    extra={
-                        "trace_duration_ms": duration_ms,
-                        "table": table,
-                        "row_count": len(data),
-                        "async_insert": async_insert,
-                        "query_id": record_query_id(result),
-                        "correlation_id": correlation_id,
-                    },
-                )
-                return result
+                prepared = ch_transport.insert_retry_or_raise(prepared, e, sanitized)
+                sanitized = True
+                continue
+            ch_transport.record_insert_success(prepared, result)
+            return result
 
     def _async_insert_settings(self) -> dict[str, Any] | None:
         """Async insert settings when the server has async inserts enabled, else None."""

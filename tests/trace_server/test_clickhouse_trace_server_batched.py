@@ -56,9 +56,7 @@ def test_clickhouse_storage_size_query_generation():
             autospec=True,
         ) as mock_cq,
         patch.object(chts.ClickHouseTraceServer, "_query_stream") as mock_query_stream,
-        patch.object(
-            chts.ClickHouseTraceServer, "_mint_client", return_value=mock_ch_client
-        ),
+        patch.object(chts.SyncClickHouseTransport, "mint", return_value=mock_ch_client),
     ):
         # Create a mock CallsQuery instance
         mock_calls_query = Mock()
@@ -130,9 +128,7 @@ def test_clickhouse_calls_query_stream_sort_modes(
             autospec=True,
         ) as mock_cq,
         patch.object(chts.ClickHouseTraceServer, "_query_stream") as mock_query_stream,
-        patch.object(
-            chts.ClickHouseTraceServer, "_mint_client", return_value=MagicMock()
-        ),
+        patch.object(chts.SyncClickHouseTransport, "mint", return_value=MagicMock()),
     ):
         mock_calls_query = Mock()
         mock_calls_query.order_fields = []
@@ -639,9 +635,7 @@ def test_completions_create_stream_custom_provider_with_tracking():
         patch(
             "weave.trace_server.clickhouse_trace_server_batched.AgentWriteHandler"
         ) as mock_agent_writer_cls,
-        patch.object(
-            chts.ClickHouseTraceServer, "_mint_client", return_value=mock_ch_client
-        ),
+        patch.object(chts.SyncClickHouseTransport, "mint", return_value=mock_ch_client),
     ):
         mock_agent_writer = MagicMock()
         mock_agent_writer_cls.return_value = mock_agent_writer
@@ -809,9 +803,7 @@ def test_completions_create_stream_multiple_choices():
         patch(
             "weave.trace_server.clickhouse_trace_server_batched.AgentWriteHandler"
         ) as mock_agent_writer_cls,
-        patch.object(
-            chts.ClickHouseTraceServer, "_mint_client", return_value=mock_ch_client
-        ),
+        patch.object(chts.SyncClickHouseTransport, "mint", return_value=mock_ch_client),
     ):
         mock_agent_writer = MagicMock()
         mock_agent_writer_cls.return_value = mock_agent_writer
@@ -909,9 +901,7 @@ def test_completions_create_stream_single_choice_unified_wrapper():
         patch(
             "weave.trace_server.clickhouse_trace_server_batched.AgentWriteHandler"
         ) as mock_agent_writer_cls,
-        patch.object(
-            chts.ClickHouseTraceServer, "_mint_client", return_value=mock_ch_client
-        ),
+        patch.object(chts.SyncClickHouseTransport, "mint", return_value=mock_ch_client),
     ):
         mock_agent_writer = MagicMock()
         mock_agent_writer_cls.return_value = mock_agent_writer
@@ -1127,7 +1117,7 @@ def test_insert_deduplication_token_gated_on_replicated():
                 return_value=replicated,
             ),
             patch.object(
-                chts.ClickHouseTraceServer, "_mint_client", return_value=mock_client
+                chts.SyncClickHouseTransport, "mint", return_value=mock_client
             ),
         ):
             server = chts.ClickHouseTraceServer(host="h")
@@ -1279,7 +1269,7 @@ def test_insert_retries_only_invalid_utf8(error):
     mock_ch_client.insert.side_effect = error
 
     with patch.object(
-        chts.ClickHouseTraceServer, "_mint_client", return_value=mock_ch_client
+        chts.SyncClickHouseTransport, "mint", return_value=mock_ch_client
     ):
         server = chts.ClickHouseTraceServer(host="test_host")
         with pytest.raises(type(error)):
@@ -1316,7 +1306,7 @@ def test_one_correlation_id_across_an_insert_retry():
     mock_ch_client.insert.side_effect = capture
 
     with patch.object(
-        chts.ClickHouseTraceServer, "_mint_client", return_value=mock_ch_client
+        chts.SyncClickHouseTransport, "mint", return_value=mock_ch_client
     ):
         server = chts.ClickHouseTraceServer(host="test_host")
         server._insert("t", data=[["\ud800"]], column_names=["a"])
@@ -1347,7 +1337,7 @@ def test_no_query_id_is_sent_to_clickhouse():
     mock_ch_client.query.return_value = QueryResult(summary={"query_id": "server-side"})
 
     with patch.object(
-        chts.ClickHouseTraceServer, "_mint_client", return_value=mock_ch_client
+        chts.SyncClickHouseTransport, "mint", return_value=mock_ch_client
     ):
         server = chts.ClickHouseTraceServer(host="test_host")
         server._query("SELECT 1", parameters={})
@@ -1367,9 +1357,7 @@ def test_correlation_id_and_query_id_are_set_on_the_dd_span():
     tagged: list[dict] = []
 
     with (
-        patch.object(
-            chts.ClickHouseTraceServer, "_mint_client", return_value=mock_ch_client
-        ),
+        patch.object(chts.SyncClickHouseTransport, "mint", return_value=mock_ch_client),
         patch.object(chts_utilities, "set_current_span_dd_tags", tagged.append),
     ):
         server = chts.ClickHouseTraceServer(host="test_host")
@@ -1397,7 +1385,7 @@ def test_correlation_id_is_logged_on_success_and_failure(caplog):
     )
 
     with patch.object(
-        chts.ClickHouseTraceServer, "_mint_client", return_value=mock_ch_client
+        chts.SyncClickHouseTransport, "mint", return_value=mock_ch_client
     ):
         server = chts.ClickHouseTraceServer(host="test_host")
 
@@ -1428,7 +1416,7 @@ def test_call_batch_clears_on_insert_failure():
     project_id = base64.b64encode(b"test_entity/test_project").decode("utf-8")
 
     with patch.object(
-        chts.ClickHouseTraceServer, "_mint_client", return_value=mock_ch_client
+        chts.SyncClickHouseTransport, "mint", return_value=mock_ch_client
     ):
         server = chts.ClickHouseTraceServer(host="test_host")
 
@@ -1475,7 +1463,7 @@ def server_with_mock_kafka():
     mock_producer = MagicMock()
 
     with patch.object(
-        chts.ClickHouseTraceServer, "_mint_client", return_value=mock_ch_client
+        chts.SyncClickHouseTransport, "mint", return_value=mock_ch_client
     ):
         server = chts.ClickHouseTraceServer(host="test_host")
         server._kafka_producer = mock_producer
@@ -1506,9 +1494,7 @@ def test_kafka_producer_feature_gate(
     monkeypatch, online_eval, scoring, insights, should_enable
 ):
     mock_producer = MagicMock()
-    monkeypatch.setattr(
-        chts.ClickHouseTraceServer, "_mint_client", lambda self: MagicMock()
-    )
+    monkeypatch.setattr(chts.SyncClickHouseTransport, "mint", lambda self: MagicMock())
     server = chts.ClickHouseTraceServer(host="test_host")
     server._kafka_producer = mock_producer
     monkeypatch.setattr(
@@ -1625,7 +1611,7 @@ def test_file_batch_clears_on_insert_failure():
     mock_ch_client.insert.side_effect = _MockInsertError("Connection refused")
 
     with patch.object(
-        chts.ClickHouseTraceServer, "_mint_client", return_value=mock_ch_client
+        chts.SyncClickHouseTransport, "mint", return_value=mock_ch_client
     ):
         server = chts.ClickHouseTraceServer(host="test_host")
 
@@ -1731,11 +1717,11 @@ def test_resent_request_vs_query_id_autogeneration(
     resend succeeds.
     """
     client = clickhouse_connect.get_client(
-        host=ch_server._host,
-        port=ch_server._port,
-        user=ch_server._user,
-        password=ch_server._password,
-        secure=ch_server._port == chts.CLICKHOUSE_SECURE_PORT,
+        host=ch_server._config.host,
+        port=ch_server._config.port,
+        user=ch_server._config.user,
+        password=ch_server._config.password,
+        secure=ch_server._config.secure,
         pool_mgr=urllib3.PoolManager(maxsize=8, num_pools=4),
         autogenerate_session_id=False,
         autogenerate_query_id=autogenerate_query_id,
@@ -1783,11 +1769,11 @@ def test_concurrent_queries_on_one_client_vs_session_autogeneration(
     disabled, overlapping queries succeed. See fix PR #6655.
     """
     client = clickhouse_connect.get_client(
-        host=ch_server._host,
-        port=ch_server._port,
-        user=ch_server._user,
-        password=ch_server._password,
-        secure=ch_server._port == chts.CLICKHOUSE_SECURE_PORT,
+        host=ch_server._config.host,
+        port=ch_server._config.port,
+        user=ch_server._config.user,
+        password=ch_server._config.password,
+        secure=ch_server._config.secure,
         autogenerate_session_id=autogenerate_session_id,
     )
     n_workers = 8
@@ -2203,9 +2189,7 @@ def _turn_ended_span_row() -> AgentSpanCHInsertable:
 def test_genai_otel_export_emit_gate(monkeypatch, online_eval, scoring, insights):
     """OTel ingest emits for scoring or Insights, independent of online eval."""
     mock_producer = MagicMock()
-    monkeypatch.setattr(
-        chts.ClickHouseTraceServer, "_mint_client", lambda self: MagicMock()
-    )
+    monkeypatch.setattr(chts.SyncClickHouseTransport, "mint", lambda self: MagicMock())
     server = chts.ClickHouseTraceServer(host="test_host")
     server._kafka_producer = mock_producer
 
@@ -2246,16 +2230,16 @@ def test_genai_otel_export_emit_gate(monkeypatch, online_eval, scoring, insights
         mock_producer.flush.assert_not_called()
 
 
-def test_mint_client_forwards_send_receive_timeout():
+def test_transport_mint_forwards_send_receive_timeout():
     server = chts.ClickHouseTraceServer(host="test_host")
     with (
-        patch.object(chts.ClickHouseTraceServer, "_ensure_database"),
+        patch.object(chts.SyncClickHouseTransport, "_ensure_database_once"),
         patch(
-            "weave.trace_server.clickhouse_trace_server_batched.clickhouse_connect.get_client"
+            "weave.trace_server.clickhouse.transport.clickhouse_connect.get_client"
         ) as mock_get_client,
     ):
         mock_get_client.return_value = MagicMock()
-        server._mint_client(
+        server._transport.mint(
             send_receive_timeout=ch_settings.MIGRATION_CLIENT_SEND_RECEIVE_TIMEOUT_SEC
         )
         kwargs = mock_get_client.call_args.kwargs
@@ -2265,14 +2249,14 @@ def test_mint_client_forwards_send_receive_timeout():
         )
 
 
-def test_mint_client_omits_send_receive_timeout_by_default():
+def test_transport_mint_omits_send_receive_timeout_by_default():
     server = chts.ClickHouseTraceServer(host="test_host")
     with (
-        patch.object(chts.ClickHouseTraceServer, "_ensure_database"),
+        patch.object(chts.SyncClickHouseTransport, "_ensure_database_once"),
         patch(
-            "weave.trace_server.clickhouse_trace_server_batched.clickhouse_connect.get_client"
+            "weave.trace_server.clickhouse.transport.clickhouse_connect.get_client"
         ) as mock_get_client,
     ):
         mock_get_client.return_value = MagicMock()
-        server._mint_client()
+        server._transport.mint()
         assert "send_receive_timeout" not in mock_get_client.call_args.kwargs

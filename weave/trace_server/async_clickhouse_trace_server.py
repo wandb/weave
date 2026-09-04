@@ -1,21 +1,38 @@
-"""Async layer over `ClickHouseTraceServer` for I/O-bound completion calls."""
+"""Async layer over `ClickHouseTraceServer`.
+
+Two mechanisms live here:
+
+  - `_run_on_ch_executor` hands a *blocking* driver call to a thread pool. The
+    caller awaits a thread, not a socket. Every sync `ClickHouseTraceServer`
+    method is reachable this way, at the cost of one pool slot held for the
+    whole round-trip.
+  - `_aquery` / `_ainsert` / `_acommand` go through `AsyncClickHouseTransport`,
+    which speaks HTTP over aiohttp. No pool slot is held while the server works,
+    so concurrency stops being bounded by pool width.
+"""
 
 import asyncio
 import contextvars
 import datetime
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from concurrent.futures import Executor
 from typing import Any, NamedTuple, TypeVar
+
+from clickhouse_connect.driver.query import QueryResult
+from clickhouse_connect.driver.summary import QuerySummary
 
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.agents.clickhouse import AgentWriteHandler
 from weave.trace_server.agents.schema import AgentSpanCHInsertable
+from weave.trace_server.clickhouse import transport as ch_transport
+from weave.trace_server.clickhouse.transport import AsyncClickHouseTransport
 from weave.trace_server.clickhouse_trace_server_batched import (
     ClickHouseTraceServer,
     CompletionPrepResult,
 )
 from weave.trace_server.datadog import tag_db_insert_path
 from weave.trace_server.llm_completion import lite_llm_acompletion
+from weave.trace_server.tracing import traced
 
 _T = TypeVar("_T")
 
@@ -28,6 +45,7 @@ class AsyncClickHouseTraceServer(ClickHouseTraceServer):
     ) -> None:
         super().__init__(host=host, **kwargs)
         self._ch_executor: Executor | None = ch_executor
+        self._atransport = AsyncClickHouseTransport(self._config)
 
     @tag_db_insert_path("completions_create")
     async def acompletions_create(
@@ -112,6 +130,76 @@ class AsyncClickHouseTraceServer(ClickHouseTraceServer):
         if not req.track_llm_call:
             return tsi.CompletionsCreateRes(response=res.response)
         return _CompletionCall(prep, res, start_time, end_time)
+
+    # -- Native async transport ------------------------------------------------
+
+    async def aclose(self) -> None:
+        """Drain the aiohttp session. A worker calls this on shutdown."""
+        await self._atransport.close()
+
+    @traced(name="async_clickhouse_trace_server._aquery")
+    async def _aquery(
+        self,
+        query: str,
+        parameters: dict[str, Any],
+        column_formats: dict[str, Any] | None = None,
+        settings: dict[str, int | str] | None = None,
+    ) -> QueryResult:
+        """Native-async twin of `_query`."""
+        prepared = ch_transport.prepare_query(
+            query, parameters, column_formats, settings
+        )
+        try:
+            result = await self._atransport.query(prepared)
+        except Exception as e:
+            ch_transport.raise_query_error(prepared, e)
+        ch_transport.record_query_success(prepared, result)
+        return result
+
+    @traced(name="async_clickhouse_trace_server._acommand")
+    async def _acommand(
+        self,
+        command: str,
+        parameters: dict[str, Any] | None = None,
+        settings: dict[str, int | str] | None = None,
+    ) -> None:
+        """Native-async twin of `_command`."""
+        prepared = ch_transport.prepare_command(command, parameters, settings)
+        try:
+            result = await self._atransport.command(prepared)
+        except Exception as e:
+            ch_transport.raise_command_error(prepared, e)
+        ch_transport.record_command_success(prepared, result)
+
+    @traced(name="async_clickhouse_trace_server._ainsert")
+    async def _ainsert(
+        self,
+        table: str,
+        data: Sequence[Sequence[Any]],
+        column_names: list[str],
+        settings: dict[str, Any] | None = None,
+        do_sync_insert: bool = False,  # overrides _use_async_insert
+    ) -> QuerySummary:
+        """Native-async twin of `_insert`."""
+        prepared = ch_transport.prepare_insert(
+            table,
+            data,
+            column_names,
+            settings,
+            do_sync_insert,
+            use_async_insert=self._use_async_insert,
+            use_replicated_tables=self._use_replicated_tables,
+        )
+        sanitized = False
+        while True:
+            try:
+                result = await self._atransport.insert(prepared)
+            except Exception as e:
+                prepared = ch_transport.insert_retry_or_raise(prepared, e, sanitized)
+                sanitized = True
+                continue
+            ch_transport.record_insert_success(prepared, result)
+            return result
 
     async def _run_on_ch_executor(self, fn: Callable[..., _T], *args: object) -> _T:
         """Run `fn(*args)` on `_ch_executor`.
