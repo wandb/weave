@@ -177,6 +177,13 @@ def test_walker_redacts_json_escaped_values_without_scanning_keys() -> None:
     )
 
 
+def test_walker_scans_whitespace_padded_json_strings() -> None:
+    assert redact_pii_value(' {"contact":"ada@example.com"} \n') == (
+        '{"contact":"<EMAIL_ADDRESS>"}'
+    )
+    assert redact_pii_value("  [1, 2, 3]  ") == "  [1, 2, 3]  "
+
+
 def test_walker_drops_shadowed_duplicate_json_keys() -> None:
     assert redact_pii_value('{"x":"ada@example.com","x":"safe"}') == '{"x":"safe"}'
     assert redact_pii_value(

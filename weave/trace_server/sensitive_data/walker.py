@@ -69,14 +69,19 @@ def _check_depth(depth: int) -> None:
 
 
 def _is_json_candidate(value: str) -> bool:
-    stripped = value.strip()
-    if len(stripped) < 2 or (stripped[0], stripped[-1]) not in {
+    # Scan the edges in place; strip() would copy the whole string.
+    start, end = 0, len(value)
+    while start < end and value[start].isspace():
+        start += 1
+    while end > start and value[end - 1].isspace():
+        end -= 1
+    if end - start < 2 or (value[start], value[end - 1]) not in {
         ("{", "}"),
         ("[", "]"),
         ('"', '"'),
     }:
         return False
-    return "@" in stripped or any("0" <= character <= "9" for character in stripped)
+    return "@" in value or any("0" <= character <= "9" for character in value)
 
 
 def _redact_json_string(value: str, depth: int) -> str:
