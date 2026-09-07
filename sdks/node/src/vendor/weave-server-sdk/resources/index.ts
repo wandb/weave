@@ -49,7 +49,13 @@ export {
   type CallUpsertBatchParams,
   type CallUsageParams,
 } from './calls';
-export { Completions, type CompletionCreateResponse, type CompletionCreateParams } from './completions';
+export {
+  Completions,
+  type CompletionCreateResponse,
+  type CompletionCreateStreamResponse,
+  type CompletionCreateParams,
+  type CompletionCreateStreamParams,
+} from './completions';
 export {
   Costs,
   type CostCreateResponse,
@@ -59,6 +65,15 @@ export {
   type CostPurgeParams,
   type CostQueryParams,
 } from './costs';
+export {
+  DatasetSources,
+  type DatasetSourceLinkResponse,
+  type DatasetSourceQueryResponse,
+  type DatasetSourceSourceDatasetsQueryResponse,
+  type DatasetSourceLinkParams,
+  type DatasetSourceQueryParams,
+  type DatasetSourceSourceDatasetsQueryParams,
+} from './dataset-sources';
 export {
   Evaluations,
   type EvaluationEvaluateModelResponse,
@@ -91,9 +106,11 @@ export {
   Files,
   type FileCreateResponse,
   type FileContentResponse,
+  type FileResolveURLResponse,
   type FileStatsResponse,
   type FileCreateParams,
   type FileContentParams,
+  type FileResolveURLParams,
   type FileStatsParams,
 } from './files';
 export { Images, type ImageCreateResponse, type ImageCreateParams } from './images';
@@ -109,6 +126,7 @@ export {
   type ObjectReadParams,
 } from './objects/objects';
 export { Otel, type OtelExportResponse } from './otel';
+export { Projects, type ProjectStatsResponse, type ProjectStatsParams } from './projects/projects';
 export { Refs, type RefReadBatchResponse, type RefReadBatchParams } from './refs';
 export {
   Services,

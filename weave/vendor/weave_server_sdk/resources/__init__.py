@@ -104,6 +104,14 @@ from .feedback import (
     FeedbackResourceWithStreamingResponse,
     AsyncFeedbackResourceWithStreamingResponse,
 )
+from .projects import (
+    ProjectsResource,
+    AsyncProjectsResource,
+    ProjectsResourceWithRawResponse,
+    AsyncProjectsResourceWithRawResponse,
+    ProjectsResourceWithStreamingResponse,
+    AsyncProjectsResourceWithStreamingResponse,
+)
 from .services import (
     ServicesResource,
     AsyncServicesResource,
@@ -191,6 +199,14 @@ from .v2_predictions import (
     AsyncV2PredictionsResourceWithRawResponse,
     V2PredictionsResourceWithStreamingResponse,
     AsyncV2PredictionsResourceWithStreamingResponse,
+)
+from .dataset_sources import (
+    DatasetSourcesResource,
+    AsyncDatasetSourcesResource,
+    DatasetSourcesResourceWithRawResponse,
+    AsyncDatasetSourcesResourceWithRawResponse,
+    DatasetSourcesResourceWithStreamingResponse,
+    AsyncDatasetSourcesResourceWithStreamingResponse,
 )
 from .v2_eval_results import (
     V2EvalResultsResource,
@@ -314,6 +330,18 @@ __all__ = [
     "AsyncImagesResourceWithRawResponse",
     "ImagesResourceWithStreamingResponse",
     "AsyncImagesResourceWithStreamingResponse",
+    "ProjectsResource",
+    "AsyncProjectsResource",
+    "ProjectsResourceWithRawResponse",
+    "AsyncProjectsResourceWithRawResponse",
+    "ProjectsResourceWithStreamingResponse",
+    "AsyncProjectsResourceWithStreamingResponse",
+    "DatasetSourcesResource",
+    "AsyncDatasetSourcesResource",
+    "DatasetSourcesResourceWithRawResponse",
+    "AsyncDatasetSourcesResourceWithRawResponse",
+    "DatasetSourcesResourceWithStreamingResponse",
+    "AsyncDatasetSourcesResourceWithStreamingResponse",
     "V2OpsResource",
     "AsyncV2OpsResource",
     "V2OpsResourceWithRawResponse",
