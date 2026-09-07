@@ -100,7 +100,9 @@ V1_RESPONSE = {
     "conversations": [],
     "duplicates": 0,
     "end": "2026-08-20T00:00:00Z",
+    "entries": [],
     "evaluation_run_id": "run-id",
+    "files_storage_size_bytes": 0,
     "granularity": 86400,
     "groups": [],
     "has_more": False,
@@ -109,19 +111,24 @@ V1_RESPONSE = {
     "item": ITEM,
     "items": [],
     "limit": 0,
+    "links": [],
     "messages": [],
+    "memberships": [],
     "name": "my-runtime",
+    "objects_storage_size_bytes": 0,
     "offset": 0,
     "paths": [],
     "queue": QUEUE,
     "response": {},
     "results": [],
+    "retention_days": 30,
     "rows": [],
     "runtime_ids": [],
     "spans": [],
     "start": "2026-08-20T00:00:00Z",
     "stats": [],
     "status": {"code": "not_found"},
+    "tables_storage_size_bytes": 0,
     "timezone": "UTC",
     "total_cache_creation_input_tokens": 0,
     "total_cache_read_input_tokens": 0,
@@ -132,6 +139,7 @@ V1_RESPONSE = {
     "total_reasoning_tokens": 0,
     "total_rows": 0,
     "total_turns": 0,
+    "trace_storage_size_bytes": 0,
     "trace_id": "t1",
     "turns": [],
     "usage_buckets": [],
@@ -532,6 +540,79 @@ def test_v2_method_reaches_its_flat_route(
             "/image/create",
             tsi.ImageGenerationCreateRes,
             id="image_create",
+        ),
+        pytest.param(
+            "project_stats",
+            tsi.ProjectStatsReq(project_id=PROJECT),
+            "POST",
+            "/project/stats",
+            tsi.ProjectStatsRes,
+            id="project_stats",
+        ),
+        pytest.param(
+            "project_ttl_settings_read",
+            tsi.ProjectTTLSettingsReadReq(project_id=PROJECT),
+            "POST",
+            "/project/ttl_settings/read",
+            tsi.ProjectTTLSettingsReadRes,
+            id="project_ttl_settings_read",
+        ),
+        pytest.param(
+            "project_ttl_settings_update",
+            tsi.ProjectTTLSettingsUpdateReq(project_id=PROJECT, retention_days=30),
+            "POST",
+            "/project/ttl_settings/update",
+            tsi.ProjectTTLSettingsUpdateRes,
+            id="project_ttl_settings_update",
+        ),
+        pytest.param(
+            "dataset_sources_link",
+            tsi.DatasetSourcesLinkReq(
+                project_id=PROJECT,
+                dataset_object_id="ds",
+                dataset_digest="abc123",
+                links=[
+                    tsi.DatasetSourceLinkPayload(
+                        row_digest="row1",
+                        sources=[
+                            tsi.SourceRef(
+                                source_kind=tsi.SourceKind.CALL,
+                                source_id="c1",
+                                source_trace_id="t1",
+                            )
+                        ],
+                    )
+                ],
+            ),
+            "POST",
+            "/dataset_sources/link",
+            tsi.DatasetSourcesLinkRes,
+            id="dataset_sources_link",
+        ),
+        pytest.param(
+            "dataset_sources_query",
+            tsi.DatasetSourcesQueryReq(project_id=PROJECT, dataset_object_id="ds"),
+            "POST",
+            "/dataset_sources/query",
+            tsi.DatasetSourcesQueryRes,
+            id="dataset_sources_query",
+        ),
+        pytest.param(
+            "source_datasets_query",
+            tsi.SourceDatasetsQueryReq(
+                project_id=PROJECT,
+                sources=[
+                    tsi.SourceRef(
+                        source_kind=tsi.SourceKind.CALL,
+                        source_id="c1",
+                        source_trace_id="t1",
+                    )
+                ],
+            ),
+            "POST",
+            "/dataset_sources/source_datasets_query",
+            tsi.SourceDatasetsQueryRes,
+            id="source_datasets_query",
         ),
         pytest.param(
             "evaluate_model",
@@ -1070,6 +1151,114 @@ def test_create_sends_every_supported_field(
                 "wb_user_id": "user-id",
             },
             id="image_create",
+        ),
+        pytest.param(
+            "project_ttl_settings_update",
+            tsi.ProjectTTLSettingsUpdateReq(
+                project_id=PROJECT, retention_days=30, wb_user_id="user-id"
+            ),
+            {
+                "project_id": PROJECT,
+                "retention_days": 30,
+                "wb_user_id": "user-id",
+            },
+            id="project_ttl_settings_update",
+        ),
+        pytest.param(
+            "dataset_sources_link",
+            tsi.DatasetSourcesLinkReq(
+                project_id=PROJECT,
+                dataset_object_id="ds",
+                dataset_digest="abc123",
+                links=[
+                    tsi.DatasetSourceLinkPayload(
+                        row_digest="row1",
+                        sources=[
+                            tsi.SourceRef(
+                                source_kind=tsi.SourceKind.CALL,
+                                source_id="c1",
+                                source_trace_id="t1",
+                            )
+                        ],
+                        link_metadata={"note": "from-call"},
+                    )
+                ],
+                include_created_status=True,
+                wb_user_id="user-id",
+            ),
+            {
+                "project_id": PROJECT,
+                "dataset_object_id": "ds",
+                "dataset_digest": "abc123",
+                "links": [
+                    {
+                        "row_digest": "row1",
+                        "sources": [
+                            {
+                                "source_kind": "call",
+                                "source_id": "c1",
+                                "source_trace_id": "t1",
+                            }
+                        ],
+                        "link_metadata": {"note": "from-call"},
+                    }
+                ],
+                "include_created_status": True,
+                "wb_user_id": "user-id",
+            },
+            id="dataset_sources_link",
+        ),
+        pytest.param(
+            "dataset_sources_query",
+            tsi.DatasetSourcesQueryReq(
+                project_id=PROJECT,
+                dataset_object_id="ds",
+                row_digests=["row1"],
+                source_kinds=[tsi.SourceKind.CALL],
+                include_deleted=True,
+                limit=10,
+                offset=2,
+                wb_user_id="user-id",
+            ),
+            {
+                "project_id": PROJECT,
+                "dataset_object_id": "ds",
+                "row_digests": ["row1"],
+                "source_kinds": ["call"],
+                "include_deleted": True,
+                "limit": 10,
+                "offset": 2,
+                "wb_user_id": "user-id",
+            },
+            id="dataset_sources_query",
+        ),
+        pytest.param(
+            "source_datasets_query",
+            tsi.SourceDatasetsQueryReq(
+                project_id=PROJECT,
+                sources=[
+                    tsi.SourceRef(
+                        source_kind=tsi.SourceKind.SPAN,
+                        source_id="s1",
+                        source_trace_id="t1",
+                    )
+                ],
+                include_deleted=True,
+                wb_user_id="user-id",
+            ),
+            {
+                "project_id": PROJECT,
+                "sources": [
+                    {
+                        "source_kind": "span",
+                        "source_id": "s1",
+                        "source_trace_id": "t1",
+                    }
+                ],
+                "include_deleted": True,
+                "wb_user_id": "user-id",
+            },
+            id="source_datasets_query",
         ),
         pytest.param(
             "call_stats",
@@ -1683,14 +1872,9 @@ def test_custom_runtime_name_keeps_its_colon():
     ("method_name", "req"),
     [
         pytest.param(
-            "project_stats",
-            tsi.ProjectStatsReq(project_id=PROJECT),
-            id="project_stats",
-        ),
-        pytest.param(
-            "completions_create_stream",
-            tsi.CompletionsCreateReq(project_id=PROJECT, inputs={"model": "gpt-4o"}),
-            id="completions_create_stream",
+            "otel_export",
+            tsi.OTelExportReq(project_id=PROJECT, processed_spans=[]),
+            id="otel_export",
         ),
     ],
 )
@@ -1702,6 +1886,44 @@ def test_route_missing_from_the_spec_raises(method_name: str, req: BaseModel):
         getattr(mock_server.server, method_name)(req)
 
     assert mock_server.requests == []
+
+
+def test_completions_create_stream_reads_ndjson_chunks():
+    """Test that the stream keeps _meta on the first line and omits it later."""
+    mock_server = _mock_server(
+        httpx.Response(
+            200,
+            content="\n".join(
+                [
+                    json.dumps({"_meta": {"weave_call_id": "c1", "trace_id": "t1"}}),
+                    json.dumps({"choices": [{"delta": {"content": "hi"}}]}),
+                ]
+            ).encode(),
+            headers={"content-type": "application/x-ndjson"},
+        )
+    )
+
+    chunks = list(
+        mock_server.server.completions_create_stream(
+            tsi.CompletionsCreateReq(
+                project_id=PROJECT,
+                inputs={"model": "gpt-4o", "messages": [{"role": "user"}]},
+                wb_user_id="user-id",
+            )
+        )
+    )
+
+    assert len(mock_server.requests) == 1
+    request = mock_server.requests[0]
+    assert (request.method, request.url.path) == ("POST", "/completions/create_stream")
+    assert request.headers["accept"] == "application/x-ndjson"
+    assert "_meta" in chunks[0]
+    assert "api_meta" not in chunks[0]
+    assert chunks[0]["_meta"]["weave_call_id"] == "c1"
+    assert "_meta" not in chunks[1]
+    assert "error" not in chunks[1]
+    assert chunks[1]["choices"] == [{"delta": {"content": "hi"}}]
+    assert json.loads(request.content)["wb_user_id"] == "user-id"
 
 
 def test_file_create_sends_the_filename():

@@ -1313,9 +1313,11 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         Yields:
             Dictionary chunks of the streamed response.
         """
-        raise NotImplementedError(
-            "completions_create_stream is not yet implemented in stainless client"
-        )
+        self._update_client_headers()
+        req_dict = req.model_dump(by_alias=True)
+        response = self._stainless_client.completions.create_stream(**req_dict)
+        for item in response:
+            yield item.model_dump(by_alias=True, exclude_unset=True)
 
     @validate_call
     def image_create(
@@ -1345,24 +1347,100 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         Returns:
             Project stats response.
         """
-        raise NotImplementedError(
-            "project_stats is not yet implemented in stainless client"
+        return self._stainless_request(
+            req,
+            tsi.ProjectStatsRes,
+            self._stainless_client.projects.stats,
         )
 
     @validate_call
     def project_ttl_settings_read(
         self, req: tsi.ProjectTTLSettingsReadReq
     ) -> tsi.ProjectTTLSettingsReadRes:
-        raise NotImplementedError(
-            "project_ttl_settings_read is not yet implemented in stainless client"
+        """Read project TTL settings.
+
+        Args:
+            req: Project TTL settings read request.
+
+        Returns:
+            Project TTL settings read response.
+        """
+        return self._stainless_request(
+            req,
+            tsi.ProjectTTLSettingsReadRes,
+            self._stainless_client.projects.ttl_settings.read,
         )
 
     @validate_call
     def project_ttl_settings_update(
         self, req: tsi.ProjectTTLSettingsUpdateReq
     ) -> tsi.ProjectTTLSettingsUpdateRes:
-        raise NotImplementedError(
-            "project_ttl_settings_update is not yet implemented in stainless client"
+        """Update project TTL settings.
+
+        Args:
+            req: Project TTL settings update request.
+
+        Returns:
+            Project TTL settings update response.
+        """
+        return self._stainless_request(
+            req,
+            tsi.ProjectTTLSettingsUpdateRes,
+            self._stainless_client.projects.ttl_settings.update,
+        )
+
+    @validate_call
+    def dataset_sources_link(
+        self, req: tsi.DatasetSourcesLinkReq
+    ) -> tsi.DatasetSourcesLinkRes:
+        """Link dataset rows to their provenance sources.
+
+        Args:
+            req: Dataset sources link request.
+
+        Returns:
+            Dataset sources link response.
+        """
+        return self._stainless_request(
+            req,
+            tsi.DatasetSourcesLinkRes,
+            self._stainless_client.dataset_sources.link,
+        )
+
+    @validate_call
+    def dataset_sources_query(
+        self, req: tsi.DatasetSourcesQueryReq
+    ) -> tsi.DatasetSourcesQueryRes:
+        """Query sources linked to a dataset.
+
+        Args:
+            req: Dataset sources query request.
+
+        Returns:
+            Dataset sources query response.
+        """
+        return self._stainless_request(
+            req,
+            tsi.DatasetSourcesQueryRes,
+            self._stainless_client.dataset_sources.query,
+        )
+
+    @validate_call
+    def source_datasets_query(
+        self, req: tsi.SourceDatasetsQueryReq
+    ) -> tsi.SourceDatasetsQueryRes:
+        """Query datasets that contain the given sources.
+
+        Args:
+            req: Source datasets query request.
+
+        Returns:
+            Source datasets query response.
+        """
+        return self._stainless_request(
+            req,
+            tsi.SourceDatasetsQueryRes,
+            self._stainless_client.dataset_sources.source_datasets_query,
         )
 
     @validate_call
