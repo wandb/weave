@@ -42,7 +42,13 @@ import {
   CallUsageResponse,
   Calls,
 } from './resources/calls';
-import { CompletionCreateParams, CompletionCreateResponse, Completions } from './resources/completions';
+import {
+  CompletionCreateParams,
+  CompletionCreateResponse,
+  CompletionCreateStreamParams,
+  CompletionCreateStreamResponse,
+  Completions,
+} from './resources/completions';
 import {
   CostCreateParams,
   CostCreateResponse,
@@ -52,6 +58,15 @@ import {
   CostQueryResponse,
   Costs,
 } from './resources/costs';
+import {
+  DatasetSourceLinkParams,
+  DatasetSourceLinkResponse,
+  DatasetSourceQueryParams,
+  DatasetSourceQueryResponse,
+  DatasetSourceSourceDatasetsQueryParams,
+  DatasetSourceSourceDatasetsQueryResponse,
+  DatasetSources,
+} from './resources/dataset-sources';
 import {
   EvaluationEvaluateModelParams,
   EvaluationEvaluateModelResponse,
@@ -85,6 +100,8 @@ import {
   FileContentResponse,
   FileCreateParams,
   FileCreateResponse,
+  FileResolveURLParams,
+  FileResolveURLResponse,
   FileStatsParams,
   FileStatsResponse,
   Files,
@@ -249,6 +266,7 @@ import {
   ObjectReadResponse,
   Objects,
 } from './resources/objects/objects';
+import { ProjectStatsParams, ProjectStatsResponse, Projects } from './resources/projects/projects';
 import { type Fetch } from './internal/builtin-types';
 import { HeadersLike, NullableHeaders, buildHeaders } from './internal/headers';
 import { FinalRequestOptions, RequestOptions } from './internal/request-options';
@@ -1001,6 +1019,8 @@ export class WeaveTrace {
   annotationQueues: API.AnnotationQueues = new API.AnnotationQueues(this);
   evaluations: API.Evaluations = new API.Evaluations(this);
   images: API.Images = new API.Images(this);
+  projects: API.Projects = new API.Projects(this);
+  datasetSources: API.DatasetSources = new API.DatasetSources(this);
   v2Ops: API.V2Ops = new API.V2Ops(this);
   v2Scorers: API.V2Scorers = new API.V2Scorers(this);
   v2Datasets: API.V2Datasets = new API.V2Datasets(this);
@@ -1030,6 +1050,8 @@ WeaveTrace.Agents = Agents;
 WeaveTrace.AnnotationQueues = AnnotationQueues;
 WeaveTrace.Evaluations = Evaluations;
 WeaveTrace.Images = Images;
+WeaveTrace.Projects = Projects;
+WeaveTrace.DatasetSources = DatasetSources;
 WeaveTrace.V2Ops = V2Ops;
 WeaveTrace.V2Scorers = V2Scorers;
 WeaveTrace.V2Datasets = V2Datasets;
@@ -1117,9 +1139,11 @@ export declare namespace WeaveTrace {
     Files as Files,
     type FileCreateResponse as FileCreateResponse,
     type FileContentResponse as FileContentResponse,
+    type FileResolveURLResponse as FileResolveURLResponse,
     type FileStatsResponse as FileStatsResponse,
     type FileCreateParams as FileCreateParams,
     type FileContentParams as FileContentParams,
+    type FileResolveURLParams as FileResolveURLParams,
     type FileStatsParams as FileStatsParams,
   };
 
@@ -1164,7 +1188,9 @@ export declare namespace WeaveTrace {
   export {
     Completions as Completions,
     type CompletionCreateResponse as CompletionCreateResponse,
+    type CompletionCreateStreamResponse as CompletionCreateStreamResponse,
     type CompletionCreateParams as CompletionCreateParams,
+    type CompletionCreateStreamParams as CompletionCreateStreamParams,
   };
 
   export {
@@ -1212,6 +1238,22 @@ export declare namespace WeaveTrace {
     Images as Images,
     type ImageCreateResponse as ImageCreateResponse,
     type ImageCreateParams as ImageCreateParams,
+  };
+
+  export {
+    Projects as Projects,
+    type ProjectStatsResponse as ProjectStatsResponse,
+    type ProjectStatsParams as ProjectStatsParams,
+  };
+
+  export {
+    DatasetSources as DatasetSources,
+    type DatasetSourceLinkResponse as DatasetSourceLinkResponse,
+    type DatasetSourceQueryResponse as DatasetSourceQueryResponse,
+    type DatasetSourceSourceDatasetsQueryResponse as DatasetSourceSourceDatasetsQueryResponse,
+    type DatasetSourceLinkParams as DatasetSourceLinkParams,
+    type DatasetSourceQueryParams as DatasetSourceQueryParams,
+    type DatasetSourceSourceDatasetsQueryParams as DatasetSourceSourceDatasetsQueryParams,
   };
 
   export {
