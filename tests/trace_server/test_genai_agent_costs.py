@@ -134,40 +134,66 @@ def test_spans_query_includes_costs(ch_server):
     )
 
 
-def test_spans_query_cost_subtracts_cache_tokens(ch_server):
-    """Cached input tokens are billed at the cache rate, not the input rate."""
+def test_spans_query_costs_cached_tokens(ch_server):
+    """Cached tokens use their own rate across supported input conventions."""
     project_id = _make_project_id("span-costs-cache")
     model = f"test-cost-model-{uuid.uuid4().hex}"
     _insert_project_price(ch_server.ch_client, project_id, model)
+    inclusive_span = _make_span(
+        project_id,
+        request_model=model,
+        input_tokens=1000,
+        output_tokens=500,
+        cache_read_input_tokens=200,
+        cache_creation_input_tokens=100,
+    )
+    exclusive_span = _make_span(
+        project_id,
+        request_model=model,
+        input_tokens=100,
+        output_tokens=50,
+        cache_read_input_tokens=200,
+        cache_creation_input_tokens=50,
+    )
     _insert_spans(
         ch_server.ch_client,
-        [
-            _make_span(
-                project_id,
-                request_model=model,
-                input_tokens=1000,
-                output_tokens=500,
-                cache_read_input_tokens=200,
-                cache_creation_input_tokens=100,
-            )
-        ],
+        [inclusive_span, exclusive_span],
     )
 
     res = ch_server.agent_spans_query(
         AgentSpansQueryReq(project_id=project_id, include_costs=True)
     )
-    span = res.spans[0]
-    expected_input = (1000 - 200 - 100) * _PROMPT_COST
-    expected_total = (
-        expected_input
+    by_id = {span.span_id: span for span in res.spans}
+
+    # Canonical OTel input includes cached tokens.
+    inclusive = by_id[inclusive_span.span_id]
+    inclusive_input_cost = (1000 - 200 - 100) * _PROMPT_COST
+    inclusive_total_cost = (
+        inclusive_input_cost
         + 500 * _COMPLETION_COST
         + 200 * _CACHE_READ_COST
         + 100 * _CACHE_CREATION_COST
     )
-    assert span.input_cost_usd == pytest.approx(expected_input)
-    assert span.cache_read_cost_usd == pytest.approx(200 * _CACHE_READ_COST)
-    assert span.cache_creation_cost_usd == pytest.approx(100 * _CACHE_CREATION_COST)
-    assert span.total_cost_usd == pytest.approx(expected_total)
+    assert inclusive.input_cost_usd == pytest.approx(inclusive_input_cost)
+    assert inclusive.cache_read_cost_usd == pytest.approx(200 * _CACHE_READ_COST)
+    assert inclusive.cache_creation_cost_usd == pytest.approx(
+        100 * _CACHE_CREATION_COST
+    )
+    assert inclusive.total_cost_usd == pytest.approx(inclusive_total_cost)
+
+    # Nonconforming input excludes cached tokens and remains billable input.
+    exclusive = by_id[exclusive_span.span_id]
+    exclusive_input_cost = 100 * _PROMPT_COST
+    exclusive_total_cost = (
+        exclusive_input_cost
+        + 50 * _COMPLETION_COST
+        + 200 * _CACHE_READ_COST
+        + 50 * _CACHE_CREATION_COST
+    )
+    assert exclusive.input_cost_usd == pytest.approx(exclusive_input_cost)
+    assert exclusive.cache_read_cost_usd == pytest.approx(200 * _CACHE_READ_COST)
+    assert exclusive.cache_creation_cost_usd == pytest.approx(50 * _CACHE_CREATION_COST)
+    assert exclusive.total_cost_usd == pytest.approx(exclusive_total_cost)
 
 
 def test_spans_query_unpriced_model_has_none_cost(ch_server):
