@@ -1153,6 +1153,21 @@ def test_create_sends_every_supported_field(
             id="image_create",
         ),
         pytest.param(
+            "project_stats",
+            tsi.ProjectStatsReq(
+                project_id=PROJECT,
+                include_file_storage_size=False,
+            ),
+            {
+                "project_id": PROJECT,
+                "include_trace_storage_size": True,
+                "include_object_storage_size": True,
+                "include_table_storage_size": True,
+                "include_file_storage_size": False,
+            },
+            id="project_stats",
+        ),
+        pytest.param(
             "project_ttl_settings_update",
             tsi.ProjectTTLSettingsUpdateReq(
                 project_id=PROJECT, retention_days=30, wb_user_id="user-id"
