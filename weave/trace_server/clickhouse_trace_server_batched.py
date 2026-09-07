@@ -7841,7 +7841,6 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         if self._use_replicated_tables:
             settings = {**(settings or {}), "insert_deduplication_token": generate_id()}
 
-        start = time.monotonic()
         sanitized_invalid_utf8 = False
         # At most two attempts: the original, plus one retry after sanitizing
         # invalid client UTF-8.
@@ -7872,18 +7871,8 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 log_and_raise_insert_error(e, table, data, correlation_id)
 
             else:
-                duration_ms = round((time.monotonic() - start) * 1000, 1)
-                logger.info(
-                    "clickhouse_insert",
-                    extra={
-                        "trace_duration_ms": duration_ms,
-                        "table": table,
-                        "row_count": len(data),
-                        "async_insert": async_insert,
-                        "query_id": record_query_id(result),
-                        "correlation_id": correlation_id,
-                    },
-                )
+                # Unlogged: the `_insert` span already carries table, rows, and ids.
+                record_query_id(result)
                 return result
 
     def _async_insert_settings(self) -> dict[str, Any] | None:
