@@ -623,6 +623,7 @@ _INTENT_COLUMNS = [
     ("extracted_at", "DateTime64(6, 'UTC')"),
     ("inserted_at", "DateTime64(6, 'UTC')"),
     ("expire_at", "DateTime"),
+    ("sentiment_target", "LowCardinality(String)"),
 ]
 
 _FAILURE_COLUMNS = [
