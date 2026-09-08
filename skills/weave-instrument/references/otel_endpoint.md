@@ -15,7 +15,7 @@ must carry the GenAI semantic conventions (a `gen_ai.operation.name` of `invoke_
 - **Routing:** the project comes from the resource attributes `wandb.entity=<entity>` and
   `wandb.project=<project>`. Without them, spans do not reach the right project.
 
-## Case A — generic env-var config (any language or framework, no code change)
+## Case A: generic env-var config (any language or framework, no code change)
 
 ```bash
 export OTEL_EXPORTER_OTLP_TRACES_ENDPOINT="https://trace.wandb.ai/agents/otel/v1/traces"
@@ -26,7 +26,7 @@ export OTEL_RESOURCE_ATTRIBUTES="wandb.entity=<entity>,wandb.project=<project>"
 Build the header value once, for example:
 `python -c 'import base64,os;print(base64.b64encode(("api:"+os.environ["WANDB_API_KEY"]).encode()).decode())'`.
 
-## Case B — the app builds its own TracerProvider (in code)
+## Case B: the app builds its own TracerProvider (in code)
 
 `weave.init()` **backs off if a real `TracerProvider` already exists**. It adds no exporter, so the
 app's spans **never reach Weave** unless you add Weave's exporter yourself. Add a second span processor
@@ -50,3 +50,11 @@ provider.add_span_processor(BatchSpanProcessor(OTLPSpanExporter(
 The provider's `Resource` must carry `wandb.entity` and `wandb.project` (or you can set them through
 `OTEL_RESOURCE_ATTRIBUTES`) so that spans route to the right project. This keeps the app's existing
 export *and* fans out to Weave, which is the right move whenever the app owns its OTel setup.
+
+## Agents-tab shape
+
+Raw OTEL does not get the Session SDK mapping for free. Read `span-shape.md` before you emit a span,
+and keep `gen_ai.input.messages` / `gen_ai.output.messages` / system instructions / tool definitions
+on the turn root only. Filling them on a `chat` or `execute_tool` child restacks history under the
+first turn. Conversation id belongs on the turn and on `chat`. Token usage belongs on `chat`. Leave
+healthy span status unset.

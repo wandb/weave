@@ -1,0 +1,29 @@
+{
+  "skill_name": "calls-to-agent-spans",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "I have an old Weave project my-team/legacy-bot that only logged @weave.op calls. I want that history to show up in the Agents tab. Please convert 2026-08-01 into a new project my-team/legacy-bot-agents.",
+      "expected_output": "Uses the calls-to-agent-spans converter. Dry-run first against a new target project. Does not write to the source. Does not mention storage engines or edit span_builder. Tells the user to open the Agents tab and check turn text, tools, and cost.",
+      "files": [],
+      "expectations": [
+        "The solution runs scripts/convert_calls_to_agent_spans.py with --dry-run before any write",
+        "source-project is my-team/legacy-bot and target-project is a different project (my-team/legacy-bot-agents)",
+        "The response does not write to the source project and does not tell the user to edit span_builder.py",
+        "The response does not mention ClickHouse, table names, or semconv.py in the primary steps",
+        "The user is told to open the target in the Agents tab and confirm user text, assistant reply, tools, and cost"
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "Dry-run coverage listed missing_user: [\"orchestrator\"]. The root op takes a `task` argument. How do I fix the mapping and continue?",
+      "expected_output": "Adds --user-path inputs.task (or the path to USER_TEXT_PATHS) and dry-runs again. Does not rewrite span classification.",
+      "files": [],
+      "expectations": [
+        "The solution passes --user-path inputs.task or adds inputs.task to USER_TEXT_PATHS",
+        "It dry-runs again and only then drops --dry-run",
+        "It does not invent assistant text or edit span_builder.py classification"
+      ]
+    }
+  ]
+}

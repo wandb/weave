@@ -16,6 +16,10 @@ description: >-
 Your job is to add Weave tracing to someone's LLM or agent code so their runs show up in the W&B Weave
 UI. Fit the approach to their codebase instead of applying a one-size-fits-all template.
 
+This skill changes source so new runs appear. If the project already logs classic `@weave.op` calls
+and they want that history in the Agents tab without editing code, use `skills/calls-to-agent-spans`
+instead.
+
 This skill works for any agent, whatever libraries it uses or none at all. Choose the approach based
 on two things:
 
@@ -46,6 +50,8 @@ easy to get subtly wrong.
 
 - `references/decision.md` is the full decision procedure (shape, then structure, then probe, then
   strategy) and the coverage examples. Read it during "Choose a strategy" below.
+- `references/span-shape.md` is what the Agents tab actually reads (conversation id, where messages
+  live, where tokens live). Read it before you instrument, and again at verify.
 - `references/session_sdk_python.md` covers the Python Session SDK: the classes, the context-manager
   pattern, the batch path, and the data types. Read it when instrumenting Python with the Session SDK.
 - `references/session_sdk_typescript.md` covers the TypeScript Session SDK: the `start*` functions, the
@@ -137,15 +143,17 @@ for coverage, and fall back to the universal path.
 When you instrument with the Session SDK, the mapping is the heart of the work.
 
 - **`Turn`** is one cycle of the top-level agent loop handling one user input, and it opens its own
-  trace root. Wrap the loop body, not the whole program.
-- **`LLM`** is one model API call. Wrap the call site, and record the input messages, the output, and
-  the token usage when it is available.
+  trace root. Wrap the loop body, not the whole program. Pass the user text here
+  (`user_message` / `userMessage`).
+- **`LLM`** is one model API call. Wrap the call site. Record the model, `llm.output(...)` for the
+  reply, and token usage. Do not copy the conversation history onto the LLM span.
 - **`Tool`** is one tool or function execution. Wrap the dispatch, and record the name, the arguments,
   and the result.
 - **`SubAgent`** is a delegated or nested agent invocation. Wrap the sub-call.
 
-Map to the agent's *real* semantic boundaries. Not every helper function is a `Tool`, and a retry of
-one model call is still one `LLM`. Over-instrumenting produces noisy, misleading traces.
+Open `references/span-shape.md` for the product contracts those APIs have to satisfy. Over-instrumenting
+(every helper as a `Tool`, history duplicated onto every `LLM`) produces a thread that looks populated
+and is wrong.
 
 **Never change behavior.** This is instrumentation, so the program must do exactly what it did before.
 Preserve return values and exceptions. Keep spans closed on every path. Python context managers and
@@ -167,7 +175,9 @@ Instrumentation you cannot see is worthless, so confirm that traces actually arr
   path, capture the emitted spans with an in-memory OTel exporter (no credentials needed) and confirm
   the operations are what you intended: a `gen_ai.operation.name` of `invoke_agent` for turns and
   sub-agents, `chat` for model calls, and `execute_tool` for tools, with the turn nesting its LLM and
-  tool spans. This is also how you confirm that an *auto* strategy emits agent shape rather than flat
+  tool spans. Then open one conversation in the Agents tab and confirm: a user message on the turn,
+  an assistant reply, tools on the turns that called them, and a non-empty cost wherever you recorded
+  usage. This is also how you confirm that an *auto* strategy emits agent shape rather than flat
   calls, since registry membership alone does not prove it.
 - If you cannot run it (because of missing provider keys or heavy setup), give the user an exact
   copy-paste command to run themselves, and tell them what to look for: the `View Weave data at
@@ -185,3 +195,5 @@ Instrumentation you cannot see is worthless, so confirm that traces actually arr
 - `weave.init()` appears once per entry point, ordered correctly relative to any user OTel setup.
 - The version is pinned high enough for the APIs you used.
 - The user knows the destination URL and how to verify.
+- One conversation in the Agents tab shows user text, the reply, tools on the right turns, and cost
+  wherever usage was recorded. See `references/span-shape.md`.

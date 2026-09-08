@@ -40,7 +40,10 @@ There are three mechanisms.
    `TracerProvider`, use **raw OTEL export** (`otel_endpoint.md`); `weave.init()` will not auto-attach
    to an existing provider. A **mixed** approach is normal: auto for the covered parts, and the
    Session SDK around bespoke orchestration.
-5. **Verify the emitted spans** (SKILL.md step 4).
+5. **Verify the emitted spans** (SKILL.md step 4). For Agents-tab work, read `span-shape.md`:
+   operation names alone are not enough. The tab also needs conversation id on the turn and on
+   `chat`, user text on the turn (not the conversation history on every child), and token usage on
+   the model call.
 
 ## Auto-coverage examples (illustrative, not an allow-list)
 
