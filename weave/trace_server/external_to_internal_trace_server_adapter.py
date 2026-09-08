@@ -1,6 +1,7 @@
 import abc
 import asyncio
 from collections.abc import Awaitable, Callable, Iterable, Iterator
+from concurrent.futures import ThreadPoolExecutor
 from typing import Any, TypeVar
 
 from opentelemetry.proto.common.v1.common_pb2 import AnyValue, KeyValue
@@ -26,6 +27,9 @@ _OTEL_REF_ATTR_KEYS = frozenset(
         "weave.object_refs",
     }
 )
+
+# Bounds the fanout of concurrent run-id conversions for a single query.
+_MAX_RUN_ID_CONVERSION_WORKERS = 8
 
 
 def _rewrite_otel_ref_attrs_inplace(
@@ -402,11 +406,20 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
     ) -> list[str]:
         # A bare run id (no "/") is prefixed with the queried "entity/project"
         # to form the "entity/project/run" that ext_to_int_run_id requires.
-        int_run_ids = []
-        for run_id in run_ids:
-            qualified = run_id if "/" in run_id else f"{ext_entity_project_id}/{run_id}"
-            int_run_ids.append(self._idc.ext_to_int_run_id(qualified))
-        return int_run_ids
+        qualified = [
+            run_id if "/" in run_id else f"{ext_entity_project_id}/{run_id}"
+            for run_id in run_ids
+        ]
+        if len(qualified) < 2:
+            return [self._idc.ext_to_int_run_id(run_id) for run_id in qualified]
+
+        # Each conversion is an independent gorilla round trip. `map` preserves
+        # input order and re-raises the first failure, as the serial loop did.
+        with ThreadPoolExecutor(
+            max_workers=min(len(qualified), _MAX_RUN_ID_CONVERSION_WORKERS),
+            thread_name_prefix="ext-to-int-run-id",
+        ) as pool:
+            return list(pool.map(self._idc.ext_to_int_run_id, qualified))
 
     def calls_query(self, req: tsi.CallsQueryReq) -> tsi.CallsQueryRes:
         req = req.model_copy(deep=True)
