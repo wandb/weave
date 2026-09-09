@@ -2246,6 +2246,42 @@ def test_genai_otel_export_emit_gate(monkeypatch, online_eval, scoring, insights
         mock_producer.flush.assert_not_called()
 
 
+def test_genai_otel_export_request_disables_insights(monkeypatch):
+    """A request with `insights_enabled=False` skips only the Insights emit."""
+    mock_producer = MagicMock()
+    monkeypatch.setattr(
+        chts.ClickHouseTraceServer, "_mint_client", lambda self: MagicMock()
+    )
+    server = chts.ClickHouseTraceServer(host="test_host")
+    server._kafka_producer = mock_producer
+
+    monkeypatch.setattr(
+        AgentWriteHandler,
+        "insert_otel_spans",
+        lambda self, req: (
+            GenAIOTelExportRes(accepted_spans=1),
+            [_turn_ended_span_row()],
+        ),
+    )
+    monkeypatch.setattr(
+        "weave.trace_server.environment.wf_enable_agent_scoring", lambda: True
+    )
+    monkeypatch.setattr(
+        "weave.trace_server.environment.wf_enable_agent_insights", lambda: True
+    )
+
+    res = server.genai_otel_export(
+        GenAIOTelExportReq(
+            processed_spans=[], project_id="p", wb_user_id="", insights_enabled=False
+        )
+    )
+
+    assert res.accepted_spans == 1
+    mock_producer.produce_score_agent_spans.assert_called_once()
+    mock_producer.produce_embed_agent_spans.assert_not_called()
+    mock_producer.flush.assert_called_once_with(0)
+
+
 def test_mint_client_forwards_send_receive_timeout():
     server = chts.ClickHouseTraceServer(host="test_host")
     with (

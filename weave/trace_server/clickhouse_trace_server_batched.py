@@ -7441,7 +7441,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         ).insert_otel_spans(req)
 
         scoring_enabled = wf_env.wf_enable_agent_scoring()
-        insights_enabled = wf_env.wf_enable_agent_insights()
+        insights_enabled = wf_env.wf_enable_agent_insights() and req.insights_enabled
         if not (scoring_enabled or insights_enabled):
             return res
 

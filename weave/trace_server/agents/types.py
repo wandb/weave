@@ -1364,6 +1364,11 @@ class GenAIOTelExportReq(BaseModel):
     wb_user_id: str | None = None
     entity_name: str | None = None
     sensitive_data_policy: SensitiveDataPolicy = SensitiveDataPolicy.OFF
+    insights_enabled: bool = Field(
+        default=True,
+        description="False skips Agent Insights emission for this batch, e.g. when "
+        "the org has AI-powered features turned off.",
+    )
 
 
 class GenAIOTelExportRes(BaseModel):
