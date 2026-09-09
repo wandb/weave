@@ -21,6 +21,7 @@ from tests.trace_server_bindings.conftest import (
     generate_end,
     generate_start,
 )
+from weave.trace_server import common_interface
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server_bindings.call_batch_processor import CallBatchProcessor
 from weave.trace_server_bindings.models import (
@@ -279,3 +280,22 @@ def test_requeue_after_max_retries(server, server_class, caplog):
     assert len(caplog.records) == 1
     msg = caplog.records[0].message
     assert "batch failed after max retries, requeuing batch with" in msg
+
+
+def test_mixed_batch_parses_without_extra_field_warnings(caplog, monkeypatch):
+    """The generated client re-parses its own batch; ends must not look like starts."""
+    start, end = generate_call_start_end_pair()
+    encoded = (
+        Batch(batch=[StartBatchItem(req=start), EndBatchItem(req=end)])
+        .model_dump_json()
+        .encode("utf-8")
+    )
+    # The warning is emitted once per process, so an earlier test in the same
+    # session would otherwise make this assertion vacuous.
+    monkeypatch.setattr(common_interface, "_warned_field_sets", set())
+
+    caplog.set_level(logging.WARNING)
+    parsed = Batch.model_validate_json(encoded.decode("utf-8"))
+
+    assert [item.mode for item in parsed.batch] == ["start", "end"]
+    assert caplog.records == []
