@@ -5,7 +5,8 @@
 set -uo pipefail
 
 # Single source of truth for the ClickHouse image version used across CI.
-tag="${1:-26.4}"
+# Pinned to match the Weave production ClickHouse version.
+tag="${1:-26.2}"
 ghcr="ghcr.io/wandb/clickhouse-server:${tag}"
 hub="clickhouse/clickhouse-server:${tag}"
 
