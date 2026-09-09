@@ -10,7 +10,7 @@ from typing_extensions import ParamSpec
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.errors import NotFoundError, ObjectDeletedError
 from weave.trace_server_bindings.async_batch_processor import AsyncBatchProcessor
-from weave.utils.retry import _is_retryable_exception, with_retry
+from weave.utils.retry import _http_response, _is_retryable_exception, with_retry
 
 if TYPE_CHECKING:
     from weave.trace_server_bindings.models import EndBatchItem, StartBatchItem
@@ -357,11 +357,8 @@ def check_endpoint_exists(
 
 def _is_413_error(e: Exception) -> bool:
     """Check if an exception is an HTTP 413 (Payload Too Large) error."""
-    return (
-        isinstance(e, httpx.HTTPStatusError)
-        and e.response is not None
-        and e.response.status_code == 413
-    )
+    response = _http_response(e)
+    return response is not None and response.status_code == 413
 
 
 def _is_retryable_not_found(exc: BaseException) -> bool:
@@ -379,12 +376,11 @@ def _is_retryable_not_found(exc: BaseException) -> bool:
     if isinstance(exc, NotFoundError):
         return True
     # Remote HTTP 404 -- retry unless the body indicates a delete.
-    if not isinstance(exc, httpx.HTTPStatusError) or exc.response is None:
-        return False
-    if exc.response.status_code != 404:
+    response = _http_response(exc)
+    if response is None or response.status_code != 404:
         return False
     try:
-        body = exc.response.json()
+        body = response.json()
     except (json.JSONDecodeError, ValueError):
         return False
     if not isinstance(body, dict):
