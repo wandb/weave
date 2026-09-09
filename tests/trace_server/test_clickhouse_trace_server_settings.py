@@ -83,3 +83,19 @@ def test_command_settings_skip_prediction_guards(monkeypatch, reload_settings):
     assert "max_estimated_execution_time" not in command_settings
     assert "timeout_before_checking_execution_speed" not in command_settings
     assert "timeout_overflow_mode" not in command_settings
+
+
+def test_query_condition_cache_disabled_on_every_path(reload_settings):
+    settings_module = reload_settings()
+    assert (
+        settings_module.CLICKHOUSE_DEFAULT_QUERY_SETTINGS["use_query_condition_cache"]
+        == 0
+    )
+    assert (
+        settings_module.merge_default_query_settings({})["use_query_condition_cache"]
+        == 0
+    )
+    assert (
+        settings_module.merge_default_command_settings({})["use_query_condition_cache"]
+        == 0
+    )
