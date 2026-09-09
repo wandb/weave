@@ -9,8 +9,9 @@ from zoneinfo import ZoneInfo
 from pydantic import BaseModel, validate_call
 from typing_extensions import Self
 
-from weave.trace.env import weave_trace_server_url
+from weave.trace.env import ssl_verify, weave_trace_server_url
 from weave.trace.settings import (
+    http_timeout,
     max_calls_queue_size,
     should_enable_disk_fallback,
     should_use_calls_complete,
@@ -39,7 +40,7 @@ from weave.trace_server_bindings.models import (
 )
 from weave.utils.project_id import from_project_id
 from weave.utils.retry import get_current_retry_id, with_retry
-from weave.vendor.weave_server_sdk import APIStatusError
+from weave.vendor.weave_server_sdk import APIStatusError, DefaultHttpxClient
 from weave.vendor.weave_server_sdk import Client as StainlessClient
 from weave.wandb_interface import project_creator
 from weave.wandb_interface.auth import (
@@ -129,6 +130,9 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
             username="",
             password="",
             default_headers=self._compose_headers(),
+            timeout=http_timeout(),
+            # DefaultHttpxClient keeps the vendor's own limits and redirect handling.
+            http_client=DefaultHttpxClient(verify=ssl_verify()),
         )
 
     def _compose_headers(self, trace_id: str | None = None) -> dict[str, str]:
