@@ -3096,19 +3096,10 @@ class WeaveClient:
                 project_id=self.project_id, row_digests=[]
             )
 
-            def test_func(req: TableCreateFromDigestsReq) -> Any:
-                server = self.server
-                if hasattr(server, "_next_trace_server"):
-                    server = server._next_trace_server
-
-                assert hasattr(server, "_post_request_executor")
-                assert hasattr(server._post_request_executor, "__wrapped__")
-                return server._post_request_executor.__wrapped__(
-                    server, "/table/create_from_digests", req
-                )
-
             use_parallel_chunks = check_endpoint_exists(
-                test_func, test_req, "table_create_from_digests"
+                self.server.table_create_from_digests,
+                test_req,
+                "table_create_from_digests",
             )
 
         return ChunkingConfig(
