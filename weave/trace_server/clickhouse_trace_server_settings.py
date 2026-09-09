@@ -76,11 +76,6 @@ CLICKHOUSE_BASE_QUERY_SETTINGS: dict[str, int | str] = {
     # CH 24.3+ analyzer ignores this, so double-distributed JOINs must also set an
     # explicit GLOBAL (see token_costs / object_ref); kept as it still applies pre-24.3.
     "distributed_product_mode": "global",
-    # CH 26.2 returns wrong results when PREWHERE on a pk-prefix column is combined
-    # with WHERE non-pk IN/= on a skip-indexed column (the calls_merged trace_id
-    # bloom-filter CTE): the query condition cache is poisoned and later reads drop
-    # rows. https://github.com/ClickHouse/ClickHouse/issues/104781, fixed in 26.3+.
-    "use_query_condition_cache": 0,
 }
 
 CLICKHOUSE_QUERY_FAILURE_PREDICTION_SETTINGS: dict[str, int | str] = {}
