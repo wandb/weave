@@ -37,7 +37,7 @@ from weave.trace_server_bindings.stainless_remote_http_trace_server import (
     StainlessRemoteHTTPTraceServer,
 )
 from weave.utils.retry import with_retry
-from weave.vendor.weave_server_sdk import APIStatusError
+from weave.vendor.weave_server_sdk import APIStatusError, DefaultHttpxClient
 from weave.wandb_interface.auth import ApiKeyCredentials, WandbCredentials
 
 
@@ -512,3 +512,24 @@ def test_calls_complete_needs_batching(monkeypatch):
 
     assert server.use_calls_complete is False
     assert server.call_processor is None
+
+
+def test_generated_client_gets_our_ssl_and_timeout_settings(monkeypatch):
+    """The vendor client built its own httpx client, so both settings were lost."""
+    monkeypatch.setenv("WEAVE_INSECURE_DISABLE_SSL", "true")
+    monkeypatch.setenv("WEAVE_HTTP_TIMEOUT", "7")
+    captured: dict[str, object] = {}
+
+    def spy(**kwargs: object) -> httpx.Client:
+        captured.update(kwargs)
+        return DefaultHttpxClient(**kwargs)
+
+    monkeypatch.setattr(
+        "weave.trace_server_bindings.stainless_remote_http_trace_server.DefaultHttpxClient",
+        spy,
+    )
+
+    server = StainlessRemoteHTTPTraceServer("http://example.com")
+
+    assert captured == {"verify": False}
+    assert server._stainless_client.timeout == 7.0
