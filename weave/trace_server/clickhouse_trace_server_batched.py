@@ -1955,6 +1955,8 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         # CH lazy materialization (see CLICKHOUSE_CALLS_COMPLETE_READ_SETTINGS).
         if read_table == ReadTable.CALLS_COMPLETE:
             settings = ch_settings.update_settings_for_calls_complete_read(settings)
+            if req.latest_only:
+                settings = {**settings, "final": 1}
 
         pb = ParamBuilder()
         raw_res = self._query_stream(cq.as_sql(pb), pb.get_params(), settings=settings)
