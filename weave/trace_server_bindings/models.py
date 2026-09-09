@@ -1,17 +1,17 @@
-from typing import Literal
+from typing import Annotated, Literal
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from weave.trace_server import trace_server_interface as tsi
 
 
 class StartBatchItem(BaseModel):
-    mode: str = "start"
+    mode: Literal["start"] = "start"
     req: tsi.CallStartReq
 
 
 class EndBatchItem(BaseModel):
-    mode: str = "end"
+    mode: Literal["end"] = "end"
     req: tsi.CallEndReq
 
 
@@ -23,7 +23,8 @@ class CompleteBatchItem(BaseModel):
 
 
 class Batch(BaseModel):
-    batch: list[StartBatchItem | EndBatchItem]
+    # Discriminated: untagged, each item is tried against the wrong member and warns.
+    batch: list[Annotated[StartBatchItem | EndBatchItem, Field(discriminator="mode")]]
 
 
 class EntityProjectInfo(BaseModel):
