@@ -1031,6 +1031,9 @@ def test_signature_cluster_tables_schema_and_retry(ch_client):
                 ("signature_config_sha", "LowCardinality(String)"),
                 ("cluster_config_sha", "LowCardinality(String)"),
                 ("naming_config_sha", "LowCardinality(String)"),
+                ("mode", "Enum8('full' = 1, 'incremental' = 2)"),
+                ("anchor_run_id", "UUID"),
+                ("continuity_config", "String"),
                 ("window_start", "DateTime64(6, 'UTC')"),
                 ("window_end", "DateTime64(6, 'UTC')"),
                 (
@@ -1054,6 +1057,7 @@ def test_signature_cluster_tables_schema_and_retry(ch_client):
                 ("run_window_end", "DateTime64(6, 'UTC')"),
                 ("signature_type", "Enum8('intent' = 1, 'failure' = 2)"),
                 ("topic_id", "UUID"),
+                ("parent_topic_ids", "Array(UUID)"),
                 ("category", "LowCardinality(String)"),
                 ("centroid", "Array(Float32)"),
                 ("label", "String"),
