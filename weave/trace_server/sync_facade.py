@@ -11,8 +11,10 @@ from __future__ import annotations
 
 import asyncio
 import inspect
+import os
 import threading
 from collections.abc import AsyncIterator, Awaitable, Callable, Coroutine, Iterator
+from concurrent.futures import ThreadPoolExecutor
 from functools import wraps
 from typing import Any, TypeVar
 
@@ -20,12 +22,21 @@ _T = TypeVar("_T")
 
 _thread_state = threading.local()
 
+# One executor for every thread loop. Each loop would otherwise grow its own
+# default executor (min(32, cpu+4) threads) for the driver's response parsing
+# and for `asyncio.to_thread`, which on a 40-thread request pool is hundreds of
+# idle threads.
+_shared_executor = ThreadPoolExecutor(
+    max_workers=min(32, (os.cpu_count() or 1) + 4), thread_name_prefix="sync-facade"
+)
+
 
 def thread_loop() -> asyncio.AbstractEventLoop:
     """The calling thread's private event loop, created on first use."""
     loop: asyncio.AbstractEventLoop | None = getattr(_thread_state, "loop", None)
     if loop is None or loop.is_closed():
         loop = asyncio.new_event_loop()
+        loop.set_default_executor(_shared_executor)
         _thread_state.loop = loop
     return loop
 
@@ -35,7 +46,7 @@ def close_thread_loop() -> None:
     loop: asyncio.AbstractEventLoop | None = getattr(_thread_state, "loop", None)
     if loop is not None and not loop.is_closed():
         loop.run_until_complete(loop.shutdown_asyncgens())
-        loop.run_until_complete(loop.shutdown_default_executor())
+        # The default executor is shared; it outlives any one loop.
         loop.close()
     _thread_state.loop = None
 

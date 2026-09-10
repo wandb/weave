@@ -152,3 +152,21 @@ def test_resolve_accepts_a_value_or_an_awaitable() -> None:
     assert resolve(3) == 3
     assert resolve(later()) == 3
     close_thread_loop()
+
+
+def test_thread_loops_share_one_default_executor() -> None:
+    seen: list[str] = []
+
+    async def where() -> None:
+        seen.append(await asyncio.to_thread(lambda: threading.current_thread().name))
+
+    def run() -> None:
+        sync_facade.run_sync(where())
+        close_thread_loop()
+
+    threads = [threading.Thread(target=run) for _ in range(3)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+    assert all(name.startswith("sync-facade") for name in seen), seen
