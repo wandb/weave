@@ -48,36 +48,135 @@ addresses are rejected.
 
 - `remote_scorer_app.py`: minimal FastAPI adapter with `GET /health` and
   `POST /score`.
-- `scoring_logic.py`: framework-independent scoring logic that can be copied
-  into another web framework or language.
+- `scoring_logic.py`: framework-independent scoring logic that dispatches on
+  the request version and scoring target. It can be copied into another web
+  framework or language.
 - `auth.py`: dev-only bearer-token validator stub.
 - `register_remote_scorer.py`: publishes a `RemoteScorer` and activates a
-  `Monitor`.
-- `trigger_test_trace.py`: sends a small traced call that can trigger the
+  `Monitor` for a traced op or for agent turns.
+- `trigger_test_trace.py`: sends a small traced call that can trigger an op
   monitor.
-- `sample_request.json`: representative request body sent by Weave.
+- `trigger_test_agent_turn.py`: logs one agent turn that can trigger an
+  agent-turn monitor.
+- `sample_request.json`: V1 request body for a traced call.
+- `sample_request_v2_call.json`: V2 request body for a traced call.
+- `sample_request_v2_agent_turn.json`: V2 request body for an agent turn.
 - `requirements.txt`: packages needed to run the endpoint, register the scorer,
   and trigger a test trace.
 
 ## Remote Scorer Contract
 
-Weave sends an HTTP `POST` to your configured scorer endpoint.
+Weave sends an HTTP `POST` to your configured scorer endpoint each time a
+monitor selects something to score. A `RemoteScorer` can be attached to two
+kinds of monitor:
+
+| Monitor target | How to configure | Request version Weave sends |
+| --- | --- | --- |
+| A traced op (a call) | `op_names=["my_op"]` | `schema_version: 1` |
+| Completed agent turns | `op_names=["weave.genai.turn_ended"]` | `schema_version: 2` |
+
+The two versions share one envelope. They differ only in where the scored
+data lives, so one endpoint can accept both. See
+[Request versions](#request-versions).
+
+### Headers
 
 Request headers include:
 
+- `Content-Type: application/json`
 - `Authorization: Bearer <token>`
 - `Idempotency-Key: <stable key for this scoring attempt>`
 - `X-Correlation-ID: <request correlation id>`
-- `X-Weave-Schema-Version: 1`
+- `X-Weave-Schema-Version: <1 or 2>`, matching `schema_version` in the body
 
-If the scorer performs side effects or writes to a downstream system, it may use
-`Idempotency-Key` to deduplicate retries or repeated scoring attempts.
+`Idempotency-Key` is derived from the scored target, the monitor version, and
+the scorer version. Weave may deliver the same scoring attempt more than once.
+If the scorer performs side effects or writes to a downstream system, use
+`Idempotency-Key` to deduplicate repeated attempts. The key is stable for one
+request version; a V1 and a V2 request for the same call carry different keys.
+
+Weave does not follow redirects, and it times out requests that take too long.
+Return the score directly from the URL you registered.
+
+### Request versions
+
+Every request carries these top-level fields:
+
+- `schema_version`: integer, `1` or `2`.
+- `scoring_call_id` and `scoring_trace_id`: identifiers for this scoring
+  attempt.
+- `monitor`: `name` and `version_digest` of the monitor that selected the
+  target.
+- `scorer`: `name`, `ref`, and optional `config`. `config` is the mapping you
+  set on the `RemoteScorer`, passed through unchanged.
+- `triggered_at`: optional ISO 8601 timestamp.
+
+**V1** puts the scored call at the top level under `original_call`. See
+`sample_request.json`. Call monitors send V1 today.
+
+**V2** puts the scored data under `scoring_target`, a tagged union with three
+fields:
+
+- `type`: the kind of thing being scored, `"call"` or `"agent_turn"`.
+- `schema_version`: the version of the payload for that type, independent of
+  the top-level envelope version.
+- `payload`: the data for that type.
+
+Dispatch on the top-level `schema_version` first, then on the pair
+`(scoring_target.type, scoring_target.schema_version)`. Return a 4xx response
+for a pair you do not implement. The sample returns `400` with
+`unsupported_scoring_target_type` in the body.
+
+The `("call", 1)` payload is the same object V1 sends as `original_call`. See
+`sample_request_v2_call.json`. Weave does not send V2 for call monitors today,
+but the sample accepts it so the endpoint is ready when it does.
+
+The `("agent_turn", 1)` payload describes one completed agent turn. See
+`sample_request_v2_agent_turn.json`. Its fields are:
+
+- `event_type`: always `"weave.genai.turn_ended"`.
+- `project_id`: `entity/project` of the turn.
+- `trace_id` and `span_id`: the trace that holds the turn and the root span
+  that ended it. Weave records feedback against the turn using `trace_id`.
+- `span_name`, `operation_name`, `started_at`, `ended_at`: span metadata. Each
+  may be `null`.
+- `conversation`: `id` and `name`, each possibly `null`.
+- `agent`: `name`, `version`, and `description`, each possibly `null`.
+- `status`: `code`, `message`, and `error_type`, each possibly `null`.
+- `messages`: `system_instructions` (a list of strings), `input`, and `output`.
+  `input` and `output` are lists of messages with `role`, `content`, and
+  `finish_reason`. `content` is plain text, or a JSON-encoded array of parts
+  when the message carried structured content such as tool calls. Lists are
+  always present and may be empty.
+
+Weave may add optional fields to any version without changing its number, so
+ignore fields you do not recognize. A field is removed, renamed, or changed in
+meaning only with a new `scoring_target.schema_version` for that type, or a
+new top-level `schema_version` for envelope changes.
+
+### Request content
+
+Weave removes internal references and rejects media before it sends a request.
+Payloads contain JSON text only, never images, audio, or video. Request and
+response bodies are each limited to 1 MiB. A target that cannot be represented
+within those rules fails to score and is not sent.
+
+The request carries no W&B credential and no feedback identity. The bearer
+token authenticates Weave to your endpoint, not the reverse. Your endpoint
+returns a result; Weave records it as feedback on the scored call or turn.
+
+### Response
 
 The endpoint must return HTTP 200 with a JSON object. The required top-level
 contract fields are:
 
-- `schema_version`: required integer; must be `1`.
+- `schema_version`: required integer; must equal the request's
+  `schema_version`.
 - `result`: required structured scorer output.
+
+`result` takes one of three shapes: one score object, a list of score objects,
+or `{"scores": [...]}`. Agent-turn scoring requires this structured form, since
+Weave stores the tags and ratings it produces as typed feedback columns.
 
 The simplest structured result is one score object:
 
@@ -119,8 +218,23 @@ This sample returns one numeric rating and one tag:
 }
 ```
 
-Non-200 responses are treated as scorer failures by Weave. The `result` value is
-the scorer output that Weave records as feedback.
+The same `result` shape is valid for a V2 request. Only `schema_version`
+changes:
+
+```json
+{
+  "schema_version": 2,
+  "result": {"value": "concise", "reason": "59 characters.", "confidence": 0.9}
+}
+```
+
+### Errors
+
+Weave treats a non-200 response as a scorer failure and records no feedback
+for that attempt. A `5xx`, `408`, or `429` response, or a timeout, is retried
+a limited number of times. Any other `4xx` is not retried, so return `4xx` for
+requests you will never accept and `5xx` for temporary problems. The response
+body of an error is for your logs; Weave does not parse it.
 
 ## Auth
 
@@ -166,7 +280,7 @@ export REMOTE_SCORER_DEV_BEARER_TOKEN="dev-token"
 uvicorn remote_scorer_app:app --host 127.0.0.1 --port 8000
 ```
 
-Exercise the local contract without Weave:
+Exercise the local contract without Weave. For a V1 call request:
 
 ```bash
 curl -sS http://127.0.0.1:8000/score \
@@ -177,6 +291,20 @@ curl -sS http://127.0.0.1:8000/score \
   -H "X-Weave-Schema-Version: 1" \
   --data @sample_request.json
 ```
+
+For a V2 agent-turn request, change the header and the body:
+
+```bash
+curl -sS http://127.0.0.1:8000/score \
+  -H "Authorization: Bearer dev-token" \
+  -H "Content-Type: application/json" \
+  -H "Idempotency-Key: local-contract-check" \
+  -H "X-Correlation-ID: local-contract-check" \
+  -H "X-Weave-Schema-Version: 2" \
+  --data @sample_request_v2_agent_turn.json
+```
+
+Use `sample_request_v2_call.json` the same way for a V2 call request.
 
 This local check only verifies the endpoint contract. It does not prove that a
 Weave deployment can reach a loopback URL.
@@ -193,6 +321,10 @@ This sample does not configure TLS itself; in production TLS is usually
 terminated by your ingress, API gateway, load balancer, or service mesh.
 
 ## Register A Remote Scorer
+
+The register script publishes one `RemoteScorer` and activates one `Monitor`.
+By default the monitor targets the traced op `sample_remote_scorer_target`.
+Pass `--agent-turn` instead of `--op-name` to target completed agent turns.
 
 OAuth client credentials:
 
@@ -219,6 +351,18 @@ python register_remote_scorer.py \
   --secret-name WEAVE_REMOTE_SCORER_BEARER_TOKEN
 ```
 
+Agent turns, with static bearer auth:
+
+```bash
+python register_remote_scorer.py \
+  --project entity/project \
+  --score-url https://scoring.example.com/weave/score \
+  --agent-turn \
+  --monitor-name example_remote_scorer_agent_monitor \
+  --auth-mode static_bearer \
+  --secret-name WEAVE_REMOTE_SCORER_BEARER_TOKEN
+```
+
 For local-only testing against `http://127.0.0.1:8000/score`, your Weave
 deployment must explicitly allow insecure HTTP and loopback/private addresses.
 Most hosted or managed deployments will not allow this. Use an HTTPS endpoint
@@ -239,6 +383,21 @@ Monitor scoring is asynchronous, so feedback will not show up immediately.
 Confirm the endpoint received a request and that Weave recorded feedback for
 the traced call.
 
+## Trigger A Test Agent Turn
+
+After registering a monitor with `--agent-turn`, run:
+
+```bash
+python trigger_test_agent_turn.py \
+  --project entity/project \
+  --input "How do I reset my password?" \
+  --output "Open Settings, choose Security, then select Reset password."
+```
+
+The script logs one completed turn with `weave.conversation.log_turn`. The
+endpoint receives a V2 request with `scoring_target.type` set to
+`"agent_turn"`, and Weave records the result as feedback on that turn.
+
 ## Troubleshooting
 
 | Symptom | What to check |
@@ -248,16 +407,22 @@ the traced call.
 | Remote scorer endpoint returns `401` or `403` | Check the W&B secret name, OAuth client credentials, audience, scope, and the scorer endpoint's bearer-token validation. |
 | OAuth succeeds but scoring fails, or the reverse | Check each URL separately. The token endpoint and scorer endpoint are independently validated and may use different hosts. Both must be in the allow list. |
 | Feedback does not appear immediately | Monitor scoring is asynchronous, so feedback will not show up immediately. Confirm the trace matched the configured operation and sampling rate. |
+| Endpoint returns `400` for agent turns | Confirm the endpoint dispatches on the top-level `schema_version` and accepts `scoring_target.type` `"agent_turn"` with inner `schema_version` `1`. |
+| Feedback is missing after a `200` response | Confirm `schema_version` in the response equals the request's, and that `result` uses one of the three structured shapes. |
 
 ## Adapting This Sample
 
 Most teams should copy the scoring contract, auth validation, and
-`score_remote_call` behavior into an existing approved web service rather than
-adopting this exact FastAPI app. The important production requirements are:
+`score_remote_request` dispatch into an existing approved web service rather
+than adopting this exact FastAPI app. The important production requirements
+are:
 
 - HTTPS endpoint reachable from Weave.
 - Host allowlist configured if the Weave deployment requires it.
 - Bearer-token validation implemented with your identity/security standards.
+- Dispatch on `schema_version`, then on `scoring_target.type` and its
+  `schema_version`, with a `4xx` for targets you do not support.
 - HTTP 200 response body shaped as
-  `{"schema_version": 1, "result": {"value": 0.9, "reason": "...", "confidence": 1.0}}`.
+  `{"schema_version": <request version>, "result": {"value": 0.9, "reason": "...", "confidence": 1.0}}`.
+- Unknown request fields ignored.
 - Optional dedupe uses `Idempotency-Key`.

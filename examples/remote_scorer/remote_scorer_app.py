@@ -10,12 +10,16 @@ import uvicorn
 from auth import validate_bearer_token
 from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
-from scoring_logic import REMOTE_SCORER_SCHEMA_VERSION, score_remote_call
+from scoring_logic import (
+    UnsupportedScoringTargetError,
+    read_schema_version,
+    score_remote_request,
+)
 
 logging.basicConfig(level=os.environ.get("LOG_LEVEL", "INFO"))
 logger = logging.getLogger(__name__)
 
-app = FastAPI(title="Weave remote scorer sample", version="1.0.0")
+app = FastAPI(title="Weave remote scorer sample", version="2.0.0")
 security = HTTPBearer(auto_error=False)
 
 
@@ -53,12 +57,20 @@ async def score(
     )
 
     try:
-        result = score_remote_call(body)
-    except ValueError as exc:
+        result = score_remote_request(body)
+    except UnsupportedScoringTargetError as exc:
+        # Weave treats any non-transient 4xx as a scorer failure for this
+        # request and does not retry it. The body is for operators reading logs.
+        raise HTTPException(
+            status_code=400,
+            detail={"error": "unsupported_scoring_target_type", "message": str(exc)},
+        ) from exc
+    except (TypeError, ValueError) as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
+    # The response must echo the request's top-level schema_version.
     return {
-        "schema_version": REMOTE_SCORER_SCHEMA_VERSION,
+        "schema_version": read_schema_version(body),
         "result": result,
     }
 
