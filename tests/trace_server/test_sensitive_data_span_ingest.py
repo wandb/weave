@@ -137,7 +137,8 @@ def test_pii_policy_redacts_stored_span_details(ch_server) -> None:
             project_id,
             [_pii_proto_span(b"\x41" * 8)],
             SensitiveDataPolicy.PII_V1,
-        )
+        ),
+        enable_llm_powered_features=True,
     )
 
     assert res.rejected_spans == 0
@@ -196,7 +197,8 @@ def test_pii_policy_redacts_before_ingest_sampling(
             project_id,
             [_pii_proto_span(b"\x43" * 8)],
             SensitiveDataPolicy.PII_V1,
-        )
+        ),
+        enable_llm_powered_features=True,
     )
 
     assert observed_redacted_span
@@ -214,7 +216,8 @@ def test_off_policy_stores_span_values_unchanged(ch_server) -> None:
             project_id,
             [_pii_proto_span(b"\x42" * 8)],
             SensitiveDataPolicy.OFF,
-        )
+        ),
+        enable_llm_powered_features=True,
     )
 
     assert res.rejected_spans == 0
@@ -262,7 +265,8 @@ def test_redaction_failure_rejects_request_before_any_side_effect(
                 project_id,
                 [_pii_proto_span(b"\x44" * 8), poison],
                 SensitiveDataPolicy.PII_V1,
-            )
+            ),
+            enable_llm_powered_features=True,
         )
 
     assert not extraction_started

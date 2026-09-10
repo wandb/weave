@@ -97,7 +97,8 @@ def _export(ch_server, project_id: str, *spans: PbSpan):
             processed_spans=[_processed(*spans)],
             project_id=project_id,
             wb_user_id="test-user",
-        )
+        ),
+        enable_llm_powered_features=True,
     )
 
 

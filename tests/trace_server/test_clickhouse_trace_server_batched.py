@@ -14,6 +14,8 @@ import urllib3
 from clickhouse_connect.driver.exceptions import DatabaseError, ProgrammingError
 from clickhouse_connect.driver.query import QueryResult
 from clickhouse_connect.driver.summary import QuerySummary
+from opentelemetry.proto.common.v1.common_pb2 import AnyValue, KeyValue
+from opentelemetry.proto.trace.v1.trace_pb2 import ResourceSpans, ScopeSpans, Span
 
 from tests.trace_server.test_project_version import make_project_id
 from weave.trace_server import ch_sentinel_values
@@ -22,7 +24,11 @@ from weave.trace_server import clickhouse_trace_server_settings as ch_settings
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.agents.clickhouse import AgentWriteHandler
 from weave.trace_server.agents.schema import AgentSpanCHInsertable
-from weave.trace_server.agents.types import GenAIOTelExportReq, GenAIOTelExportRes
+from weave.trace_server.agents.types import (
+    AgentSpansQueryReq,
+    GenAIOTelExportReq,
+    GenAIOTelExportRes,
+)
 from weave.trace_server.ch_sentinel_values import EXPIRE_AT_NEVER
 from weave.trace_server.clickhouse import utilities as chts_utilities
 from weave.trace_server.clickhouse.schema_converters import (
@@ -38,6 +44,9 @@ from weave.trace_server.clickhouse_schema import (
 from weave.trace_server.errors import NotFoundError, ObjectDeletedError
 from weave.trace_server.project_version.types import ReadTable
 from weave.trace_server.secret_fetcher_context import secret_fetcher_context
+
+TURN_START_TIME_NS = 1_700_000_000_000_000_000
+TURN_END_TIME_NS = 1_700_000_001_000_000_000
 
 
 class MockObjectReadError(Exception):
@@ -2228,7 +2237,8 @@ def test_genai_otel_export_emit_gate(monkeypatch, online_eval, scoring, insights
     )
 
     res = server.genai_otel_export(
-        GenAIOTelExportReq(processed_spans=[], project_id="p", wb_user_id="")
+        GenAIOTelExportReq(processed_spans=[], project_id="p", wb_user_id=""),
+        enable_llm_powered_features=True,
     )
 
     assert res.accepted_spans == 1
@@ -2244,6 +2254,60 @@ def test_genai_otel_export_emit_gate(monkeypatch, online_eval, scoring, insights
         mock_producer.flush.assert_called_once_with(0)
     else:
         mock_producer.flush.assert_not_called()
+
+
+@pytest.mark.parametrize("enable_llm_powered_features", [False, True])
+@pytest.mark.parametrize("insights", [False, True])
+def test_genai_otel_export_llm_policy(
+    ch_server, trace_server, monkeypatch, enable_llm_powered_features, insights
+):
+    """Store spans and emit scoring while policy gates Insights."""
+    producer = MagicMock()
+    ch_server._kafka_producer = producer
+    monkeypatch.setenv("WEAVE_ENABLE_AGENT_SCORING", "true")
+    monkeypatch.setenv("WEAVE_ENABLE_AGENT_INSIGHTS", str(insights).lower())
+    project_id = "test/privacy"
+    trace_id = uuid.uuid4().bytes
+    span_id = uuid.uuid4().bytes[:8]
+    span = Span(
+        trace_id=trace_id,
+        span_id=span_id,
+        name="assistant turn",
+        start_time_unix_nano=TURN_START_TIME_NS,
+        end_time_unix_nano=TURN_END_TIME_NS,
+        attributes=[
+            KeyValue(
+                key="gen_ai.operation.name",
+                value=AnyValue(string_value="invoke_agent"),
+            ),
+            KeyValue(
+                key="gen_ai.conversation.id",
+                value=AnyValue(string_value="conversation"),
+            ),
+        ],
+    )
+    processed = tsi.ProcessedResourceSpans(
+        entity="test",
+        project="privacy",
+        run_id=None,
+        resource_spans=ResourceSpans(scope_spans=[ScopeSpans(spans=[span])]),
+    )
+
+    res = trace_server.genai_otel_export(
+        GenAIOTelExportReq(processed_spans=[processed], project_id=project_id),
+        enable_llm_powered_features=enable_llm_powered_features,
+    )
+    stored = trace_server.agent_spans_query(AgentSpansQueryReq(project_id=project_id))
+
+    assert res == GenAIOTelExportRes(accepted_spans=1)
+    assert [(row.trace_id, row.span_id) for row in stored.spans] == [
+        (trace_id.hex(), span_id.hex())
+    ]
+    assert producer.produce_score_agent_spans.call_count == 1
+    assert producer.produce_embed_agent_spans.call_count == int(
+        insights and enable_llm_powered_features
+    )
+    producer.flush.assert_called_once_with(0)
 
 
 def test_mint_client_forwards_send_receive_timeout():
