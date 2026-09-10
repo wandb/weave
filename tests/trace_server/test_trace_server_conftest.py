@@ -25,6 +25,7 @@ def test_trace_server_fixture(request, trace_server: UserInjectingExternalTraceS
 # _reset_server_state in conftest.py needs to reset it between tests.
 KNOWN_SERVER_ATTRS = frozenset(
     {
+        "_atransport",
         "_config",
         "_evaluate_model_dispatcher",
         "_file_storage_client",
