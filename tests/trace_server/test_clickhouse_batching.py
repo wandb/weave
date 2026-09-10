@@ -4,9 +4,12 @@ This module verifies that multiple calls are properly batched into a single
 ClickHouse insert operation for performance optimization.
 """
 
+import asyncio
 import base64
+import contextvars
 import datetime
 import json
+import threading
 from typing import Any
 from unittest.mock import MagicMock, patch
 
@@ -16,7 +19,10 @@ from tests.trace.util import NOT_CLICKHOUSE_BACKEND
 from weave.shared.digest import str_digest
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.base64_content_conversion import AUTO_CONVERSION_MIN_SIZE
-from weave.trace_server.clickhouse_trace_server_batched import ClickHouseTraceServer
+from weave.trace_server.clickhouse_trace_server_batched import (
+    ClickHouseTraceServer,
+    _WriteBatch,
+)
 from weave.trace_server.errors import (
     InvalidRequest,
     ObjectDeletedError,
@@ -534,3 +540,46 @@ def test_obj_batch_mixed_projects_errors(trace_server, client):
         match="obj_create_batch only supports updating a single project.",
     ):
         server.obj_create_batch(batch=batch)
+
+
+def _server_without_clickhouse() -> ClickHouseTraceServer:
+    # Batch state never touches ch_client, so no client is minted.
+    return ClickHouseTraceServer(host="test_host")
+
+
+def test_write_batch_is_fresh_in_a_bare_thread():
+    server = _server_without_clickhouse()
+    server._flush_immediately = False
+    server._call_batch.append(["row"])
+    seen: dict[str, Any] = {}
+
+    def read_from_thread() -> None:
+        seen["flush_immediately"] = server._flush_immediately
+        seen["calls"] = server._call_batch
+
+    thread = threading.Thread(target=read_from_thread)
+    thread.start()
+    thread.join()
+
+    assert seen["flush_immediately"] is True
+    assert seen["calls"] == []
+    assert server._call_batch == [["row"]]
+    # Leave nothing staged, or __del__ tries to flush it to test_host.
+    server._call_batch = []
+    server._flush_immediately = True
+
+
+def test_write_batch_follows_the_request_context():
+    server = _server_without_clickhouse()
+    server._flush_immediately = False
+    batch = server._write_batch
+
+    # copy_context().run and asyncio.to_thread both carry the context along.
+    assert contextvars.copy_context().run(lambda: server._write_batch) is batch
+
+    async def offloaded() -> _WriteBatch:
+        return await asyncio.to_thread(lambda: server._write_batch)
+
+    assert asyncio.run(offloaded()) is batch
+    assert server._flush_immediately is False
+    server._flush_immediately = True
