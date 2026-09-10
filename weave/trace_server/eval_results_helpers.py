@@ -9,8 +9,8 @@ refs_read_batch.
 import json
 import logging
 from collections import defaultdict
-from collections.abc import Callable, Iterable
-from typing import Any
+from collections.abc import Awaitable, Callable, Iterable, Iterator
+from typing import Any, Protocol
 
 from pydantic import ValidationError
 
@@ -23,7 +23,25 @@ from weave.trace_server.agents import types as agent_types
 from weave.trace_server.agents.constants import MAX_AGENT_QUERY_LIMIT
 from weave.trace_server.errors import InvalidRequest
 from weave.trace_server.interface.query import Query
+from weave.trace_server.sync_facade import resolve
 from weave.trace_server.tracing import traced
+
+
+class EvalResultsServer(Protocol):
+    """What the eval-results helpers read from the server.
+
+    `agent_spans_query` is already a coroutine on the server and a plain call
+    through the facade; `resolve` accepts either. The other two are blocking.
+    """
+
+    def refs_read_batch(self, req: tsi.RefsReadBatchReq) -> tsi.RefsReadBatchRes: ...
+    def calls_query_stream(
+        self, req: tsi.CallsQueryReq
+    ) -> Iterator[tsi.CallSchema]: ...
+    def agent_spans_query(
+        self, req: agent_types.AgentSpansQueryReq
+    ) -> agent_types.AgentSpansQueryRes | Awaitable[agent_types.AgentSpansQueryRes]: ...
+
 
 _SUPPORTED_SORT_PREFIXES = (
     "scores.",
@@ -476,7 +494,7 @@ def merge_eval_agent_span_refs(
 
 
 def _query_eval_agent_spans(
-    server: tsi.TraceServerInterface,
+    server: EvalResultsServer,
     project_id: str,
     eval_call_ids: set[str],
     predict_and_score_call_ids: list[str],
@@ -515,12 +533,14 @@ def _query_eval_agent_spans(
         )
         offset = 0
         while True:
-            result = server.agent_spans_query(
-                agent_types.AgentSpansQueryReq(
-                    project_id=project_id,
-                    query=query,
-                    limit=MAX_AGENT_QUERY_LIMIT,
-                    offset=offset,
+            result = resolve(
+                server.agent_spans_query(
+                    agent_types.AgentSpansQueryReq(
+                        project_id=project_id,
+                        query=query,
+                        limit=MAX_AGENT_QUERY_LIMIT,
+                        offset=offset,
+                    )
                 )
             )
             linked_spans.extend(
@@ -536,7 +556,7 @@ def _query_eval_agent_spans(
 
 
 def hydrate_eval_agent_span_refs(
-    server: tsi.TraceServerInterface,
+    server: EvalResultsServer,
     project_id: str,
     rows: list[tsi.EvalResultsRow],
 ) -> list[str]:
@@ -786,7 +806,7 @@ def apply_row_selection(
 
 
 def resolve_eval_row_refs(
-    server: tsi.TraceServerInterface,
+    server: EvalResultsServer,
     rows: list[tsi.EvalResultsRow],
     project_id: str,
 ) -> list[str]:
@@ -844,7 +864,7 @@ def eval_results_grouped_rows(
 
 @traced(name="eval_results_helpers.fetch_eval_root_metadata")
 def fetch_eval_root_metadata(
-    server: tsi.TraceServerInterface,
+    server: EvalResultsServer,
     project_id: str,
     eval_root_ids: list[str],
 ) -> dict[str, dict[str, Any]]:
@@ -886,7 +906,7 @@ def validate_eval_results_request(req: tsi.EvalResultsQueryReq) -> None:
 
 @traced(name="eval_results_helpers.eval_results_query")
 def eval_results_query(
-    server: tsi.TraceServerInterface,
+    server: EvalResultsServer,
     req: tsi.EvalResultsQueryReq,
     eval_root_ids: list[str],
     all_calls: list[tsi.CallSchema],

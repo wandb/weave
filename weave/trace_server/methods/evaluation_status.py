@@ -1,7 +1,23 @@
 import logging
+from typing import Protocol
 
 from weave.shared import refs_internal as ri
 from weave.trace_server import trace_server_interface as tsi
+
+
+class EvaluationStatusServer(Protocol):
+    """The four reads the evaluation status computation needs."""
+
+    def call_read(self, req: tsi.CallReadReq) -> tsi.CallReadRes: ...
+    def calls_query_stats(
+        self, req: tsi.CallsQueryStatsReq
+    ) -> tsi.CallsQueryStatsRes: ...
+    def obj_read(self, req: tsi.ObjReadReq) -> tsi.ObjReadRes: ...
+    def table_query_stats(
+        self, req: tsi.TableQueryStatsReq
+    ) -> tsi.TableQueryStatsRes: ...
+
+
 from weave.trace_server.errors import (
     InvalidRequest,
 )
@@ -11,7 +27,7 @@ logger.setLevel(logging.INFO)
 
 
 def evaluation_status(
-    server: tsi.TraceServerInterface, req: tsi.EvaluationStatusReq
+    server: EvaluationStatusServer, req: tsi.EvaluationStatusReq
 ) -> tsi.EvaluationStatusRes:
     eval_call = server.call_read(
         tsi.CallReadReq(
