@@ -1,0 +1,64 @@
+{
+  "schema_version": 2,
+  "scoring_target": {
+    "type": "agent_turn",
+    "schema_version": 1,
+    "payload": {
+      "event_type": "weave.genai.turn_ended",
+      "project_id": "entity/project",
+      "trace_id": "0af7651916cd43dd8448eb211c80319c",
+      "span_id": "b7ad6b7169203331",
+      "span_name": "invoke_agent sample-support-agent",
+      "operation_name": "invoke_agent",
+      "started_at": "2026-06-08T12:00:00+00:00",
+      "ended_at": "2026-06-08T12:00:01+00:00",
+      "conversation": {
+        "id": "conversation-0001",
+        "name": "Support session"
+      },
+      "agent": {
+        "name": "sample-support-agent",
+        "version": "2026-06-08",
+        "description": "Answers support questions"
+      },
+      "status": {
+        "code": "OK",
+        "message": null,
+        "error_type": null
+      },
+      "messages": {
+        "system_instructions": [
+          "Answer the user accurately and concisely."
+        ],
+        "input": [
+          {
+            "role": "user",
+            "content": "How do I reset my password?",
+            "finish_reason": ""
+          }
+        ],
+        "output": [
+          {
+            "role": "assistant",
+            "content": "Open Settings, choose Security, then select Reset password.",
+            "finish_reason": "stop"
+          }
+        ]
+      }
+    }
+  },
+  "scoring_call_id": "018f8d6c-8d5f-7000-8000-000000000005",
+  "scoring_trace_id": "018f8d6c-8d5f-7000-8000-000000000006",
+  "monitor": {
+    "name": "example_remote_scorer_agent_monitor",
+    "version_digest": "monitor-version-digest"
+  },
+  "scorer": {
+    "name": "example_remote_scorer",
+    "ref": "weave:///entity/project/object/example_remote_scorer:scorer-version-digest",
+    "config": {
+      "example_threshold": 0.8
+    }
+  },
+  "triggered_at": "2026-06-08T12:00:02+00:00"
+}
