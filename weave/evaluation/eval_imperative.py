@@ -1141,7 +1141,10 @@ class EvaluationLogger:
         final_summary = {}
         if summary_data:
             final_summary = summary_data
-        if summary is not None:
+        # Only nest the user-supplied summary under "output" when auto_summarize is True.
+        # When auto_summarize=False, summary_data IS summary, so adding it again would
+        # produce every key twice — once at the top level and once under "output".
+        if auto_summarize and summary is not None:
             final_summary = {**final_summary, "output": summary}
 
         # Call the summarize op
