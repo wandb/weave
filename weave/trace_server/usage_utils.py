@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import dataclasses
 from collections import deque
-from collections.abc import Iterable
+from collections.abc import Iterable, Mapping
 from typing import Any
 
 from weave.trace_server import trace_server_interface as tsi
@@ -13,7 +13,7 @@ from weave.trace_server.tracing import traced
 class UsageCall:
     id: str
     parent_id: str | None
-    summary: dict[str, Any] | None
+    summary: Mapping[str, Any] | None
 
 
 @traced(name="usage_utils.aggregate_usage_with_descendants")

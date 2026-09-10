@@ -14,7 +14,7 @@ Two mechanisms live here:
 import asyncio
 import contextvars
 import datetime
-from collections.abc import Callable, Sequence
+from collections.abc import AsyncIterator, Callable, Sequence
 from concurrent.futures import Executor
 from typing import Any, NamedTuple, TypeVar
 
@@ -26,13 +26,14 @@ from weave.trace_server.agents.clickhouse import AgentWriteHandler
 from weave.trace_server.agents.schema import AgentSpanCHInsertable
 from weave.trace_server.clickhouse import transport as ch_transport
 from weave.trace_server.clickhouse.transport import AsyncClickHouseTransport
+from weave.trace_server.clickhouse.utilities import record_query_id
 from weave.trace_server.clickhouse_trace_server_batched import (
     ClickHouseTraceServer,
     CompletionPrepResult,
 )
 from weave.trace_server.datadog import tag_db_insert_path
 from weave.trace_server.llm_completion import lite_llm_acompletion
-from weave.trace_server.tracing import traced
+from weave.trace_server.tracing import traced, traced_generator
 
 _T = TypeVar("_T")
 
@@ -155,6 +156,33 @@ class AsyncClickHouseTraceServer(ClickHouseTraceServer):
             ch_transport.raise_query_error(prepared, e)
         ch_transport.record_query_success(prepared, result)
         return result
+
+    @traced_generator(name="async_clickhouse_trace_server._query_stream_async")
+    async def _query_stream_async(
+        self,
+        query: str,
+        parameters: dict[str, Any],
+        column_formats: dict[str, Any] | None = None,
+        settings: dict[str, int | str] | None = None,
+    ) -> AsyncIterator[tuple]:
+        """Native-async twin of `_query_stream`."""
+        prepared = ch_transport.prepare_query(
+            query, parameters, column_formats, settings
+        )
+        query_id = None
+        try:
+            blocks = await self._atransport.query_stream(prepared)
+            async with blocks:
+                summary = None
+                if isinstance(blocks.source, QueryResult):
+                    summary = blocks.source.summary
+                    query_id = record_query_id(blocks.source)
+                ch_transport.record_stream_success(prepared, summary, query_id)
+                async for block in blocks:
+                    for row in block:
+                        yield row
+        except Exception as e:
+            ch_transport.raise_stream_error(prepared, e, query_id)
 
     @traced(name="async_clickhouse_trace_server._command_async")
     async def _command_async(
