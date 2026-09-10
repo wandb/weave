@@ -12,7 +12,7 @@ from __future__ import annotations
 import asyncio
 import inspect
 import threading
-from collections.abc import AsyncIterator, Callable, Coroutine, Iterator
+from collections.abc import AsyncIterator, Awaitable, Callable, Coroutine, Iterator
 from functools import wraps
 from typing import Any, TypeVar
 
@@ -51,10 +51,22 @@ def _refuse_inside_running_loop() -> None:
     )
 
 
-def run_sync(coro: Coroutine[Any, Any, _T]) -> _T:
-    """Run `coro` to completion on the calling thread's loop."""
+def run_sync(awaitable: Awaitable[_T]) -> _T:
+    """Run `awaitable` to completion on the calling thread's loop."""
     _refuse_inside_running_loop()
-    return thread_loop().run_until_complete(coro)
+    return thread_loop().run_until_complete(awaitable)
+
+
+def resolve(value: _T | Awaitable[_T]) -> _T:
+    """Return `value`, running it first if it is awaitable.
+
+    For a blocking body that calls a sibling which may already be a coroutine,
+    or may be reached through the facade and already resolved. Goes away when
+    the caller itself becomes a coroutine.
+    """
+    if inspect.isawaitable(value):
+        return run_sync(value)
+    return value
 
 
 def iterate_sync(agen: AsyncIterator[_T]) -> Iterator[_T]:

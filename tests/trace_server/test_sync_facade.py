@@ -11,7 +11,11 @@ from unittest.mock import patch
 import pytest
 
 from weave.trace_server import sync_facade
-from weave.trace_server.sync_facade import SyncTraceServerFacade, close_thread_loop
+from weave.trace_server.sync_facade import (
+    SyncTraceServerFacade,
+    close_thread_loop,
+    resolve,
+)
 
 _request_tag: contextvars.ContextVar[str] = contextvars.ContextVar("tag", default="")
 
@@ -139,3 +143,12 @@ def test_close_thread_loop_then_reuse(facade: SyncTraceServerFacade) -> None:
     assert first.is_closed()
     assert facade.read(2) == 4
     assert sync_facade.thread_loop() is not first
+
+
+def test_resolve_accepts_a_value_or_an_awaitable() -> None:
+    async def later() -> int:
+        return 3
+
+    assert resolve(3) == 3
+    assert resolve(later()) == 3
+    close_thread_loop()
