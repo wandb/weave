@@ -1218,18 +1218,16 @@ class InMemoryTraceServer(tsi.FullTraceServerInterface):
     # Call write path
     # ------------------------------------------------------------------
 
-    def call_start_batch(self, req: tsi.CallCreateBatchReq) -> tsi.CallCreateBatchRes:
-        return self._call_start_batch(req, INGEST_SOURCE_WEAVE)
-
-    def _call_start_batch(
+    def call_start_batch(
         self,
         req: tsi.CallCreateBatchReq,
-        ingest_source: str,
+        *,
+        ingest_source: str = INGEST_SOURCE_WEAVE,
     ) -> tsi.CallCreateBatchRes:
         res = []
         for item in req.batch:
             if item.mode == "start":
-                res.append(self._call_start(item.req, ingest_source))
+                res.append(self.call_start(item.req, ingest_source=ingest_source))
             elif item.mode == "end":
                 res.append(self.call_end(item.req))
             else:
@@ -1336,13 +1334,11 @@ class InMemoryTraceServer(tsi.FullTraceServerInterface):
         )
         return tsi.CallEndV2Res()
 
-    def call_start(self, req: tsi.CallStartReq) -> tsi.CallStartRes:
-        return self._call_start(req, INGEST_SOURCE_WEAVE)
-
-    def _call_start(
+    def call_start(
         self,
         req: tsi.CallStartReq,
-        ingest_source: str,
+        *,
+        ingest_source: str = INGEST_SOURCE_WEAVE,
     ) -> tsi.CallStartRes:
         if req.start.trace_id is None:
             raise ValueError("trace_id is required")
@@ -4717,9 +4713,9 @@ class InMemoryTraceServer(tsi.FullTraceServerInterface):
                             tsi.CallBatchEndMode(req=tsi.CallEndReq(end=end_call)),
                         ]
                     )
-        self._call_start_batch(
+        self.call_start_batch(
             tsi.CallCreateBatchReq(batch=calls),
-            INGEST_SOURCE_OTLP,
+            ingest_source=INGEST_SOURCE_OTLP,
         )
         if rejected_spans > 0:
             return tsi.OTelExportRes(

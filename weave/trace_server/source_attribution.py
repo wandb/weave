@@ -1,30 +1,14 @@
-"""Resolve which instrumentation produced an ingested row.
+"""Resolve source_name, source_version, and ingest_source on ingest.
 
-Answers "which SDK / integration / agent harness wrote this?" as promoted
-`source_name` and `source_version` columns instead of a JSON scan over
-`attributes_dump` / `custom_attrs_string`. `ingest_source` separately records
-the authoritative server endpoint. The calls path
-(`clickhouse/schema_converters.py`) and spans path
-(`opentelemetry/genai_extraction.py`) both go through this module.
+Ladder for `source_name` / `source_version` (always taken as a pair):
+1. Explicit attributes (`weave.source.*`, `integration.*`, `weave.integration.*`).
+2. OTel instrumentation scope, normalized.
+3. `''`.
 
-`source_name` / `source_version` come from the first rung of the ladder that
-resolves, and are always taken as a pair so a version never describes a
-different rung's name:
+Not yet a rung: request `User-Agent` (needs FastAPI to thread the header in).
 
-1. Explicit attributes — `weave.source.{name,version}` or the
-   `attributes["integration"].{name,version}` block the Weave SDK integrations
-   stamp (see `weave/integrations/integration_metadata.py`), in either nested or
-   flat-dotted form. `agents/semconv.py` owns that key list.
-2. The OTel instrumentation scope (`scope.name` / `scope.version`), normalized.
-   This is what Codex, the Claude Code plugin, OpenInference and OpenLLMetry
-   all set for free, so it attributes them with no client-side work.
-3. `''` — unattributable.
-
-Not yet a rung: the ingest request `User-Agent`. Reading it needs the FastAPI
-layer in `wandb/core` to thread the header into the export request; the
-`resolve_*` signatures below are where it would slot in.
-
-`ingest_source` never participates in the ladder.
+`ingest_source` records the server endpoint and never participates in the ladder.
+See `agents/semconv.py` and migration 040.
 """
 
 from __future__ import annotations
@@ -94,7 +78,7 @@ INGEST_SOURCE_WEAVE = "weave"
 INGEST_SOURCE_OTLP = "otlp"
 
 # Namespaces producers put in front of the library they instrument. Longest
-# match is not needed — none of these is a prefix of another.
+# match is not needed; none of these is a prefix of another.
 _SCOPE_NAME_PREFIXES = (
     "opentelemetry.instrumentation.",
     "@opentelemetry/instrumentation-",

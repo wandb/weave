@@ -36,6 +36,25 @@ from weave.trace_server.source_attribution import (
 from weave.trace_server.trace_server_common import make_derived_summary_fields
 from weave.trace_server.ttl_settings import compute_expire_at
 
+
+def _resolved_source_fields(
+    *,
+    attributes: dict[str, Any] | None,
+    otel_dump: dict[str, Any] | None,
+    ingest_source: str,
+) -> dict[str, str]:
+    source = resolve_for_call(
+        attributes=attributes,
+        ingest_source=ingest_source,
+        otel_dump=otel_dump,
+    )
+    return {
+        "source_name": source.name,
+        "source_version": source.version,
+        "ingest_source": source.ingest_source,
+    }
+
+
 # ---------------------------------------------------------------------------
 # Call schema converters
 # ---------------------------------------------------------------------------
@@ -156,12 +175,6 @@ def start_call_for_insert_to_ch_insertable(
 
     otel_dump_str = _redacted_otel_dump(start_call.otel_dump)
 
-    source = resolve_for_call(
-        attributes=start_call.attributes,
-        ingest_source=ingest_source,
-        otel_dump=start_call.otel_dump,
-    )
-
     return CallStartCHInsertable(
         project_id=start_call.project_id,
         id=call_id,
@@ -179,9 +192,11 @@ def start_call_for_insert_to_ch_insertable(
         wb_run_step=start_call.wb_run_step,
         wb_user_id=start_call.wb_user_id,
         display_name=start_call.display_name,
-        source_name=source.name,
-        source_version=source.version,
-        ingest_source=source.ingest_source,
+        **_resolved_source_fields(
+            attributes=start_call.attributes,
+            otel_dump=start_call.otel_dump,
+            ingest_source=ingest_source,
+        ),
         expire_at=compute_expire_at(retention_days, start_call.started_at),
     )
 
@@ -281,12 +296,6 @@ def start_end_calls_to_ch_complete_insertable(
 
     otel_dump_str = _redacted_otel_dump(start_call.otel_dump)
 
-    source = resolve_for_call(
-        attributes=start_call.attributes,
-        ingest_source=ingest_source,
-        otel_dump=start_call.otel_dump,
-    )
-
     return CallCompleteCHInsertable(
         project_id=start_call.project_id,
         id=call_id,
@@ -310,9 +319,11 @@ def start_end_calls_to_ch_complete_insertable(
         wb_run_id=start_call.wb_run_id,
         wb_run_step=start_call.wb_run_step,
         wb_run_step_end=end_call.wb_run_step_end,
-        source_name=source.name,
-        source_version=source.version,
-        ingest_source=source.ingest_source,
+        **_resolved_source_fields(
+            attributes=start_call.attributes,
+            otel_dump=start_call.otel_dump,
+            ingest_source=ingest_source,
+        ),
         expire_at=compute_expire_at(retention_days, start_call.started_at),
     )
 
@@ -349,12 +360,6 @@ def complete_call_to_ch_insertable(
 
     otel_dump_str = _redacted_otel_dump(complete_call.otel_dump)
 
-    source = resolve_for_call(
-        attributes=complete_call.attributes,
-        ingest_source=INGEST_SOURCE_WEAVE,
-        otel_dump=complete_call.otel_dump,
-    )
-
     return CallCompleteCHInsertable(
         project_id=complete_call.project_id,
         id=complete_call.id,
@@ -378,9 +383,11 @@ def complete_call_to_ch_insertable(
         wb_run_id=complete_call.wb_run_id,
         wb_run_step=complete_call.wb_run_step,
         wb_run_step_end=complete_call.wb_run_step_end,
-        source_name=source.name,
-        source_version=source.version,
-        ingest_source=source.ingest_source,
+        **_resolved_source_fields(
+            attributes=complete_call.attributes,
+            otel_dump=complete_call.otel_dump,
+            ingest_source=INGEST_SOURCE_WEAVE,
+        ),
         expire_at=compute_expire_at(retention_days, complete_call.started_at),
     )
 

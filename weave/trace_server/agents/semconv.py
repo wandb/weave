@@ -30,16 +30,17 @@ AttributeType = Literal["string", "int", "float", "string[]", "json"]
 class Attribute:
     """A single semantic convention attribute.
 
-    ``aliases`` lists wire keys recognised as equivalent to this column. The
-    first entry is the canonical upstream name; later entries are parallel
-    forms also accepted on ingest.
+    ``gen_ai_aliases`` lists the OTel ``gen_ai.*`` wire key(s) for this
+    column. The first entry is the canonical upstream name; later entries
+    are parallel forms recognised on ingest. See ``USAGE_REASONING_TOKENS``
+    for an example with multiple aliases.
     """
 
     key: str  # canonical weave.* key
     type: AttributeType
     description: str
-    # Wire key equivalent(s), if any -- usually gen_ai.*
-    aliases: list[str] = field(default_factory=list)
+    # OTel gen_ai.* equivalent(s), if any
+    gen_ai_aliases: list[str] = field(default_factory=list)
 
     def __post_init__(self) -> None:
         """Validate that canonical attributes stay in the Weave namespace."""
@@ -56,7 +57,7 @@ class Attribute:
         so callers can rely on the weave.* key winning over OTel aliases
         when both are present on a span.
         """
-        return (self.key, *self.aliases)
+        return (self.key, *self.gen_ai_aliases)
 
 
 # ---------------------------------------------------------------------------
@@ -474,12 +475,12 @@ ATTRIBUTES: dict[str, Attribute] = {a.key: a for a in _DEFS}
 SEMCONV_LOOKUP_KEYS: dict[str, tuple[str, ...]] = {a.key: a.lookup_keys for a in _DEFS}
 
 # Map from any recognized key (weave.* or any registered gen_ai.* alias) to
-# canonical weave.* key. Every entry in ``aliases`` participates so
+# canonical weave.* key. Every entry in ``gen_ai_aliases`` participates so
 # parallel client emissions all resolve to the same column.
 _ALIAS_TO_CANONICAL: dict[str, str] = {}
 for _a in _DEFS:
     _ALIAS_TO_CANONICAL[_a.key] = _a.key
-    for _alias in _a.aliases:
+    for _alias in _a.gen_ai_aliases:
         _ALIAS_TO_CANONICAL[_alias] = _a.key
 
 
@@ -573,9 +574,9 @@ def _build_filterable_lookup() -> dict[str, str]:
     for canonical, col in CANONICAL_KEY_TO_COLUMN.items():
         out[canonical] = col
         attr = ATTRIBUTES[canonical]
-        for alias in attr.aliases:
+        for alias in attr.gen_ai_aliases:
             out[alias] = col
-        for k in (canonical, *attr.aliases):
+        for k in (canonical, *attr.gen_ai_aliases):
             for prefix in ("weave.", "gen_ai."):
                 if k.startswith(prefix):
                     out[k[len(prefix) :]] = col
