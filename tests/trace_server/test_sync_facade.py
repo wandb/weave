@@ -23,6 +23,7 @@ _request_tag: contextvars.ContextVar[str] = contextvars.ContextVar("tag", defaul
 class FakeAsyncServer:
     def __init__(self) -> None:
         self.loops: list[asyncio.AbstractEventLoop] = []
+        self.closed_on: list[asyncio.AbstractEventLoop] = []
         self.closed_streams = 0
         self.plain = "attribute"
 
@@ -44,6 +45,9 @@ class FakeAsyncServer:
 
     async def boom(self) -> None:
         raise ValueError("boom")
+
+    async def aclose(self) -> None:
+        self.closed_on.append(asyncio.get_running_loop())
 
     def sync_method(self) -> str:
         return "sync"
@@ -131,7 +135,7 @@ def test_facade_defines_no_server_methods() -> None:
     own = {
         name
         for name, value in vars(SyncTraceServerFacade).items()
-        if callable(value) and not name.startswith("__")
+        if callable(value) and not name.startswith("_")
     }
     assert own == set()
 
@@ -170,3 +174,27 @@ def test_thread_loops_share_one_default_executor() -> None:
     for t in threads:
         t.join()
     assert all(name.startswith("sync-facade") for name in seen), seen
+
+
+def test_dead_threads_loops_are_reaped_and_their_sessions_closed(
+    facade: SyncTraceServerFacade,
+) -> None:
+    """A pool thread exits without closing its loop; the next caller cleans up,
+    running the server's aclose on the orphaned loop so its aiohttp session is
+    drained on the loop that owns it.
+    """
+    orphan: dict[str, asyncio.AbstractEventLoop] = {}
+
+    def use_and_exit() -> None:
+        facade.read(1)
+        orphan["loop"] = sync_facade.thread_loop()
+
+    t = threading.Thread(target=use_and_exit)
+    t.start()
+    t.join()
+    assert not orphan["loop"].is_closed()
+
+    facade.read(2)  # any bridged call reaps
+    assert orphan["loop"].is_closed()
+    # Other tests' exited threads may be reaped in the same sweep.
+    assert orphan["loop"] in facade._inner.closed_on
