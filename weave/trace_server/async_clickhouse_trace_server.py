@@ -6,7 +6,7 @@ Two mechanisms live here:
     caller awaits a thread, not a socket. Every sync `ClickHouseTraceServer`
     method is reachable this way, at the cost of one pool slot held for the
     whole round-trip.
-  - `_aquery` / `_ainsert` / `_acommand` go through `AsyncClickHouseTransport`,
+  - `_query_async` / `_insert_async` / `_command_async` go through `AsyncClickHouseTransport`,
     which speaks HTTP over aiohttp. No pool slot is held while the server works,
     so concurrency stops being bounded by pool width.
 """
@@ -137,8 +137,8 @@ class AsyncClickHouseTraceServer(ClickHouseTraceServer):
         """Drain the aiohttp session. A worker calls this on shutdown."""
         await self._atransport.close()
 
-    @traced(name="async_clickhouse_trace_server._aquery")
-    async def _aquery(
+    @traced(name="async_clickhouse_trace_server._query_async")
+    async def _query_async(
         self,
         query: str,
         parameters: dict[str, Any],
@@ -156,8 +156,8 @@ class AsyncClickHouseTraceServer(ClickHouseTraceServer):
         ch_transport.record_query_success(prepared, result)
         return result
 
-    @traced(name="async_clickhouse_trace_server._acommand")
-    async def _acommand(
+    @traced(name="async_clickhouse_trace_server._command_async")
+    async def _command_async(
         self,
         command: str,
         parameters: dict[str, Any] | None = None,
@@ -171,8 +171,8 @@ class AsyncClickHouseTraceServer(ClickHouseTraceServer):
             ch_transport.raise_command_error(prepared, e)
         ch_transport.record_command_success(prepared, result)
 
-    @traced(name="async_clickhouse_trace_server._ainsert")
-    async def _ainsert(
+    @traced(name="async_clickhouse_trace_server._insert_async")
+    async def _insert_async(
         self,
         table: str,
         data: Sequence[Sequence[Any]],

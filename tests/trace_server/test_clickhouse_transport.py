@@ -1,6 +1,6 @@
 """Sync/async parity for the shared ClickHouse call logic.
 
-`ClickHouseTraceServer._insert` and `AsyncClickHouseTraceServer._ainsert` are
+`ClickHouseTraceServer._insert` and `AsyncClickHouseTraceServer._insert_async` are
 deliberately separate loops over the same `prepare_insert` /
 `insert_retry_or_raise` / `record_insert_success` functions. These tests drive
 both against a recording transport and assert they cannot drift, including on
@@ -68,7 +68,7 @@ def drive_both(fail_times=0, error=None):
     async_server._atransport = async_transport
     recorded["async"] = (
         async_transport,
-        asyncio.run(async_server._ainsert(TABLE, DATA, COLUMNS)),
+        asyncio.run(async_server._insert_async(TABLE, DATA, COLUMNS)),
     )
     return recorded
 
@@ -89,7 +89,7 @@ def drive_one(arm, fail_times=0, error=None):
     server = AsyncClickHouseTraceServer(host="test_host", use_async_insert=False)
     server._use_replicated_tables = True
     server._atransport = RecordingAsyncTransport(fail_times, error)
-    return asyncio.run(server._ainsert(TABLE, DATA, COLUMNS))
+    return asyncio.run(server._insert_async(TABLE, DATA, COLUMNS))
 
 
 def stable(settings):
