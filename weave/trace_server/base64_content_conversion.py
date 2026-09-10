@@ -10,7 +10,7 @@ import logging
 import re
 import threading
 from dataclasses import dataclass, field
-from typing import Any, TypeVar
+from typing import Any, Protocol, TypeVar
 
 from cachetools import LRUCache
 
@@ -24,11 +24,20 @@ from weave.trace_server.trace_server_interface import (
     CallStartReq,
     CompletedCallSchemaForInsert,
     FileCreateReq,
+    FileCreateRes,
     ObjCreateReq,
+    ObjCreateRes,
     ObjSchemaForInsert,
-    TraceServerInterface,
 )
 from weave.trace_server.tracing import traced
+
+
+class ContentWriter(Protocol):
+    """The two server writes content extraction needs."""
+
+    def file_create(self, req: FileCreateReq) -> FileCreateRes: ...
+    def obj_create(self, req: ObjCreateReq) -> ObjCreateRes: ...
+
 
 logger = logging.getLogger(__name__)
 
@@ -189,7 +198,7 @@ def is_data_uri(data_uri: str) -> bool:
 def store_content_object(
     content_obj: Content,
     project_id: str,
-    trace_server: TraceServerInterface,
+    trace_server: ContentWriter,
 ) -> dict[str, Any]:
     """Create a proper Content object structure and store its files.
 
@@ -233,7 +242,7 @@ def store_content_object(
 def store_content_object_ref(
     content_obj: Content,
     project_id: str,
-    trace_server: TraceServerInterface,
+    trace_server: ContentWriter,
     wb_user_id: str | None = None,
     pending_objs: PendingContentObjs | None = None,
     raw_val: str | None = None,
@@ -297,7 +306,7 @@ T = TypeVar("T")
 def replace_base64_with_content_objects(
     vals: T,
     project_id: str,
-    trace_server: TraceServerInterface,
+    trace_server: ContentWriter,
     wb_user_id: str | None = None,
     pending_objs: PendingContentObjs | None = None,
 ) -> T:
@@ -417,7 +426,7 @@ R = TypeVar(
 
 def process_call_content(
     req: R,
-    trace_server: TraceServerInterface,
+    trace_server: ContentWriter,
     pending_objs: PendingContentObjs | None = None,
 ) -> R:
     """Replace base64 content in a call's inputs/outputs with Content refs.
@@ -491,7 +500,7 @@ def _restore_refs(val: Any, raw_by_ref: dict[str, str]) -> Any:
 def replace_base64_in_raw_messages(
     raw: Any,
     project_id: str,
-    trace_server: TraceServerInterface,
+    trace_server: ContentWriter,
     wb_user_id: str | None = None,
 ) -> Any:
     """Strip inline base64 / base64 data-URIs from raw GenAI message payloads.
