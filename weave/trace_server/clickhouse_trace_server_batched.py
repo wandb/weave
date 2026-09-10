@@ -7439,7 +7439,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         self,
         req: GenAIOTelExportReq,
         *,
-        enable_llm_powered_features: bool,
+        enable_llm_powered_features: bool = True,
     ) -> GenAIOTelExportRes:
         """Store spans and gate Insights emission on server-side LLM policy."""
         res, span_rows = AgentWriteHandler(

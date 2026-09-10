@@ -1465,7 +1465,7 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
         self,
         req: tsi.agent_types.GenAIOTelExportReq,
         *,
-        enable_llm_powered_features: bool,
+        enable_llm_powered_features: bool = True,
     ) -> tsi.agent_types.GenAIOTelExportRes:
         # Capture the entity before conversion, while `project_id` is still
         # `entity/project`: recovering it downstream costs a gorilla round-trip.
