@@ -4,6 +4,29 @@ All notable changes to the Weave TypeScript SDK will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.16.8] - 2026-09-10
+
+### Changed
+
+- Refresh the vendored trace-server client to the current trace-server API. ([#7838](https://github.com/wandb/weave/pull/7838))
+
+
+## [0.16.7] - 2026-09-03
+
+### Added
+
+- Record the invoking OpenTelemetry span's trace and span ids on `weave.op` calls, so calls made under a user-managed OTel span link back to that span instead of opening a separate trace. ([#7753](https://github.com/wandb/weave/pull/7753))
+- Add `recordError(error)` to GenAI spans for recording failures without ending them, and derive `error.type` from standard `Error` values passed to `recordError()` or `end()`. ([#7738](https://github.com/wandb/weave/pull/7738))
+
+### Changed
+
+- Replace the generated swagger HTTP client with a vendored Stainless client. Public method signatures are unchanged; the request timeout is now five minutes. ([#7785](https://github.com/wandb/weave/pull/7785))
+
+### Fixed
+
+- Count cached-read and cache-creation tokens toward the Anthropic prompt total on plain, streaming, and batch calls, so traces and token-derived costs are correct with prompt caching enabled. ([#7725](https://github.com/wandb/weave/pull/7725))
+
+
 ## [0.16.6] - 2026-08-14
 
 ### Added
@@ -11,7 +34,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Trace nested and background Claude Agent SDK subagents as `invoke_agent` spans, including their prompts, models, child chats, and terminal status. ([#7630](https://github.com/wandb/weave/pull/7630))
 - Accept JSON-compatible tool arguments and results through `Tool`, and export the `JsonObject` and `JsonValue` types. ([#7702](https://github.com/wandb/weave/pull/7702))
 - Link `weave.op` calls to the agent spans they produce, and expose the parent-call identifiers on queried span records. ([#7730](https://github.com/wandb/weave/pull/7730), [#7711](https://github.com/wandb/weave/pull/7711))
-- Add `recordError(error)` to GenAI spans for recording failures without ending them, and derive `error.type` from standard `Error` values passed to `recordError()` or `end()`. ([#7738](https://github.com/wandb/weave/pull/7738))
 
 ### Changed
 
