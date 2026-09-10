@@ -25,26 +25,22 @@ def test_trace_server_fixture(request, trace_server: UserInjectingExternalTraceS
 # _reset_server_state in conftest.py needs to reset it between tests.
 KNOWN_SERVER_ATTRS = frozenset(
     {
-        "_database",
-        "_database_ensured",
+        "_config",
         "_evaluate_model_dispatcher",
         "_file_storage_client",
-        "_file_storage_client_initialized",
-        "_host",
         "_init_lock",
+        "_file_storage_client_initialized",
         "_kafka_producer",
         "_model_to_provider_info_map",
         "_op_ref_cache",
         "_op_ref_cache_lock",
-        "_password",
         "_placeholder_file_projects",
-        "_port",
         "_run_migrations",
         "_table_routing_resolver",
         "_thread_local",
+        "_transport",
         "_use_async_insert",
         "_use_replicated_tables",
-        "_user",
     }
 )
 
