@@ -2237,7 +2237,8 @@ def test_genai_otel_export_emit_gate(monkeypatch, online_eval, scoring, insights
     )
 
     res = server.genai_otel_export(
-        GenAIOTelExportReq(processed_spans=[], project_id="p", wb_user_id="")
+        GenAIOTelExportReq(processed_spans=[], project_id="p", wb_user_id=""),
+        enable_llm_powered_features=True,
     )
 
     assert res.accepted_spans == 1

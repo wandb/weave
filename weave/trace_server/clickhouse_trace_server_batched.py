@@ -7439,7 +7439,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         self,
         req: GenAIOTelExportReq,
         *,
-        enable_llm_powered_features: bool = True,
+        enable_llm_powered_features: bool,
     ) -> GenAIOTelExportRes:
         """Store spans and gate Insights emission on server-side LLM policy."""
         res, span_rows = AgentWriteHandler(
@@ -7447,6 +7447,8 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         ).insert_otel_spans(req)
 
         scoring_enabled = wf_env.wf_enable_agent_scoring()
+        # Agent Insights require org consent to LLM-powered features. Scoring does not:
+        # the user opts in when creating an LLM scorer.
         insights_enabled = (
             wf_env.wf_enable_agent_insights() and enable_llm_powered_features
         )

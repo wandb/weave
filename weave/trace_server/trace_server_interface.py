@@ -3613,7 +3613,7 @@ class TraceServerInterface(Protocol):
         self,
         req: agent_types.GenAIOTelExportReq,
         *,
-        enable_llm_powered_features: bool = True,
+        enable_llm_powered_features: bool,
     ) -> agent_types.GenAIOTelExportRes: ...
     def agent_spans_query(
         self, req: agent_types.AgentSpansQueryReq
