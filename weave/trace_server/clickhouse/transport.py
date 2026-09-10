@@ -215,6 +215,8 @@ class AsyncClickHouseTransport:
 
     def __init__(self, config: ClickHouseConfig) -> None:
         self._config = config
+        # The database is created once per process, not once per loop's client.
+        self._database_ensured = False
         # Weak keys: a loop that is garbage collected takes its entry with it.
         self._clients: weakref.WeakKeyDictionary[
             asyncio.AbstractEventLoop, AsyncClient
@@ -257,11 +259,13 @@ class AsyncClickHouseTransport:
         # returning it -- a failed CREATE DATABASE, or cancellation -- has to
         # close it here, or `start()` retries and leaks another connector each
         # time. BaseException so CancelledError is covered too.
-        try:
-            await aensure_database(client, self._config.database)
-        except BaseException:
-            await client.close()
-            raise
+        if not self._database_ensured:
+            try:
+                await aensure_database(client, self._config.database)
+            except BaseException:
+                await client.close()
+                raise
+            self._database_ensured = True
         client.database = self._config.database
         return client
 
