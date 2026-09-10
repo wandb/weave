@@ -13,6 +13,7 @@ import asyncio
 import logging
 import threading
 import time
+import weakref
 from collections.abc import Sequence
 from dataclasses import dataclass, replace
 from typing import Any, NoReturn
@@ -205,29 +206,40 @@ class SyncClickHouseTransport:
 
 
 class AsyncClickHouseTransport:
-    """clickhouse-connect's aiohttp `AsyncClient`.
+    """clickhouse-connect's aiohttp `AsyncClient`, one per event loop.
 
-    Start, use and close it on one event loop: an aiohttp session belongs to the
-    loop that opened it. That is the caller's invariant to keep; one worker owns
-    one loop and one transport.
+    An aiohttp session belongs to the loop that opened it, so the transport keeps
+    a client per running loop and hands each caller the one for its own loop.
+    Whoever owns a loop closes its client before the loop ends.
     """
 
     def __init__(self, config: ClickHouseConfig) -> None:
         self._config = config
-        self._client: AsyncClient | None = None
-        self._lock = asyncio.Lock()
+        # Weak keys: a loop that is garbage collected takes its entry with it.
+        self._clients: weakref.WeakKeyDictionary[
+            asyncio.AbstractEventLoop, AsyncClient
+        ] = weakref.WeakKeyDictionary()
+        # asyncio.Lock binds to the loop that first uses it, so one per loop.
+        self._locks: weakref.WeakKeyDictionary[
+            asyncio.AbstractEventLoop, asyncio.Lock
+        ] = weakref.WeakKeyDictionary()
 
     async def start(self) -> AsyncClient:
-        """Open the session if it is not open yet, and return it.
+        """Open this loop's session if it is not open yet, and return it.
 
         Locked because concurrent first calls would otherwise each connect.
         """
-        if self._client is not None:
-            return self._client
-        async with self._lock:
-            if self._client is None:
-                self._client = await self._connect()
-            return self._client
+        loop = asyncio.get_running_loop()
+        client = self._clients.get(loop)
+        if client is not None:
+            return client
+        lock = self._locks.setdefault(loop, asyncio.Lock())
+        async with lock:
+            client = self._clients.get(loop)
+            if client is None:
+                client = await self._connect()
+                self._clients[loop] = client
+            return client
 
     async def _connect(self) -> AsyncClient:
         client = await clickhouse_connect.get_async_client(
@@ -254,15 +266,33 @@ class AsyncClickHouseTransport:
         return client
 
     async def close(self) -> None:
-        """Drain the aiohttp session. Workers call this on shutdown."""
-        async with self._lock:
-            if self._client is not None:
-                await self._client.close()
-                self._client = None
+        """Drain the running loop's session. Each loop owner calls this on shutdown."""
+        loop = asyncio.get_running_loop()
+        lock = self._locks.setdefault(loop, asyncio.Lock())
+        async with lock:
+            client = self._clients.pop(loop, None)
+            if client is not None:
+                await client.close()
 
     async def query(self, prepared: PreparedQuery) -> QueryResult:
         client = await self.start()
         return await client.query(
+            prepared.query,
+            parameters=prepared.parameters,
+            column_formats=prepared.column_formats,
+            use_none=True,
+            settings=prepared.settings,
+        )
+
+    async def query_stream(self, prepared: PreparedQuery) -> Any:
+        """The driver's row-block stream context manager, unwrapped by the caller.
+
+        Blocks, not rows: the driver's async stream hops to the executor once
+        per yielded item, which per row is ~50x slower than the blocking driver
+        and per block is at parity. The caller flattens each block.
+        """
+        client = await self.start()
+        return await client.query_row_block_stream(
             prepared.query,
             parameters=prepared.parameters,
             column_formats=prepared.column_formats,
