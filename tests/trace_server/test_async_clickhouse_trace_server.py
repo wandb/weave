@@ -200,9 +200,9 @@ async def test_deferred_span_flow_lands_queryable_spans(ch_server) -> None:
     project_id = make_project_id("deferred_flow")
     ch_executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="ch-pool")
     srv = AsyncClickHouseTraceServer(
-        host=ch_server._host,
-        port=ch_server._port,
-        database=ch_server._database,
+        host=ch_server._config.host,
+        port=ch_server._config.port,
+        database=ch_server._config.database,
         ch_executor=ch_executor,
     )
     try:
