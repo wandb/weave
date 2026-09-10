@@ -7,7 +7,7 @@ they don't depend on (or interfere with) any process-global tracer state.
 from __future__ import annotations
 
 import asyncio
-from collections.abc import Iterator
+from collections.abc import AsyncIterator, Iterator
 from typing import Any
 
 import pytest
@@ -234,13 +234,61 @@ def test_traced_generator_marks_error_on_exception(
     assert span.status.description == "RuntimeError: stream-boom"
 
 
-def test_traced_generator_refuses_async_generator_function() -> None:
-    """`yield from` does not work on async generators; refuse at decoration."""
-    with pytest.raises(TypeError, match="async generator function"):
+def test_traced_async_generator_span_covers_full_iteration(
+    exporter: InMemorySpanExporter,
+) -> None:
+    @traced_generator(name="astream_op")
+    async def astream_op(n: int) -> AsyncIterator[int]:
+        for i in range(n):
+            yield i
 
-        @traced_generator(name="bad")
-        async def agen_fn() -> Any:
-            yield 1
+    async def consume() -> list[int]:
+        return [item async for item in astream_op(5)]
+
+    assert asyncio.run(consume()) == [0, 1, 2, 3, 4]
+    span = _single_span(exporter)
+    assert span.name == "astream_op"
+    assert span.status.status_code == StatusCode.UNSET
+
+
+def test_traced_async_generator_client_disconnect_not_marked_error(
+    exporter: InMemorySpanExporter,
+) -> None:
+    @traced_generator(name="abandoned_aop")
+    async def abandoned_aop() -> AsyncIterator[int]:
+        i = 0
+        while True:
+            yield i
+            i += 1
+
+    async def abandon() -> None:
+        agen = abandoned_aop()
+        await anext(agen)
+        await anext(agen)
+        await agen.aclose()
+
+    asyncio.run(abandon())
+    span = _single_span(exporter)
+    assert span.name == "abandoned_aop"
+    assert span.status.status_code == StatusCode.UNSET
+
+
+def test_traced_async_generator_marks_error_on_exception(
+    exporter: InMemorySpanExporter,
+) -> None:
+    @traced_generator(name="astream_raises_op")
+    async def astream_raises_op() -> AsyncIterator[int]:
+        yield 1
+        raise RuntimeError("astream-boom")
+
+    async def consume() -> list[int]:
+        return [item async for item in astream_raises_op()]
+
+    with pytest.raises(RuntimeError, match="astream-boom"):
+        asyncio.run(consume())
+    span = _single_span(exporter)
+    assert span.status.status_code == StatusCode.ERROR
+    assert span.status.description == "RuntimeError: astream-boom"
 
 
 # ---------------------------------------------------------------------------
