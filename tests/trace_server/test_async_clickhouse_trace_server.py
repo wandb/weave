@@ -25,6 +25,7 @@ from weave.trace_server.external_to_internal_trace_server_adapter import (
     ExternalTraceServer,
 )
 from weave.trace_server.ids import generate_id
+from weave.trace_server.sync_facade import SyncTraceServerFacade
 
 LITELLM_ACOMPLETION_PATCH = (
     "weave.trace_server.async_clickhouse_trace_server.lite_llm_acompletion"
@@ -225,7 +226,7 @@ async def test_deferred_span_flow_lands_queryable_spans(ch_server) -> None:
     finally:
         ch_executor.shutdown(wait=True)
 
-    res = ch_server.agent_spans_query(AgentSpansQueryReq(project_id=project_id))
+    res = await srv.agent_spans_query(AgentSpansQueryReq(project_id=project_id))
     assert res.total_count == 2
     assert {d1.result.span_id, d2.result.span_id} == {s.span_id for s in res.spans}
 
@@ -390,6 +391,26 @@ async def test_cancellation_during_acompletion_propagates(
 async def test_external_adapter_routes_to_async_backend() -> None:
     inner = AsyncClickHouseTraceServer(host="test_host")
     adapter = ExternalTraceServer(inner, DummyIdConverter(), username_resolver=None)
+
+    expected = tsi.CompletionsCreateRes(response={"ok": True}, weave_call_id="abc")
+    with patch.object(
+        inner, "acompletions_create", new=AsyncMock(return_value=expected)
+    ) as a_mock:
+        res = await adapter.acompletions_create(_make_req(track_llm_call=False))
+
+    assert res.response == {"ok": True}
+    assert a_mock.await_count == 1
+
+
+@pytest.mark.asyncio
+async def test_external_adapter_routes_through_the_sync_facade() -> None:
+    """The HTTP service wraps the server in the facade; the async path must
+    still reach the server's own coroutine rather than a thread hop.
+    """
+    inner = AsyncClickHouseTraceServer(host="test_host")
+    adapter = ExternalTraceServer(
+        SyncTraceServerFacade(inner), DummyIdConverter(), username_resolver=None
+    )
 
     expected = tsi.CompletionsCreateRes(response={"ok": True}, weave_call_id="abc")
     with patch.object(

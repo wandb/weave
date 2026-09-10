@@ -1,5 +1,6 @@
 # Clickhouse Trace Server
 
+import asyncio
 import dataclasses
 import datetime
 import json
@@ -392,7 +393,15 @@ _CALLS_COMPLETE_SENTINEL_COLUMNS: list[tuple[int, str]] = [
 ]
 
 
-class ClickHouseTraceServer(tsi.FullTraceServerInterface):
+class ClickHouseTraceServer:
+    """ClickHouse-backed trace server.
+
+    Methods are becoming coroutines one family at a time; until the last one
+    moves, this class satisfies neither `tsi.FullTraceServerInterface` nor its
+    async twin, so it names neither. Sync callers go through
+    `sync_facade.SyncTraceServerFacade`.
+    """
+
     def __init__(
         self,
         *,
@@ -7391,46 +7400,50 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
     # TODO: Normalize method names across this interface before the agent
     # observability API is considered stable.
 
-    def agent_spans_query(self, req: AgentSpansQueryReq) -> AgentSpansQueryRes:
-        return AgentQueryHandler(self._query, self.feedback_query).spans_query(req)
+    async def agent_spans_query(self, req: AgentSpansQueryReq) -> AgentSpansQueryRes:
+        return await self._agent_reads().spans_query(req)
 
-    def agent_spans_stats(self, req: AgentSpanStatsReq) -> AgentSpanStatsRes:
-        return AgentQueryHandler(self._query, self.feedback_query).spans_stats(req)
+    async def agent_spans_stats(self, req: AgentSpanStatsReq) -> AgentSpanStatsRes:
+        return await self._agent_reads().spans_stats(req)
 
-    def agent_custom_attrs_schema(
+    async def agent_custom_attrs_schema(
         self, req: AgentCustomAttrsSchemaReq
     ) -> AgentCustomAttrsSchemaRes:
-        return AgentQueryHandler(self._query, self.feedback_query).custom_attrs_schema(
-            req
-        )
+        return await self._agent_reads().custom_attrs_schema(req)
 
-    def agent_agents_query(self, req: AgentsQueryReq) -> AgentsQueryRes:
-        return AgentQueryHandler(self._query, self.feedback_query).agents_query(req)
+    async def agent_agents_query(self, req: AgentsQueryReq) -> AgentsQueryRes:
+        return await self._agent_reads().agents_query(req)
 
-    def agent_versions_query(self, req: AgentVersionsQueryReq) -> AgentVersionsQueryRes:
-        return AgentQueryHandler(self._query, self.feedback_query).agent_versions_query(
-            req
-        )
+    async def agent_versions_query(
+        self, req: AgentVersionsQueryReq
+    ) -> AgentVersionsQueryRes:
+        return await self._agent_reads().agent_versions_query(req)
 
-    def agent_search(self, req: AgentSearchReq) -> AgentSearchRes:
-        return AgentQueryHandler(self._query, self.feedback_query).search_messages(req)
+    async def agent_search(self, req: AgentSearchReq) -> AgentSearchRes:
+        return await self._agent_reads().search_messages(req)
 
-    def agent_traces_chat(self, req: AgentTraceChatReq) -> AgentTraceChatRes:
-        return AgentQueryHandler(self._query, self.feedback_query).traces_chat(req)
+    async def agent_traces_chat(self, req: AgentTraceChatReq) -> AgentTraceChatRes:
+        return await self._agent_reads().traces_chat(req)
 
-    def agent_conversation_chat(
+    async def agent_conversation_chat(
         self, req: AgentConversationChatReq
     ) -> AgentConversationChatRes:
-        return AgentQueryHandler(self._query, self.feedback_query).conversation_chat(
-            req
-        )
+        return await self._agent_reads().conversation_chat(req)
 
-    def agent_conversation_spans(
+    async def agent_conversation_spans(
         self, req: AgentConversationSpansReq
     ) -> AgentConversationSpansRes:
-        return AgentQueryHandler(self._query, self.feedback_query).conversation_spans(
-            req
-        )
+        return await self._agent_reads().conversation_spans(req)
+
+    def _agent_reads(self) -> AgentQueryHandler:
+        return AgentQueryHandler(self._query_async, self._feedback_query_async)
+
+    async def _feedback_query_async(
+        self, req: tsi.FeedbackQueryReq
+    ) -> tsi.FeedbackQueryRes:
+        # Until feedback_query is itself a coroutine, keep its blocking read off
+        # the loop.
+        return await asyncio.to_thread(self.feedback_query, req)
 
     @tag_db_insert_path("genai_otel_export")
     def genai_otel_export(

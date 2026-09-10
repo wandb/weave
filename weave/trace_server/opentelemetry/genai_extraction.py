@@ -12,7 +12,7 @@ The main entry point is `extract_genai_span()` which takes a parsed OTel
 import json
 import math
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
 from weave.trace_server.agents import semconv
 from weave.trace_server.agents.constants import (
@@ -26,6 +26,7 @@ from weave.trace_server.agents.schema import (
     NormalizedMessage,
 )
 from weave.trace_server.base64_content_conversion import (
+    ContentWriter,
     replace_base64_in_raw_messages,
     replace_base64_with_content_objects,
 )
@@ -41,9 +42,6 @@ from weave.trace_server.query_builder.agent_query_builder import (
     safe_float,
     safe_int,
 )
-
-if TYPE_CHECKING:
-    from weave.trace_server.trace_server_interface import TraceServerInterface
 
 # Known operation name prefixes for span-name inference.
 _KNOWN_OP_PREFIXES = (
@@ -504,7 +502,7 @@ def _strip_message_attr(
     attrs: dict[str, Any],
     lookup_keys: tuple[str, ...],
     project_id: str,
-    trace_server: "TraceServerInterface",
+    trace_server: ContentWriter,
     wb_user_id: str | None = None,
 ) -> None:
     """Strip base64 from the first present message-payload attribute key.
@@ -536,7 +534,7 @@ def _strip_message_attr(
 def strip_inline_blobs_from_span(
     span: Span,
     project_id: str,
-    trace_server: "TraceServerInterface",
+    trace_server: ContentWriter,
     wb_user_id: str | None = None,
 ) -> None:
     """Strip inline base64 / base64 data-URIs from a span into stored Content refs.

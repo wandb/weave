@@ -843,7 +843,11 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
     ) -> tsi.CompletionsCreateRes:
         req = req.model_copy(deep=True)
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)
-        inner = self._internal_trace_server
+        # The HTTP service hands us the server through its sync facade; the
+        # native async completion path wants the server itself.
+        inner = getattr(
+            self._internal_trace_server, "_inner", self._internal_trace_server
+        )
         if isinstance(inner, AsyncClickHouseTraceServer):
             return await self._aref_apply(
                 inner.acompletions_create, req, req.project_id
