@@ -10,6 +10,7 @@ from collections import defaultdict
 from collections.abc import Callable, Iterator, Sequence
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from contextlib import contextmanager
+from contextvars import ContextVar
 from functools import partial
 from typing import Any, NamedTuple, TypeVar, cast
 from zoneinfo import ZoneInfo
@@ -397,6 +398,20 @@ _CALLS_COMPLETE_SENTINEL_COLUMNS: list[tuple[int, str]] = [
 ]
 
 
+@dataclasses.dataclass
+class _WriteBatch:
+    """Rows staged by one logical request while `call_batch()` holds the flush."""
+
+    flush_immediately: bool = True
+    calls: list[list[Any]] = dataclasses.field(default_factory=list)
+    calls_complete: list[list[Any]] = dataclasses.field(default_factory=list)
+    files: list[FileChunkCreateCHInsertable] = dataclasses.field(default_factory=list)
+    content_objs: list[tsi.ObjSchemaForInsert] = dataclasses.field(default_factory=list)
+    bucket_uploads: BucketUploadBatch = dataclasses.field(
+        default_factory=BucketUploadBatch
+    )
+
+
 class ClickHouseTraceServer(tsi.FullTraceServerInterface):
     def __init__(
         self,
@@ -411,6 +426,11 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
     ):
         super().__init__()
         self._thread_local = threading.local()
+        # Context-local, not thread-local: a batch follows the request through
+        # `asyncio.to_thread` and tasks, while bare threads still start fresh.
+        self._write_batch_var: ContextVar[_WriteBatch | None] = ContextVar(
+            "weave_ch_write_batch", default=None
+        )
         self._host = host
         self._port = port
         self._user = user
@@ -470,62 +490,60 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             pass
 
     @property
+    def _write_batch(self) -> _WriteBatch:
+        batch = self._write_batch_var.get()
+        if batch is None:
+            batch = _WriteBatch()
+            self._write_batch_var.set(batch)
+        return batch
+
+    @property
     def _flush_immediately(self) -> bool:
-        return getattr(self._thread_local, "flush_immediately", True)
+        return self._write_batch.flush_immediately
 
     @_flush_immediately.setter
     def _flush_immediately(self, value: bool) -> None:
-        self._thread_local.flush_immediately = value
+        self._write_batch.flush_immediately = value
 
     @property
     def _call_batch(self) -> list[list[Any]]:
-        if not hasattr(self._thread_local, "call_batch"):
-            self._thread_local.call_batch = []
-        return self._thread_local.call_batch
+        return self._write_batch.calls
 
     @_call_batch.setter
     def _call_batch(self, value: list[list[Any]]) -> None:
-        self._thread_local.call_batch = value
+        self._write_batch.calls = value
 
     @property
     def _file_batch(self) -> list[FileChunkCreateCHInsertable]:
-        if not hasattr(self._thread_local, "file_batch"):
-            self._thread_local.file_batch = []
-        return self._thread_local.file_batch
+        return self._write_batch.files
 
     @_file_batch.setter
     def _file_batch(self, value: list[FileChunkCreateCHInsertable]) -> None:
-        self._thread_local.file_batch = value
+        self._write_batch.files = value
 
     @property
     def _bucket_uploads(self) -> BucketUploadBatch:
-        if not hasattr(self._thread_local, "bucket_uploads"):
-            self._thread_local.bucket_uploads = BucketUploadBatch()
-        return self._thread_local.bucket_uploads
+        return self._write_batch.bucket_uploads
 
     @_bucket_uploads.setter
     def _bucket_uploads(self, value: BucketUploadBatch) -> None:
-        self._thread_local.bucket_uploads = value
+        self._write_batch.bucket_uploads = value
 
     @property
     def _calls_complete_batch(self) -> list[list[Any]]:
-        if not hasattr(self._thread_local, "calls_complete_batch"):
-            self._thread_local.calls_complete_batch = []
-        return self._thread_local.calls_complete_batch
+        return self._write_batch.calls_complete
 
     @_calls_complete_batch.setter
     def _calls_complete_batch(self, value: list[list[Any]]) -> None:
-        self._thread_local.calls_complete_batch = value
+        self._write_batch.calls_complete = value
 
     @property
     def _content_obj_batch(self) -> list[tsi.ObjSchemaForInsert]:
-        if not hasattr(self._thread_local, "content_obj_batch"):
-            self._thread_local.content_obj_batch = []
-        return self._thread_local.content_obj_batch
+        return self._write_batch.content_objs
 
     @_content_obj_batch.setter
     def _content_obj_batch(self, value: list[tsi.ObjSchemaForInsert]) -> None:
-        self._thread_local.content_obj_batch = value
+        self._write_batch.content_objs = value
 
     @classmethod
     def from_env(cls, use_async_insert: bool = True, **kwargs: Any) -> Self:
@@ -910,8 +928,12 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
     @contextmanager
     def call_batch(self) -> Iterator[None]:
-        """Batch call operations and flush them all at the end."""
-        # Not thread safe - do not use across threads
+        """Batch call operations and flush them all at the end.
+
+        The batch is context-local: it is shared with work this request runs via
+        `asyncio.to_thread` or `copy_context().run`, and invisible to other
+        requests. Do not hand it to a bare thread.
+        """
         self._flush_immediately = False
         try:
             yield
@@ -950,7 +972,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             logger.exception("Failed to flush bucket uploads")
             raise
 
-        # File chunks || content objects. Snapshot the thread-local batches so
+        # File chunks || content objects. Snapshot the context-local batches so
         # each worker inserts an explicit list on its own pooled ch_client.
         file_rows = self._file_batch
         content_objs = self._content_obj_batch
