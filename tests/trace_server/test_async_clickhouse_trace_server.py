@@ -24,6 +24,7 @@ from weave.trace_server.datadog import _db_insert_path
 from weave.trace_server.external_to_internal_trace_server_adapter import (
     ExternalTraceServer,
 )
+from weave.trace_server.ids import generate_id
 
 LITELLM_ACOMPLETION_PATCH = (
     "weave.trace_server.async_clickhouse_trace_server.lite_llm_acompletion"
@@ -422,3 +423,46 @@ async def test_external_adapter_falls_back_for_sync_backend() -> None:
     res = await adapter.acompletions_create(_make_req(track_llm_call=False))
     assert res.response == {"ok": True}
     assert captured["tid"] != loop_tid
+
+
+@pytest.mark.asyncio
+async def test_query_stream_async_matches_the_sync_stream(ch_server) -> None:
+    """Same rows in the same order, block-flattened, with the stream closed after."""
+    srv = AsyncClickHouseTraceServer(
+        host=ch_server._config.host,
+        port=ch_server._config.port,
+        database=ch_server._config.database,
+    )
+    table = f"stream_parity_{generate_id()[:8]}"
+    rows = [[f"p{i:03d}"] for i in range(2_500)]
+    try:
+        await srv._command_async(
+            f"CREATE TABLE {table} (project_id String) ENGINE = Memory"
+        )
+        await srv._insert_async(table, rows, ["project_id"])
+        sql = f"SELECT project_id FROM {table} ORDER BY project_id"
+        streamed = [row async for row in srv._query_stream_async(sql, {})]
+        assert streamed == list(ch_server._query_stream(sql, {}))
+        assert len(streamed) == len(rows)
+    finally:
+        await srv._command_async(f"DROP TABLE IF EXISTS {table}")
+        await srv.aclose()
+
+
+@pytest.mark.asyncio
+@pytest.mark.disable_logging_error_check
+async def test_query_stream_async_raises_like_the_sync_stream(ch_server) -> None:
+    srv = AsyncClickHouseTraceServer(
+        host=ch_server._config.host,
+        port=ch_server._config.port,
+        database=ch_server._config.database,
+    )
+    sql = "SELECT project_id FROM table_that_does_not_exist"
+    try:
+        with pytest.raises(Exception, match="table_that_does_not_exist") as sync_err:
+            list(ch_server._query_stream(sql, {}))
+        with pytest.raises(Exception, match="table_that_does_not_exist") as async_err:
+            [row async for row in srv._query_stream_async(sql, {})]
+        assert type(async_err.value) is type(sync_err.value)
+    finally:
+        await srv.aclose()
