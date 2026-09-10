@@ -3610,7 +3610,10 @@ class TraceServerInterface(Protocol):
 
     # GenAI / Agent Observability API
     def genai_otel_export(
-        self, req: agent_types.GenAIOTelExportReq
+        self,
+        req: agent_types.GenAIOTelExportReq,
+        *,
+        enable_llm_powered_features: bool = True,
     ) -> agent_types.GenAIOTelExportRes: ...
     def agent_spans_query(
         self, req: agent_types.AgentSpansQueryReq
