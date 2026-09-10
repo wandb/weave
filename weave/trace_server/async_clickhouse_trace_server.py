@@ -231,7 +231,7 @@ class AsyncClickHouseTraceServer(ClickHouseTraceServer):
             raise GroupedQueryNotSupportedAsync()
         handler = AgentQueryHandler(self._query, self.feedback_query)
         total, rows = await handler.arun_paginated(
-            make_spans_count_query, make_spans_list_query, req, self._aquery
+            make_spans_count_query, make_spans_list_query, req, self._query_async
         )
         return ungrouped_spans_res(total, rows)
 
@@ -239,7 +239,7 @@ class AsyncClickHouseTraceServer(ClickHouseTraceServer):
     async def aagent_search(self, req: AgentSearchReq) -> AgentSearchRes:
         """Native-async twin of `agent_search`."""
         handler = AgentQueryHandler(self._query, self.feedback_query)
-        rows = await handler.arun_message_search_query(req, self._aquery)
+        rows = await handler.arun_message_search_query(req, self._query_async)
         return search_res_from_rows(rows)
 
     @tag_db_insert_path("feedback_create")
@@ -251,7 +251,7 @@ class AsyncClickHouseTraceServer(ClickHouseTraceServer):
         Keeps the sync-insert override: a caller is waiting on the write.
         """
         prepared, row = await asyncio.to_thread(self._prepare_feedback_create, req)
-        await self._ainsert(
+        await self._insert_async(
             TABLE_FEEDBACK.name,
             prepared.data,
             prepared.column_names,

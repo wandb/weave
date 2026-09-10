@@ -109,7 +109,7 @@ async def test_afeedback_create_keeps_the_sync_insert_override():
     server._prepare_feedback_create = MagicMock(
         return_value=(SimpleNamespace(data=[["x"]], column_names=["a"]), {"id": "f-1"})
     )
-    server._ainsert = AsyncMock()
+    server._insert_async = AsyncMock()
 
     with pytest.MonkeyPatch.context() as mp:
         mp.setattr(
@@ -118,4 +118,4 @@ async def test_afeedback_create_keeps_the_sync_insert_override():
         )
         await server.afeedback_create(MagicMock())
 
-    assert server._ainsert.await_args.kwargs["do_sync_insert"] is True
+    assert server._insert_async.await_args.kwargs["do_sync_insert"] is True
