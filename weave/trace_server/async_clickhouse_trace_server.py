@@ -284,7 +284,9 @@ class AsyncClickHouseTraceServer(ClickHouseTraceServer):
             raise HydratedQueryNotSupportedAsync()
         cq, settings = await asyncio.to_thread(self._build_calls_query, req)
         pb = ParamBuilder()
-        raw_res = await self._aquery(cq.as_sql(pb), pb.get_params(), settings=settings)
+        raw_res = await self._query_async(
+            cq.as_sql(pb), pb.get_params(), settings=settings
+        )
         if req.include_costs:
             # Cost query SELECT adds ORDER BY fields; result columns must match.
             select_columns = get_cost_result_columns(
@@ -318,7 +320,9 @@ class AsyncClickHouseTraceServer(ClickHouseTraceServer):
         )
         pb = ParamBuilder()
         query, columns, settings = build_calls_stats_query(req, pb, read_table)
-        raw_res = await self._aquery(query, pb.get_params(), settings=settings or None)
+        raw_res = await self._query_async(
+            query, pb.get_params(), settings=settings or None
+        )
         return calls_stats_res(raw_res, columns)
 
     async def _run_on_ch_executor(self, fn: Callable[..., _T], *args: object) -> _T:

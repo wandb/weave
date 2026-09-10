@@ -44,7 +44,9 @@ def test_acalls_query_stats_never_touches_ch_client_on_the_event_loop():
         with (
             patch.object(type(server), "ch_client", Guard()),
             patch.object(type(server), "table_routing_resolver", MagicMock()),
-            patch.object(server, "_aquery", return_value=MagicMock(result_rows=[[0]])),
+            patch.object(
+                server, "_query_async", return_value=MagicMock(result_rows=[[0]])
+            ),
             patch(
                 "weave.trace_server.async_clickhouse_trace_server.build_calls_stats_query",
                 return_value=("SELECT 1", ["count"], None),
@@ -96,7 +98,7 @@ def test_acalls_query_maps_columns_the_way_sync_does(include_costs: bool):
             patch.object(server, "_build_calls_query", return_value=(cq, None)),
             patch.object(
                 server,
-                "_aquery",
+                "_query_async",
                 return_value=MagicMock(result_rows=[list(range(len(expected)))]),
             ),
             patch(
