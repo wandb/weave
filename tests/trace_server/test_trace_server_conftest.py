@@ -4,19 +4,19 @@ from tests.trace_server.conftest_lib.trace_server_external_adapter import (
 )
 from weave.trace_server.clickhouse_trace_server_batched import ClickHouseTraceServer
 from weave.trace_server.in_memory_trace_server import InMemoryTraceServer
+from weave.trace_server.sync_facade import SyncTraceServerFacade
 
 
 def test_trace_server_fixture(request, trace_server: UserInjectingExternalTraceServer):
     assert isinstance(trace_server, UserInjectingExternalTraceServer)
     flag = get_trace_server_flag(request)
-    expected_internal_types = {
-        "fake": InMemoryTraceServer,
-        "clickhouse": ClickHouseTraceServer,
-    }
+    internal = trace_server._internal_trace_server
     # KeyError on an unrecognized backend — fail loudly rather than guess.
-    assert isinstance(
-        trace_server._internal_trace_server, expected_internal_types[flag]
-    )
+    if flag == "clickhouse":
+        assert isinstance(internal, SyncTraceServerFacade)
+        assert isinstance(internal._inner, ClickHouseTraceServer)
+    else:
+        assert isinstance(internal, {"fake": InMemoryTraceServer}[flag])
 
 
 # All instance attributes set in ClickHouseTraceServer.__init__.
@@ -54,8 +54,9 @@ def test_reset_server_state_covers_all_attrs(ch_server):
     # Only check underscore-prefixed attrs (real app state).
     # Instrumentation (ddtrace) injects public-name wrappers like
     # 'objs_query', 'file_create' etc. — ignore those.
+    server = ch_server._inner  # the facade's own __dict__ is just {"_inner"}
     actual = {
-        a for a in ch_server.__dict__ if a.startswith("_") and not a.startswith("__")
+        a for a in server.__dict__ if a.startswith("_") and not a.startswith("__")
     }
     unknown = actual - KNOWN_SERVER_ATTRS
     assert not unknown, (

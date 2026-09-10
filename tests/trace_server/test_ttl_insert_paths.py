@@ -51,7 +51,7 @@ def _clear_ttl_cache():
 @pytest.fixture
 def internal_server(trace_server):
     server = trace_server._internal_trace_server
-    assert isinstance(server, ClickHouseTraceServer)
+    assert isinstance(server._inner, ClickHouseTraceServer)
     server.table_routing_resolver._mode = CallsStorageServerMode.AUTO
     return server
 

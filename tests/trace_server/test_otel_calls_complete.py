@@ -57,7 +57,7 @@ pytestmark = pytest.mark.skipif(
 def clickhouse_trace_server(trace_server):
     """Get internal ClickHouse server with AUTO routing mode enabled."""
     internal_server = trace_server._internal_trace_server
-    assert isinstance(internal_server, ClickHouseTraceServer)
+    assert isinstance(internal_server._inner, ClickHouseTraceServer)
     internal_server.table_routing_resolver._mode = CallsStorageServerMode.AUTO
     return internal_server
 
