@@ -178,10 +178,47 @@ async def test_async_transport_round_trips_against_clickhouse(ch_server) -> None
             )
         )
         assert [row[0] for row in result.result_rows] == ["p1", "p2"]
+        blocks = await transport.query_stream(
+            ch_transport.prepare_query(
+                f"SELECT project_id FROM {table} ORDER BY project_id", {}, None, None
+            )
+        )
+        async with blocks:
+            streamed = [row[0] async for block in blocks for row in block]
+        assert streamed == ["p1", "p2"]
     finally:
         await transport.command(
             ch_transport.prepare_command(f"DROP TABLE IF EXISTS {table}", {}, None)
         )
         await transport.close()
 
-    assert transport._client is None
+    assert asyncio.get_running_loop() not in transport._clients
+
+
+def test_async_transport_keeps_one_client_per_loop(ch_server) -> None:
+    """Two loops get two sessions; one loop reuses its own; close is per loop."""
+    transport = AsyncClickHouseTransport(ch_server._config)
+
+    async def use_and_report(close: bool) -> tuple[int, bool]:
+        first = await transport.start()
+        second = await transport.start()
+        assert first is second
+        if close:
+            await transport.close()
+        return id(first), asyncio.get_running_loop() in transport._clients
+
+    loop_a = asyncio.new_event_loop()
+    loop_b = asyncio.new_event_loop()
+    try:
+        client_a, a_open = loop_a.run_until_complete(use_and_report(close=False))
+        client_b, b_open = loop_b.run_until_complete(use_and_report(close=True))
+        assert client_a != client_b
+        assert a_open is True
+        assert b_open is False
+        # Closing on loop B left loop A's session untouched.
+        assert loop_a in transport._clients
+        loop_a.run_until_complete(transport.close())
+        assert loop_a not in transport._clients
+    finally:
+        loop_a.close()
+        loop_b.close()
