@@ -30,6 +30,7 @@ from weave.trace_server.in_memory_trace_server import InMemoryTraceServer
 from weave.trace_server.parallel_bucket_uploads import BucketUploadBatch
 from weave.trace_server.project_version import project_version
 from weave.trace_server.secret_fetcher_context import secret_fetcher_context
+from weave.trace_server.sync_facade import SyncTraceServerFacade
 
 pytest_plugins = ["tests.trace_server.conftest_lib.clickhouse_server"]
 
@@ -335,7 +336,10 @@ def get_ch_trace_server(
         server._evaluate_model_dispatcher = EvaluateModelTestDispatcher(
             id_converter=id_converter
         )
-        return externalize_trace_server(server, TEST_ENTITY, id_converter=id_converter)
+        # Sync callers see the server through the facade, as production will.
+        return externalize_trace_server(
+            SyncTraceServerFacade(server), TEST_ENTITY, id_converter=id_converter
+        )
 
     return ch_trace_server_inner
 
@@ -387,14 +391,19 @@ def ch_server(request, trace_server):
     if get_trace_server_flag(request) != "clickhouse":
         pytest.skip("ClickHouse-only test")
     server = trace_server._internal_trace_server
-    assert isinstance(server, ClickHouseTraceServer)
+    assert isinstance(server, SyncTraceServerFacade)
+    assert isinstance(server._inner, ClickHouseTraceServer)
     return server
 
 
 @pytest.fixture
 def internal_server(client):
-    """Return the underlying fake or ClickHouse server from the middleware chain."""
-    for layer_type in (InMemoryTraceServer, ClickHouseTraceServer):
+    """Return the innermost sync-callable server from the middleware chain.
+
+    For ClickHouse that is the facade over `ClickHouseTraceServer`, so tests
+    keep calling methods without `await` as those methods become coroutines.
+    """
+    for layer_type in (InMemoryTraceServer, SyncTraceServerFacade):
         try:
             return find_server_layer(client.server, layer_type)
         except TypeError:
