@@ -114,17 +114,14 @@ Args:
 """
 
 
-def _get_server_info(server: TraceServerClientInterface) -> ServerInfoRes | None:
-    """Fetch server_info or return None if the server is unavailable."""
+def _get_server_info(server: TraceServerClientInterface) -> ServerInfoRes:
+    """Fetch server_info, or raise a RuntimeError naming the underlying cause."""
     try:
         return server.server_info()
-    except Exception:
-        logger.warning(
-            "Unexpected error when checking if Weave is available on the server. "
-            "Please contact support.",
-            exc_info=True,
-        )
-        return None
+    except Exception as e:
+        raise RuntimeError(
+            f"Weave is not available on the server: {e}. Please contact support."
+        ) from e
 
 
 def _setup_conversation_tracing(
@@ -291,10 +288,6 @@ def init_weave(
 
     remote_server = init_weave_get_server(credentials)
     server_info = _get_server_info(remote_server)
-    if server_info is None:
-        raise RuntimeError(
-            "Weave is not available on the server.  Please contact support."
-        )
     server: TraceServerClientInterface = remote_server
     if use_server_cache():
         server = CachingMiddlewareTraceServer.from_env(server)

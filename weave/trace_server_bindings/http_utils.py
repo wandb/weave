@@ -316,12 +316,10 @@ def check_endpoint_exists(
 ) -> bool:
     """Check if a function/endpoint exists and works by calling it with a test request.
 
-    This allows bypassing retry logic by passing the unwrapped function directly,
-    or testing any callable with consistent caching and error handling.
+    Tests any callable with consistent caching and error handling.
 
     Args:
-        func: The function to test (e.g., server.table_create_from_digests or
-              server._post_request_executor.__wrapped__)
+        func: The function to test (e.g., server.table_create_from_digests)
         test_req: A test request to use for checking the function
         cache_key: Optional cache key. If not provided, uses id(func)
 

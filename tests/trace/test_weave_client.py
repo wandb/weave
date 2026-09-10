@@ -71,7 +71,13 @@ from weave.trace_server.trace_server_interface import (
     TableQueryReq,
     TableSchemaForInsert,
 )
-from weave.trace_server_bindings.http_utils import _ENDPOINT_CACHE
+from weave.trace_server_bindings.http_utils import (
+    _ENDPOINT_CACHE,
+    ROW_COUNT_CHUNKING_THRESHOLD,
+)
+from weave.trace_server_bindings.stainless_remote_http_trace_server import (
+    StainlessRemoteHTTPTraceServer,
+)
 
 
 @pytest.mark.flaky(reruns=3, reruns_delay=0.2)
@@ -1662,6 +1668,37 @@ def test_table_partitioning(network_proxy_client, use_parallel_table_upload):
             f"Expected 2 obj_create/obj_read calls, got {len(obj_records)}"
         )
         assert len(records) == 6, f"Expected 6 total records, got {len(records)}"
+
+
+def test_parallel_chunk_probe_works_for_the_generated_client(client, monkeypatch):
+    """The probe must work for any client, not just the hand-written one.
+
+    It used to reach for `_post_request_executor`, an attribute only
+    RemoteHTTPTraceServer has, so it always answered "endpoint missing" for the
+    generated client and silently disabled parallel table upload.
+    """
+    probed: list[httpx.Request] = []
+
+    def handle(request: httpx.Request) -> httpx.Response:
+        probed.append(request)
+        return httpx.Response(
+            200, json={"digest": "d", "row_digests": []}, request=request
+        )
+
+    server = StainlessRemoteHTTPTraceServer("http://example.com")
+    server._stainless_client = server._stainless_client.copy(
+        http_client=httpx.Client(transport=httpx.MockTransport(handle))
+    )
+    monkeypatch.setattr(client, "server", server)
+    monkeypatch.setenv("WEAVE_USE_PARALLEL_TABLE_UPLOAD", "true")
+    _ENDPOINT_CACHE.discard("table_create_from_digests")
+
+    rows = [{"a": i} for i in range(ROW_COUNT_CHUNKING_THRESHOLD + 1)]
+    config = client._should_use_chunking(weave_client.Table(rows))
+
+    assert config.use_chunking is True
+    assert config.use_parallel_chunks is True
+    assert [r.url.path for r in probed] == ["/table/create_from_digests"]
 
 
 def test_summary_tokens_cost(client):
