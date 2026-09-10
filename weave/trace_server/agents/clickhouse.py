@@ -7,7 +7,6 @@ handling) and hydrates result rows into agent schemas.
 
 from __future__ import annotations
 
-import asyncio
 import datetime
 import logging
 from collections.abc import Awaitable, Callable
@@ -174,8 +173,7 @@ class AgentQueryHandler:
     participate in the same logging / ddtrace / error-handling wrapper as the
     rest of the trace server. Also takes a `feedback_query_fn` (the server's
     feedback query), awaited only when `include_feedback=True` to fold
-    agent-target feedback into the chat response. Every method is a coroutine;
-    independent reads run concurrently.
+    agent-target feedback into the chat response. Every method is a coroutine.
     """
 
     _query: QueryFn
@@ -471,7 +469,9 @@ class AgentQueryHandler:
             )
             return _rows_as_dicts(await self._query(sql, pb.get_params()))
 
-        numeric, categorical = await asyncio.gather(numeric_rows(), categorical_rows())
+        # Same reasoning as `_run_paginated`: one scan at a time.
+        numeric = await numeric_rows()
+        categorical = await categorical_rows()
 
         for row in numeric:
             key = _SpanGroupDistKey(
@@ -804,10 +804,12 @@ class AgentQueryHandler:
         count_sql = count_builder(pb, req)
         list_sql = list_builder(pb, req)
         params = pb.get_params()
-        count_res, list_res = await asyncio.gather(
-            self._query(count_sql, params), self._query(list_sql, params)
-        )
-        return _first_cell_int(count_res), _rows_as_dicts(list_res)
+        # Sequential on purpose: the list scan rides the page cache the count
+        # just warmed. Run together on a busy cluster they compete, and on QA
+        # that cost p95 on every paginated read and slowed unrelated writes.
+        total = _first_cell_int(await self._query(count_sql, params))
+        rows = _rows_as_dicts(await self._query(list_sql, params))
+        return total, rows
 
     async def _run_message_search_query(
         self, req: AgentSearchReq
