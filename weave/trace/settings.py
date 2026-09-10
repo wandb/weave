@@ -243,7 +243,7 @@ class UserSettings:
     Can be overridden with the environment variable `WEAVE_HTTP_TIMEOUT`
     """
 
-    use_stainless_server: bool = False
+    use_stainless_server: bool = True
     """
     Toggles use of the stainless-generated HTTP client for trace server communication.
 
