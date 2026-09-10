@@ -16,6 +16,14 @@ from .ttl_settings import (
     TtlSettingsResourceWithStreamingResponse,
     AsyncTtlSettingsResourceWithStreamingResponse,
 )
+from .sensitive_data_settings import (
+    SensitiveDataSettingsResource,
+    AsyncSensitiveDataSettingsResource,
+    SensitiveDataSettingsResourceWithRawResponse,
+    AsyncSensitiveDataSettingsResourceWithRawResponse,
+    SensitiveDataSettingsResourceWithStreamingResponse,
+    AsyncSensitiveDataSettingsResourceWithStreamingResponse,
+)
 from .ingest_sampling_settings import (
     IngestSamplingSettingsResource,
     AsyncIngestSamplingSettingsResource,
@@ -38,6 +46,12 @@ __all__ = [
     "AsyncIngestSamplingSettingsResourceWithRawResponse",
     "IngestSamplingSettingsResourceWithStreamingResponse",
     "AsyncIngestSamplingSettingsResourceWithStreamingResponse",
+    "SensitiveDataSettingsResource",
+    "AsyncSensitiveDataSettingsResource",
+    "SensitiveDataSettingsResourceWithRawResponse",
+    "AsyncSensitiveDataSettingsResourceWithRawResponse",
+    "SensitiveDataSettingsResourceWithStreamingResponse",
+    "AsyncSensitiveDataSettingsResourceWithStreamingResponse",
     "ProjectsResource",
     "AsyncProjectsResource",
     "ProjectsResourceWithRawResponse",
