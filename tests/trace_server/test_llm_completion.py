@@ -370,8 +370,8 @@ class TestLLMCompletionStreaming(unittest.TestCase):
         self.server = chts.ClickHouseTraceServer(host="test_host")
         mock_ch_client = MagicMock()
         mock_ch_client.query.return_value = MagicMock(result_rows=[[0, 0]])
-        # ch_client is lazy; pre-populating _thread_local.ch_client bypasses _mint_client.
-        self.server._thread_local.ch_client = mock_ch_client
+        # ch_client is lazy; pre-populating the transport's client bypasses mint().
+        self.server._transport._thread_local.client = mock_ch_client
         self.mock_secret_fetcher = MagicMock()
         self.mock_secret_fetcher.fetch.return_value = {
             "secrets": {
@@ -1387,8 +1387,8 @@ def completions_mock_server():
     server = chts.ClickHouseTraceServer(host="test_host")
     mock_ch_client = MagicMock()
     mock_ch_client.query.return_value = MagicMock(result_rows=[[0, 0]])
-    # ch_client is lazy; pre-populating _thread_local.ch_client bypasses _mint_client.
-    server._thread_local.ch_client = mock_ch_client
+    # ch_client is lazy; pre-populating the transport's client bypasses mint().
+    server._transport._thread_local.client = mock_ch_client
     return server
 
 

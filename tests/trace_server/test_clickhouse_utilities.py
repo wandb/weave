@@ -55,7 +55,7 @@ def test_insert_does_not_sanitize_successful_clean_clickhouse_write() -> None:
     mock_ch_client.insert.return_value = MagicMock()
 
     with patch.object(
-        chts.ClickHouseTraceServer, "_mint_client", return_value=mock_ch_client
+        chts.SyncClickHouseTransport, "mint", return_value=mock_ch_client
     ):
         server = chts.ClickHouseTraceServer(host="test_host")
         server._insert(
@@ -78,7 +78,7 @@ def test_insert_sanitizes_invalid_utf8_surrogates_after_encode_error() -> None:
     ]
 
     with patch.object(
-        chts.ClickHouseTraceServer, "_mint_client", return_value=mock_ch_client
+        chts.SyncClickHouseTransport, "mint", return_value=mock_ch_client
     ):
         server = chts.ClickHouseTraceServer(host="test_host")
         server._insert(
