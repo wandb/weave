@@ -127,23 +127,49 @@ For a multi-turn loop with tools, see the [custom agents quickstart](https://doc
 
 ## Function tracing
 
-`@weave.op` still traces individual functions. Those traces land in the **Calls** tab, not the Agents tab. Use it for evaluations, scorers, and non-agent pipelines.
+`@weave.op` traces a function. Those traces land in the **Calls** tab, not the Agents tab. Use it for evaluations, scorers, and LLM calls that are not an agent loop.
+
+Plain `openai` is also auto-traced into the Calls tab after `weave.init()`. `@weave.op` wraps the call in a parent function, so the OpenAI request sits under `extract_fruit`.
+
+```bash
+pip install weave openai
+```
 
 ```python
+import json
 import weave
+from openai import OpenAI
 
 weave.init("<your-team>/<your-project-name>")
 
 
 @weave.op
-def greet(name: str) -> str:
-    return name
+def extract_fruit(sentence: str) -> dict:
+    client = OpenAI()
+    response = client.chat.completions.create(
+        model="gpt-4o-mini",
+        messages=[
+            {
+                "role": "system",
+                "content": (
+                    "You will be provided with unstructured data, and your task is to parse "
+                    "it into one JSON object with fruit, color and flavor as keys."
+                ),
+            },
+            {"role": "user", "content": sentence},
+        ],
+        temperature=0.7,
+        response_format={"type": "json_object"},
+    )
+    extracted = response.choices[0].message.content
+    return json.loads(extracted)
 
 
-greet("world")
+extract_fruit(
+    "There are many fruits that were found on the recently discovered planet Goocrux. "
+    "There are neoskizzles that grow there, which are purple and taste like candy."
+)
 ```
-
-Plain `openai` auto-traces into the **Calls** tab, not the Agents tab. For the Agents tab, wrap the call with `start_llm` as above.
 
 ## Contributing
 
