@@ -6,7 +6,7 @@ import json
 import logging
 import threading
 from collections import defaultdict
-from collections.abc import Callable, Iterator, Sequence
+from collections.abc import AsyncIterator, Callable, Iterator, Sequence
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from contextlib import contextmanager
 from functools import partial
@@ -134,6 +134,7 @@ from weave.trace_server.clickhouse.schema_converters import (
 )
 from weave.trace_server.clickhouse.transport import (
     CLICKHOUSE_DEFAULT_PORT,
+    AsyncClickHouseTransport,
     ClickHouseConfig,
     SyncClickHouseTransport,
 )
@@ -413,6 +414,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             database=database,
         )
         self._transport = SyncClickHouseTransport(self._config, _CH_POOL_MANAGER)
+        self._atransport = AsyncClickHouseTransport(self._config)
         self._use_async_insert = use_async_insert
         self._use_replicated_tables = wf_env.wf_clickhouse_replicated()
         self._model_to_provider_info_map = read_model_to_provider_info_map()
@@ -7602,6 +7604,103 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             ),
         )
         migrator.apply_migrations(self._config.database)
+
+    # -- Native async transport ------------------------------------------------
+
+    async def aclose(self) -> None:
+        """Drain the aiohttp session. A worker calls this on shutdown."""
+        await self._atransport.close()
+
+    @traced(name="async_clickhouse_trace_server._query_async")
+    async def _query_async(
+        self,
+        query: str,
+        parameters: dict[str, Any],
+        column_formats: dict[str, Any] | None = None,
+        settings: dict[str, int | str] | None = None,
+    ) -> QueryResult:
+        """Native-async twin of `_query`."""
+        prepared = ch_transport.prepare_query(
+            query, parameters, column_formats, settings
+        )
+        try:
+            result = await self._atransport.query(prepared)
+        except Exception as e:
+            ch_transport.raise_query_error(prepared, e)
+        ch_transport.record_query_success(prepared, result)
+        return result
+
+    @traced_generator(name="async_clickhouse_trace_server._query_stream_async")
+    async def _query_stream_async(
+        self,
+        query: str,
+        parameters: dict[str, Any],
+        column_formats: dict[str, Any] | None = None,
+        settings: dict[str, int | str] | None = None,
+    ) -> AsyncIterator[tuple]:
+        """Native-async twin of `_query_stream`."""
+        prepared = ch_transport.prepare_query(
+            query, parameters, column_formats, settings
+        )
+        query_id = None
+        try:
+            blocks = await self._atransport.query_stream(prepared)
+            async with blocks:
+                summary = None
+                if isinstance(blocks.source, QueryResult):
+                    summary = blocks.source.summary
+                    query_id = record_query_id(blocks.source)
+                ch_transport.record_stream_success(prepared, summary, query_id)
+                async for block in blocks:
+                    for row in block:
+                        yield row
+        except Exception as e:
+            ch_transport.raise_stream_error(prepared, e, query_id)
+
+    @traced(name="async_clickhouse_trace_server._command_async")
+    async def _command_async(
+        self,
+        command: str,
+        parameters: dict[str, Any] | None = None,
+        settings: dict[str, int | str] | None = None,
+    ) -> None:
+        """Native-async twin of `_command`."""
+        prepared = ch_transport.prepare_command(command, parameters, settings)
+        try:
+            result = await self._atransport.command(prepared)
+        except Exception as e:
+            ch_transport.raise_command_error(prepared, e)
+        ch_transport.record_command_success(prepared, result)
+
+    @traced(name="async_clickhouse_trace_server._insert_async")
+    async def _insert_async(
+        self,
+        table: str,
+        data: Sequence[Sequence[Any]],
+        column_names: list[str],
+        settings: dict[str, Any] | None = None,
+        do_sync_insert: bool = False,  # overrides _use_async_insert
+    ) -> QuerySummary:
+        """Native-async twin of `_insert`."""
+        prepared = ch_transport.prepare_insert(
+            table,
+            data,
+            column_names,
+            settings,
+            do_sync_insert,
+            use_async_insert=self._use_async_insert,
+            use_replicated_tables=self._use_replicated_tables,
+        )
+        sanitized = False
+        while True:
+            try:
+                result = await self._atransport.insert(prepared)
+            except Exception as e:
+                prepared = ch_transport.insert_retry_or_raise(prepared, e, sanitized)
+                sanitized = True
+                continue
+            ch_transport.record_insert_success(prepared, result)
+            return result
 
     @traced_generator(name="clickhouse_trace_server_batched._query_stream")
     def _query_stream(
