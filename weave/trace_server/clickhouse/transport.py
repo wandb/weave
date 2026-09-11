@@ -52,6 +52,13 @@ CLICKHOUSE_SECURE_PORT = 8443
 # async analogue of the thread pool's width.
 ASYNC_CH_CONNECTOR_LIMIT = 200
 ASYNC_CH_CONNECTOR_LIMIT_PER_HOST = 100
+# Shorter than ClickHouse's HTTP keep_alive_timeout (10 s by default, and on
+# ClickHouse Cloud). aiohttp reuses a pooled connection without checking that
+# the server still holds it open, so a connection the server already closed
+# fails with ServerDisconnectedError and the driver retries on a fresh TLS
+# handshake. urllib3 probes the socket first and never pays this. Closing our
+# side earlier keeps every reused connection one the server still knows.
+ASYNC_CH_KEEPALIVE_TIMEOUT_SECONDS = 5.0
 
 
 @dataclass(frozen=True)
@@ -254,6 +261,7 @@ class AsyncClickHouseTransport:
             autogenerate_query_id=False,
             connector_limit=ASYNC_CH_CONNECTOR_LIMIT,
             connector_limit_per_host=ASYNC_CH_CONNECTOR_LIMIT_PER_HOST,
+            keepalive_timeout=ASYNC_CH_KEEPALIVE_TIMEOUT_SECONDS,
         )
         # The session exists before the database does. Anything that stops us
         # returning it -- a failed CREATE DATABASE, or cancellation -- has to
