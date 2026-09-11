@@ -90,14 +90,8 @@ class RemoteScorer(Scorer):
     outbound ``POST`` and feedback writes; it does not run by calling
     :meth:`score` in user code.
 
-    A ``RemoteScorer`` can be attached to two kinds of ``Monitor``. A monitor on
-    traced ops (``op_names=["my_op"]``) sends each selected call as a
-    ``schema_version: 1`` request with the call under ``original_call``. A
-    monitor on agent turns (``op_names=["weave.genai.turn_ended"]``) sends each
-    completed turn as a ``schema_version: 2`` request with the turn under
-    ``scoring_target``. The endpoint returns a structured score; the worker
-    records it as feedback. See ``examples/remote_scorer/README.md`` for the
-    request and response shapes.
+    A ``RemoteScorer`` can be attached to a monitor on traced ops or on agent
+    turns. See ``examples/remote_scorer/README.md`` for the request each sends.
 
     **Authentication** can be configured with ``auth_config`` using secret-store
     references only. The SDK validates URL shape only; the worker enforces
