@@ -11,7 +11,6 @@ from __future__ import annotations
 
 import asyncio
 import inspect
-import os
 import threading
 import weakref
 from collections.abc import AsyncIterator, Awaitable, Callable, Coroutine, Iterator
@@ -24,9 +23,12 @@ _T = TypeVar("_T")
 _thread_state = threading.local()
 
 # One executor for every thread loop. Each loop would otherwise grow its own
-# default executor (min(32, cpu+4) threads) for the driver's response parsing
-# and for `asyncio.to_thread`, which on a 40-thread request pool is hundreds of
-# idle threads.
+# default executor for the driver's response parsing and for `asyncio.to_thread`,
+# which on a 40-thread request pool is hundreds of idle threads. Sized to the
+# request pool, not the CPU count: the driver parses every response here, and
+# cpu+4 threads on a 1-CPU pod queued forty callers' parsing behind five
+# workers, which on QA doubled p95 on every read that returns real rows.
+SHARED_EXECUTOR_WORKERS = 64
 
 
 class _SharedExecutor(ThreadPoolExecutor):
@@ -37,7 +39,7 @@ class _SharedExecutor(ThreadPoolExecutor):
 
 
 _shared_executor = _SharedExecutor(
-    max_workers=min(32, (os.cpu_count() or 1) + 4), thread_name_prefix="sync-facade"
+    max_workers=SHARED_EXECUTOR_WORKERS, thread_name_prefix="sync-facade"
 )
 
 
