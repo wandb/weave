@@ -64,6 +64,7 @@ from .file_create_response import FileCreateResponse as FileCreateResponse
 from .object_create_params import ObjectCreateParams as ObjectCreateParams
 from .object_delete_params import ObjectDeleteParams as ObjectDeleteParams
 from .object_read_response import ObjectReadResponse as ObjectReadResponse
+from .project_stats_params import ProjectStatsParams as ProjectStatsParams
 from .table_query_response import TableQueryResponse as TableQueryResponse
 from .trace_usage_response import TraceUsageResponse as TraceUsageResponse
 from .v2_model_list_params import V2ModelListParams as V2ModelListParams
@@ -83,6 +84,7 @@ from .v2_scorer_list_params import V2ScorerListParams as V2ScorerListParams
 from .feedback_create_params import FeedbackCreateParams as FeedbackCreateParams
 from .object_create_response import ObjectCreateResponse as ObjectCreateResponse
 from .object_delete_response import ObjectDeleteResponse as ObjectDeleteResponse
+from .project_stats_response import ProjectStatsResponse as ProjectStatsResponse
 from .v2_dataset_list_params import V2DatasetListParams as V2DatasetListParams
 from .v2_model_create_params import V2ModelCreateParams as V2ModelCreateParams
 from .v2_model_delete_params import V2ModelDeleteParams as V2ModelDeleteParams
@@ -97,6 +99,7 @@ from .call_query_stats_params import CallQueryStatsParams as CallQueryStatsParam
 from .feedback_query_response import FeedbackQueryResponse as FeedbackQueryResponse
 from .feedback_replace_params import FeedbackReplaceParams as FeedbackReplaceParams
 from .feedback_stats_response import FeedbackStatsResponse as FeedbackStatsResponse
+from .file_resolve_url_params import FileResolveURLParams as FileResolveURLParams
 from .ref_read_batch_response import RefReadBatchResponse as RefReadBatchResponse
 from .v2_call_complete_params import V2CallCompleteParams as V2CallCompleteParams
 from .v2_runtime_apply_params import V2RuntimeApplyParams as V2RuntimeApplyParams
@@ -122,6 +125,7 @@ from .call_query_stats_response import CallQueryStatsResponse as CallQueryStatsR
 from .evaluation_rescore_params import EvaluationRescoreParams as EvaluationRescoreParams
 from .feedback_aggregate_params import FeedbackAggregateParams as FeedbackAggregateParams
 from .feedback_replace_response import FeedbackReplaceResponse as FeedbackReplaceResponse
+from .file_resolve_url_response import FileResolveURLResponse as FileResolveURLResponse
 from .v2_evaluation_list_params import V2EvaluationListParams as V2EvaluationListParams
 from .v2_prediction_list_params import V2PredictionListParams as V2PredictionListParams
 from .v2_runtime_apply_response import V2RuntimeApplyResponse as V2RuntimeApplyResponse
@@ -129,11 +133,13 @@ from .v2_scorer_create_response import V2ScorerCreateResponse as V2ScorerCreateR
 from .v2_scorer_delete_response import V2ScorerDeleteResponse as V2ScorerDeleteResponse
 from .call_upsert_batch_response import CallUpsertBatchResponse as CallUpsertBatchResponse
 from .completion_create_response import CompletionCreateResponse as CompletionCreateResponse
+from .dataset_source_link_params import DatasetSourceLinkParams as DatasetSourceLinkParams
 from .evaluation_status_response import EvaluationStatusResponse as EvaluationStatusResponse
 from .table_query_stats_response import TableQueryStatsResponse as TableQueryStatsResponse
 from .thread_stream_query_params import ThreadStreamQueryParams as ThreadStreamQueryParams
 from .v2_dataset_create_response import V2DatasetCreateResponse as V2DatasetCreateResponse
 from .v2_dataset_delete_response import V2DatasetDeleteResponse as V2DatasetDeleteResponse
+from .dataset_source_query_params import DatasetSourceQueryParams as DatasetSourceQueryParams
 from .evaluation_rescore_response import EvaluationRescoreResponse as EvaluationRescoreResponse
 from .feedback_aggregate_response import FeedbackAggregateResponse as FeedbackAggregateResponse
 from .v2_eval_result_query_params import V2EvalResultQueryParams as V2EvalResultQueryParams
@@ -146,11 +152,13 @@ from .v2_prediction_delete_params import V2PredictionDeleteParams as V2Predictio
 from .v2_prediction_list_response import V2PredictionListResponse as V2PredictionListResponse
 from .v2_prediction_read_response import V2PredictionReadResponse as V2PredictionReadResponse
 from .annotation_queue_read_params import AnnotationQueueReadParams as AnnotationQueueReadParams
+from .dataset_source_link_response import DatasetSourceLinkResponse as DatasetSourceLinkResponse
 from .feedback_batch_create_params import FeedbackBatchCreateParams as FeedbackBatchCreateParams
 from .service_projects_info_params import ServiceProjectsInfoParams as ServiceProjectsInfoParams
 from .thread_stream_query_response import ThreadStreamQueryResponse as ThreadStreamQueryResponse
 from .annotation_queue_query_params import AnnotationQueueQueryParams as AnnotationQueueQueryParams
 from .annotation_queue_stats_params import AnnotationQueueStatsParams as AnnotationQueueStatsParams
+from .dataset_source_query_response import DatasetSourceQueryResponse as DatasetSourceQueryResponse
 from .v2_eval_result_query_response import V2EvalResultQueryResponse as V2EvalResultQueryResponse
 from .v2_evaluation_create_response import V2EvaluationCreateResponse as V2EvaluationCreateResponse
 from .v2_evaluation_delete_response import V2EvaluationDeleteResponse as V2EvaluationDeleteResponse
@@ -167,6 +175,7 @@ from .feedback_payload_schema_params import FeedbackPayloadSchemaParams as Feedb
 from .service_projects_info_response import ServiceProjectsInfoResponse as ServiceProjectsInfoResponse
 from .table_query_stats_batch_params import TableQueryStatsBatchParams as TableQueryStatsBatchParams
 from .annotation_queue_stats_response import AnnotationQueueStatsResponse as AnnotationQueueStatsResponse
+from .completion_create_stream_params import CompletionCreateStreamParams as CompletionCreateStreamParams
 from .v2_evaluation_run_create_params import V2EvaluationRunCreateParams as V2EvaluationRunCreateParams
 from .v2_evaluation_run_delete_params import V2EvaluationRunDeleteParams as V2EvaluationRunDeleteParams
 from .v2_evaluation_run_finish_params import V2EvaluationRunFinishParams as V2EvaluationRunFinishParams
@@ -179,11 +188,18 @@ from .evaluation_evaluate_model_params import EvaluationEvaluateModelParams as E
 from .feedback_payload_schema_response import FeedbackPayloadSchemaResponse as FeedbackPayloadSchemaResponse
 from .table_create_from_digests_params import TableCreateFromDigestsParams as TableCreateFromDigestsParams
 from .table_query_stats_batch_response import TableQueryStatsBatchResponse as TableQueryStatsBatchResponse
+from .completion_create_stream_response import CompletionCreateStreamResponse as CompletionCreateStreamResponse
 from .v2_evaluation_run_create_response import V2EvaluationRunCreateResponse as V2EvaluationRunCreateResponse
 from .v2_evaluation_run_delete_response import V2EvaluationRunDeleteResponse as V2EvaluationRunDeleteResponse
 from .v2_evaluation_run_finish_response import V2EvaluationRunFinishResponse as V2EvaluationRunFinishResponse
 from .evaluation_evaluate_model_response import EvaluationEvaluateModelResponse as EvaluationEvaluateModelResponse
 from .table_create_from_digests_response import TableCreateFromDigestsResponse as TableCreateFromDigestsResponse
+from .dataset_source_source_datasets_query_params import (
+    DatasetSourceSourceDatasetsQueryParams as DatasetSourceSourceDatasetsQueryParams,
+)
+from .dataset_source_source_datasets_query_response import (
+    DatasetSourceSourceDatasetsQueryResponse as DatasetSourceSourceDatasetsQueryResponse,
+)
 
 # Rebuild cyclical models only after all modules are imported.
 # This ensures that, when building the deferred (due to cyclical references) model schema,

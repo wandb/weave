@@ -6,9 +6,9 @@ from typing import Mapping, Optional, cast
 
 import httpx
 
-from ..types import file_stats_params, file_create_params, file_content_params
+from ..types import file_stats_params, file_create_params, file_content_params, file_resolve_url_params
 from .._files import deepcopy_with_paths
-from .._types import Body, Omit, Query, Headers, NotGiven, FileTypes, omit, not_given
+from .._types import Body, Omit, Query, Headers, NotGiven, FileTypes, SequenceNotStr, omit, not_given
 from .._utils import extract_files, maybe_transform, async_maybe_transform
 from .._compat import cached_property
 from .._resource import SyncAPIResource, AsyncAPIResource
@@ -21,6 +21,7 @@ from .._response import (
 from .._base_client import make_request_options
 from ..types.file_stats_response import FileStatsResponse
 from ..types.file_create_response import FileCreateResponse
+from ..types.file_resolve_url_response import FileResolveURLResponse
 
 __all__ = ["FilesResource", "AsyncFilesResource"]
 
@@ -130,6 +131,45 @@ class FilesResource(SyncAPIResource):
                 extra_headers=extra_headers, extra_query=extra_query, extra_body=extra_body, timeout=timeout
             ),
             cast_to=object,
+        )
+
+    def resolve_url(
+        self,
+        *,
+        project_id: str,
+        uris: SequenceNotStr[str],
+        # Use the following arguments if you need to pass additional parameters to the API that aren't available via kwargs.
+        # The extra values given here take precedence over values defined on the client or passed to this method.
+        extra_headers: Headers | None = None,
+        extra_query: Query | None = None,
+        extra_body: Body | None = None,
+        timeout: float | httpx.Timeout | None | NotGiven = not_given,
+    ) -> FileResolveURLResponse:
+        """
+        Files Resolve Url
+
+        Args:
+          extra_headers: Send extra headers
+
+          extra_query: Add additional query parameters to the request
+
+          extra_body: Add additional JSON properties to the request
+
+          timeout: Override the client-level default timeout for this request, in seconds
+        """
+        return self._post(
+            "/files/resolve_url",
+            body=maybe_transform(
+                {
+                    "project_id": project_id,
+                    "uris": uris,
+                },
+                file_resolve_url_params.FileResolveURLParams,
+            ),
+            options=make_request_options(
+                extra_headers=extra_headers, extra_query=extra_query, extra_body=extra_body, timeout=timeout
+            ),
+            cast_to=FileResolveURLResponse,
         )
 
     def stats(
@@ -272,6 +312,45 @@ class AsyncFilesResource(AsyncAPIResource):
             cast_to=object,
         )
 
+    async def resolve_url(
+        self,
+        *,
+        project_id: str,
+        uris: SequenceNotStr[str],
+        # Use the following arguments if you need to pass additional parameters to the API that aren't available via kwargs.
+        # The extra values given here take precedence over values defined on the client or passed to this method.
+        extra_headers: Headers | None = None,
+        extra_query: Query | None = None,
+        extra_body: Body | None = None,
+        timeout: float | httpx.Timeout | None | NotGiven = not_given,
+    ) -> FileResolveURLResponse:
+        """
+        Files Resolve Url
+
+        Args:
+          extra_headers: Send extra headers
+
+          extra_query: Add additional query parameters to the request
+
+          extra_body: Add additional JSON properties to the request
+
+          timeout: Override the client-level default timeout for this request, in seconds
+        """
+        return await self._post(
+            "/files/resolve_url",
+            body=await async_maybe_transform(
+                {
+                    "project_id": project_id,
+                    "uris": uris,
+                },
+                file_resolve_url_params.FileResolveURLParams,
+            ),
+            options=make_request_options(
+                extra_headers=extra_headers, extra_query=extra_query, extra_body=extra_body, timeout=timeout
+            ),
+            cast_to=FileResolveURLResponse,
+        )
+
     async def stats(
         self,
         *,
@@ -315,6 +394,9 @@ class FilesResourceWithRawResponse:
         self.content = to_raw_response_wrapper(
             files.content,
         )
+        self.resolve_url = to_raw_response_wrapper(
+            files.resolve_url,
+        )
         self.stats = to_raw_response_wrapper(
             files.stats,
         )
@@ -329,6 +411,9 @@ class AsyncFilesResourceWithRawResponse:
         )
         self.content = async_to_raw_response_wrapper(
             files.content,
+        )
+        self.resolve_url = async_to_raw_response_wrapper(
+            files.resolve_url,
         )
         self.stats = async_to_raw_response_wrapper(
             files.stats,
@@ -345,6 +430,9 @@ class FilesResourceWithStreamingResponse:
         self.content = to_streamed_response_wrapper(
             files.content,
         )
+        self.resolve_url = to_streamed_response_wrapper(
+            files.resolve_url,
+        )
         self.stats = to_streamed_response_wrapper(
             files.stats,
         )
@@ -359,6 +447,9 @@ class AsyncFilesResourceWithStreamingResponse:
         )
         self.content = async_to_streamed_response_wrapper(
             files.content,
+        )
+        self.resolve_url = async_to_streamed_response_wrapper(
+            files.resolve_url,
         )
         self.stats = async_to_streamed_response_wrapper(
             files.stats,

@@ -2,7 +2,11 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock, patch
 
+import httpx
+import pytest
+
 from weave.utils import retry
+from weave.vendor.weave_server_sdk import APIStatusError
 
 
 @patch("weave.utils.retry.retry_max_attempts")
@@ -57,3 +61,34 @@ def test_retry_creates_correct_instance(mock_retrying):
 
     # Check that reraise is True
     assert call_kwargs["reraise"] is True
+
+
+@pytest.mark.parametrize(
+    ("status_code", "retryable"),
+    [
+        (400, False),
+        (401, False),
+        (403, False),
+        (404, False),
+        (422, False),
+        (429, True),
+        (500, True),
+    ],
+)
+def test_status_errors_are_classified_by_status_code(status_code, retryable):
+    """The Stainless client's error is classified like the httpx one."""
+    request = httpx.Request("POST", "http://example.com")
+    response = httpx.Response(status_code, json={}, request=request)
+
+    assert (
+        retry._is_retryable_exception(
+            APIStatusError(str(status_code), response=response, body=None)
+        )
+        is retryable
+    )
+    assert (
+        retry._is_retryable_exception(
+            httpx.HTTPStatusError(str(status_code), request=request, response=response)
+        )
+        is retryable
+    )

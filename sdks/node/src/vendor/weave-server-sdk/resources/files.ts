@@ -22,6 +22,13 @@ export class Files extends APIResource {
   }
 
   /**
+   * Files Resolve Url
+   */
+  resolveURL(body: FileResolveURLParams, options?: RequestOptions): APIPromise<FileResolveURLResponse> {
+    return this._client.post('/files/resolve_url', { body, ...options });
+  }
+
+  /**
    * Files Stats
    */
   stats(body: FileStatsParams, options?: RequestOptions): APIPromise<FileStatsResponse> {
@@ -34,6 +41,12 @@ export interface FileCreateResponse {
 }
 
 export type FileContentResponse = unknown;
+
+export interface FileResolveURLResponse {
+  download_urls: Array<string>;
+
+  expires_at?: string | null;
+}
 
 export interface FileStatsResponse {
   total_size_bytes: number;
@@ -53,6 +66,12 @@ export interface FileContentParams {
   project_id: string;
 }
 
+export interface FileResolveURLParams {
+  project_id: string;
+
+  uris: Array<string>;
+}
+
 export interface FileStatsParams {
   project_id: string;
 }
@@ -61,9 +80,11 @@ export declare namespace Files {
   export {
     type FileCreateResponse as FileCreateResponse,
     type FileContentResponse as FileContentResponse,
+    type FileResolveURLResponse as FileResolveURLResponse,
     type FileStatsResponse as FileStatsResponse,
     type FileCreateParams as FileCreateParams,
     type FileContentParams as FileContentParams,
+    type FileResolveURLParams as FileResolveURLParams,
     type FileStatsParams as FileStatsParams,
   };
 }

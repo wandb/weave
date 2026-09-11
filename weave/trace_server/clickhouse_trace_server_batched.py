@@ -7435,26 +7435,36 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         )
 
     @tag_db_insert_path("genai_otel_export")
-    def genai_otel_export(self, req: GenAIOTelExportReq) -> GenAIOTelExportRes:
+    def genai_otel_export(
+        self,
+        req: GenAIOTelExportReq,
+        *,
+        enable_llm_powered_features: bool = True,
+    ) -> GenAIOTelExportRes:
+        """Store spans and gate Insights emission on server-side LLM policy."""
         res, span_rows = AgentWriteHandler(
             self.ch_client, self._async_insert_settings(), self
         ).insert_otel_spans(req)
 
         scoring_enabled = wf_env.wf_enable_agent_scoring()
-        insights_enabled = wf_env.wf_enable_agent_insights()
+        # Agent Insights require org consent to LLM-powered features. Scoring does not:
+        # the user opts in when creating an LLM scorer.
+        insights_enabled = (
+            wf_env.wf_enable_agent_insights() and enable_llm_powered_features
+        )
         if not (scoring_enabled or insights_enabled):
             return res
 
         producer = self.kafka_producer
         for row in span_rows:
             if scoring_enabled and (
-                event := ScoreAgentSpansEvent.from_row(row, req.entity_name)
+                score_event := ScoreAgentSpansEvent.from_row(row, req.entity_name)
             ):
-                event.emit(producer)
+                score_event.emit(producer)
             if insights_enabled and (
-                event := EmbedAgentSpansEvent.from_row(row, req.entity_name)
+                insights_event := EmbedAgentSpansEvent.from_row(row, req.entity_name)
             ):
-                event.emit(producer)
+                insights_event.emit(producer)
 
         # Flush kafka producer
         if span_rows and producer:

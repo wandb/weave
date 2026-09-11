@@ -541,19 +541,14 @@ class WeaveClient:
             # Set Client project name with updated project name
             self.project = resp.project_name
 
-        self._server_call_processor: AsyncBatchProcessor | CallBatchProcessor | None = (
-            None
-        )
         self._server_feedback_processor: AsyncBatchProcessor | None = None
         # This is a short-term hack to get around the fact that we are reaching into
-        # the underlying implementation of the specific server to get the call processor.
-        # The `RemoteHTTPTraceServer` contains a call processor and we use that to control
+        # the underlying implementation of the specific server to get the feedback processor.
+        # The `RemoteHTTPTraceServer` contains a feedback processor and we use that to control
         # some client-side flushing mechanics. We should move this to the interface layer. However,
         # we don't really want the server-side implementations to need to define no-ops as that is
         # even uglier. So we are using this "hasattr" check to avoid forcing the server-side implementations
         # to define no-ops.
-        if hasattr(self.server, "get_call_processor"):
-            self._server_call_processor = self.server.get_call_processor()
         if hasattr(self.server, "get_feedback_processor"):
             self._server_feedback_processor = self.server.get_feedback_processor()
         self.send_file_cache = WeaveClientSendFileCache()
@@ -1616,7 +1611,7 @@ class WeaveClient:
         # Check if using CallBatchProcessor with non-eager mode (calls_complete path)
         # In this case, we delay printing the call link until finish_call
         uses_calls_complete_path = (
-            isinstance(self._server_call_processor, CallBatchProcessor)
+            isinstance(_get_call_processor(self.server), CallBatchProcessor)
             and not op.eager_call_start
         )
 
@@ -1841,7 +1836,7 @@ class WeaveClient:
         # after finish_call, when the complete call is queued to the batch processor.
         is_root_call = call.parent_id is None
         uses_calls_complete_path = isinstance(
-            self._server_call_processor, CallBatchProcessor
+            _get_call_processor(self.server), CallBatchProcessor
         ) and not (op is not None and op.eager_call_start)
 
         def on_end_complete(f: Future) -> None:
@@ -3096,19 +3091,10 @@ class WeaveClient:
                 project_id=self.project_id, row_digests=[]
             )
 
-            def test_func(req: TableCreateFromDigestsReq) -> Any:
-                server = self.server
-                if hasattr(server, "_next_trace_server"):
-                    server = server._next_trace_server
-
-                assert hasattr(server, "_post_request_executor")
-                assert hasattr(server._post_request_executor, "__wrapped__")
-                return server._post_request_executor.__wrapped__(
-                    server, "/table/create_from_digests", req
-                )
-
             use_parallel_chunks = check_endpoint_exists(
-                test_func, test_req, "table_create_from_digests"
+                self.server.table_create_from_digests,
+                test_req,
+                "table_create_from_digests",
             )
 
         return ChunkingConfig(
@@ -3361,8 +3347,8 @@ class WeaveClient:
             total += self.future_executor_fastlane.num_outstanding_futures
 
         # Add call batch uploads if available
-        if self._server_call_processor:
-            total += self._server_call_processor.num_outstanding_jobs
+        if call_processor := _get_call_processor(self.server):
+            total += call_processor.num_outstanding_jobs
         # Add feedback batch uploads if available
         if self._server_feedback_processor:
             total += self._server_feedback_processor.num_outstanding_jobs
@@ -3507,10 +3493,16 @@ class WeaveClient:
             self.future_executor.flush()
         if self.future_executor_fastlane:
             self.future_executor_fastlane.flush()
-        if self._server_call_processor:
-            self._server_call_processor.stop_accepting_new_work_and_flush_queue()
-            # Restart call processor processing thread after flushing
-            self._server_call_processor.accept_new_work()
+        # Draining can swap the call processor once, so drain the replacement too
+        # and restart only whichever one is still live.
+        call_processor = _get_call_processor(self.server)
+        while call_processor is not None:
+            call_processor.stop_accepting_new_work_and_flush_queue()
+            replacement = _get_call_processor(self.server)
+            if replacement is call_processor:
+                call_processor.accept_new_work()
+                break
+            call_processor = replacement
         if self._server_feedback_processor:
             self._server_feedback_processor.stop_accepting_new_work_and_flush_queue()
             # Restart feedback processor processing thread after flushing
@@ -3534,8 +3526,8 @@ class WeaveClient:
         if self.future_executor_fastlane:
             fastlane_jobs = self.future_executor_fastlane.num_outstanding_futures
         call_processor_jobs = 0
-        if self._server_call_processor:
-            call_processor_jobs = self._server_call_processor.num_outstanding_jobs
+        if call_processor := _get_call_processor(self.server):
+            call_processor_jobs = call_processor.num_outstanding_jobs
         feedback_processor_jobs = 0
         if self._server_feedback_processor:
             feedback_processor_jobs = (

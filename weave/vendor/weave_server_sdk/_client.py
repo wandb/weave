@@ -50,6 +50,7 @@ if TYPE_CHECKING:
         objects,
         threads,
         feedback,
+        projects,
         services,
         v2_calls,
         v2_models,
@@ -61,6 +62,7 @@ if TYPE_CHECKING:
         v2_runtimes,
         v2_evaluations,
         v2_predictions,
+        dataset_sources,
         v2_eval_results,
         annotation_queues,
         v2_evaluation_runs,
@@ -88,8 +90,10 @@ if TYPE_CHECKING:
     from .resources.agents.agents import AgentsResource, AsyncAgentsResource
     from .resources.v2_evaluations import V2EvaluationsResource, AsyncV2EvaluationsResource
     from .resources.v2_predictions import V2PredictionsResource, AsyncV2PredictionsResource
+    from .resources.dataset_sources import DatasetSourcesResource, AsyncDatasetSourcesResource
     from .resources.objects.objects import ObjectsResource, AsyncObjectsResource
     from .resources.v2_eval_results import V2EvalResultsResource, AsyncV2EvalResultsResource
+    from .resources.projects.projects import ProjectsResource, AsyncProjectsResource
     from .resources.v2_evaluation_runs import V2EvaluationRunsResource, AsyncV2EvaluationRunsResource
     from .resources.annotation_queues.annotation_queues import AnnotationQueuesResource, AsyncAnnotationQueuesResource
 
@@ -276,6 +280,18 @@ class WeaveTrace(SyncAPIClient):
         from .resources.images import ImagesResource
 
         return ImagesResource(self)
+
+    @cached_property
+    def projects(self) -> ProjectsResource:
+        from .resources.projects import ProjectsResource
+
+        return ProjectsResource(self)
+
+    @cached_property
+    def dataset_sources(self) -> DatasetSourcesResource:
+        from .resources.dataset_sources import DatasetSourcesResource
+
+        return DatasetSourcesResource(self)
 
     @cached_property
     def v2_ops(self) -> V2OpsResource:
@@ -632,6 +648,18 @@ class AsyncWeaveTrace(AsyncAPIClient):
         return AsyncImagesResource(self)
 
     @cached_property
+    def projects(self) -> AsyncProjectsResource:
+        from .resources.projects import AsyncProjectsResource
+
+        return AsyncProjectsResource(self)
+
+    @cached_property
+    def dataset_sources(self) -> AsyncDatasetSourcesResource:
+        from .resources.dataset_sources import AsyncDatasetSourcesResource
+
+        return AsyncDatasetSourcesResource(self)
+
+    @cached_property
     def v2_ops(self) -> AsyncV2OpsResource:
         from .resources.v2_ops import AsyncV2OpsResource
 
@@ -916,6 +944,18 @@ class WeaveTraceWithRawResponse:
         return ImagesResourceWithRawResponse(self._client.images)
 
     @cached_property
+    def projects(self) -> projects.ProjectsResourceWithRawResponse:
+        from .resources.projects import ProjectsResourceWithRawResponse
+
+        return ProjectsResourceWithRawResponse(self._client.projects)
+
+    @cached_property
+    def dataset_sources(self) -> dataset_sources.DatasetSourcesResourceWithRawResponse:
+        from .resources.dataset_sources import DatasetSourcesResourceWithRawResponse
+
+        return DatasetSourcesResourceWithRawResponse(self._client.dataset_sources)
+
+    @cached_property
     def v2_ops(self) -> v2_ops.V2OpsResourceWithRawResponse:
         from .resources.v2_ops import V2OpsResourceWithRawResponse
 
@@ -1083,6 +1123,18 @@ class AsyncWeaveTraceWithRawResponse:
         from .resources.images import AsyncImagesResourceWithRawResponse
 
         return AsyncImagesResourceWithRawResponse(self._client.images)
+
+    @cached_property
+    def projects(self) -> projects.AsyncProjectsResourceWithRawResponse:
+        from .resources.projects import AsyncProjectsResourceWithRawResponse
+
+        return AsyncProjectsResourceWithRawResponse(self._client.projects)
+
+    @cached_property
+    def dataset_sources(self) -> dataset_sources.AsyncDatasetSourcesResourceWithRawResponse:
+        from .resources.dataset_sources import AsyncDatasetSourcesResourceWithRawResponse
+
+        return AsyncDatasetSourcesResourceWithRawResponse(self._client.dataset_sources)
 
     @cached_property
     def v2_ops(self) -> v2_ops.AsyncV2OpsResourceWithRawResponse:
@@ -1254,6 +1306,18 @@ class WeaveTraceWithStreamedResponse:
         return ImagesResourceWithStreamingResponse(self._client.images)
 
     @cached_property
+    def projects(self) -> projects.ProjectsResourceWithStreamingResponse:
+        from .resources.projects import ProjectsResourceWithStreamingResponse
+
+        return ProjectsResourceWithStreamingResponse(self._client.projects)
+
+    @cached_property
+    def dataset_sources(self) -> dataset_sources.DatasetSourcesResourceWithStreamingResponse:
+        from .resources.dataset_sources import DatasetSourcesResourceWithStreamingResponse
+
+        return DatasetSourcesResourceWithStreamingResponse(self._client.dataset_sources)
+
+    @cached_property
     def v2_ops(self) -> v2_ops.V2OpsResourceWithStreamingResponse:
         from .resources.v2_ops import V2OpsResourceWithStreamingResponse
 
@@ -1421,6 +1485,18 @@ class AsyncWeaveTraceWithStreamedResponse:
         from .resources.images import AsyncImagesResourceWithStreamingResponse
 
         return AsyncImagesResourceWithStreamingResponse(self._client.images)
+
+    @cached_property
+    def projects(self) -> projects.AsyncProjectsResourceWithStreamingResponse:
+        from .resources.projects import AsyncProjectsResourceWithStreamingResponse
+
+        return AsyncProjectsResourceWithStreamingResponse(self._client.projects)
+
+    @cached_property
+    def dataset_sources(self) -> dataset_sources.AsyncDatasetSourcesResourceWithStreamingResponse:
+        from .resources.dataset_sources import AsyncDatasetSourcesResourceWithStreamingResponse
+
+        return AsyncDatasetSourcesResourceWithStreamingResponse(self._client.dataset_sources)
 
     @cached_property
     def v2_ops(self) -> v2_ops.AsyncV2OpsResourceWithStreamingResponse:

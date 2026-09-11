@@ -339,9 +339,7 @@ class ErrorRegistry:
         self.register(InvalidIdFormat, 400)
         # A malformed query value is a client request error, not an authz failure.
         self.register(BadQueryParameterError, 400)
-
-        # 403
-        self.register(QueryIllegalTypeofArgumentError, 403)
+        self.register(QueryIllegalTypeofArgumentError, 400)
 
         # 404
         self.register(NotFoundError, 404)
