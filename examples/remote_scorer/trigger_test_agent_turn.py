@@ -12,8 +12,10 @@ from weave.conversation import Message, log_turn
 
 DEFAULT_AGENT_NAME = "sample-support-agent"
 DEFAULT_SYSTEM_INSTRUCTION = "Answer the user accurately and concisely."
-DEFAULT_INPUT_TEXT = "How do I reset my password?"
-DEFAULT_OUTPUT_TEXT = "Open Settings, choose Security, then select Reset password."
+DEFAULT_INPUT_TEXT = "What are your support hours?"
+DEFAULT_OUTPUT_TEXT = (
+    "Our support team is available Monday through Friday, 9am to 5pm Eastern."
+)
 
 FLUSH_TIMEOUT_MILLISECONDS = 30_000
 
