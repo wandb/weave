@@ -128,8 +128,9 @@ for a pair you do not implement. The sample returns `400` with
 `unsupported_scoring_target_type` in the body.
 
 The `("call", 1)` payload is the same object V1 sends as `original_call`. See
-`sample_request_v2_call.json`. Weave does not send V2 for call monitors today,
-but the sample accepts it so the endpoint is ready when it does.
+`sample_request_v2_call.json`. Optional call fields such as `thread_id` are
+omitted when absent, not sent as `null`. Weave does not send V2 for call
+monitors today, but the sample accepts it so the endpoint is ready when it does.
 
 The `("agent_turn", 1)` payload describes one completed agent turn. See
 `sample_request_v2_agent_turn.json`. Its fields are:
