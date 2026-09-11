@@ -622,6 +622,27 @@ deterministic.
   ```
 - Some integrations (like instructor) may need to patch multiple libraries
 
+### Wrapping `fn` to change what an SDK receives
+
+- An `on_input_handler` shapes only what gets recorded. To change the arguments
+  that actually reach the vendor, wrap `fn` before `weave.op` sees it — see
+  `_add_stream_options` (openai) and `_unbox_inputs` (google_genai).
+- Such a wrapper must preserve the function's kind. `weave.op` dispatches on
+  `inspect.iscoroutinefunction` / `isgeneratorfunction` / `isasyncgenfunction`,
+  and `functools.wraps` carries none of them, so a plain wrapper around a
+  `*_stream` method silently moves it off the streaming path.
+- Values read out of a saved Weave object are subclasses of builtins
+  (`box.BoxedStr`, `WeaveList`). A pydantic model with `from_attributes=True`
+  and all-optional fields accepts a *subclass* as an attribute source and
+  validates to an empty model, where a bare `str` would take its own branch — so
+  the value vanishes without an error. `box.unbox` on the leaves is the fix;
+  `WeaveList`/`WeaveDict` need no special case, they subclass `list`/`dict`.
+- Unbox inside the wrapper, not earlier: `_create_call` captures the arguments
+  before `resolve_fn` runs, so the recorded inputs keep their refs.
+- `box.box` normalizes a datetime to UTC, so `unbox(box(naive))` comes back
+  aware. Round-trip equality holds for what `box` produced, not for a naive
+  input.
+
 ### Python Conversation Turn messages
 
 - `Turn.messages` stores input messages, while `Turn.output_messages` stores
