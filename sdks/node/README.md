@@ -30,10 +30,10 @@ npm install weave @openai/agents zod
 
 Put this in a file called `main.mjs`:
 
-```javascript
+```typescript
 import { randomUUID } from "node:crypto";
 import * as weave from "weave";
-import { Agent, Runner, tool } from "@openai/agents";
+import { Agent, Runner, tool, type AgentInputItem } from "@openai/agents";
 import { z } from "zod";
 
 const wikipediaSearch = tool({
@@ -57,7 +57,7 @@ const wikipediaSearch = tool({
 
     const response = await fetch(url, { headers: { "User-Agent": "weave-demo" } });
     const data = await response.json();
-    const page = Object.values(data.query.pages)[0];
+    const page = Object.values(data.query.pages)[0] as { title: string; extract: string };
     return `${page.title}: ${page.extract}`;
   },
 });
@@ -81,7 +81,7 @@ async function main() {
     "Summarize what we discussed in one sentence.",
   ];
 
-  let history = [];
+  let history: AgentInputItem[] = [];
   for (const question of questions) {
     history.push({ role: "user", content: question });
     console.log(`USER: ${question}`);
