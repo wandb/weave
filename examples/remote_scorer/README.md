@@ -297,7 +297,7 @@ curl -sS http://127.0.0.1:8000/score \
   --data @sample_request_v2_agent_turn.json
 ```
 
-Use `sample_request_v2_call.json` the same way for a V2 call request.
+Substitute `sample_request_v2_call.json` for a V2 call request.
 
 This local check only verifies the endpoint contract. It does not prove that a
 Weave deployment can reach a loopback URL.
