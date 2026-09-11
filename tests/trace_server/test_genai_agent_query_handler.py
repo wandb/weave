@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 from dataclasses import dataclass
 from typing import Any
 
@@ -10,7 +11,11 @@ from weave.trace_server.agents.types import (
     AgentSpansQueryReq,
     AgentSpanValueRef,
 )
-from weave.trace_server.trace_server_interface import FeedbackQueryRes
+from weave.trace_server.trace_server_interface import FeedbackQueryReq, FeedbackQueryRes
+
+
+async def _no_feedback(req: FeedbackQueryReq) -> FeedbackQueryRes:
+    return FeedbackQueryRes(result=[], total_count=0)
 
 
 @dataclass
@@ -125,15 +130,13 @@ def test_group_distributions_are_hydrated_with_batched_queries() -> None:
     ]
     calls: list[tuple[str, dict[str, Any]]] = []
 
-    def query(sql: str, params: dict[str, Any]) -> _FakeQueryResult:
+    async def query(sql: str, params: dict[str, Any]) -> _FakeQueryResult:
         calls.append((sql, params))
         return results.pop(0)
 
-    handler = AgentQueryHandler(
-        query, lambda req: FeedbackQueryRes(result=[], total_count=0)
-    )
+    handler = AgentQueryHandler(query, _no_feedback)
 
-    res = handler.spans_query(req)
+    res = asyncio.run(handler.spans_query(req))
 
     assert len(calls) == 6
     assert not results
@@ -222,14 +225,12 @@ def test_grouped_rows_hydrate_message_previews() -> None:
     ]
     calls: list[str] = []
 
-    def query(sql: str, params: dict[str, Any]) -> _FakeQueryResult:
+    async def query(sql: str, params: dict[str, Any]) -> _FakeQueryResult:
         calls.append(sql)
         return results.pop(0)
 
-    handler = AgentQueryHandler(
-        query, lambda req: FeedbackQueryRes(result=[], total_count=0)
-    )
-    res = handler.spans_query(req)
+    handler = AgentQueryHandler(query, _no_feedback)
+    res = asyncio.run(handler.spans_query(req))
 
     # 3 queries: count, grouped list, bounded preview. The grouped list query
     # never reads the wide message columns; the preview is scoped by conversation_id.

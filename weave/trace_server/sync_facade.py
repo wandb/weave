@@ -12,7 +12,9 @@ from __future__ import annotations
 import asyncio
 import inspect
 import threading
-from collections.abc import AsyncIterator, Callable, Coroutine, Iterator
+import weakref
+from collections.abc import AsyncIterator, Awaitable, Callable, Coroutine, Iterator
+from concurrent.futures import ThreadPoolExecutor
 from functools import wraps
 from typing import Any, TypeVar
 
@@ -20,14 +22,72 @@ _T = TypeVar("_T")
 
 _thread_state = threading.local()
 
+# One executor for every thread loop. Each loop would otherwise grow its own
+# default executor for the driver's response parsing and for `asyncio.to_thread`,
+# which on a 40-thread request pool is hundreds of idle threads. Sized to the
+# request pool, not the CPU count: the driver parses every response here, and
+# cpu+4 threads on a 1-CPU pod queued forty callers' parsing behind five
+# workers, which on QA doubled p95 on every read that returns real rows.
+SHARED_EXECUTOR_WORKERS = 64
+
+
+class _SharedExecutor(ThreadPoolExecutor):
+    def shutdown(self, wait: bool = True, *, cancel_futures: bool = False) -> None:
+        # `loop.close()` shuts down the loop's default executor; this one is
+        # shared by every thread loop and outlives all of them.
+        pass
+
+
+_shared_executor = _SharedExecutor(
+    max_workers=SHARED_EXECUTOR_WORKERS, thread_name_prefix="sync-facade"
+)
+
+
+# Every thread loop ever created, with a weak ref to its thread. Pool threads
+# (Starlette's, anyio's) exit when idle and take their thread-local slot with
+# them, but not the loop or the aiohttp session opened on it. `reap_dead_loops`
+# closes those from whichever thread calls next.
+_loops: dict[int, tuple[weakref.ref[threading.Thread], asyncio.AbstractEventLoop]] = {}
+_loops_lock = threading.Lock()
+
 
 def thread_loop() -> asyncio.AbstractEventLoop:
     """The calling thread's private event loop, created on first use."""
     loop: asyncio.AbstractEventLoop | None = getattr(_thread_state, "loop", None)
     if loop is None or loop.is_closed():
         loop = asyncio.new_event_loop()
+        loop.set_default_executor(_shared_executor)
         _thread_state.loop = loop
+        with _loops_lock:
+            _loops[id(loop)] = (weakref.ref(threading.current_thread()), loop)
     return loop
+
+
+def reap_dead_loops(closer: Callable[[], Awaitable[None]] | None = None) -> int:
+    """Close loops whose thread has exited. Returns how many were closed.
+
+    `closer` runs on each dead loop first, so a server can drain the aiohttp
+    session that belongs to that loop; a loop that is not running may be driven
+    from any thread.
+    """
+    with _loops_lock:
+        dead = [
+            (key, loop)
+            for key, (thread_ref, loop) in _loops.items()
+            if (thread := thread_ref()) is None or not thread.is_alive()
+        ]
+        for key, _ in dead:
+            del _loops[key]
+    for _, loop in dead:
+        if loop.is_closed():
+            continue
+        try:
+            if closer is not None:
+                loop.run_until_complete(closer())
+            loop.run_until_complete(loop.shutdown_asyncgens())
+        finally:
+            loop.close()
+    return len(dead)
 
 
 def close_thread_loop() -> None:
@@ -35,8 +95,10 @@ def close_thread_loop() -> None:
     loop: asyncio.AbstractEventLoop | None = getattr(_thread_state, "loop", None)
     if loop is not None and not loop.is_closed():
         loop.run_until_complete(loop.shutdown_asyncgens())
-        loop.run_until_complete(loop.shutdown_default_executor())
+        # The default executor is shared; it outlives any one loop.
         loop.close()
+    with _loops_lock:
+        _loops.pop(id(loop), None)
     _thread_state.loop = None
 
 
@@ -51,10 +113,22 @@ def _refuse_inside_running_loop() -> None:
     )
 
 
-def run_sync(coro: Coroutine[Any, Any, _T]) -> _T:
-    """Run `coro` to completion on the calling thread's loop."""
+def run_sync(awaitable: Awaitable[_T]) -> _T:
+    """Run `awaitable` to completion on the calling thread's loop."""
     _refuse_inside_running_loop()
-    return thread_loop().run_until_complete(coro)
+    return thread_loop().run_until_complete(awaitable)
+
+
+def resolve(value: _T | Awaitable[_T]) -> _T:
+    """Return `value`, running it first if it is awaitable.
+
+    For a blocking body that calls a sibling which may already be a coroutine,
+    or may be reached through the facade and already resolved. Goes away when
+    the caller itself becomes a coroutine.
+    """
+    if inspect.isawaitable(value):
+        return run_sync(value)
+    return value
 
 
 def iterate_sync(agen: AsyncIterator[_T]) -> Iterator[_T]:
@@ -98,26 +172,35 @@ class SyncTraceServerFacade:
     def __getattr__(self, name: str) -> Any:
         attr = getattr(self._inner, name)
         if inspect.iscoroutinefunction(attr):
-            return _sync_call(attr)
+            return _sync_call(attr, self._reap)
         if inspect.isasyncgenfunction(attr):
-            return _sync_iterate(attr)
+            return _sync_iterate(attr, self._reap)
         return attr
 
+    def _reap(self) -> None:
+        reap_dead_loops(getattr(self._inner, "aclose", None))
 
-def _sync_call(fn: Callable[..., Coroutine[Any, Any, _T]]) -> Callable[..., _T]:
+
+def _sync_call(
+    fn: Callable[..., Coroutine[Any, Any, _T]], before: Callable[[], None]
+) -> Callable[..., _T]:
     @wraps(fn)
     def call(*args: Any, **kwargs: Any) -> _T:
         # Refuse before creating the coroutine, or it is never awaited.
         _refuse_inside_running_loop()
+        before()
         return thread_loop().run_until_complete(fn(*args, **kwargs))
 
     return call
 
 
-def _sync_iterate(fn: Callable[..., AsyncIterator[_T]]) -> Callable[..., Iterator[_T]]:
+def _sync_iterate(
+    fn: Callable[..., AsyncIterator[_T]], before: Callable[[], None]
+) -> Callable[..., Iterator[_T]]:
     @wraps(fn)
     def iterate(*args: Any, **kwargs: Any) -> Iterator[_T]:
         _refuse_inside_running_loop()
+        before()
         return iterate_sync(fn(*args, **kwargs))
 
     return iterate

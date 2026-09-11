@@ -11,7 +11,11 @@ from unittest.mock import patch
 import pytest
 
 from weave.trace_server import sync_facade
-from weave.trace_server.sync_facade import SyncTraceServerFacade, close_thread_loop
+from weave.trace_server.sync_facade import (
+    SyncTraceServerFacade,
+    close_thread_loop,
+    resolve,
+)
 
 _request_tag: contextvars.ContextVar[str] = contextvars.ContextVar("tag", default="")
 
@@ -19,6 +23,7 @@ _request_tag: contextvars.ContextVar[str] = contextvars.ContextVar("tag", defaul
 class FakeAsyncServer:
     def __init__(self) -> None:
         self.loops: list[asyncio.AbstractEventLoop] = []
+        self.closed_on: list[asyncio.AbstractEventLoop] = []
         self.closed_streams = 0
         self.plain = "attribute"
 
@@ -40,6 +45,9 @@ class FakeAsyncServer:
 
     async def boom(self) -> None:
         raise ValueError("boom")
+
+    async def aclose(self) -> None:
+        self.closed_on.append(asyncio.get_running_loop())
 
     def sync_method(self) -> str:
         return "sync"
@@ -127,7 +135,7 @@ def test_facade_defines_no_server_methods() -> None:
     own = {
         name
         for name, value in vars(SyncTraceServerFacade).items()
-        if callable(value) and not name.startswith("__")
+        if callable(value) and not name.startswith("_")
     }
     assert own == set()
 
@@ -139,3 +147,54 @@ def test_close_thread_loop_then_reuse(facade: SyncTraceServerFacade) -> None:
     assert first.is_closed()
     assert facade.read(2) == 4
     assert sync_facade.thread_loop() is not first
+
+
+def test_resolve_accepts_a_value_or_an_awaitable() -> None:
+    async def later() -> int:
+        return 3
+
+    assert resolve(3) == 3
+    assert resolve(later()) == 3
+    close_thread_loop()
+
+
+def test_thread_loops_share_one_default_executor() -> None:
+    seen: list[str] = []
+
+    async def where() -> None:
+        seen.append(await asyncio.to_thread(lambda: threading.current_thread().name))
+
+    def run() -> None:
+        sync_facade.run_sync(where())
+        close_thread_loop()
+
+    threads = [threading.Thread(target=run) for _ in range(3)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+    assert all(name.startswith("sync-facade") for name in seen), seen
+
+
+def test_dead_threads_loops_are_reaped_and_their_sessions_closed(
+    facade: SyncTraceServerFacade,
+) -> None:
+    """A pool thread exits without closing its loop; the next caller cleans up,
+    running the server's aclose on the orphaned loop so its aiohttp session is
+    drained on the loop that owns it.
+    """
+    orphan: dict[str, asyncio.AbstractEventLoop] = {}
+
+    def use_and_exit() -> None:
+        facade.read(1)
+        orphan["loop"] = sync_facade.thread_loop()
+
+    t = threading.Thread(target=use_and_exit)
+    t.start()
+    t.join()
+    assert not orphan["loop"].is_closed()
+
+    facade.read(2)  # any bridged call reaps
+    assert orphan["loop"].is_closed()
+    # Other tests' exited threads may be reaped in the same sweep.
+    assert orphan["loop"] in facade._inner.closed_on
