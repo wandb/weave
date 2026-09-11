@@ -130,8 +130,8 @@ the envelope first and scoring the payload second, as `extract_scoring_target`
 in `scoring_logic.py` does. Call monitors send V1 today.
 
 The `("agent_turn", 1)` payload describes one completed agent turn.
-`sample_request_v2_agent_turn.json` shows every field. Two things the sample
-cannot show:
+`sample_request_v2_agent_turn.json` shows every field. What the sample cannot
+show:
 
 - Eight fields are `null` when the trace did not record them:
   `operation_name`, the three under `agent`, the two under `conversation`,
