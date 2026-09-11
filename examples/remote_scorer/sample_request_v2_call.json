@@ -16,8 +16,7 @@
       "output": {
         "reply": "received: test message for scoring",
         "status": "ok"
-      },
-      "thread_id": null
+      }
     }
   },
   "scoring_call_id": "018f8d6c-8d5f-7000-8000-000000000003",

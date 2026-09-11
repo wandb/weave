@@ -107,6 +107,8 @@ Every request carries these top-level fields:
   set on the `RemoteScorer`, passed through unchanged.
 - `triggered_at`: optional ISO 8601 timestamp.
 
+An optional field with no value is omitted, not sent as `null`.
+
 **V1** puts the scored call at the top level under `original_call`. See
 `sample_request.json`. Call monitors send V1 today.
 
