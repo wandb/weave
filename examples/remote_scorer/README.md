@@ -133,7 +133,7 @@ The `("agent_turn", 1)` payload describes one completed agent turn.
 `sample_request_v2_agent_turn.json` shows every field. Two things the sample
 cannot show:
 
-- Eight fields are `null` when the client did not record them:
+- Eight fields are `null` when the trace did not record them:
   `operation_name`, the three under `agent`, the two under `conversation`,
   and `status.message` and `status.error_type`. Every other field always has
   a value. The `messages` lists are `[]` when the trace has no messages of
