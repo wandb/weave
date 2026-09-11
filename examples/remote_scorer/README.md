@@ -129,23 +129,14 @@ wrapper differs. Because of that, one endpoint can accept both by unwrapping
 the envelope first and scoring the payload second, as `extract_scoring_target`
 in `scoring_logic.py` does. Call monitors send V1 today.
 
-The `("agent_turn", 1)` payload describes one completed agent turn. See
-`sample_request_v2_agent_turn.json`. Its fields are:
+The `("agent_turn", 1)` payload describes one completed agent turn.
+`sample_request_v2_agent_turn.json` shows every field. Two things the sample
+cannot show:
 
-- `event_type`: always `"weave.genai.turn_ended"`.
-- `project_id`: `entity/project` of the turn.
-- `trace_id` and `span_id`: the trace that holds the turn and the root span
-  that ended it. Weave records feedback against the turn using `trace_id`.
-- `span_name`, `operation_name`, `started_at`, `ended_at`: span metadata. Each
-  may be `null`.
-- `conversation`: `id` and `name`, each possibly `null`.
-- `agent`: `name`, `version`, and `description`, each possibly `null`.
-- `status`: `code`, `message`, and `error_type`, each possibly `null`.
-- `messages`: `system_instructions` (a list of strings), `input`, and `output`.
-  `input` and `output` are lists of messages with `role`, `content`, and
-  `finish_reason`. `content` is plain text, or a JSON-encoded array of parts
-  when the message carried structured content such as tool calls. Lists are
-  always present and may be empty.
+- Every field is present and no value is `null`. A string Weave did not
+  record is `""`, and a list with nothing in it is `[]`.
+- A message `content` is plain text, or a JSON-encoded array of parts when the
+  message carried structured content such as tool calls.
 
 Weave may add optional fields to any version without changing its number, so
 ignore fields you do not recognize. A field is removed, renamed, or changed in
