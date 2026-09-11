@@ -150,8 +150,8 @@ new top-level `schema_version` for envelope changes.
 
 Weave removes internal references and rejects media before it sends a request.
 Payloads contain JSON text only, never images, audio, or video. Request and
-response bodies are each limited to 1 MiB. A target that cannot be represented
-within those rules fails to score and is not sent.
+response bodies are each limited to 1 MiB. A target that breaks those rules is
+not sent, so it is not scored.
 
 The request carries no W&B credential and no feedback identity. The bearer
 token authenticates Weave to your endpoint, not the reverse. Your endpoint
