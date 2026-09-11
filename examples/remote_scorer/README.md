@@ -148,7 +148,6 @@ new top-level `schema_version` for envelope changes.
 
 ### Request content
 
-Weave removes internal references and rejects media before it sends a request.
 Payloads contain JSON text only, never images, audio, or video. Request and
 response bodies are each limited to 1 MiB. A target that breaks those rules is
 not sent, so it is not scored.
