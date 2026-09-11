@@ -2,13 +2,13 @@
 
 One endpoint accepts every request shape Weave can send:
 
-- ``schema_version: 1`` wraps a call under ``original_call``.
-- ``schema_version: 2`` wraps a ``scoring_target`` union whose ``type`` and
-  inner ``schema_version`` select the payload. Call monitors and agent-turn
+- schema_version 1 wraps a call under 'original_call'.
+- schema_version 2 wraps a 'scoring_target' union whose 'type' and inner
+  'schema_version' select the payload. Call monitors and agent-turn
   monitors share this envelope.
 
-Dispatch first on the top-level ``schema_version``, then on the pair
-``(scoring_target.type, scoring_target.schema_version)``. A new target type
+Dispatch first on the top-level schema_version, then on the pair
+(scoring_target.type, scoring_target.schema_version). A new target type
 extends the V2 union and starts at inner schema version 1, so an endpoint
 should reject a pair it does not implement instead of guessing.
 """
@@ -42,10 +42,10 @@ def read_schema_version(request_body: dict[str, Any]) -> int:
 def extract_scoring_target(
     request_body: dict[str, Any],
 ) -> tuple[str, int, dict[str, Any]]:
-    """Return ``(type, schema_version, payload)`` for either envelope version.
+    """Return (type, schema_version, payload) for either envelope version.
 
-    V1 has no ``scoring_target`` field; its ``original_call`` is the same
-    payload V2 carries as the ``("call", 1)`` target.
+    V1 has no 'scoring_target' field; its 'original_call' is the same
+    payload V2 carries as the ("call", 1) target.
     """
     schema_version = read_schema_version(request_body)
 
@@ -84,7 +84,7 @@ def score_remote_request(request_body: dict[str, Any]) -> list[dict[str, Any]]:
 
 
 def score_call(original_call: dict[str, Any]) -> list[dict[str, Any]]:
-    """Score a traced call by the length of its ``inputs.message``."""
+    """Score a traced call by the length of its inputs.message value."""
     inputs = original_call.get("inputs", {})
     message = inputs.get("message", "") if isinstance(inputs, dict) else ""
     return score_text_length(message if isinstance(message, str) else "")
@@ -93,8 +93,8 @@ def score_call(original_call: dict[str, Any]) -> list[dict[str, Any]]:
 def score_agent_turn(agent_turn: dict[str, Any]) -> list[dict[str, Any]]:
     """Score an agent turn by the length of its last assistant output message.
 
-    ``messages.output`` lists the normalized messages the agent produced during
-    the turn. ``content`` is plain text, or a JSON-encoded array of parts when
+    messages.output lists the normalized messages the agent produced during
+    the turn. Each 'content' is plain text, or a JSON-encoded array of parts when
     the message carried structured content. This sample treats both as text.
     """
     messages = agent_turn.get("messages", {})
@@ -109,7 +109,7 @@ def score_agent_turn(agent_turn: dict[str, Any]) -> list[dict[str, Any]]:
 
 
 def score_text_length(text: str) -> list[dict[str, Any]]:
-    """Return one numeric rating and one tag describing how concise ``text`` is.
+    """Return one numeric rating and one tag describing how concise the text is.
 
     Replace this with your real policy, model, or business logic. It is
     deliberately independent of FastAPI so it can be copied into another service
