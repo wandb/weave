@@ -23,8 +23,8 @@
       },
       "status": {
         "code": "OK",
-        "message": "",
-        "error_type": ""
+        "message": null,
+        "error_type": null
       },
       "messages": {
         "system_instructions": [
