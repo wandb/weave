@@ -48,9 +48,8 @@ addresses are rejected.
 
 - `remote_scorer_app.py`: minimal FastAPI adapter with `GET /health` and
   `POST /score`.
-- `scoring_logic.py`: framework-independent scoring logic that dispatches on
-  the request version and scoring target. It can be copied into another web
-  framework or language.
+- `scoring_logic.py`: framework-independent scoring logic that can be copied
+  into another web framework or language.
 - `auth.py`: dev-only bearer-token validator stub.
 - `register_remote_scorer.py`: publishes a `RemoteScorer` and activates a
   `Monitor` for a traced op or for agent turns.
@@ -95,14 +94,11 @@ If the scorer performs side effects or writes to a downstream system, use
 `Idempotency-Key` to deduplicate repeated attempts. The key is stable for one
 request version; a V1 and a V2 request for the same call carry different keys.
 
-Weave does not follow redirects, and it times out requests that take too long.
-Return the score directly from the URL you registered.
-
 ### Request versions
 
 Every request carries these top-level fields:
 
-- `schema_version`: integer, `1` or `2`.
+- `schema_version`: integer, currently `1` or `2`.
 - `scoring_call_id` and `scoring_trace_id`: identifiers for this scoring
   attempt.
 - `monitor`: `name` and `version_digest` of the monitor that selected the
@@ -127,9 +123,11 @@ Dispatch on the top-level `schema_version` first, then on the pair
 for a pair you do not implement. The sample returns `400` with
 `unsupported_scoring_target_type` in the body.
 
-The `("call", 1)` payload is the same object V1 sends as `original_call`. See
-`sample_request_v2_call.json`. Weave does not send V2 for call monitors today,
-but the sample accepts it so the endpoint is ready when it does.
+The `("call", 1)` payload is the same object V1 sends as `original_call`.
+Compare `sample_request.json` with `sample_request_v2_call.json`: only the
+wrapper differs. Because of that, one endpoint can accept both by unwrapping
+the envelope first and scoring the payload second, as `extract_scoring_target`
+in `scoring_logic.py` does. Call monitors send V1 today.
 
 The `("agent_turn", 1)` payload describes one completed agent turn. See
 `sample_request_v2_agent_turn.json`. Its fields are:
@@ -231,7 +229,8 @@ changes:
 ### Errors
 
 Weave treats a non-200 response as a scorer failure and records no feedback
-for that attempt. A `5xx`, `408`, or `429` response, or a timeout, is retried
+for that attempt. Weave does not follow redirects, so a redirect is also a
+failure. A `5xx`, `408`, or `429` response, or a timeout, is retried
 a limited number of times. Any other `4xx` is not retried, so return `4xx` for
 requests you will never accept and `5xx` for temporary problems. The response
 body of an error is for your logs; Weave does not parse it.
