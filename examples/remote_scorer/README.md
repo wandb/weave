@@ -133,8 +133,11 @@ The `("agent_turn", 1)` payload describes one completed agent turn.
 `sample_request_v2_agent_turn.json` shows every field. Two things the sample
 cannot show:
 
-- Every field is present and no value is `null`. A string Weave did not
-  record is `""`, and a list with nothing in it is `[]`.
+- Eight fields are `null` when the client did not record them:
+  `operation_name`, the three under `agent`, the two under `conversation`,
+  and `status.message` and `status.error_type`. Every other field always has
+  a value. The `messages` lists are `[]` when the trace has no messages of
+  that kind.
 - A message `content` is plain text, or a JSON-encoded array of parts when the
   message carried structured content such as tool calls.
 
