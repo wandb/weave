@@ -22,7 +22,7 @@
         "description": "Answers support questions"
       },
       "status": {
-        "code": "OK",
+        "code": "UNSET",
         "message": null,
         "error_type": null
       },

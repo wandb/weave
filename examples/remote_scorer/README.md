@@ -142,7 +142,10 @@ The `("agent_turn", 1)` payload describes one completed agent turn. See
   may be `null`.
 - `conversation`: `id` and `name`, each possibly `null`.
 - `agent`: `name`, `version`, and `description`, each possibly `null`.
-- `status`: `code`, `message`, and `error_type`, each possibly `null`.
+- `status`: `code`, `message`, and `error_type`. `code` is `"UNSET"`, `"OK"`,
+  or `"ERROR"`. A turn logged without an explicit status arrives as `"UNSET"`,
+  so treat `"UNSET"` as a normal completed turn and `"ERROR"` as the failure
+  signal. `message` and `error_type` may be `null`.
 - `messages`: `system_instructions` (a list of strings), `input`, and `output`.
   `input` and `output` are lists of messages with `role`, `content`, and
   `finish_reason`. `content` is plain text, or a JSON-encoded array of parts
