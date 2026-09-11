@@ -22,7 +22,7 @@
         "description": "Answers support questions"
       },
       "status": {
-        "code": "OK",
+        "code": "UNSET",
         "message": null,
         "error_type": null
       },
@@ -33,14 +33,14 @@
         "input": [
           {
             "role": "user",
-            "content": "How do I reset my password?",
+            "content": "What are your support hours?",
             "finish_reason": ""
           }
         ],
         "output": [
           {
             "role": "assistant",
-            "content": "Open Settings, choose Security, then select Reset password.",
+            "content": "Our support team is available Monday through Friday, 9am to 5pm Eastern.",
             "finish_reason": "stop"
           }
         ]

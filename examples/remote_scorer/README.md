@@ -138,6 +138,9 @@ cannot show:
   and `status.message` and `status.error_type`. Every other field always has
   a value. The `messages` lists are `[]` when the trace has no messages of
   that kind.
+- `status.code` is `"UNSET"`, `"OK"`, or `"ERROR"`. A turn that ends without
+  an explicit status arrives as `"UNSET"`, so treat `"UNSET"` as a normal
+  completed turn and `"ERROR"` as the failure signal.
 - A message `content` is plain text, or a JSON-encoded array of parts when the
   message carried structured content such as tool calls.
 
@@ -215,7 +218,7 @@ changes:
 ```json
 {
   "schema_version": 2,
-  "result": {"value": "concise", "reason": "59 characters.", "confidence": 0.9}
+  "result": {"value": "concise", "reason": "72 characters.", "confidence": 0.9}
 }
 ```
 
@@ -382,8 +385,8 @@ After registering a monitor with `--agent-turn`, run:
 ```bash
 python trigger_test_agent_turn.py \
   --project entity/project \
-  --input "How do I reset my password?" \
-  --output "Open Settings, choose Security, then select Reset password."
+  --input "What are your support hours?" \
+  --output "Our support team is available Monday through Friday, 9am to 5pm Eastern."
 ```
 
 The script logs one completed turn with `weave.conversation.log_turn`. The
