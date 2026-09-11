@@ -231,10 +231,16 @@ changes:
 ### Errors
 
 Weave treats a non-200 response as a scorer failure and records no feedback
-for that attempt. A `5xx`, `408`, or `429` response, or a timeout, is retried
-a limited number of times. Any other `4xx` is not retried, so return `4xx` for
-requests you will never accept and `5xx` for temporary problems. The response
-body of an error is for your logs; Weave does not parse it.
+for that attempt. Retries depend on the request version:
+
+- A V2 agent-turn request that gets a `5xx`, `408`, or `429` response, or
+  times out, is sent again with the same `Idempotency-Key`, up to three
+  attempts within about 30 seconds.
+- A V1 call request is sent once. No response or timeout is retried.
+
+In both versions, any other `4xx` is not retried, so return `4xx` for requests
+you will never accept and `5xx` for temporary problems. The response body of
+an error is for your logs; Weave does not parse it.
 
 ## Auth
 
