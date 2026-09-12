@@ -622,6 +622,14 @@ class CallsQueryReq(BaseModelStrict):
     filter: CallsFilter | None = None
     limit: int | None = None
     offset: int | None = None
+    latest_only: bool = Field(
+        default=False,
+        description=(
+            "If true, collapse multiple physical versions of each call before "
+            "applying filters. This provides current logical-row semantics for "
+            "calls_complete reads while ReplacingMergeTree merges are pending."
+        ),
+    )
     # Sort by multiple fields
     sort_by: list[SortBy] | None = None
     query: Query | None = None

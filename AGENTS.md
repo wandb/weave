@@ -182,6 +182,14 @@ If `sdks/node/node_modules` is missing, run `pnpm install --frozen-lockfile` in 
   ClickHouse backend. Build inputs with the real APIs
   (`obj_create`, `table_create`, etc.). Mock only external services we don't own.
 
+### Current logical calls
+
+- `calls_complete` uses `ReplacingMergeTree(created_at)`, so more than one
+  physical version of a call can remain visible until background merges run.
+- Set `CallsQueryReq.latest_only=True` when correctness requires filtering the
+  current logical version. It enables ClickHouse `FINAL` for that request, so
+  use it for bounded correctness-sensitive reads rather than broad list scans.
+
 ### Assert on the complete payload (no substring / membership checks)
 
 Assert on the **full value**, not that a fragment appears somewhere inside a
