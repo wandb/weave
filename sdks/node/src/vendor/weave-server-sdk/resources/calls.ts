@@ -799,6 +799,13 @@ export interface CallStreamQueryParams {
   include_usernames?: boolean | null;
 
   /**
+   * Body param: If true, collapse multiple physical versions of each call before
+   * applying filters. This provides current logical-row semantics for calls_complete
+   * reads while ReplacingMergeTree merges are pending.
+   */
+  latest_only?: boolean;
+
+  /**
    * Body param
    */
   limit?: number | null;
