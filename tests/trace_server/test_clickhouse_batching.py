@@ -21,8 +21,8 @@ from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.base64_content_conversion import AUTO_CONVERSION_MIN_SIZE
 from weave.trace_server.clickhouse_trace_server_batched import (
     ClickHouseTraceServer,
-    _WriteBatch,
     SyncClickHouseTransport,
+    _WriteBatch,
 )
 from weave.trace_server.errors import (
     InvalidRequest,
