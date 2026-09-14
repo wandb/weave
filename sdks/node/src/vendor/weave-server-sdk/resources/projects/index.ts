@@ -7,6 +7,11 @@ export {
 } from './ingest-sampling-settings';
 export { Projects, type ProjectStatsResponse, type ProjectStatsParams } from './projects';
 export {
+  SensitiveDataSettings,
+  type SensitiveDataSettingReadResponse,
+  type SensitiveDataSettingReadParams,
+} from './sensitive-data-settings';
+export {
   TtlSettings,
   type TtlSettingUpdateResponse,
   type TtlSettingReadResponse,

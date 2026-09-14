@@ -7,6 +7,12 @@ import {
   IngestSamplingSettingReadResponse,
   IngestSamplingSettings,
 } from './ingest-sampling-settings';
+import * as SensitiveDataSettingsAPI from './sensitive-data-settings';
+import {
+  SensitiveDataSettingReadParams,
+  SensitiveDataSettingReadResponse,
+  SensitiveDataSettings,
+} from './sensitive-data-settings';
 import * as TtlSettingsAPI from './ttl-settings';
 import {
   TtlSettingReadParams,
@@ -22,6 +28,8 @@ export class Projects extends APIResource {
   ttlSettings: TtlSettingsAPI.TtlSettings = new TtlSettingsAPI.TtlSettings(this._client);
   ingestSamplingSettings: IngestSamplingSettingsAPI.IngestSamplingSettings =
     new IngestSamplingSettingsAPI.IngestSamplingSettings(this._client);
+  sensitiveDataSettings: SensitiveDataSettingsAPI.SensitiveDataSettings =
+    new SensitiveDataSettingsAPI.SensitiveDataSettings(this._client);
 
   /**
    * Project Stats
@@ -55,6 +63,7 @@ export interface ProjectStatsParams {
 
 Projects.TtlSettings = TtlSettings;
 Projects.IngestSamplingSettings = IngestSamplingSettings;
+Projects.SensitiveDataSettings = SensitiveDataSettings;
 
 export declare namespace Projects {
   export { type ProjectStatsResponse as ProjectStatsResponse, type ProjectStatsParams as ProjectStatsParams };
@@ -71,5 +80,11 @@ export declare namespace Projects {
     IngestSamplingSettings as IngestSamplingSettings,
     type IngestSamplingSettingReadResponse as IngestSamplingSettingReadResponse,
     type IngestSamplingSettingReadParams as IngestSamplingSettingReadParams,
+  };
+
+  export {
+    SensitiveDataSettings as SensitiveDataSettings,
+    type SensitiveDataSettingReadResponse as SensitiveDataSettingReadResponse,
+    type SensitiveDataSettingReadParams as SensitiveDataSettingReadParams,
   };
 }

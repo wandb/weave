@@ -26,6 +26,14 @@ from .ttl_settings import (
     AsyncTtlSettingsResourceWithStreamingResponse,
 )
 from ..._base_client import make_request_options
+from .sensitive_data_settings import (
+    SensitiveDataSettingsResource,
+    AsyncSensitiveDataSettingsResource,
+    SensitiveDataSettingsResourceWithRawResponse,
+    AsyncSensitiveDataSettingsResourceWithRawResponse,
+    SensitiveDataSettingsResourceWithStreamingResponse,
+    AsyncSensitiveDataSettingsResourceWithStreamingResponse,
+)
 from .ingest_sampling_settings import (
     IngestSamplingSettingsResource,
     AsyncIngestSamplingSettingsResource,
@@ -47,6 +55,10 @@ class ProjectsResource(SyncAPIResource):
     @cached_property
     def ingest_sampling_settings(self) -> IngestSamplingSettingsResource:
         return IngestSamplingSettingsResource(self._client)
+
+    @cached_property
+    def sensitive_data_settings(self) -> SensitiveDataSettingsResource:
+        return SensitiveDataSettingsResource(self._client)
 
     @cached_property
     def with_raw_response(self) -> ProjectsResourceWithRawResponse:
@@ -121,6 +133,10 @@ class AsyncProjectsResource(AsyncAPIResource):
     @cached_property
     def ingest_sampling_settings(self) -> AsyncIngestSamplingSettingsResource:
         return AsyncIngestSamplingSettingsResource(self._client)
+
+    @cached_property
+    def sensitive_data_settings(self) -> AsyncSensitiveDataSettingsResource:
+        return AsyncSensitiveDataSettingsResource(self._client)
 
     @cached_property
     def with_raw_response(self) -> AsyncProjectsResourceWithRawResponse:
@@ -203,6 +219,10 @@ class ProjectsResourceWithRawResponse:
     def ingest_sampling_settings(self) -> IngestSamplingSettingsResourceWithRawResponse:
         return IngestSamplingSettingsResourceWithRawResponse(self._projects.ingest_sampling_settings)
 
+    @cached_property
+    def sensitive_data_settings(self) -> SensitiveDataSettingsResourceWithRawResponse:
+        return SensitiveDataSettingsResourceWithRawResponse(self._projects.sensitive_data_settings)
+
 
 class AsyncProjectsResourceWithRawResponse:
     def __init__(self, projects: AsyncProjectsResource) -> None:
@@ -219,6 +239,10 @@ class AsyncProjectsResourceWithRawResponse:
     @cached_property
     def ingest_sampling_settings(self) -> AsyncIngestSamplingSettingsResourceWithRawResponse:
         return AsyncIngestSamplingSettingsResourceWithRawResponse(self._projects.ingest_sampling_settings)
+
+    @cached_property
+    def sensitive_data_settings(self) -> AsyncSensitiveDataSettingsResourceWithRawResponse:
+        return AsyncSensitiveDataSettingsResourceWithRawResponse(self._projects.sensitive_data_settings)
 
 
 class ProjectsResourceWithStreamingResponse:
@@ -237,6 +261,10 @@ class ProjectsResourceWithStreamingResponse:
     def ingest_sampling_settings(self) -> IngestSamplingSettingsResourceWithStreamingResponse:
         return IngestSamplingSettingsResourceWithStreamingResponse(self._projects.ingest_sampling_settings)
 
+    @cached_property
+    def sensitive_data_settings(self) -> SensitiveDataSettingsResourceWithStreamingResponse:
+        return SensitiveDataSettingsResourceWithStreamingResponse(self._projects.sensitive_data_settings)
+
 
 class AsyncProjectsResourceWithStreamingResponse:
     def __init__(self, projects: AsyncProjectsResource) -> None:
@@ -253,3 +281,7 @@ class AsyncProjectsResourceWithStreamingResponse:
     @cached_property
     def ingest_sampling_settings(self) -> AsyncIngestSamplingSettingsResourceWithStreamingResponse:
         return AsyncIngestSamplingSettingsResourceWithStreamingResponse(self._projects.ingest_sampling_settings)
+
+    @cached_property
+    def sensitive_data_settings(self) -> AsyncSensitiveDataSettingsResourceWithStreamingResponse:
+        return AsyncSensitiveDataSettingsResourceWithStreamingResponse(self._projects.sensitive_data_settings)

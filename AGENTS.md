@@ -182,6 +182,14 @@ If `sdks/node/node_modules` is missing, run `pnpm install --frozen-lockfile` in 
   ClickHouse backend. Build inputs with the real APIs
   (`obj_create`, `table_create`, etc.). Mock only external services we don't own.
 
+### Current logical calls
+
+- `calls_complete` uses `ReplacingMergeTree(created_at)`, so more than one
+  physical version of a call can remain visible until background merges run.
+- Set `CallsQueryReq.latest_only=True` when correctness requires filtering the
+  current logical version. It enables ClickHouse `FINAL` for that request, so
+  use it for bounded correctness-sensitive reads rather than broad list scans.
+
 ### Assert on the complete payload (no substring / membership checks)
 
 Assert on the **full value**, not that a fragment appears somewhere inside a
@@ -621,6 +629,27 @@ deterministic.
       patcher.undo_patch()
   ```
 - Some integrations (like instructor) may need to patch multiple libraries
+
+### Wrapping `fn` to change what an SDK receives
+
+- An `on_input_handler` shapes only what gets recorded. To change the arguments
+  that actually reach the vendor, wrap `fn` before `weave.op` sees it — see
+  `_add_stream_options` (openai) and `_unbox_inputs` (google_genai).
+- Such a wrapper must preserve the function's kind. `weave.op` dispatches on
+  `inspect.iscoroutinefunction` / `isgeneratorfunction` / `isasyncgenfunction`,
+  and `functools.wraps` carries none of them, so a plain wrapper around a
+  `*_stream` method silently moves it off the streaming path.
+- Values read out of a saved Weave object are subclasses of builtins
+  (`box.BoxedStr`, `WeaveList`). A pydantic model with `from_attributes=True`
+  and all-optional fields accepts a *subclass* as an attribute source and
+  validates to an empty model, where a bare `str` would take its own branch — so
+  the value vanishes without an error. `box.unbox` on the leaves is the fix;
+  `WeaveList`/`WeaveDict` need no special case, they subclass `list`/`dict`.
+- Unbox inside the wrapper, not earlier: `_create_call` captures the arguments
+  before `resolve_fn` runs, so the recorded inputs keep their refs.
+- `box.box` normalizes a datetime to UTC, so `unbox(box(naive))` comes back
+  aware. Round-trip equality holds for what `box` produced, not for a naive
+  input.
 
 ### Python Conversation Turn messages
 

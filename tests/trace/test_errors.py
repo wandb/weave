@@ -1,6 +1,14 @@
 import httpx
+import pytest
 
 from weave.trace.errors import format_http_error, response_error_message
+from weave.trace_server.errors import (
+    BadQueryParameterError,
+    InvalidFieldError,
+    QueryIllegalTypeofArgumentError,
+    QueryNoCommonTypeError,
+    handle_server_exception,
+)
 
 
 def test_response_error_message_prefers_common_json_fields_and_falls_back_to_body():
@@ -50,3 +58,19 @@ def test_response_error_message_prefers_common_json_fields_and_falls_back_to_bod
         "weave:///test/test-project/object/frozen-dataset:abc123 "
         "(status 403): Project not found"
     )
+
+
+@pytest.mark.parametrize(
+    "exc",
+    [
+        QueryIllegalTypeofArgumentError("illegal type of argument"),
+        QueryNoCommonTypeError("no common type"),
+        BadQueryParameterError("bad query parameter"),
+        InvalidFieldError("field not allowed"),
+    ],
+)
+def test_rejected_queries_are_client_errors_not_authz_failures(exc):
+    """A query we reject is a 4xx about the request, never a 403."""
+    status_code = handle_server_exception(exc).status_code
+    assert 400 <= status_code < 500
+    assert status_code != 403
