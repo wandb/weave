@@ -16,6 +16,7 @@ from weave.trace_server.external_to_internal_trace_server_adapter import (
     ExternalTraceServer,
     IdConverter,
 )
+from weave.trace_server.sync_facade import SyncTraceServerFacade
 
 REF_A = "weave-trace-internal:///test_project/object/obj_a:abc123"
 REF_B = "weave-trace-internal:///test_project/object/obj_b:def456"
@@ -301,7 +302,7 @@ def test_adapter_does_not_mutate_req_when_inner_raises(
     """
     inner = MagicMock(spec=tsi.FullTraceServerInterface)
     getattr(inner, method_name).side_effect = NotFoundError("test")
-    adapter = ExternalTraceServer(inner, _EncodingIdConverter())
+    adapter = SyncTraceServerFacade(ExternalTraceServer(inner, _EncodingIdConverter()))
 
     req = req_factory()
     snapshot = req.model_dump()
@@ -329,7 +330,7 @@ def test_export_adapter_converts_project_id_and_delegates() -> None:
             tsi.ExportManifestEntry(target="calls", status="done", rows=3),
         ],
     )
-    adapter = ExternalTraceServer(inner, idc)
+    adapter = SyncTraceServerFacade(ExternalTraceServer(inner, idc))
 
     start_req = tsi.ExportStartReq(project_id="ent/proj", targets=["calls"])
     start_res = adapter.export_start(start_req)
@@ -422,7 +423,7 @@ def _capture_genai_otel_export_req(
     """
     inner = MagicMock(spec=tsi.FullTraceServerInterface)
     inner.genai_otel_export.return_value = tsi.agent_types.GenAIOTelExportRes()
-    adapter = ExternalTraceServer(inner, _EncodingIdConverter())
+    adapter = SyncTraceServerFacade(ExternalTraceServer(inner, _EncodingIdConverter()))
     adapter.genai_otel_export(req, enable_llm_powered_features=True)
     assert inner.genai_otel_export.call_count == 1
     return inner.genai_otel_export.call_args.args[0]
@@ -720,7 +721,7 @@ def test_genai_otel_export_caches_project_id_lookup_across_batch() -> None:
     inner = MagicMock(spec=tsi.FullTraceServerInterface)
     inner.genai_otel_export.return_value = tsi.agent_types.GenAIOTelExportRes()
     converter = CountingIdConverter()
-    ExternalTraceServer(inner, converter).genai_otel_export(
+    SyncTraceServerFacade(ExternalTraceServer(inner, converter)).genai_otel_export(
         req, enable_llm_powered_features=True
     )
 
@@ -758,7 +759,7 @@ def _capture_otel_export_req(req: tsi.OTelExportReq) -> tsi.OTelExportReq:
     """
     inner = MagicMock(spec=tsi.FullTraceServerInterface)
     inner.otel_export.return_value = tsi.OTelExportRes(partial_success=None)
-    adapter = ExternalTraceServer(inner, _EncodingIdConverter())
+    adapter = SyncTraceServerFacade(ExternalTraceServer(inner, _EncodingIdConverter()))
     adapter.otel_export(req)
     assert inner.otel_export.call_count == 1
     return inner.otel_export.call_args.args[0]

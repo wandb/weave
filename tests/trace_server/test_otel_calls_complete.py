@@ -40,6 +40,7 @@ from weave.trace_server.clickhouse_trace_server_batched import ClickHouseTraceSe
 from weave.trace_server.errors import CallsCompleteModeRequired
 from weave.trace_server.orm import ParamBuilder
 from weave.trace_server.project_version.types import CallsStorageServerMode
+from weave.trace_server.sync_facade import SyncTraceServerFacade
 
 # =============================================================================
 # Fixtures
@@ -57,9 +58,9 @@ pytestmark = pytest.mark.skipif(
 def clickhouse_trace_server(trace_server):
     """Get internal ClickHouse server with AUTO routing mode enabled."""
     internal_server = trace_server._internal_trace_server
-    assert isinstance(internal_server._inner, ClickHouseTraceServer)
+    assert isinstance(internal_server, ClickHouseTraceServer)
     internal_server.table_routing_resolver._mode = CallsStorageServerMode.AUTO
-    return internal_server
+    return SyncTraceServerFacade(internal_server)
 
 
 # =============================================================================
