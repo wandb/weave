@@ -64,6 +64,13 @@ class CallStreamQueryParams(TypedDict, total=False):
     username for the duration of this request.
     """
 
+    latest_only: bool
+    """
+    If true, collapse multiple physical versions of each call before applying
+    filters. This provides current logical-row semantics for calls_complete reads
+    while ReplacingMergeTree merges are pending.
+    """
+
     limit: Optional[int]
 
     offset: Optional[int]

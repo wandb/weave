@@ -437,6 +437,7 @@ class CallsResource(SyncAPIResource):
         include_storage_size: Optional[bool] | Omit = omit,
         include_total_storage_size: Optional[bool] | Omit = omit,
         include_usernames: Optional[bool] | Omit = omit,
+        latest_only: bool | Omit = omit,
         limit: Optional[int] | Omit = omit,
         offset: Optional[int] | Omit = omit,
         query: Optional[call_stream_query_params.Query] | Omit = omit,
@@ -472,6 +473,10 @@ class CallsResource(SyncAPIResource):
           include_usernames: If true, the response will attempt to resolve each call's wb_user_id to a
               username for the duration of this request.
 
+          latest_only: If true, collapse multiple physical versions of each call before applying
+              filters. This provides current logical-row semantics for calls_complete reads
+              while ReplacingMergeTree merges are pending.
+
           return_expanded_column_values: If true, the response will include raw values for expanded columns. If false,
               the response expand_columns will only be used for filtering and ordering. This
               is useful for clients that want to resolve refs themselves, e.g. for performance
@@ -500,6 +505,7 @@ class CallsResource(SyncAPIResource):
                     "include_storage_size": include_storage_size,
                     "include_total_storage_size": include_total_storage_size,
                     "include_usernames": include_usernames,
+                    "latest_only": latest_only,
                     "limit": limit,
                     "offset": offset,
                     "query": query,
@@ -992,6 +998,7 @@ class AsyncCallsResource(AsyncAPIResource):
         include_storage_size: Optional[bool] | Omit = omit,
         include_total_storage_size: Optional[bool] | Omit = omit,
         include_usernames: Optional[bool] | Omit = omit,
+        latest_only: bool | Omit = omit,
         limit: Optional[int] | Omit = omit,
         offset: Optional[int] | Omit = omit,
         query: Optional[call_stream_query_params.Query] | Omit = omit,
@@ -1027,6 +1034,10 @@ class AsyncCallsResource(AsyncAPIResource):
           include_usernames: If true, the response will attempt to resolve each call's wb_user_id to a
               username for the duration of this request.
 
+          latest_only: If true, collapse multiple physical versions of each call before applying
+              filters. This provides current logical-row semantics for calls_complete reads
+              while ReplacingMergeTree merges are pending.
+
           return_expanded_column_values: If true, the response will include raw values for expanded columns. If false,
               the response expand_columns will only be used for filtering and ordering. This
               is useful for clients that want to resolve refs themselves, e.g. for performance
@@ -1055,6 +1066,7 @@ class AsyncCallsResource(AsyncAPIResource):
                     "include_storage_size": include_storage_size,
                     "include_total_storage_size": include_total_storage_size,
                     "include_usernames": include_usernames,
+                    "latest_only": latest_only,
                     "limit": limit,
                     "offset": offset,
                     "query": query,
