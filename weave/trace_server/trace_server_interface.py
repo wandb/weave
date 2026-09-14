@@ -26,6 +26,7 @@ else:
 from weave.trace_server import http_service_interface as his
 from weave.trace_server.agents import types as agent_types
 from weave.trace_server.common_interface import (
+    RESPONSE_DEFAULTS_REQUIRED,
     WB_USER_ID_DESCRIPTION,
     AnnotationState,
     BaseModelStrict,
@@ -598,6 +599,8 @@ class ImageGenerationCreateReq(BaseModel):
 
 
 class ImageGenerationCreateRes(BaseModel):
+    model_config = RESPONSE_DEFAULTS_REQUIRED
+
     response: dict[str, Any]
     weave_call_id: str | None = None
 
@@ -1629,6 +1632,8 @@ class FeedbackAggregateReq(BaseModelStrict):
 class FeedbackAggregateBucket(BaseModel):
     """One (time bucket, group) row of aggregated scorer feedback."""
 
+    model_config = RESPONSE_DEFAULTS_REQUIRED
+
     time_bucket_start_ms: int | None = Field(
         default=None,
         description="Time bucket start, unix epoch ms (UTC). None when unbucketed.",
@@ -1661,6 +1666,8 @@ class FeedbackAggregateBucket(BaseModel):
 
 class FeedbackAggregateRes(BaseModel):
     """Sparse time-series of aggregated scorer feedback (empty buckets omitted)."""
+
+    model_config = RESPONSE_DEFAULTS_REQUIRED
 
     time_bucket_seconds: int | None = Field(
         default=None,
@@ -1902,6 +1909,8 @@ class ProjectTTLSettingsReadReq(BaseModelStrict):
 
 
 class ProjectTTLSettingsReadRes(BaseModel):
+    model_config = RESPONSE_DEFAULTS_REQUIRED
+
     retention_days: int | None = Field(
         default=None, description="None = no TTL (infinite retention)"
     )
@@ -2222,6 +2231,8 @@ class DatasetSourcesLinkReq(BaseModelStrict):
 class DatasetSourcesLinkResEntry(BaseModel):
     """Result for a single flattened (row_digest, source) link."""
 
+    model_config = RESPONSE_DEFAULTS_REQUIRED
+
     link_id: str
     # None strictly means include_created_status was False on the request.
     created: bool | None = None
@@ -2259,6 +2270,8 @@ class DatasetSourcesLinkDeleteRes(BaseModel):
 
 class DatasetSourceLinkSchema(BaseModel):
     """Schema for a single dataset source link row."""
+
+    model_config = RESPONSE_DEFAULTS_REQUIRED
 
     id: str
     row_digest: str
@@ -2498,21 +2511,29 @@ class EvaluationStatusReq(BaseModelStrict):
 
 
 class EvaluationStatusNotFound(BaseModelStrict):
+    model_config = RESPONSE_DEFAULTS_REQUIRED
+
     code: Literal["not_found"] = "not_found"
 
 
 class EvaluationStatusRunning(BaseModelStrict):
+    model_config = RESPONSE_DEFAULTS_REQUIRED
+
     code: Literal["running"] = "running"
     completed_rows: int
     total_rows: int
 
 
 class EvaluationStatusFailed(BaseModelStrict):
+    model_config = RESPONSE_DEFAULTS_REQUIRED
+
     code: Literal["failed"] = "failed"
     error: str | None = None
 
 
 class EvaluationStatusComplete(BaseModelStrict):
+    model_config = RESPONSE_DEFAULTS_REQUIRED
+
     code: Literal["complete"] = "complete"
     output: dict[str, Any]
 
@@ -2787,6 +2808,8 @@ class CustomRuntimeApplyReq(CustomRuntimeApplyBody):
 
 
 class CustomRuntimeIDRes(CustomRuntimeID):
+    model_config = RESPONSE_DEFAULTS_REQUIRED
+
     playground_id: str
 
 
@@ -3524,6 +3547,8 @@ class EvalResultsQueryReq(EvalResultsQueryBody):
 
 
 class EvalResultsTrial(BaseModel):
+    model_config = RESPONSE_DEFAULTS_REQUIRED
+
     predict_and_score_call_id: str
     predict_call_id: str | None = None
     model_output: Any | None = None
@@ -3536,17 +3561,23 @@ class EvalResultsTrial(BaseModel):
 
 
 class EvalResultsRowEvaluation(BaseModel):
+    model_config = RESPONSE_DEFAULTS_REQUIRED
+
     evaluation_call_id: str
     trials: list[EvalResultsTrial] = Field(default_factory=list)
 
 
 class EvalResultsRow(BaseModel):
+    model_config = RESPONSE_DEFAULTS_REQUIRED
+
     row_digest: str
     raw_data_row: Any | None = None
     evaluations: list[EvalResultsRowEvaluation] = Field(default_factory=list)
 
 
 class EvalResultsQueryRes(BaseModel):
+    model_config = RESPONSE_DEFAULTS_REQUIRED
+
     rows: list[EvalResultsRow]
     total_rows: int
     summary: "EvalResultsSummaryRes | None" = None
@@ -3558,6 +3589,8 @@ class EvalResultsQueryRes(BaseModel):
 
 class EvalResultsScorerStats(BaseModel):
     """Stats for a single flattened score dimension (scorer_key or scorer_key.path.to.leaf)."""
+
+    model_config = RESPONSE_DEFAULTS_REQUIRED
 
     scorer_key: str
     path: str | None = Field(
@@ -3581,6 +3614,8 @@ class EvalResultsScorerStats(BaseModel):
 
 
 class EvalResultsEvaluationSummary(BaseModel):
+    model_config = RESPONSE_DEFAULTS_REQUIRED
+
     evaluation_call_id: str
     trial_count: int = 0
     scorer_stats: list[EvalResultsScorerStats] = Field(default_factory=list)
@@ -3608,6 +3643,8 @@ class EvalResultsEvaluationSummary(BaseModel):
 
 
 class EvalResultsSummaryRes(BaseModel):
+    model_config = RESPONSE_DEFAULTS_REQUIRED
+
     row_count: int = 0
     evaluations: list[EvalResultsEvaluationSummary] = Field(default_factory=list)
 
