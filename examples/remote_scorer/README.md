@@ -94,7 +94,7 @@ If the scorer performs side effects or writes to a downstream system, use
 `Idempotency-Key` to deduplicate repeated attempts. The key is stable for one
 request version; a V1 and a V2 request for the same call carry different keys.
 
-### Request versions
+### Common fields
 
 Every request carries these top-level fields:
 
@@ -108,6 +108,8 @@ Every request carries these top-level fields:
 - `triggered_at`: optional ISO 8601 timestamp.
 
 An optional field with no value is omitted, not sent as `null`.
+
+### Request versions
 
 **V1** puts the scored call at the top level under `original_call`. See
 `sample_request.json`. Call monitors send V1 today.
