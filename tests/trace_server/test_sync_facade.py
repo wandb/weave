@@ -56,6 +56,17 @@ class FakeAsyncServer:
     def sync_method(self) -> str:
         return "sync"
 
+    def stream_via_plain_def(self, n: int) -> AsyncIterator[int]:
+        return self.stream(n)
+
+    async def scoped_stream(self, n: int) -> AsyncIterator[int]:
+        token = _request_tag.set("streaming")
+        try:
+            for i in range(n):
+                yield i
+        finally:
+            _request_tag.reset(token)
+
 
 @pytest.fixture
 def facade() -> SyncTraceServerFacade:
@@ -71,6 +82,20 @@ def test_coroutine_runs_to_completion(facade: SyncTraceServerFacade) -> None:
 def test_non_async_attributes_pass_through(facade: SyncTraceServerFacade) -> None:
     assert facade.plain == "attribute"
     assert facade.sync_method() == "sync"
+
+
+def test_plain_def_returning_an_async_iterator(facade: SyncTraceServerFacade) -> None:
+    assert list(facade.stream_via_plain_def(3)) == [0, 1, 2]
+
+
+def test_generator_keeps_one_context_across_yields(
+    facade: SyncTraceServerFacade,
+) -> None:
+    """A contextvar set before the first yield is reset after the last one; the
+    token would be rejected if each step ran in a fresh context copy.
+    """
+    assert list(facade.scoped_stream(2)) == [0, 1]
+    assert _request_tag.get() == ""
 
 
 def test_attribute_writes_land_on_the_inner_server(
@@ -127,12 +152,15 @@ def test_caller_context_is_visible_inside(facade: SyncTraceServerFacade) -> None
     assert facade.tagged() == "req-7"
 
 
-def test_refuses_to_run_inside_a_running_loop(facade: SyncTraceServerFacade) -> None:
-    async def misuse() -> None:
-        facade.read(1)
+def test_runs_from_a_foreign_running_loop(facade: SyncTraceServerFacade) -> None:
+    """A caller on some other loop (an async test driving a sync client) blocks
+    that loop, but the work runs on a pool loop, so it completes.
+    """
 
-    with pytest.raises(RuntimeError, match="inside a running event loop"):
-        asyncio.run(misuse())
+    async def caller() -> int:
+        return facade.read(1)
+
+    assert asyncio.run(caller()) == facade.read(1)
 
 
 def test_refuses_from_a_pool_loop_itself(facade: SyncTraceServerFacade) -> None:
@@ -145,7 +173,7 @@ def test_refuses_from_a_pool_loop_itself(facade: SyncTraceServerFacade) -> None:
         facade.read(1)
 
     inner.reenter = reenter
-    with pytest.raises(RuntimeError, match="inside a running event loop"):
+    with pytest.raises(RuntimeError, match="one of its own event loops"):
         facade.reenter()
 
 
