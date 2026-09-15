@@ -7,6 +7,7 @@ handling) and hydrates result rows into agent schemas.
 
 from __future__ import annotations
 
+import asyncio
 import datetime
 import logging
 from collections.abc import Awaitable, Callable
@@ -196,7 +197,7 @@ class AgentQueryHandler:
         )
 
         if not req.group_by:
-            spans = [AgentSpanSchema(**normalize_span_row(r)) for r in rows]
+            spans = await asyncio.to_thread(_hydrate_spans, rows)
             return AgentSpansQueryRes(spans=spans, total_count=total)
 
         aliases = [group_by_ref_alias(ref) for ref in req.group_by]
@@ -673,7 +674,7 @@ class AgentQueryHandler:
         public query endpoint.
         """
         rows = await self._run_trace_detail_query(project_id, trace_id)
-        return [AgentSpanSchema.model_validate(normalize_span_row(r)) for r in rows]
+        return await asyncio.to_thread(_hydrate_spans, rows)
 
     async def traces_chat(self, req: AgentTraceChatReq) -> AgentTraceChatRes:
         """Build chat trajectory for a single trace."""
@@ -1034,6 +1035,11 @@ class AgentWriteHandler:
 # ---------------------------------------------------------------------------
 # Private helpers
 # ---------------------------------------------------------------------------
+
+
+def _hydrate_spans(rows: list[ClickHouseRow]) -> list[AgentSpanSchema]:
+    """Row dicts to models; CPU-bound, so callers run it on a thread."""
+    return [AgentSpanSchema.model_validate(normalize_span_row(r)) for r in rows]
 
 
 def _rows_as_dicts(result: QueryResult) -> list[ClickHouseRow]:
