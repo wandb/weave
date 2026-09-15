@@ -7,10 +7,12 @@ from confluent_kafka import (
     Consumer as ConfluentKafkaConsumer,
 )
 from confluent_kafka import (
-    Producer as ConfluentKafkaProducer,
+    KafkaError,
+    Message,
+    TopicPartition,
 )
 from confluent_kafka import (
-    TopicPartition,
+    Producer as ConfluentKafkaProducer,
 )
 
 from weave.trace_server import trace_server_interface as tsi
@@ -20,7 +22,7 @@ from weave.trace_server.agents.kafka_events import (
     EmbedAgentSpansEvent,
     ScoreAgentSpansEvent,
 )
-from weave.trace_server.datadog import set_root_span_dd_tags
+from weave.trace_server.datadog import emit_counter, set_root_span_dd_tags
 from weave.trace_server.environment import (
     kafka_broker_host,
     kafka_broker_port,
@@ -37,6 +39,10 @@ SCORE_CALLS_TOPIC = "weave.score_calls"
 DEFAULT_MAX_BUFFER_SIZE = 100000
 # Fraction of `max_buffer_size` at which a "buffer pressure" warning is logged.
 BUFFER_WARN_THRESHOLD = 0.5
+# Counts a failed on_delivery, tagged by topic and KafkaError.name().
+DELIVERY_FAILED_METRIC = "weave_trace_server.kafka_producer.delivery_failed"
+# logger.error on count == 1 and count % DELIVERY_ERROR_LOG_EVERY == 0.
+DELIVERY_ERROR_LOG_EVERY = 100
 
 logger = logging.getLogger(__name__)
 
@@ -54,6 +60,7 @@ class KafkaProducer(ConfluentKafkaProducer):
         self.max_buffer_size = (
             kafka_producer_max_buffer_size() or DEFAULT_MAX_BUFFER_SIZE
         )
+        self._delivery_error_counts: dict[tuple[str | None, str], int] = {}
 
     @classmethod
     def from_env(
@@ -85,6 +92,33 @@ class KafkaProducer(ConfluentKafkaProducer):
         }
 
         return cls(config)
+
+    def produce(self, *args: Any, **kwargs: Any) -> None:
+        kwargs.setdefault("on_delivery", self._on_delivery)
+        super().produce(*args, **kwargs)
+
+    def _on_delivery(self, err: KafkaError | None, msg: Message) -> None:
+        """Count a failed delivery; runs inside `poll`/`flush`."""
+        if err is None:
+            return
+
+        topic = msg.topic()
+        error_name = err.name()
+        key = (topic, error_name)
+        count = self._delivery_error_counts.get(key, 0) + 1
+        self._delivery_error_counts[key] = count
+
+        if count == 1 or count % DELIVERY_ERROR_LOG_EVERY == 0:
+            logger.error(
+                "Kafka delivery failed topic=%s error=%s count=%s",
+                topic,
+                err.str(),
+                count,
+                extra={"key": msg.key(), "error_code": error_name},
+            )
+        emit_counter(
+            DELIVERY_FAILED_METRIC, 1, [f"topic:{topic}", f"error:{error_name}"]
+        )
 
     def produce_call_end(
         self, call_end: tsi.EndedCallSchemaForInsert, flush_immediately: bool = False
