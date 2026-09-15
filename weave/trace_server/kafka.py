@@ -142,9 +142,9 @@ class KafkaProducer(ConfluentKafkaProducer):
 
         if flush_immediately:
             # Use a short non-blocking flush instead of an unbounded flush().
-            # KafkaProducer is a process-level singleton shared across request
+            # The producer is a process-level singleton shared across all request
             # threads, so flush() (no timeout) blocks until ALL in-flight messages
-            # from every concurrent request are acknowledged, causing a convoy
+            # from every concurrent request are acknowledged — causing a convoy
             # effect under load.  flush(0) triggers a delivery attempt for queued
             # messages and returns immediately.
             self.flush(0)
@@ -374,8 +374,8 @@ def _bucketed_project_key(project_id: str, bucket_seed: str) -> str:
     bucket_count = wf_kafka_project_id_bucket_count()
     if bucket_count <= 1:
         return project_id
-    # crc32(bucket_seed) % bucket_count suffixes project_id so murmur2_random
-    # hashes `project_id:bucket` and one project_id uses at most bucket_count partitions.
+    # crc32 picks the bucket; the murmur2 partitioner re-hashes the composite key,
+    # so bucket_count caps (not equals) the partitions a project spreads across.
     bucket = zlib.crc32(bucket_seed.encode()) % bucket_count
     return f"{project_id}:{bucket}"
 
