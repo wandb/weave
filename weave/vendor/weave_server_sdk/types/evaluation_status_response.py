@@ -16,27 +16,27 @@ __all__ = [
 
 
 class StatusEvaluationStatusNotFound(BaseModel):
-    code: Optional[Literal["not_found"]] = None
+    code: Literal["not_found"]
 
 
 class StatusEvaluationStatusRunning(BaseModel):
+    code: Literal["running"]
+
     completed_rows: int
 
     total_rows: int
 
-    code: Optional[Literal["running"]] = None
-
 
 class StatusEvaluationStatusFailed(BaseModel):
-    code: Optional[Literal["failed"]] = None
+    code: Literal["failed"]
 
     error: Optional[str] = None
 
 
 class StatusEvaluationStatusComplete(BaseModel):
-    output: Dict[str, object]
+    code: Literal["complete"]
 
-    code: Optional[Literal["complete"]] = None
+    output: Dict[str, object]
 
 
 Status: TypeAlias = Union[

@@ -62,27 +62,27 @@ export interface EvaluationStatusResponse {
 
 export namespace EvaluationStatusResponse {
   export interface EvaluationStatusNotFound {
-    code?: 'not_found';
+    code: 'not_found';
   }
 
   export interface EvaluationStatusRunning {
+    code: 'running';
+
     completed_rows: number;
 
     total_rows: number;
-
-    code?: 'running';
   }
 
   export interface EvaluationStatusFailed {
-    code?: 'failed';
+    code: 'failed';
 
-    error?: string | null;
+    error: string | null;
   }
 
   export interface EvaluationStatusComplete {
-    output: { [key: string]: unknown };
+    code: 'complete';
 
-    code?: 'complete';
+    output: { [key: string]: unknown };
   }
 }
 

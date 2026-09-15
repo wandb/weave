@@ -16,7 +16,7 @@ export class Images extends APIResource {
 export interface ImageCreateResponse {
   response: { [key: string]: unknown };
 
-  weave_call_id?: string | null;
+  weave_call_id: string | null;
 }
 
 export interface ImageCreateParams {

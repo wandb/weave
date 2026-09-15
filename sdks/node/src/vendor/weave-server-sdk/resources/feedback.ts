@@ -169,12 +169,12 @@ export interface FeedbackAggregateResponse {
    */
   before_ms: number;
 
-  buckets?: Array<FeedbackAggregateResponse.Bucket>;
+  buckets: Array<FeedbackAggregateResponse.Bucket>;
 
   /**
    * Time bucket size used (seconds). None when unbucketed.
    */
-  time_bucket_seconds?: number | null;
+  time_bucket_seconds: number | null;
 }
 
 export namespace FeedbackAggregateResponse {
@@ -183,40 +183,40 @@ export namespace FeedbackAggregateResponse {
    */
   export interface Bucket {
     /**
+     * Group-by dimension values for this row (e.g. {'scorer_id': '...'}).
+     */
+    group: { [key: string]: string };
+
+    /**
+     * Number of rows carrying each rating key (e.g. '_rating_').
+     */
+    rating_counts: { [key: string]: number };
+
+    /**
+     * Sum of each rating key's values; client derives avg = sum/count.
+     */
+    rating_sums: { [key: string]: number };
+
+    /**
      * Rows that emitted a score (at least one tag or rating). Excludes agent-monitor
      * rows that scored nothing — use this for score volume.
      */
     scored_count: number;
 
     /**
-     * Number of feedback rows in this bucket/group.
-     */
-    total_count: number;
-
-    /**
-     * Group-by dimension values for this row (e.g. {'scorer_id': '...'}).
-     */
-    group?: { [key: string]: string };
-
-    /**
-     * Number of rows carrying each rating key (e.g. '_rating_').
-     */
-    rating_counts?: { [key: string]: number };
-
-    /**
-     * Sum of each rating key's values; client derives avg = sum/count.
-     */
-    rating_sums?: { [key: string]: number };
-
-    /**
      * Count of each scorer tag.
      */
-    tag_counts?: { [key: string]: number };
+    tag_counts: { [key: string]: number };
 
     /**
      * Time bucket start, unix epoch ms (UTC). None when unbucketed.
      */
-    time_bucket_start_ms?: number | null;
+    time_bucket_start_ms: number | null;
+
+    /**
+     * Number of feedback rows in this bucket/group.
+     */
+    total_count: number;
   }
 }
 

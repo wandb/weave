@@ -10,9 +10,9 @@ __all__ = ["DatasetSourceLinkResponse", "Entry"]
 class Entry(BaseModel):
     """Result for a single flattened (row_digest, source) link."""
 
-    link_id: str
-
     created: Optional[bool] = None
+
+    link_id: str
 
 
 class DatasetSourceLinkResponse(BaseModel):
