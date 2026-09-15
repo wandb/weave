@@ -94,11 +94,8 @@ class KafkaProducer(ConfluentKafkaProducer):
         return cls(config)
 
     def produce(self, *args: Any, **kwargs: Any) -> None:
-        super().produce(*args, **self._attach_delivery_callback(kwargs))
-
-    def _attach_delivery_callback(self, kwargs: dict[str, Any]) -> dict[str, Any]:
         kwargs.setdefault("on_delivery", self._on_delivery)
-        return kwargs
+        super().produce(*args, **kwargs)
 
     def _on_delivery(self, err: KafkaError | None, msg: Message) -> None:
         """Count a failed delivery; runs inside `poll`/`flush`."""
@@ -107,7 +104,8 @@ class KafkaProducer(ConfluentKafkaProducer):
 
         topic = msg.topic()
         error_name = err.name()
-        count = self._record_delivery_error(topic, error_name)
+        count = self._delivery_error_counts.get((topic, error_name), 0) + 1
+        self._delivery_error_counts[(topic, error_name)] = count
 
         if count == 1 or count % DELIVERY_ERROR_LOG_EVERY == 0:
             logger.error(
@@ -239,13 +237,6 @@ class KafkaProducer(ConfluentKafkaProducer):
             value=event.model_dump_json(),
             key=publish_key,
         )
-
-    def _record_delivery_error(self, topic: str | None, error_name: str) -> int:
-        key = (topic, error_name)
-        count = self._delivery_error_counts.get(key, 0) + 1
-        self._delivery_error_counts[key] = count
-
-        return count
 
     def _check_buffer_pressure(
         self, message_type: str, logging_extra: dict[str, str | int] | None = None

@@ -135,7 +135,7 @@ def test_delivery_failure_is_counted_per_topic_and_error(monkeypatch) -> None:
     """Failed deliveries always increment the counter; logger.error is sampled."""
     producer = MagicMock(spec=KafkaProducer)
     producer._delivery_error_counts = {}
-    _bind_real_methods(producer, "_on_delivery", "_record_delivery_error")
+    _bind_real_methods(producer, "_on_delivery")
     emitted = MagicMock()
     logged = MagicMock()
     monkeypatch.setattr(kafka, "emit_counter", emitted)
@@ -184,18 +184,32 @@ def test_delivery_failure_is_counted_per_topic_and_error(monkeypatch) -> None:
     assert logged.call_count == 3
 
 
-def test_produce_defaults_on_delivery() -> None:
-    """produce() setdefaults _on_delivery; an explicit callback wins."""
-    producer = MagicMock(spec=KafkaProducer)
-    _bind_real_methods(producer, "_attach_delivery_callback")
-    attached = producer._attach_delivery_callback({"topic": "weave.call_ended"})
-    assert attached["on_delivery"] == producer._on_delivery
-
-    other = object()
-    attached = producer._attach_delivery_callback(
-        {"topic": "weave.call_ended", "on_delivery": other}
+@pytest.mark.disable_logging_error_check
+def test_a_message_the_broker_never_took_reaches_the_delivery_counter(
+    monkeypatch,
+) -> None:
+    """End to end through librdkafka: produce() attaches the callback, and flush()
+    runs it with the timeout error once the broker never answers."""
+    emitted = MagicMock()
+    monkeypatch.setattr(kafka, "emit_counter", emitted)
+    producer = KafkaProducer(
+        {
+            # Nothing listens here, so every message times out locally.
+            "bootstrap.servers": "127.0.0.1:1",
+            "message.timeout.ms": 500,
+            "log_level": 0,
+        }
     )
-    assert attached["on_delivery"] is other
+
+    producer.produce(topic="weave.embed_agent_spans", value="{}", key="conv-1")
+    remaining = producer.flush(10)
+
+    assert remaining == 0
+    emitted.assert_called_once_with(
+        DELIVERY_FAILED_METRIC,
+        1,
+        ["topic:weave.embed_agent_spans", "error:_MSG_TIMED_OUT"],
+    )
 
 
 @pytest.mark.disable_logging_error_check
