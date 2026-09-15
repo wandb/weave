@@ -7,16 +7,14 @@ from weave.trace_server.in_memory_trace_server import InMemoryTraceServer
 from weave.trace_server.sync_facade import SyncTraceServerFacade
 
 
-def test_trace_server_fixture(request, trace_server: UserInjectingExternalTraceServer):
-    assert isinstance(trace_server, UserInjectingExternalTraceServer)
+def test_trace_server_fixture(request, trace_server: SyncTraceServerFacade):
+    assert isinstance(trace_server, SyncTraceServerFacade)
+    assert isinstance(trace_server._inner, UserInjectingExternalTraceServer)
     flag = get_trace_server_flag(request)
     internal = trace_server._internal_trace_server
     # KeyError on an unrecognized backend — fail loudly rather than guess.
-    if flag == "clickhouse":
-        assert isinstance(internal, SyncTraceServerFacade)
-        assert isinstance(internal._inner, ClickHouseTraceServer)
-    else:
-        assert isinstance(internal, {"fake": InMemoryTraceServer}[flag])
+    expected = {"clickhouse": ClickHouseTraceServer, "fake": InMemoryTraceServer}[flag]
+    assert isinstance(internal, expected)
 
 
 # All instance attributes set in ClickHouseTraceServer.__init__.

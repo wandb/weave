@@ -23,6 +23,7 @@ import contextvars
 import inspect
 import itertools
 import os
+import sys
 import threading
 from collections.abc import AsyncIterator, Awaitable, Callable, Iterator
 from concurrent.futures import ThreadPoolExecutor
@@ -52,6 +53,10 @@ class _SharedExecutor(ThreadPoolExecutor):
 _shared_executor = _SharedExecutor(
     max_workers=SHARED_EXECUTOR_WORKERS, thread_name_prefix="sync-facade"
 )
+
+
+async def _await(awaitable: Awaitable[_T]) -> _T:
+    return await awaitable
 
 
 class LoopPool:
@@ -92,7 +97,12 @@ class LoopPool:
         """Round-robin. Cheap, and it spreads a burst over every loop."""
         return self._loops[next(self._next) % len(self._loops)]
 
-    def run(self, loop: asyncio.AbstractEventLoop, awaitable: Awaitable[_T]) -> _T:
+    def run(
+        self,
+        loop: asyncio.AbstractEventLoop,
+        awaitable: Awaitable[_T],
+        ctx: contextvars.Context | None = None,
+    ) -> _T:
         """Run `awaitable` on `loop` from another thread and block for the result.
 
         The task is created inside a copy of the caller's context, so contextvars
@@ -100,12 +110,18 @@ class LoopPool:
         they were under `run_until_complete`. `ctx.run(...)` rather than
         `create_task(context=...)` because weave still supports Python 3.10.
         """
-        ctx = contextvars.copy_context()
+        if ctx is None:
+            ctx = contextvars.copy_context()
         done: concurrent.futures.Future[_T] = concurrent.futures.Future()
 
         def start() -> None:
             try:
-                task = ctx.run(asyncio.ensure_future, awaitable, loop=loop)
+                if sys.version_info >= (3, 11):
+                    # The task runs in `ctx` itself, so steps of one generator
+                    # that share a `ctx` also share its contextvar tokens.
+                    task = loop.create_task(_await(awaitable), context=ctx)
+                else:
+                    task = ctx.run(loop.create_task, _await(awaitable))
             except BaseException as exc:
                 done.set_exception(exc)
                 return
@@ -167,14 +183,16 @@ def shutdown_loop_pool(closer: Callable[[], Awaitable[None]] | None = None) -> N
 
 
 def _refuse_inside_running_loop() -> None:
+    """Blocking on a pool loop from that same loop can never complete."""
     try:
-        asyncio.get_running_loop()
+        loop = asyncio.get_running_loop()
     except RuntimeError:
         return
-    raise RuntimeError(
-        "SyncTraceServerFacade was called from inside a running event loop; "
-        "await the async server directly instead."
-    )
+    if _pool is not None and loop in _pool.loops:
+        raise RuntimeError(
+            "SyncTraceServerFacade was called from inside one of its own event "
+            "loops; await the async server directly instead."
+        )
 
 
 def run_sync(awaitable: Awaitable[_T]) -> _T:
@@ -200,21 +218,24 @@ def iterate_sync(agen: AsyncIterator[_T]) -> Iterator[_T]:
     """Drive an async iterator one item per step, pinned to one pool loop.
 
     Lazy on purpose: a streaming response is consumed item by item. The
-    generator, every `anext`, and the final `aclose` all run on the same loop.
+    generator, every `anext`, and the final `aclose` all run on the same loop
+    and in one context, so a contextvar the generator sets before its first
+    yield is still its own to reset after the last.
     """
     _refuse_inside_running_loop()
     pool = loop_pool()
     loop = pool.pick()
+    ctx = contextvars.copy_context()
     try:
         while True:
             try:
-                yield pool.run(loop, anext(agen))
+                yield pool.run(loop, anext(agen), ctx)
             except StopAsyncIteration:
                 return
     finally:
         aclose = getattr(agen, "aclose", None)
         if aclose is not None:
-            pool.run(loop, aclose())
+            pool.run(loop, aclose(), ctx)
 
 
 class SyncTraceServerFacade:
@@ -241,6 +262,8 @@ class SyncTraceServerFacade:
             return _sync_call(attr)
         if inspect.isasyncgenfunction(attr):
             return _sync_iterate(attr)
+        if callable(attr):
+            return _sync_result(attr)
         return attr
 
 
@@ -250,6 +273,23 @@ def _sync_call(fn: Callable[..., Awaitable[_T]]) -> Callable[..., _T]:
         # Refuse before creating the coroutine, or it is never awaited.
         _refuse_inside_running_loop()
         return run_sync(fn(*args, **kwargs))
+
+    return call
+
+
+def _sync_result(fn: Callable[..., Any]) -> Callable[..., Any]:
+    """A plain method may still hand back an awaitable or an async iterator."""
+
+    @wraps(fn)
+    def call(*args: Any, **kwargs: Any) -> Any:
+        result = fn(*args, **kwargs)
+        if inspect.isawaitable(result):
+            _refuse_inside_running_loop()
+            return run_sync(result)
+        if hasattr(result, "__aiter__"):
+            _refuse_inside_running_loop()
+            return iterate_sync(result)
+        return result
 
     return call
 
