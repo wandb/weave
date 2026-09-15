@@ -349,14 +349,21 @@ class ExternalTraceServer:
         internal_project_id: str,
         tolerate_external_refs: bool = False,
     ) -> Any:
-        req_conv = universal_ext_to_int_ref_converter(
+        # Both conversions walk every field of the payload and may call out to
+        # the id converter. On a thread they interleave with other requests
+        # under the GIL; on the loop a large response would stall all of them.
+        req_conv = await asyncio.to_thread(
+            universal_ext_to_int_ref_converter,
             req,
             self._idc.ext_to_int_project_id,
             verify_internal_project_id=self._make_project_verifier(internal_project_id),
         )
         res = await self._call(method, req_conv)
-        return universal_int_to_ext_ref_converter(
-            res, self._idc.int_to_ext_project_id, tolerate_external_refs
+        return await asyncio.to_thread(
+            universal_int_to_ext_ref_converter,
+            res,
+            self._idc.int_to_ext_project_id,
+            tolerate_external_refs,
         )
 
     async def _astream_ref_apply(
