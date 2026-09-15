@@ -1089,6 +1089,7 @@ def _search_filter_sql(pb: ParamBuilder, req: AgentSearchReq) -> _FilterSQL:
             f"%{_escape_like_pattern(req.query)}%", param_type="String"
         )
         conditions.append(f"content LIKE {content_slot}")
+        conditions.append("conversation_id != ''")
     if req.trace_id:
         trace_slot = pb.add(req.trace_id, param_type="String")
         conditions.append(f"trace_id = {trace_slot}")
@@ -1894,6 +1895,7 @@ def make_message_search_query(pb: ParamBuilder, req: AgentSearchReq) -> str:
         if req.truncate_content
         else "content"
     )
+    conversation_limit = "LIMIT 1 BY conversation_id" if req.query else ""
     # content_digest is stored raw as FixedString(16); hex-encode here so
     # the Python API surface (AgentSearchMatchedMessage.content_digest: str)
     # keeps a portable text representation.
@@ -1905,6 +1907,7 @@ def make_message_search_query(pb: ParamBuilder, req: AgentSearchReq) -> str:
         FROM messages
         WHERE {filters.where}
         ORDER BY started_at DESC
+        {conversation_limit}
         LIMIT {limit_slot} OFFSET {offset_slot}
     """
 

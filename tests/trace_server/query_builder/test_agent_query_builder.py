@@ -1939,7 +1939,9 @@ class TestMakeMessageSearchQuery:
             FROM messages
             WHERE project_id = {genai_0:String}
             AND content LIKE {genai_1:String}
+              AND conversation_id != ''
             ORDER BY started_at DESC
+            LIMIT 1 BY conversation_id
             LIMIT {genai_2:UInt64} OFFSET {genai_3:UInt64}
         """
         expected_params = {
@@ -1971,10 +1973,12 @@ class TestMakeMessageSearchQuery:
             FROM messages
             WHERE project_id = {genai_0:String}
             AND content LIKE {genai_1:String}
+              AND conversation_id != ''
               AND role IN {genai_2:Array(String)}
               AND agent_name = {genai_3:String}
               AND conversation_id = {genai_4:String}
             ORDER BY started_at DESC
+            LIMIT 1 BY conversation_id
             LIMIT {genai_5:UInt64} OFFSET {genai_6:UInt64}
         """
         expected_params = {
@@ -2003,8 +2007,10 @@ class TestMakeMessageSearchQuery:
             FROM messages
             WHERE project_id = {genai_0:String}
             AND content LIKE {genai_1:String}
+              AND conversation_id != ''
               AND role IN {genai_2:Array(String)}
             ORDER BY started_at DESC
+            LIMIT 1 BY conversation_id
             LIMIT {genai_3:UInt64} OFFSET {genai_4:UInt64}
         """
         expected_params = {

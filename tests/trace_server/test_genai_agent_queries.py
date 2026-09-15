@@ -2894,6 +2894,50 @@ def test_message_search_shared_digest_across_spans(ch_server):
     assert len(digests) == 1
 
 
+def test_message_search_limits_distinct_conversations(ch_server):
+    project_id = _make_project_id("search_distinct_conversations")
+    now = datetime.datetime.now(tz=datetime.timezone.utc)
+    content = "A repeated message search result."
+
+    spans = [
+        _make_span(
+            project_id,
+            conversation_id="older-conversation",
+            output_messages=[NormalizedMessage(role="assistant", content=content)],
+            started_at=now,
+        )
+    ]
+    spans.extend(
+        _make_span(
+            project_id,
+            conversation_id="newer-conversation",
+            output_messages=[NormalizedMessage(role="assistant", content=content)],
+            started_at=now + datetime.timedelta(seconds=offset),
+        )
+        for offset in range(1, 4)
+    )
+    spans.extend(
+        _make_span(
+            project_id,
+            conversation_id="",
+            output_messages=[NormalizedMessage(role="assistant", content=content)],
+            started_at=now + datetime.timedelta(seconds=offset),
+        )
+        for offset in range(4, 7)
+    )
+    _insert_spans(ch_server.ch_client, spans)
+
+    res = ch_server.agent_search(
+        AgentSearchReq(project_id=project_id, query=content, limit=2)
+    )
+
+    assert [result.conversation_id for result in res.results] == [
+        "newer-conversation",
+        "older-conversation",
+    ]
+    assert [len(result.matched_messages) for result in res.results] == [1, 1]
+
+
 def test_message_search_trace_id_full_content(ch_server):
     """Structured retrieval: empty query + trace_id + full_content returns the
     trace's user/assistant/system messages untruncated, excluding tool roles.
