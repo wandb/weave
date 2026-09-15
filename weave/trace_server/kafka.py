@@ -7,10 +7,12 @@ from confluent_kafka import (
     Consumer as ConfluentKafkaConsumer,
 )
 from confluent_kafka import (
-    Producer as ConfluentKafkaProducer,
+    KafkaError,
+    Message,
+    TopicPartition,
 )
 from confluent_kafka import (
-    TopicPartition,
+    Producer as ConfluentKafkaProducer,
 )
 
 from weave.trace_server import trace_server_interface as tsi
@@ -20,7 +22,7 @@ from weave.trace_server.agents.kafka_events import (
     EmbedAgentSpansEvent,
     ScoreAgentSpansEvent,
 )
-from weave.trace_server.datadog import set_root_span_dd_tags
+from weave.trace_server.datadog import emit_counter, set_root_span_dd_tags
 from weave.trace_server.environment import (
     kafka_broker_host,
     kafka_broker_port,
@@ -37,6 +39,8 @@ SCORE_CALLS_TOPIC = "weave.score_calls"
 DEFAULT_MAX_BUFFER_SIZE = 100000
 # Fraction of `max_buffer_size` at which a "buffer pressure" warning is logged.
 BUFFER_WARN_THRESHOLD = 0.5
+# Counts messages librdkafka gave up on after `message.timeout.ms`, per topic.
+DELIVERY_FAILED_METRIC = "weave_trace_server.kafka_producer.delivery_failed"
 
 logger = logging.getLogger(__name__)
 
@@ -86,6 +90,22 @@ class KafkaProducer(ConfluentKafkaProducer):
 
         return cls(config)
 
+    def _on_delivery(self, err: KafkaError | None, msg: Message) -> None:
+        """Count a message the broker never acknowledged; runs inside `poll`/`flush`."""
+        if err is None:
+            return
+
+        topic = msg.topic()
+        logger.error(
+            "Kafka delivery failed topic=%s error=%s",
+            topic,
+            err.str(),
+            extra={"key": msg.key(), "error_code": err.name()},
+        )
+        emit_counter(
+            DELIVERY_FAILED_METRIC, 1, [f"topic:{topic}", f"error:{err.name()}"]
+        )
+
     def produce_call_end(
         self, call_end: tsi.EndedCallSchemaForInsert, flush_immediately: bool = False
     ) -> None:
@@ -101,6 +121,7 @@ class KafkaProducer(ConfluentKafkaProducer):
             return
 
         self.produce(
+            on_delivery=self._on_delivery,
             topic=CALL_ENDED_TOPIC,
             value=call_end.model_dump_json(),
             key=_bucketed_project_key(call_end.project_id, call_end.id),
@@ -142,6 +163,7 @@ class KafkaProducer(ConfluentKafkaProducer):
         for i in range(0, len(req.call_ids), self.SCORE_CALLS_CHUNK_SIZE):
             chunk = req.call_ids[i : i + self.SCORE_CALLS_CHUNK_SIZE]
             self.produce(
+                on_delivery=self._on_delivery,
                 topic=SCORE_CALLS_TOPIC,
                 value=req.model_copy(update={"call_ids": chunk}).model_dump_json(),
                 key=_bucketed_project_key(req.project_id, chunk[0]),
@@ -200,6 +222,7 @@ class KafkaProducer(ConfluentKafkaProducer):
         # that would send all spans for a project to a single worker instance.
         publish_key = event.conversation_id or event.trace_id
         self.produce(
+            on_delivery=self._on_delivery,
             topic=topic,
             value=event.model_dump_json(),
             key=publish_key,
