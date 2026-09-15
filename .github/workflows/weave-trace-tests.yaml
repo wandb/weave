@@ -48,20 +48,45 @@ jobs:
           token: ${{ steps.app-token.outputs.token }}
           persist-credentials: false
 
-      - name: Remove core Weave submodule placeholder
-        run: rm -rf "${CORE_DIR}/services/weave-python/weave-public"
+      # TODO[WB-38661]: Remove the legacy weave-python path after https://github.com/wandb/core/pull/50683 merges.
+      - name: Select and remove core Weave submodule placeholder
+        id: core-weave-path
+        run: |
+          set -euo pipefail
+
+          weave_path="$(
+            git -C "${CORE_DIR}" config --file .gitmodules --get-regexp '^submodule\..*\.path$' |
+              awk '
+                $2 == "services/weave-trace/weave-public" { print $2; found = 1; exit }
+                $2 == "services/weave-python/weave-public" { legacy = $2 }
+                END { if (!found && legacy) print legacy }
+              '
+          )"
+
+          case "${weave_path}" in
+            services/weave-python/weave-public|services/weave-trace/weave-public) ;;
+            *)
+              echo "::error::Could not determine the core Weave submodule path"
+              exit 1
+              ;;
+          esac
+
+          rm -rf \
+            "${CORE_DIR}/services/weave-python/weave-public" \
+            "${CORE_DIR}/services/weave-trace/weave-public"
+          echo "path=${CORE_DIR}/${weave_path}" | tee -a "${GITHUB_OUTPUT}"
 
       - name: Checkout current weave commit into core
         uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
         with:
-          path: ${{ env.CORE_DIR }}/services/weave-python/weave-public
+          path: ${{ steps.core-weave-path.outputs.path }}
           persist-credentials: false
 
       - name: Verify overlaid Weave commit
         run: |
           set -euo pipefail
 
-          actual_sha="$(git -C "${CORE_DIR}/services/weave-python/weave-public" rev-parse HEAD)"
+          actual_sha="$(git -C "${{ steps.core-weave-path.outputs.path }}" rev-parse HEAD)"
           echo "core_sha=$(git -C "${CORE_DIR}" rev-parse HEAD)"
           echo "weave_sha=${actual_sha}"
           test "${actual_sha}" = "${GITHUB_SHA}"
@@ -140,7 +165,7 @@ jobs:
       - name: Export API schema
         working-directory: ${{ env.CORE_DIR }}/services/weave-trace
         run: |
-          export PYTHONPATH="${GITHUB_WORKSPACE}/${CORE_DIR}/services/weave-python/weave-public${PYTHONPATH:+:${PYTHONPATH}}"
+          export PYTHONPATH="${GITHUB_WORKSPACE}/${{ steps.core-weave-path.outputs.path }}${PYTHONPATH:+:${PYTHONPATH}}"
           make export-api-schema
 
       - name: Run Weave Trace tests
@@ -154,7 +179,7 @@ jobs:
           KAFKA_BROKER_HOST: localhost
           KAFKA_BROKER_PORT: "9092"
         run: |
-          export PYTHONPATH="${GITHUB_WORKSPACE}/${CORE_DIR}/services/weave-python/weave-public${PYTHONPATH:+:${PYTHONPATH}}"
+          export PYTHONPATH="${GITHUB_WORKSPACE}/${{ steps.core-weave-path.outputs.path }}${PYTHONPATH:+:${PYTHONPATH}}"
           make test-cov
 
       - name: Dump service logs
