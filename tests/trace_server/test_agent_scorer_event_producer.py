@@ -120,7 +120,6 @@ def test_producer_publishes_under_buffer_limit(
         method_name,
         "_produce_agent_spans",
         "_check_buffer_pressure",
-        "_on_delivery",
     )
 
     getattr(producer, method_name)(_make_event(event_class))
@@ -128,7 +127,7 @@ def test_producer_publishes_under_buffer_limit(
     producer.produce.assert_called_once()
     call_kwargs = producer.produce.call_args.kwargs
     assert call_kwargs["topic"] == topic
-    assert call_kwargs["on_delivery"] == producer._on_delivery
+    assert "on_delivery" not in call_kwargs
 
 
 @pytest.mark.disable_logging_error_check
@@ -183,6 +182,20 @@ def test_delivery_failure_is_counted_per_topic_and_error(monkeypatch) -> None:
     producer._on_delivery(error, other)
     assert emitted.call_count == DELIVERY_ERROR_LOG_EVERY + 1
     assert logged.call_count == 3
+
+
+def test_produce_defaults_on_delivery() -> None:
+    """produce() setdefaults _on_delivery; an explicit callback wins."""
+    producer = MagicMock(spec=KafkaProducer)
+    _bind_real_methods(producer, "_attach_delivery_callback")
+    attached = producer._attach_delivery_callback({"topic": "weave.call_ended"})
+    assert attached["on_delivery"] == producer._on_delivery
+
+    other = object()
+    attached = producer._attach_delivery_callback(
+        {"topic": "weave.call_ended", "on_delivery": other}
+    )
+    assert attached["on_delivery"] is other
 
 
 @pytest.mark.disable_logging_error_check

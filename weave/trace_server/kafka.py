@@ -93,6 +93,13 @@ class KafkaProducer(ConfluentKafkaProducer):
 
         return cls(config)
 
+    def produce(self, *args: Any, **kwargs: Any) -> None:
+        super().produce(*args, **self._attach_delivery_callback(kwargs))
+
+    def _attach_delivery_callback(self, kwargs: dict[str, Any]) -> dict[str, Any]:
+        kwargs.setdefault("on_delivery", self._on_delivery)
+        return kwargs
+
     def _on_delivery(self, err: KafkaError | None, msg: Message) -> None:
         """Count a message the broker never acknowledged; runs inside `poll`/`flush`."""
         if err is None:
@@ -129,7 +136,6 @@ class KafkaProducer(ConfluentKafkaProducer):
             return
 
         self.produce(
-            on_delivery=self._on_delivery,
             topic=CALL_ENDED_TOPIC,
             value=call_end.model_dump_json(),
             key=_bucketed_project_key(call_end.project_id, call_end.id),
@@ -171,7 +177,6 @@ class KafkaProducer(ConfluentKafkaProducer):
         for i in range(0, len(req.call_ids), self.SCORE_CALLS_CHUNK_SIZE):
             chunk = req.call_ids[i : i + self.SCORE_CALLS_CHUNK_SIZE]
             self.produce(
-                on_delivery=self._on_delivery,
                 topic=SCORE_CALLS_TOPIC,
                 value=req.model_copy(update={"call_ids": chunk}).model_dump_json(),
                 key=_bucketed_project_key(req.project_id, chunk[0]),
@@ -230,7 +235,6 @@ class KafkaProducer(ConfluentKafkaProducer):
         # that would send all spans for a project to a single worker instance.
         publish_key = event.conversation_id or event.trace_id
         self.produce(
-            on_delivery=self._on_delivery,
             topic=topic,
             value=event.model_dump_json(),
             key=publish_key,
