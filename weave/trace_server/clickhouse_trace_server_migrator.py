@@ -187,6 +187,7 @@ ID_SHARDED_TABLES: dict[str, str] = {
     # nearest-neighbor search and clustering do not fan out across shards.
     "intent_signatures": "project_id",
     "failure_signatures": "project_id",
+    "question_contracts": "project_id",
     "signature_cluster_runs": "project_id",
     "signature_clusters": "project_id",
     "signature_cluster_assignments": "project_id",
