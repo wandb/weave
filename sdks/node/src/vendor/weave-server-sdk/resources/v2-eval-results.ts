@@ -23,51 +23,51 @@ export class V2EvalResults extends APIResource {
 export interface V2EvalResultQueryResponse {
   rows: Array<V2EvalResultQueryResponse.Row>;
 
-  total_rows: number;
+  summary: V2EvalResultQueryResponse.Summary | null;
 
-  summary?: V2EvalResultQueryResponse.Summary | null;
+  total_rows: number;
 
   /**
    * Non-fatal warnings (e.g. failed to resolve dataset row refs).
    */
-  warnings?: Array<string>;
+  warnings: Array<string>;
 }
 
 export namespace V2EvalResultQueryResponse {
   export interface Row {
+    evaluations: Array<Row.Evaluation>;
+
+    raw_data_row: unknown;
+
     row_digest: string;
-
-    evaluations?: Array<Row.Evaluation>;
-
-    raw_data_row?: unknown;
   }
 
   export namespace Row {
     export interface Evaluation {
       evaluation_call_id: string;
 
-      trials?: Array<Evaluation.Trial>;
+      trials: Array<Evaluation.Trial>;
     }
 
     export namespace Evaluation {
       export interface Trial {
+        genai_span_ref: Array<Trial.GenaiSpanRef> | null;
+
+        model_latency_seconds: number | null;
+
+        model_output: unknown;
+
         predict_and_score_call_id: string;
 
-        genai_span_ref?: Array<Trial.GenaiSpanRef> | null;
+        predict_call_id: string | null;
 
-        model_latency_seconds?: number | null;
+        scorer_call_ids: { [key: string]: string };
 
-        model_output?: unknown;
+        scores: { [key: string]: unknown };
 
-        predict_call_id?: string | null;
+        total_cost: number | null;
 
-        scorer_call_ids?: { [key: string]: string };
-
-        scores?: { [key: string]: unknown };
-
-        total_cost?: number | null;
-
-        total_tokens?: number | null;
+        total_tokens: number | null;
       }
 
       export namespace Trial {
@@ -81,42 +81,42 @@ export namespace V2EvalResultQueryResponse {
   }
 
   export interface Summary {
-    evaluations?: Array<Summary.Evaluation>;
+    evaluations: Array<Summary.Evaluation>;
 
-    row_count?: number;
+    row_count: number;
   }
 
   export namespace Summary {
     export interface Evaluation {
+      display_name: string | null;
+
       evaluation_call_id: string;
 
-      display_name?: string | null;
+      evaluation_ref: string | null;
 
-      evaluation_ref?: string | null;
-
-      model_ref?: string | null;
+      model_ref: string | null;
 
       /**
        * Sum of per-trial predict-only cost for this evaluation (the model's predict()
        * cost only, excluding LLM-as-a-judge scorer cost); None when no trial reports
        * cost.
        */
-      predict_total_cost?: number | null;
+      predict_total_cost: number | null;
 
       /**
        * Sum of per-trial predict-only token usage for this evaluation (the model's
        * predict() tokens only, excluding LLM-as-a-judge scorer usage); None when no
        * trial reports usage.
        */
-      predict_total_tokens?: number | null;
+      predict_total_tokens: number | null;
 
-      scorer_stats?: Array<Evaluation.ScorerStat>;
+      scorer_stats: Array<Evaluation.ScorerStat>;
 
-      started_at?: string | null;
+      started_at: string | null;
 
-      trace_id?: string | null;
+      trace_id: string | null;
 
-      trial_count?: number;
+      trial_count: number;
     }
 
     export namespace Evaluation {
@@ -125,32 +125,32 @@ export namespace V2EvalResultQueryResponse {
        * scorer_key.path.to.leaf).
        */
       export interface ScorerStat {
-        scorer_key: string;
+        numeric_count: number;
 
-        numeric_count?: number;
+        numeric_mean: number | null;
 
-        numeric_mean?: number | null;
+        pass_known_count: number;
 
-        pass_known_count?: number;
+        pass_rate: number | null;
 
-        pass_rate?: number | null;
+        pass_signal_coverage: number | null;
 
-        pass_signal_coverage?: number | null;
-
-        pass_true_count?: number;
+        pass_true_count: number;
 
         /**
          * Dot-joined subpath for nested dimensions, e.g. 'passed' for
          * token_distance.passed. None for root-level scalar scorers.
          */
-        path?: string | null;
+        path: string | null;
 
-        trial_count?: number;
+        scorer_key: string;
+
+        trial_count: number;
 
         /**
          * Type of the leaf value: binary (bool), continuous (number), or text (string).
          */
-        value_type?: 'binary' | 'continuous' | 'text' | null;
+        value_type: 'binary' | 'continuous' | 'text' | null;
       }
     }
   }

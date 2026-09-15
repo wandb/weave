@@ -41,12 +41,12 @@ export namespace V2RuntimeApplyResponse {
      */
     id: string;
 
-    playground_id: string;
-
     /**
      * Maximum tokens supported by this runtime ID
      */
-    max_tokens?: number;
+    max_tokens: number;
+
+    playground_id: string;
   }
 }
 

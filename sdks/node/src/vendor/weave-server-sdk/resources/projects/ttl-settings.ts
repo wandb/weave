@@ -28,7 +28,7 @@ export interface TtlSettingReadResponse {
   /**
    * None = no TTL (infinite retention)
    */
-  retention_days?: number | null;
+  retention_days: number | null;
 }
 
 export interface TtlSettingUpdateParams {

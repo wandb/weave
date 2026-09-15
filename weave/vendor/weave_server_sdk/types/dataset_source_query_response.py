@@ -14,7 +14,13 @@ class Link(BaseModel):
 
     id: str
 
+    added_by: Optional[str] = None
+
     created_at: datetime
+
+    deleted_at: Optional[datetime] = None
+
+    link_metadata: Optional[Dict[str, object]] = None
 
     row_digest: str
 
@@ -29,12 +35,6 @@ class Link(BaseModel):
     source_trace_id: str
 
     updated_at: datetime
-
-    added_by: Optional[str] = None
-
-    deleted_at: Optional[datetime] = None
-
-    link_metadata: Optional[Dict[str, object]] = None
 
 
 class DatasetSourceQueryResponse(BaseModel):

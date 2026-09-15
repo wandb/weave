@@ -45,7 +45,7 @@ export type FileContentResponse = unknown;
 export interface FileResolveURLResponse {
   download_urls: Array<string>;
 
-  expires_at?: string | null;
+  expires_at: string | null;
 }
 
 export interface FileStatsResponse {

@@ -11,10 +11,10 @@ class RuntimeID(BaseModel):
     id: str
     """Value sent in the OpenAI-compatible request model field"""
 
-    playground_id: str
-
-    max_tokens: Optional[int] = None
+    max_tokens: int
     """Maximum tokens supported by this runtime ID"""
+
+    playground_id: str
 
 
 class V2RuntimeApplyResponse(BaseModel):

@@ -88,9 +88,9 @@ export namespace DatasetSourceLinkResponse {
    * Result for a single flattened (row_digest, source) link.
    */
   export interface Entry {
-    link_id: string;
+    created: boolean | null;
 
-    created?: boolean | null;
+    link_id: string;
   }
 }
 
@@ -108,7 +108,13 @@ export namespace DatasetSourceQueryResponse {
   export interface Link {
     id: string;
 
+    added_by: string | null;
+
     created_at: string;
+
+    deleted_at: string | null;
+
+    link_metadata: { [key: string]: unknown } | null;
 
     row_digest: string;
 
@@ -123,12 +129,6 @@ export namespace DatasetSourceQueryResponse {
     source_trace_id: string;
 
     updated_at: string;
-
-    added_by?: string | null;
-
-    deleted_at?: string | null;
-
-    link_metadata?: { [key: string]: unknown } | null;
   }
 }
 

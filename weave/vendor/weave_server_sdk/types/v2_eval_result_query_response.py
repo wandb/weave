@@ -26,19 +26,19 @@ class RowEvaluationTrialGenaiSpanRef(BaseModel):
 
 
 class RowEvaluationTrial(BaseModel):
-    predict_and_score_call_id: str
-
     genai_span_ref: Optional[List[RowEvaluationTrialGenaiSpanRef]] = None
 
     api_model_latency_seconds: Optional[float] = FieldInfo(alias="model_latency_seconds", default=None)
 
-    api_model_output: Optional[object] = FieldInfo(alias="model_output", default=None)
+    api_model_output: object = FieldInfo(alias="model_output")
+
+    predict_and_score_call_id: str
 
     predict_call_id: Optional[str] = None
 
-    scorer_call_ids: Optional[Dict[str, str]] = None
+    scorer_call_ids: Dict[str, str]
 
-    scores: Optional[Dict[str, object]] = None
+    scores: Dict[str, object]
 
     total_cost: Optional[float] = None
 
@@ -48,15 +48,15 @@ class RowEvaluationTrial(BaseModel):
 class RowEvaluation(BaseModel):
     evaluation_call_id: str
 
-    trials: Optional[List[RowEvaluationTrial]] = None
+    trials: List[RowEvaluationTrial]
 
 
 class Row(BaseModel):
+    evaluations: List[RowEvaluation]
+
+    raw_data_row: object
+
     row_digest: str
-
-    evaluations: Optional[List[RowEvaluation]] = None
-
-    raw_data_row: Optional[object] = None
 
 
 class SummaryEvaluationScorerStat(BaseModel):
@@ -64,19 +64,17 @@ class SummaryEvaluationScorerStat(BaseModel):
     Stats for a single flattened score dimension (scorer_key or scorer_key.path.to.leaf).
     """
 
-    scorer_key: str
-
-    numeric_count: Optional[int] = None
+    numeric_count: int
 
     numeric_mean: Optional[float] = None
 
-    pass_known_count: Optional[int] = None
+    pass_known_count: int
 
     pass_rate: Optional[float] = None
 
     pass_signal_coverage: Optional[float] = None
 
-    pass_true_count: Optional[int] = None
+    pass_true_count: int
 
     path: Optional[str] = None
     """Dot-joined subpath for nested dimensions, e.g.
@@ -84,16 +82,18 @@ class SummaryEvaluationScorerStat(BaseModel):
     'passed' for token_distance.passed. None for root-level scalar scorers.
     """
 
-    trial_count: Optional[int] = None
+    scorer_key: str
+
+    trial_count: int
 
     value_type: Optional[Literal["binary", "continuous", "text"]] = None
     """Type of the leaf value: binary (bool), continuous (number), or text (string)."""
 
 
 class SummaryEvaluation(BaseModel):
-    evaluation_call_id: str
-
     display_name: Optional[str] = None
+
+    evaluation_call_id: str
 
     evaluation_ref: Optional[str] = None
 
@@ -113,27 +113,27 @@ class SummaryEvaluation(BaseModel):
     trial reports usage.
     """
 
-    scorer_stats: Optional[List[SummaryEvaluationScorerStat]] = None
+    scorer_stats: List[SummaryEvaluationScorerStat]
 
     started_at: Optional[str] = None
 
     trace_id: Optional[str] = None
 
-    trial_count: Optional[int] = None
+    trial_count: int
 
 
 class Summary(BaseModel):
-    evaluations: Optional[List[SummaryEvaluation]] = None
+    evaluations: List[SummaryEvaluation]
 
-    row_count: Optional[int] = None
+    row_count: int
 
 
 class V2EvalResultQueryResponse(BaseModel):
     rows: List[Row]
 
-    total_rows: int
-
     summary: Optional[Summary] = None
 
-    warnings: Optional[List[str]] = None
+    total_rows: int
+
+    warnings: List[str]
     """Non-fatal warnings (e.g. failed to resolve dataset row refs)."""
