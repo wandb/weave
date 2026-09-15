@@ -41,6 +41,8 @@ DEFAULT_MAX_BUFFER_SIZE = 100000
 BUFFER_WARN_THRESHOLD = 0.5
 # Counts messages librdkafka gave up on after `message.timeout.ms`, per topic.
 DELIVERY_FAILED_METRIC = "weave_trace_server.kafka_producer.delivery_failed"
+# logger.error on count == 1 and count % DELIVERY_ERROR_LOG_EVERY == 0.
+DELIVERY_ERROR_LOG_EVERY = 100
 
 logger = logging.getLogger(__name__)
 
@@ -58,6 +60,7 @@ class KafkaProducer(ConfluentKafkaProducer):
         self.max_buffer_size = (
             kafka_producer_max_buffer_size() or DEFAULT_MAX_BUFFER_SIZE
         )
+        self._delivery_error_counts: dict[tuple[str | None, str], int] = {}
 
     @classmethod
     def from_env(
@@ -96,14 +99,19 @@ class KafkaProducer(ConfluentKafkaProducer):
             return
 
         topic = msg.topic()
-        logger.error(
-            "Kafka delivery failed topic=%s error=%s",
-            topic,
-            err.str(),
-            extra={"key": msg.key(), "error_code": err.name()},
-        )
+        error_name = err.name()
+        count = self._record_delivery_error(topic, error_name)
+
+        if count == 1 or count % DELIVERY_ERROR_LOG_EVERY == 0:
+            logger.error(
+                "Kafka delivery failed topic=%s error=%s count=%s",
+                topic,
+                err.str(),
+                count,
+                extra={"key": msg.key(), "error_code": error_name},
+            )
         emit_counter(
-            DELIVERY_FAILED_METRIC, 1, [f"topic:{topic}", f"error:{err.name()}"]
+            DELIVERY_FAILED_METRIC, 1, [f"topic:{topic}", f"error:{error_name}"]
         )
 
     def produce_call_end(
@@ -129,9 +137,9 @@ class KafkaProducer(ConfluentKafkaProducer):
 
         if flush_immediately:
             # Use a short non-blocking flush instead of an unbounded flush().
-            # The producer is a process-level singleton shared across all request
+            # KafkaProducer is a process-level singleton shared across request
             # threads, so flush() (no timeout) blocks until ALL in-flight messages
-            # from every concurrent request are acknowledged — causing a convoy
+            # from every concurrent request are acknowledged, causing a convoy
             # effect under load.  flush(0) triggers a delivery attempt for queued
             # messages and returns immediately.
             self.flush(0)
@@ -227,6 +235,13 @@ class KafkaProducer(ConfluentKafkaProducer):
             value=event.model_dump_json(),
             key=publish_key,
         )
+
+    def _record_delivery_error(self, topic: str | None, error_name: str) -> int:
+        key = (topic, error_name)
+        count = self._delivery_error_counts.get(key, 0) + 1
+        self._delivery_error_counts[key] = count
+
+        return count
 
     def _check_buffer_pressure(
         self, message_type: str, logging_extra: dict[str, str | int] | None = None
@@ -363,8 +378,8 @@ def _bucketed_project_key(project_id: str, bucket_seed: str) -> str:
     bucket_count = wf_kafka_project_id_bucket_count()
     if bucket_count <= 1:
         return project_id
-    # crc32 picks the bucket; the murmur2 partitioner re-hashes the composite key,
-    # so bucket_count caps (not equals) the partitions a project spreads across.
+    # crc32(bucket_seed) % bucket_count suffixes project_id so murmur2_random
+    # hashes `project_id:bucket` and one project_id uses at most bucket_count partitions.
     bucket = zlib.crc32(bucket_seed.encode()) % bucket_count
     return f"{project_id}:{bucket}"
 

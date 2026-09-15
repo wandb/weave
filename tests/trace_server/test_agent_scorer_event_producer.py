@@ -14,6 +14,7 @@ from weave.trace_server.agents.kafka_events import (
     ScoreAgentSpansEvent,
 )
 from weave.trace_server.kafka import (
+    DELIVERY_ERROR_LOG_EVERY,
     DELIVERY_FAILED_METRIC,
     KafkaProducer,
     _bucketed_project_key,
@@ -132,11 +133,14 @@ def test_producer_publishes_under_buffer_limit(
 
 @pytest.mark.disable_logging_error_check
 def test_delivery_failure_is_counted_per_topic_and_error(monkeypatch) -> None:
-    """Only a failed delivery reaches the counter; a success is silent."""
+    """Failed deliveries always increment the counter; logger.error is sampled."""
     producer = MagicMock(spec=KafkaProducer)
-    _bind_real_methods(producer, "_on_delivery")
+    producer._delivery_error_counts = {}
+    _bind_real_methods(producer, "_on_delivery", "_record_delivery_error")
     emitted = MagicMock()
+    logged = MagicMock()
     monkeypatch.setattr(kafka, "emit_counter", emitted)
+    monkeypatch.setattr(kafka.logger, "error", logged)
     message = MagicMock()
     message.topic.return_value = "weave.embed_agent_spans"
     message.key.return_value = b"conv-1"
@@ -146,6 +150,7 @@ def test_delivery_failure_is_counted_per_topic_and_error(monkeypatch) -> None:
 
     producer._on_delivery(None, message)
     emitted.assert_not_called()
+    logged.assert_not_called()
 
     producer._on_delivery(error, message)
     emitted.assert_called_once_with(
@@ -153,6 +158,31 @@ def test_delivery_failure_is_counted_per_topic_and_error(monkeypatch) -> None:
         1,
         ["topic:weave.embed_agent_spans", "error:_MSG_TIMED_OUT"],
     )
+    logged.assert_called_once_with(
+        "Kafka delivery failed topic=%s error=%s count=%s",
+        "weave.embed_agent_spans",
+        "Local: Message timed out",
+        1,
+        extra={"key": b"conv-1", "error_code": "_MSG_TIMED_OUT"},
+    )
+
+    producer._on_delivery(error, message)
+    assert emitted.call_count == 2
+    logged.assert_called_once()
+
+    for _ in range(DELIVERY_ERROR_LOG_EVERY - 2):
+        producer._on_delivery(error, message)
+
+    assert emitted.call_count == DELIVERY_ERROR_LOG_EVERY
+    assert logged.call_count == 2
+    assert logged.call_args.args[3] == DELIVERY_ERROR_LOG_EVERY
+
+    other = MagicMock()
+    other.topic.return_value = "weave.call_ended"
+    other.key.return_value = b"call-1"
+    producer._on_delivery(error, other)
+    assert emitted.call_count == DELIVERY_ERROR_LOG_EVERY + 1
+    assert logged.call_count == 3
 
 
 @pytest.mark.disable_logging_error_check
