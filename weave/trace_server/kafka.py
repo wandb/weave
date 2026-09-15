@@ -39,7 +39,7 @@ SCORE_CALLS_TOPIC = "weave.score_calls"
 DEFAULT_MAX_BUFFER_SIZE = 100000
 # Fraction of `max_buffer_size` at which a "buffer pressure" warning is logged.
 BUFFER_WARN_THRESHOLD = 0.5
-# Counts messages librdkafka gave up on after `message.timeout.ms`, per topic.
+# Counts a failed on_delivery, tagged by topic and KafkaError.name().
 DELIVERY_FAILED_METRIC = "weave_trace_server.kafka_producer.delivery_failed"
 # logger.error on count == 1 and count % DELIVERY_ERROR_LOG_EVERY == 0.
 DELIVERY_ERROR_LOG_EVERY = 100
@@ -101,7 +101,7 @@ class KafkaProducer(ConfluentKafkaProducer):
         return kwargs
 
     def _on_delivery(self, err: KafkaError | None, msg: Message) -> None:
-        """Count a message the broker never acknowledged; runs inside `poll`/`flush`."""
+        """Count a failed delivery; runs inside `poll`/`flush`."""
         if err is None:
             return
 
