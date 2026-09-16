@@ -44,6 +44,7 @@ from weave.trace_server.agents.schema import (
     SpanKindLiteral,
     StatusCodeLiteral,
 )
+from weave.trace_server.common_interface import STAINLESS_EMPTY_OBJECT
 from weave.trace_server.interface.feedback_types import AgentSpanFeedbackType
 from weave.trace_server.interface.query import Query
 from weave.trace_server.sensitive_data.policy import SensitiveDataPolicy
@@ -1084,6 +1085,8 @@ class AgentChatAgentStart(AgentResponseModel):
 
 class AgentChatAgentHandoff(AgentResponseModel):
     """Payload for a future agent-to-agent handoff event."""
+
+    model_config = STAINLESS_EMPTY_OBJECT
 
 
 class AgentChatContextCompacted(AgentResponseModel):

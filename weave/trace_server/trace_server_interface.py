@@ -27,6 +27,7 @@ from weave.trace_server import http_service_interface as his
 from weave.trace_server.agents import types as agent_types
 from weave.trace_server.common_interface import (
     RESPONSE_DEFAULTS_REQUIRED,
+    STAINLESS_EMPTY_OBJECT,
     WB_USER_ID_DESCRIPTION,
     AnnotationState,
     BaseModelStrict,
@@ -55,6 +56,25 @@ MAX_FEEDBACK_SAMPLE_LIMIT = 5000
 @with_config(ConfigDict(extra="allow"))
 class ExtraKeysTypedDict(TypedDict):
     pass
+
+
+# A stats bucket names one key per requested metric and aggregation on top of these, so the
+# extras stay open. A bare extra="allow" would say `additionalProperties: true`, which the
+# generated clients read as an untyped index. The type array is a list rather than an anyOf
+# because an anyOf drops `integer` into `number`, and some of these keys are counts.
+@with_config(
+    ConfigDict(
+        extra="allow",
+        json_schema_extra={
+            "additionalProperties": {"type": ["integer", "number", "string", "null"]}
+        },
+    )
+)
+class StatsBucket(TypedDict):
+    """One time bucket of a stats response."""
+
+    timestamp: str
+    count: int
 
 
 class LLMUsageSchema(TypedDict, total=False):
@@ -1355,7 +1375,7 @@ class FeedbackPurgeReq(BaseModelStrict):
 
 
 class FeedbackPurgeRes(BaseModel):
-    pass
+    model_config = STAINLESS_EMPTY_OBJECT
 
 
 class FeedbackReplaceReq(FeedbackCreateReq):
@@ -1492,8 +1512,14 @@ class FeedbackStatsReq(_FeedbackFilterBase):
     )
 
 
+class FeedbackStatsBucket(StatsBucket):
+    """One feedback time bucket, plus one key per requested metric aggregation."""
+
+
 class FeedbackStatsRes(BaseModel):
     """Response with time-series feedback statistics."""
+
+    model_config = RESPONSE_DEFAULTS_REQUIRED
 
     start: datetime.datetime = Field(
         description="Resolved start time (always UTC, regardless of the requested timezone)."
@@ -1503,7 +1529,7 @@ class FeedbackStatsRes(BaseModel):
     )
     granularity: int = Field(description="Bucket size used (in seconds)")
     timezone: str = Field(description="Timezone used for bucket alignment")
-    buckets: list[dict[str, Any]] = Field(
+    buckets: list[FeedbackStatsBucket] = Field(
         default_factory=list,
         description=(
             "Time-bucketed aggregations. Each dict has 'timestamp' (ISO string), "
@@ -2568,7 +2594,7 @@ class CallsScoreRes(BaseModel):
     without a breaking change.
     """
 
-    pass
+    model_config = STAINLESS_EMPTY_OBJECT
 
 
 class OpCreateBody(BaseModel):
@@ -4069,20 +4095,32 @@ class CallStatsReq(BaseModelStrict):
         return self
 
 
+class CallBucket(StatsBucket):
+    """One call-metrics time bucket, plus one key per requested metric aggregation."""
+
+
+class UsageBucket(StatsBucket):
+    """One usage time bucket per model, plus one key per requested metric aggregation."""
+
+    model: str
+
+
 class CallStatsRes(BaseModel):
     """Response containing time-series call statistics."""
+
+    model_config = RESPONSE_DEFAULTS_REQUIRED
 
     start: datetime.datetime = Field(description="Resolved start time (UTC)")
     end: datetime.datetime = Field(description="Resolved end time (UTC)")
     granularity: int = Field(description="Bucket size used (in seconds)")
     timezone: str = Field(description="Timezone used for bucket alignment")
-    usage_buckets: list[dict[str, Any]] = Field(
+    usage_buckets: list[UsageBucket] = Field(
         default=[],
-        description="Usage metrics by model. Each bucket contains 'timestamp', 'model', and aggregated metric values.",
+        description="Usage metrics by model. Each bucket contains 'timestamp', 'model', 'count', and aggregated metric values.",
     )
-    call_buckets: list[dict[str, Any]] = Field(
+    call_buckets: list[CallBucket] = Field(
         default=[],
-        description="Call-level metrics. Each bucket contains 'timestamp' and aggregated metric values.",
+        description="Call-level metrics. Each bucket contains 'timestamp', 'count', and aggregated metric values.",
     )
 
 

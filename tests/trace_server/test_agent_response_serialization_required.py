@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import Any
 
 from weave.trace_server.agents.types import (
+    AgentChatAgentHandoff,
     AgentConversationChatRes,
     AgentConversationSpansRes,
     AgentCustomAttrsSchemaRes,
@@ -72,3 +73,10 @@ def test_agent_span_schema_constructor_and_dump_keep_defaults() -> None:
     assert dumped["parent_span_id"] is None
     assert dumped["finish_reasons"] == []
     assert dumped["input_messages"] == []
+
+
+def test_agent_handoff_is_marked_an_empty_object() -> None:
+    # An untyped payload here spreads to every chat message that carries it.
+    schema = AgentChatAgentHandoff.model_json_schema(mode="serialization")
+    assert schema.get("properties") == {}
+    assert schema["x-stainless-empty-object"] is True

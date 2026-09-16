@@ -2598,6 +2598,7 @@ class InMemoryTraceServer(tsi.FullTraceServerInterface):
             raw: dict[
                 tuple[str, str], dict[str, list[int]]
             ] = {}  # (ts, model) -> metric -> values
+            usage_counts: dict[tuple[str, str], int] = {}
 
             for call in usage_calls:
                 if not call.summary or not isinstance(call.summary, dict):
@@ -2612,6 +2613,7 @@ class InMemoryTraceServer(tsi.FullTraceServerInterface):
                     key = (ts, model)
                     if key not in raw:
                         raw[key] = {}
+                    usage_counts[key] = usage_counts.get(key, 0) + 1
                     for spec in req.usage_metrics:
                         token_keys = token_keys_map.get(spec.metric, [])
                         val = 0
@@ -2622,7 +2624,11 @@ class InMemoryTraceServer(tsi.FullTraceServerInterface):
                         raw[key].setdefault(spec.metric, []).append(val)
 
             for (ts, model), metrics in sorted(raw.items()):
-                bucket: dict[str, Any] = {"timestamp": ts, "model": model}
+                bucket: dict[str, Any] = {
+                    "timestamp": ts,
+                    "model": model,
+                    "count": usage_counts[ts, model],
+                }
                 for spec in req.usage_metrics:
                     values = metrics.get(spec.metric, [])
                     if not values:
@@ -2635,11 +2641,13 @@ class InMemoryTraceServer(tsi.FullTraceServerInterface):
         call_buckets: list[dict[str, Any]] = []
         if req.call_metrics:
             bucket_data: dict[str, dict[str, list[Any]]] = {}
+            call_counts: dict[str, int] = {}
 
             for call in metric_calls:
                 ts = _bucket_ts(call.started_at)
                 if ts not in bucket_data:
                     bucket_data[ts] = {}
+                call_counts[ts] = call_counts.get(ts, 0) + 1
                 for cm_spec in req.call_metrics:
                     if cm_spec.metric == "latency_ms":
                         if call.ended_at and call.started_at:
@@ -2655,7 +2663,7 @@ class InMemoryTraceServer(tsi.FullTraceServerInterface):
                         )
 
             for ts, metrics in sorted(bucket_data.items()):
-                bucket = {"timestamp": ts}
+                bucket = {"timestamp": ts, "count": call_counts[ts]}
                 for cm_spec in req.call_metrics:
                     values = metrics.get(cm_spec.metric, [])
                     if not values:
@@ -3983,7 +3991,7 @@ class InMemoryTraceServer(tsi.FullTraceServerInterface):
 
         buckets: list[dict[str, Any]] = []
         for bk in all_bucket_starts:
-            row_dict: dict[str, Any] = {"timestamp": bk}
+            row_dict: dict[str, Any] = {"timestamp": bk.isoformat()}
             for m in metrics:
                 slug = m.json_path.replace(".", "_")
                 vals = bucket_data.get(bk, {}).get(m.json_path, [])
