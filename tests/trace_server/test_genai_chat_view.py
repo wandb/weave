@@ -1971,72 +1971,285 @@ def test_iter_internal_refs_caps_recursion_on_deeply_nested_payload() -> None:
 _TURN_PROMPT = "Why did my run crash?"
 _PAGE_STATE = '{"type": "wandb_web_page_state", "url": "https://wandb.ai/e/p/runs/abc"}'
 _CLOCK = "Current date and time: 2026-09-15T14:02:00Z (Tuesday, UTC)."
+_COMPOSITE = f"{_PAGE_STATE}\n{_TURN_PROMPT}\n{_CLOCK}"
+_ANSWER = "Your run hit an OOM at step 340."
+_T0 = datetime.datetime(2026, 1, 1, tzinfo=datetime.timezone.utc)
+_ROOT_PROMPT = [{"role": "user", "content": _TURN_PROMPT}]
+_SYSTEM = {"role": "system", "content": "You are the W&B assistant."}
 
 
-@pytest.mark.parametrize(
-    ("llm_user_messages", "expected_context"),
-    [
-        (
-            [{"role": "user", "content": f"{_PAGE_STATE}\n{_TURN_PROMPT}\n{_CLOCK}"}],
-            [f"{_PAGE_STATE}\n\n{_CLOCK}"],
-        ),
-        (
-            [
-                {"role": "user", "content": _CLOCK},
-                {"role": "user", "content": _TURN_PROMPT},
-            ],
-            [_CLOCK],
-        ),
-        (
-            [
-                {
-                    "role": "user",
-                    "content": "<system-reminder>Budget low.</system-reminder>",
-                }
-            ],
-            ["<system-reminder>Budget low.</system-reminder>"],
-        ),
-        ([{"role": "user", "content": _TURN_PROMPT}], []),
-    ],
-    ids=["wrapped-around-prompt", "separate-message", "no-overlap", "same-prompt"],
-)
-def test_turn_root_prompt_is_the_user_message_and_llm_additions_are_context(
-    llm_user_messages: list[dict], expected_context: list[str]
-) -> None:
-    """`invoke_agent` root `input_messages` is the user bubble; `chat` span extras render as `Prompt context`."""
-    spans = [
+def _timeline(messages: list[AgentChatMessage]) -> list[tuple[str, str]]:
+    """Flatten a projection to (type, text) so a whole trajectory asserts in one line."""
+    flat: list[tuple[str, str]] = []
+    for m in messages:
+        if m.type == "user_message":
+            flat.append(("user", _user_payload(m).text))
+        elif m.type == "assistant_message":
+            flat.append(("assistant", _assistant_payload(m).text))
+        elif m.type == "tool_call":
+            tool = _tool_payload(m)
+            flat.append((tool.tool_name, tool.tool_result or ""))
+        else:
+            flat.append((m.type, m.agent_name or ""))
+    return flat
+
+
+def _turn(
+    root_input: list[dict] | None, llm_input: list[dict]
+) -> list[AgentSpanSchema]:
+    """An `invoke_agent` root over one `chat` span, the session-SDK turn shape."""
+    return [
         _span(
             span_id="turn",
             operation_name="invoke_agent",
             agent_name="wandb",
-            input_messages=[{"role": "user", "content": _TURN_PROMPT}],
+            input_messages=root_input or [],
         ),
         _span(
             span_id="llm",
             parent_span_id="turn",
             operation_name="chat",
-            input_messages=[
-                {"role": "system", "content": "You are the W&B assistant."},
-                *llm_user_messages,
-            ],
-            output_messages=[
-                {"role": "assistant", "content": "Your run hit an OOM at step 340."}
-            ],
+            input_messages=llm_input,
+            output_messages=[{"role": "assistant", "content": _ANSWER}],
         ),
     ]
 
+
+@pytest.mark.parametrize(
+    ("root_input", "llm_user_messages", "expected_context"),
+    [
+        (
+            _ROOT_PROMPT,
+            [{"role": "user", "content": _COMPOSITE}],
+            [f"{_PAGE_STATE}\n\n{_CLOCK}"],
+        ),
+        (
+            _ROOT_PROMPT,
+            [
+                {"role": "user", "content": _PAGE_STATE},
+                {"role": "user", "content": _TURN_PROMPT},
+                {"role": "user", "content": _CLOCK},
+            ],
+            [_PAGE_STATE, _CLOCK],
+        ),
+        (
+            _ROOT_PROMPT,
+            [
+                {
+                    "role": "user",
+                    "content": f"<context>{_PAGE_STATE}</context>\n\n{_TURN_PROMPT}",
+                }
+            ],
+            [f"<context>{_PAGE_STATE}</context>"],
+        ),
+        (
+            [
+                {"role": "user", "content": "Hi there"},
+                {"role": "assistant", "content": "Hello! How can I help?"},
+                *_ROOT_PROMPT,
+            ],
+            [{"role": "user", "content": _COMPOSITE}],
+            [f"{_PAGE_STATE}\n\n{_CLOCK}"],
+        ),
+    ],
+    ids=["wrapped", "separate-messages", "templated", "root-carries-history"],
+)
+def test_recorded_prompt_leads_and_what_the_llm_span_wraps_around_it_is_context(
+    root_input: list[dict], llm_user_messages: list[dict], expected_context: list[str]
+) -> None:
+    """The root's prompt is the user bubble; what the LLM span wrapped around it is `Prompt context`; no text is dropped."""
+    spans = _turn(root_input, [_SYSTEM, *llm_user_messages])
+
+    timeline = _timeline(build_chat_messages(spans))
+
+    context = [text for name, text in timeline if name == "Prompt context"]
+    assert timeline[0] == ("user", _TURN_PROMPT)
+    assert context == expected_context
+    assert timeline[-1] == ("assistant", _ANSWER)
+    assert [t for t in timeline if t[0] == "user"] == [("user", _TURN_PROMPT)]
+    # Conservation: every line the LLM saw is either the bubble or context.
+    seen = "\n".join([_TURN_PROMPT, *context])
+    for message in llm_user_messages:
+        for line in message["content"].splitlines():
+            assert line in seen
+
+
+_REMINDER = "<system-reminder>Budget low.</system-reminder>"
+
+
+@pytest.mark.parametrize(
+    ("spans", "expected"),
+    [
+        (
+            _turn(_ROOT_PROMPT, [_SYSTEM, {"role": "user", "content": _TURN_PROMPT}]),
+            [("user", _TURN_PROMPT), ("agent_start", "wandb"), ("assistant", _ANSWER)],
+        ),
+        (
+            _turn(_ROOT_PROMPT, [_SYSTEM, {"role": "user", "content": _REMINDER}]),
+            [("user", _REMINDER), ("agent_start", "wandb"), ("assistant", _ANSWER)],
+        ),
+        (
+            _turn(None, [_SYSTEM, {"role": "user", "content": _COMPOSITE}]),
+            [("user", _COMPOSITE), ("agent_start", "wandb"), ("assistant", _ANSWER)],
+        ),
+        (
+            _turn(_ROOT_PROMPT, [_SYSTEM]),
+            [("user", _TURN_PROMPT), ("agent_start", "wandb"), ("assistant", _ANSWER)],
+        ),
+        (
+            [
+                _span(
+                    span_id="only",
+                    operation_name="chat",
+                    input_messages=[_SYSTEM, {"role": "user", "content": _COMPOSITE}],
+                    output_messages=[{"role": "assistant", "content": _ANSWER}],
+                )
+            ],
+            [("user", _COMPOSITE), ("assistant", _ANSWER)],
+        ),
+        (
+            [
+                *_turn(
+                    _ROOT_PROMPT, [_SYSTEM, {"role": "user", "content": _COMPOSITE}]
+                ),
+                _span(
+                    span_id="turn2",
+                    operation_name="invoke_agent",
+                    agent_name="wandb",
+                    input_messages=[{"role": "user", "content": "And now?"}],
+                    started_at=_T0 + datetime.timedelta(seconds=5),
+                ),
+            ],
+            [
+                ("user", _COMPOSITE),
+                ("agent_start", "wandb"),
+                ("assistant", _ANSWER),
+                ("agent_start", "wandb"),
+            ],
+        ),
+    ],
+    ids=[
+        "same-prompt",
+        "no-overlap",
+        "empty-root",
+        "no-llm-user-text",
+        "chat-root",
+        "two-roots",
+    ],
+)
+def test_recorded_prompt_rule_is_inert_off_its_exact_shape(
+    spans: list[AgentSpanSchema], expected: list[tuple[str, str]]
+) -> None:
+    """Master's projection is reproduced when the root has no prompt, the first user turn does not contain it, the root is not a lone `invoke_agent`, or the LLM span has no user text."""
     messages = build_chat_messages(spans)
 
-    users = [_user_payload(m).text for m in messages if m.type == "user_message"]
-    context = [
-        _tool_payload(m).tool_result
+    assert _timeline(messages) == expected
+    assert not any(
+        _tool_payload(m).tool_name == "Prompt context"
+        for m in messages
+        if m.type == "tool_call"
+    )
+
+
+def test_recorded_prompt_turn_keeps_media_dedupes_retries_and_task_notifications() -> (
+    None
+):
+    """Media stays on the bubble, a retried LLM span replaying the same input adds nothing, and a task notification in the run still surfaces once."""
+    image_internal = "weave-trace-internal:///PID/object/Content:IMG"
+    image_external = "weave:///e/p/object/Content:IMG"
+    notification = "<task-notification>subagent done</task-notification>"
+    composite_with_image = {
+        "role": "user",
+        "content": _parts(
+            _text_part(_COMPOSITE),
+            _uri_part(image_external, mime_type="image/png", modality="image"),
+        ),
+    }
+    llm_input = [
+        _SYSTEM,
+        {"role": "user", "content": notification},
+        composite_with_image,
+    ]
+    spans = _turn(_ROOT_PROMPT, llm_input)
+    spans[1].content_refs = [image_internal]
+    retry = _span(
+        span_id="llm-retry",
+        parent_span_id="turn",
+        operation_name="chat",
+        input_messages=[_SYSTEM, composite_with_image],
+        output_messages=[{"role": "assistant", "content": _ANSWER}],
+        started_at=_T0 + datetime.timedelta(seconds=2),
+        content_refs=[image_internal],
+    )
+
+    messages = build_chat_messages([*spans, retry])
+
+    user = next(m for m in messages if m.type == "user_message")
+    assert _user_payload(user).text == _TURN_PROMPT
+    assert _user_payload(user).content_refs == [image_internal]
+    assert user.started_at == spans[1].started_at
+    assert _timeline(messages) == [
+        ("user", _TURN_PROMPT),
+        ("agent_start", "wandb"),
+        ("Task notification", notification),
+        ("Prompt context", f"{_PAGE_STATE}\n\n{_CLOCK}"),
+        ("assistant", _ANSWER),
+        ("assistant", _ANSWER),
+    ]
+    context = next(
+        m
         for m in messages
         if m.type == "tool_call" and _tool_payload(m).tool_name == "Prompt context"
+    )
+    assert _tool_payload(context).content_refs == []
+    assert _tool_payload(context).duration_ms == 0
+
+
+def test_recorded_prompt_splits_only_the_first_user_turn() -> None:
+    """A later user turn in the same trace, or a subagent handed the prompt verbatim, projects as a plain user bubble exactly as before."""
+    follow_up = f"{_PAGE_STATE}\nHow do I fix it?\n{_CLOCK}"
+    later_turn = _span(
+        span_id="llm2",
+        parent_span_id="turn",
+        operation_name="chat",
+        input_messages=[
+            _SYSTEM,
+            {"role": "user", "content": _COMPOSITE},
+            {"role": "assistant", "content": _ANSWER},
+            {"role": "user", "content": follow_up},
+        ],
+        output_messages=[{"role": "assistant", "content": "Lower the batch size."}],
+        started_at=_T0 + datetime.timedelta(seconds=5),
+    )
+    subagent = _span(
+        span_id="sub",
+        parent_span_id="turn",
+        operation_name="invoke_agent",
+        agent_name="researcher",
+        started_at=_T0 + datetime.timedelta(seconds=10),
+    )
+    subagent_llm = _span(
+        span_id="sub-llm",
+        parent_span_id="sub",
+        operation_name="chat",
+        input_messages=[{"role": "user", "content": f"Research this: {_TURN_PROMPT}"}],
+        output_messages=[{"role": "assistant", "content": "Found it."}],
+        started_at=_T0 + datetime.timedelta(seconds=11),
+    )
+    first_turn = _turn(_ROOT_PROMPT, [_SYSTEM, {"role": "user", "content": _COMPOSITE}])
+
+    timeline = _timeline(
+        build_chat_messages([*first_turn, later_turn, subagent, subagent_llm])
+    )
+
+    assert timeline == [
+        ("user", _TURN_PROMPT),
+        ("agent_start", "wandb"),
+        ("Prompt context", f"{_PAGE_STATE}\n\n{_CLOCK}"),
+        ("assistant", _ANSWER),
+        ("user", follow_up),
+        ("assistant", "Lower the batch size."),
+        ("agent_start", "researcher"),
+        ("user", f"Research this: {_TURN_PROMPT}"),
+        ("assistant", "Found it."),
     ]
-    assistants = [
-        _assistant_payload(m).text for m in messages if m.type == "assistant_message"
-    ]
-    assert users == [_TURN_PROMPT]
-    assert context == expected_context
-    assert assistants == ["Your run hit an OOM at step 340."]
-    assert messages[0].type == "user_message"

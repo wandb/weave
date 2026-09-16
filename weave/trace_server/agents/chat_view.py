@@ -61,6 +61,8 @@ _CLAUDE_TASK_NOTIFICATION_OPEN = "<task-notification>"
 _CLAUDE_TASK_NOTIFICATION_CLOSE = "</task-notification>"
 _TASK_NOTIFICATION_TOOL_NAME = "Task notification"
 _PROMPT_CONTEXT_TOOL_NAME = "Prompt context"
+# One trailing user message of an LLM span: (message, display text, media refs).
+_UserEntry = tuple[NormalizedMessage, str, list[str]]
 _CHAT_OPERATION = "chat"
 _ASSISTANT_TEXT_OPERATION = "assistant_text"
 
@@ -305,13 +307,13 @@ def build_chat_messages(spans: list[AgentSpanSchema]) -> list[AgentChatMessage]:
     (one chat span each), so the conversation is reconstructed from the spans'
     own messages rather than assuming one user prompt per trace.
 
-    When the trace root is an `invoke_agent` span carrying a user message, that
-    text is the turn's prompt: it leads the timeline, and any user-role text an
-    LLM span adds on top of it (see `_turn_prompt`) renders as `Prompt context`
-    tool activity. Otherwise, only when the walk surfaces no user message at
-    all do we fall back to a synthesized leading prompt. Claude Code task
-    notifications recorded only on that wrapper receive the equivalent fallback
-    as tool activity.
+    When the trace's lone root is an `invoke_agent` span carrying a user
+    message (see `_turn_prompt`) and the first user turn contains that text,
+    the recorded prompt is the user bubble and whatever the LLM span wrapped
+    around it renders as `Prompt context` tool activity. Only when the walk
+    surfaces no user message at all do we fall back to a synthesized leading
+    prompt. Claude Code task notifications recorded only on that wrapper
+    receive the equivalent fallback as tool activity.
     """
     if not spans:
         return []
@@ -356,8 +358,8 @@ class ChatTraversal:
     """
 
     messages: list[AgentChatMessage] = field(default_factory=list)
-    # The prompt recorded on the trace's `invoke_agent` root, when it has one.
-    # While set, LLM-span user text is harness context, not a new user turn.
+    # Prompt recorded on the trace's lone `invoke_agent` root; the first user
+    # turn containing it renders the prompt as the bubble and the rest as context.
     turn_prompt: str | None = None
     # True once any per-turn user message has been emitted during the walk;
     # gates the invoke_agent leading-prompt fallback in build_chat_messages.
@@ -630,7 +632,31 @@ class ChatTraversal:
         internal ref form via the span's ``content_refs`` because the read path
         requires internal refs (the int->ext converter rejects a bare external
         ref).
+
+        When the trace root recorded the turn's prompt (``turn_prompt``) and the
+        first user turn of the walk contains it, the prompt is the bubble and
+        the surrounding text is context (see ``_emit_recorded_prompt_turn``).
         """
+        entries = self._new_user_entries(span)
+
+        prompt = self.turn_prompt
+        # Only the trace's first user turn answers the recorded prompt; later
+        # turns are new input and project exactly as they always have.
+        if prompt is not None and not self.emitted_user:
+            lead = _entry_containing(entries, prompt)
+            if lead is not None:
+                self._emit_recorded_prompt_turn(span, agent_name, entries, lead, prompt)
+                return
+
+        for message, text, media in entries:
+            if _is_claude_task_notification(message):
+                self._emit_task_notification(span, agent_name, text, media)
+                continue
+            self._emit_user_message(span, text, media)
+
+    def _new_user_entries(self, span: AgentSpanSchema) -> list[_UserEntry]:
+        """This span's trailing user messages with their text and media, minus empties and replays."""
+        entries: list[_UserEntry] = []
         for message in _trailing_user_messages(span.input_messages):
             text = _display_text(message.content)
             media = _message_content_refs(span, [message])
@@ -640,48 +666,73 @@ class ChatTraversal:
             if sig == self._last_user_sig:
                 continue
             self._last_user_sig = sig
-            if _is_claude_task_notification(message):
-                # Claude's async subagent completion is encoded as role=user so
-                # the next model call consumes it, but it is not a new human
-                # turn. Preserve the event as foldable tool activity instead
-                # of rendering a misleading user bubble.
-                self._pending_agent_start = None
-                self.emitted_task_notification = True
-                self.messages.append(
-                    _context_tool_call(
-                        span, agent_name, _TASK_NOTIFICATION_TOOL_NAME, text, media
-                    )
-                )
-                continue
-            if self.turn_prompt is not None:
-                self._emit_prompt_context(span, agent_name, text, self.turn_prompt)
-                continue
-            self.emitted_user = True
-            # A user message marks a new turn; an unfilled agent_start from an
-            # earlier turn must not absorb this turn's instructions.
-            self._pending_agent_start = None
-            self.messages.append(
-                AgentChatMessage(
-                    type="user_message",
-                    agent_name="User",
-                    started_at=span.started_at,
-                    user_message=AgentChatUserMessage(text=text, content_refs=media),
-                )
-            )
+            entries.append((message, text, media))
 
-    def _emit_prompt_context(
-        self, span: AgentSpanSchema, agent_name: str | None, text: str, turn_prompt: str
+        return entries
+
+    def _emit_task_notification(
+        self,
+        span: AgentSpanSchema,
+        agent_name: str | None,
+        text: str,
+        media: list[str],
     ) -> None:
-        """Emit what an LLM span's user text adds around `turn_prompt`, if anything."""
-        addition = text.replace(turn_prompt, "", 1).strip()
-        if not addition:
-            return
-
+        """Surface a Claude Code task notification as tool activity."""
+        # Claude's async subagent completion is encoded as role=user so the
+        # next model call consumes it, but it is not a new human turn.
+        self._pending_agent_start = None
+        self.emitted_task_notification = True
         self.messages.append(
             _context_tool_call(
-                span, agent_name, _PROMPT_CONTEXT_TOOL_NAME, addition, []
+                span, agent_name, _TASK_NOTIFICATION_TOOL_NAME, text, media
             )
         )
+
+    def _emit_user_message(
+        self, span: AgentSpanSchema, text: str, media: list[str]
+    ) -> None:
+        """Emit one user bubble and mark the turn boundary."""
+        self.emitted_user = True
+        # A user message marks a new turn; an unfilled agent_start from an
+        # earlier turn must not absorb this turn's instructions.
+        self._pending_agent_start = None
+        self.messages.append(
+            AgentChatMessage(
+                type="user_message",
+                agent_name="User",
+                started_at=span.started_at,
+                user_message=AgentChatUserMessage(text=text, content_refs=media),
+            )
+        )
+
+    def _emit_recorded_prompt_turn(
+        self,
+        span: AgentSpanSchema,
+        agent_name: str | None,
+        entries: list[_UserEntry],
+        lead: _UserEntry,
+        prompt: str,
+    ) -> None:
+        """Lead with the recorded prompt, then what this span's user messages add around it."""
+        self._emit_user_message(span, prompt, lead[2])
+
+        for entry in entries:
+            message, text, media = entry
+            if _is_claude_task_notification(message):
+                self._emit_task_notification(span, agent_name, text, media)
+                continue
+            # The prompt and its media are already the bubble; only the
+            # surrounding text of the lead message is context.
+            if entry is lead:
+                text = text.replace(prompt, "", 1).strip()
+                media = []
+            if not text and not media:
+                continue
+            self.messages.append(
+                _context_tool_call(
+                    span, agent_name, _PROMPT_CONTEXT_TOOL_NAME, text, media
+                )
+            )
 
     def _walk_children(
         self, node: SpanNode, nearest_agent: str | None, depth: int
@@ -1272,6 +1323,14 @@ def _turn_prompt(roots: list[SpanNode]) -> str | None:
         return None
 
     return _extract_user_text(root.input_messages, last_only=True) or None
+
+
+def _entry_containing(entries: list[_UserEntry], prompt: str) -> _UserEntry | None:
+    """The first user entry whose text contains `prompt`."""
+    for entry in entries:
+        if prompt in entry[1]:
+            return entry
+    return None
 
 
 def _context_tool_call(
