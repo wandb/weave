@@ -103,7 +103,7 @@ def init(
                 - `use_stainless_server` (bool): Uses the Stainless-generated HTTP client which
                     provides better type safety, automatic retries, and improved error handling. This is
                     experimental and may become the default in future versions.
-                    Default: `False`
+                    Default: `True`
                 - `use_calls_complete` (bool): Uses an optimized write path that batches complete
                     call data (start and end) into a single request instead of separate start/end requests.
                     This reduces server load and improves performance, especially for short-lived ops.

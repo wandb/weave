@@ -167,7 +167,7 @@ function buildSpanProcessor(client: WeaveClient): SpanProcessor {
 // cost.
 function buildOtlpExporter(client: WeaveClient): OTLPTraceExporter {
   const {apiKey} = getWandbConfigs();
-  const url = `${client.traceServerApi.baseUrl}${GENAI_OTLP_PATH}`;
+  const url = `${client.traceServerApi.baseURL}${GENAI_OTLP_PATH}`;
   const authHeader = `Basic ${Buffer.from(`api:${apiKey}`).toString('base64')}`;
   return new OTLPTraceExporter({
     url,

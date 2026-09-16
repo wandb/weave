@@ -6,7 +6,7 @@ from typing import Optional
 
 import httpx
 
-from ..types import v2_scorer_create_params, v2_scorer_delete_params
+from ..types import v2_scorer_list_params, v2_scorer_create_params, v2_scorer_delete_params
 from .._types import Body, Omit, Query, Headers, NotGiven, SequenceNotStr, omit, not_given
 from .._utils import path_template, maybe_transform, async_maybe_transform
 from .._compat import cached_property
@@ -18,6 +18,8 @@ from .._response import (
     async_to_streamed_response_wrapper,
 )
 from .._base_client import make_request_options
+from .._decoders.jsonl import JSONLDecoder, AsyncJSONLDecoder
+from ..types.v2_scorer_list_response import V2ScorerListResponse
 from ..types.v2_scorer_read_response import V2ScorerReadResponse
 from ..types.v2_scorer_create_response import V2ScorerCreateResponse
 from ..types.v2_scorer_delete_response import V2ScorerDeleteResponse
@@ -104,17 +106,23 @@ class V2ScorersResource(SyncAPIResource):
         project: str,
         *,
         entity: str,
+        limit: Optional[int] | Omit = omit,
+        offset: Optional[int] | Omit = omit,
         # Use the following arguments if you need to pass additional parameters to the API that aren't available via kwargs.
         # The extra values given here take precedence over values defined on the client or passed to this method.
         extra_headers: Headers | None = None,
         extra_query: Query | None = None,
         extra_body: Body | None = None,
         timeout: float | httpx.Timeout | None | NotGiven = not_given,
-    ) -> object:
+    ) -> JSONLDecoder[V2ScorerListResponse]:
         """
         List scorer objects.
 
         Args:
+          limit: Maximum number of scorers to return
+
+          offset: Number of scorers to skip
+
           extra_headers: Send extra headers
 
           extra_query: Add additional query parameters to the request
@@ -127,12 +135,24 @@ class V2ScorersResource(SyncAPIResource):
             raise ValueError(f"Expected a non-empty value for `entity` but received {entity!r}")
         if not project:
             raise ValueError(f"Expected a non-empty value for `project` but received {project!r}")
+        extra_headers = {"Accept": "application/x-ndjson", **(extra_headers or {})}
         return self._get(
             path_template("/v2/{entity}/{project}/scorers", entity=entity, project=project),
             options=make_request_options(
-                extra_headers=extra_headers, extra_query=extra_query, extra_body=extra_body, timeout=timeout
+                extra_headers=extra_headers,
+                extra_query=extra_query,
+                extra_body=extra_body,
+                timeout=timeout,
+                query=maybe_transform(
+                    {
+                        "limit": limit,
+                        "offset": offset,
+                    },
+                    v2_scorer_list_params.V2ScorerListParams,
+                ),
             ),
-            cast_to=object,
+            cast_to=JSONLDecoder[V2ScorerListResponse],
+            stream=True,
         )
 
     def delete(
@@ -313,17 +333,23 @@ class AsyncV2ScorersResource(AsyncAPIResource):
         project: str,
         *,
         entity: str,
+        limit: Optional[int] | Omit = omit,
+        offset: Optional[int] | Omit = omit,
         # Use the following arguments if you need to pass additional parameters to the API that aren't available via kwargs.
         # The extra values given here take precedence over values defined on the client or passed to this method.
         extra_headers: Headers | None = None,
         extra_query: Query | None = None,
         extra_body: Body | None = None,
         timeout: float | httpx.Timeout | None | NotGiven = not_given,
-    ) -> object:
+    ) -> AsyncJSONLDecoder[V2ScorerListResponse]:
         """
         List scorer objects.
 
         Args:
+          limit: Maximum number of scorers to return
+
+          offset: Number of scorers to skip
+
           extra_headers: Send extra headers
 
           extra_query: Add additional query parameters to the request
@@ -336,12 +362,24 @@ class AsyncV2ScorersResource(AsyncAPIResource):
             raise ValueError(f"Expected a non-empty value for `entity` but received {entity!r}")
         if not project:
             raise ValueError(f"Expected a non-empty value for `project` but received {project!r}")
+        extra_headers = {"Accept": "application/x-ndjson", **(extra_headers or {})}
         return await self._get(
             path_template("/v2/{entity}/{project}/scorers", entity=entity, project=project),
             options=make_request_options(
-                extra_headers=extra_headers, extra_query=extra_query, extra_body=extra_body, timeout=timeout
+                extra_headers=extra_headers,
+                extra_query=extra_query,
+                extra_body=extra_body,
+                timeout=timeout,
+                query=await async_maybe_transform(
+                    {
+                        "limit": limit,
+                        "offset": offset,
+                    },
+                    v2_scorer_list_params.V2ScorerListParams,
+                ),
             ),
-            cast_to=object,
+            cast_to=AsyncJSONLDecoder[V2ScorerListResponse],
+            stream=True,
         )
 
     async def delete(

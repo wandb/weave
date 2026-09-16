@@ -423,7 +423,7 @@ def _capture_genai_otel_export_req(
     inner = MagicMock(spec=tsi.FullTraceServerInterface)
     inner.genai_otel_export.return_value = tsi.agent_types.GenAIOTelExportRes()
     adapter = ExternalTraceServer(inner, _EncodingIdConverter())
-    adapter.genai_otel_export(req)
+    adapter.genai_otel_export(req, enable_llm_powered_features=True)
     assert inner.genai_otel_export.call_count == 1
     return inner.genai_otel_export.call_args.args[0]
 
@@ -471,6 +471,34 @@ def test_genai_otel_export_rewrites_flat_ref_attrs() -> None:
     assert _ref_attr_values(forwarded, "weave.content_refs") == [
         f"weave-trace-internal:///{internal_proj}/content/c"
     ]
+
+
+def test_genai_otel_export_stamps_the_entity_before_converting_the_project() -> None:
+    """The entity survives as a field even though `project_id` becomes opaque.
+
+    Emitters downstream of the adapter see only the internal id, so without this
+    they would need an id lookup to learn which entity a span belongs to.
+    """
+    internal_proj = _EncodingIdConverter().ext_to_int_project_id("ent/proj")
+    req = _make_otel_export_req_with_ref_attrs({}, project_id="ent/proj")
+    assert req.entity_name is None
+
+    forwarded = _capture_genai_otel_export_req(req)
+
+    assert forwarded.entity_name == "ent"
+    assert forwarded.project_id == internal_proj
+
+
+def test_genai_otel_export_overwrites_a_caller_supplied_entity() -> None:
+    """The authorized project decides the entity, never the incoming field.
+
+    Consumers route on this, so a value that survived from the caller would let
+    one entity's spans claim another's routing.
+    """
+    req = _make_otel_export_req_with_ref_attrs({}, project_id="ent/proj")
+    req.entity_name = "someone-else"
+
+    assert _capture_genai_otel_export_req(req).entity_name == "ent"
 
 
 def test_genai_otel_export_rewrites_nested_kvlist_ref_attrs() -> None:
@@ -692,7 +720,9 @@ def test_genai_otel_export_caches_project_id_lookup_across_batch() -> None:
     inner = MagicMock(spec=tsi.FullTraceServerInterface)
     inner.genai_otel_export.return_value = tsi.agent_types.GenAIOTelExportRes()
     converter = CountingIdConverter()
-    ExternalTraceServer(inner, converter).genai_otel_export(req)
+    ExternalTraceServer(inner, converter).genai_otel_export(
+        req, enable_llm_powered_features=True
+    )
 
     # One call for `req.project_id` translation + exactly one more for the
     # rewrite cache (not 6 — one per ref).

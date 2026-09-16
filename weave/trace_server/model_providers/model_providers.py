@@ -69,6 +69,7 @@ Quantization = Literal[
     "int4",
     "int8",
     "fp4",
+    "nvfp4",
     "fp6",
     "fp8",
     "fp16",

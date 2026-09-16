@@ -8,32 +8,36 @@ __all__ = ["TraceUsageResponse", "CallUsageCallUsageItem"]
 
 
 class CallUsageCallUsageItem(BaseModel):
-    """Aggregated usage metrics for a specific LLM."""
+    """Aggregated usage metrics for a specific LLM.
 
-    cache_creation_input_tokens: Optional[int] = None
+    Constructor defaults stay for Python callers. Serialization JSON Schema
+    marks those fields required so OpenAPI matches the JSON FastAPI sends.
+    """
+
+    cache_creation_input_tokens: int
 
     cache_creation_input_tokens_total_cost: Optional[float] = None
 
-    cache_read_input_tokens: Optional[int] = None
+    cache_read_input_tokens: int
 
     cache_read_input_tokens_total_cost: Optional[float] = None
 
-    completion_tokens: Optional[int] = None
+    completion_tokens: int
 
     completion_tokens_total_cost: Optional[float] = None
 
-    prompt_tokens: Optional[int] = None
+    prompt_tokens: int
 
     prompt_tokens_total_cost: Optional[float] = None
 
-    requests: Optional[int] = None
+    requests: int
 
-    total_tokens: Optional[int] = None
+    total_tokens: int
 
 
 class TraceUsageResponse(BaseModel):
     """Response with per-call usage metrics (each includes descendant contributions)."""
 
-    call_usage: Optional[Dict[str, Dict[str, CallUsageCallUsageItem]]] = None
+    call_usage: Dict[str, Dict[str, CallUsageCallUsageItem]]
 
-    unfinished_call_ids: Optional[List[str]] = None
+    unfinished_call_ids: List[str]

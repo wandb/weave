@@ -3267,7 +3267,8 @@ def test_genai_otel_export_ref_boundary_internal_in_db_external_out(
             processed_spans=[processed],
             project_id=external_project_id,
             wb_user_id=external_user_id,
-        )
+        ),
+        enable_llm_powered_features=True,
     )
     assert res.accepted_spans == 1
     assert res.rejected_spans == 0
@@ -3448,7 +3449,8 @@ def test_genai_otel_export_redacts_credential_shaped_fields(ch_server, trace_ser
             processed_spans=[_build_credential_processed_span()],
             project_id=external_project_id,
             wb_user_id="user-42",
-        )
+        ),
+        enable_llm_powered_features=True,
     )
     assert res.accepted_spans == 1
     assert res.rejected_spans == 0

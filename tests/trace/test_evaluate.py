@@ -484,8 +484,6 @@ async def test_evaluate_table_lazy_iter(client, monkeypatch):
 
     log = client.server.attribute_access_log
     assert [l for l in log if not l.startswith("_")] == [
-        "get_call_processor",
-        "get_call_processor",
         "get_feedback_processor",
         "get_feedback_processor",
         "table_create",

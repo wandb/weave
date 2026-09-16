@@ -1,10 +1,10 @@
-import {ContentType} from '../generated/traceServerApi';
-import type {Api as TraceServerApi} from '../generated/traceServerApi';
+import type {WeaveTrace} from '../vendor/weave-server-sdk';
 import {
   LINK_TO_REGISTRY_PATH,
   linkAssetToRegistry,
 } from '../traceServerBindings/linkAssetToRegistry';
 import type {LinkAssetToRegistryReq} from '../traceServerBindings/linkAssetToRegistry';
+import {stainlessPromise, stainlessReject} from './helpers/stainlessPromise';
 
 function makeReq(
   overrides: Partial<LinkAssetToRegistryReq> = {}
@@ -22,50 +22,53 @@ function makeReq(
 }
 
 describe('linkAssetToRegistry', () => {
-  let mockTraceServerApi: jest.Mocked<TraceServerApi<unknown>>;
+  let mockTraceServerApi: {post: jest.Mock};
 
   beforeEach(() => {
     mockTraceServerApi = {
-      request: jest.fn(),
-    } as any;
+      post: jest.fn(),
+    };
   });
 
   it('posts the expected payload to /link_to_registry', async () => {
     const req = makeReq({aliases: ['latest']});
 
-    mockTraceServerApi.request.mockResolvedValue({
-      data: {version_index: 7},
-    } as any);
+    mockTraceServerApi.post.mockReturnValue(
+      stainlessPromise({version_index: 7})
+    );
 
-    const result = await linkAssetToRegistry(mockTraceServerApi, req);
+    const result = await linkAssetToRegistry(
+      mockTraceServerApi as unknown as WeaveTrace,
+      req
+    );
 
     expect(result).toEqual({version_index: 7});
-    expect(mockTraceServerApi.request).toHaveBeenCalledWith({
-      path: LINK_TO_REGISTRY_PATH,
-      method: 'POST',
-      body: req,
-      secure: true,
-      type: ContentType.Json,
-      format: 'json',
-    });
+    expect(mockTraceServerApi.post).toHaveBeenCalledWith(
+      LINK_TO_REGISTRY_PATH,
+      {body: req}
+    );
   });
 
   it('throws when the trace server returns invalid JSON', async () => {
-    mockTraceServerApi.request.mockResolvedValue({
-      data: null,
-    } as any);
+    mockTraceServerApi.post.mockReturnValue(stainlessPromise(null));
 
     await expect(
-      linkAssetToRegistry(mockTraceServerApi, makeReq())
+      linkAssetToRegistry(
+        mockTraceServerApi as unknown as WeaveTrace,
+        makeReq()
+      )
     ).rejects.toThrow('Trace server returned invalid JSON');
   });
 
   it('surfaces non-2xx request errors', async () => {
     const error = new Error('Request failed');
-    mockTraceServerApi.request.mockRejectedValue(error);
+    mockTraceServerApi.post.mockReturnValue(stainlessReject(error));
 
     await expect(
-      linkAssetToRegistry(mockTraceServerApi, makeReq())
+      linkAssetToRegistry(
+        mockTraceServerApi as unknown as WeaveTrace,
+        makeReq()
+      )
     ).rejects.toThrow('Request failed');
   });
 });

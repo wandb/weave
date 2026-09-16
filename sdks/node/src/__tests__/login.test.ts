@@ -1,17 +1,19 @@
 import {login} from '../clientApi';
-import {Api as TraceServerApi} from '../generated/traceServerApi';
+import {createTraceServerClient} from '../traceServerClient';
 import {getUrls} from '../urls';
 import {Netrc} from '../utils/netrc';
+import {stainlessPromise} from './helpers/stainlessPromise';
 
-// Mock dependencies
 jest.mock('../utils/netrc');
 jest.mock('../urls');
-jest.mock('../generated/traceServerApi');
+jest.mock('../traceServerClient', () => ({
+  createTraceServerClient: jest.fn(),
+}));
 
 describe('login', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    console.log = jest.fn(); // Mock console.log
+    console.log = jest.fn();
   });
 
   it('should successfully log in and save credentials', async () => {
@@ -28,9 +30,9 @@ describe('login', () => {
       save: mockSave,
     }));
 
-    (TraceServerApi as jest.Mock).mockImplementation(() => ({
-      health: {
-        readRootHealthGet: jest.fn().mockResolvedValue({}),
+    (createTraceServerClient as jest.Mock).mockImplementation(() => ({
+      services: {
+        healthCheck: jest.fn().mockReturnValue(stainlessPromise({})),
       },
     }));
 
@@ -53,9 +55,9 @@ describe('login', () => {
       domain: 'wandb.ai',
     });
 
-    (TraceServerApi as jest.Mock).mockImplementation(() => ({
-      health: {
-        readRootHealthGet: jest
+    (createTraceServerClient as jest.Mock).mockImplementation(() => ({
+      services: {
+        healthCheck: jest
           .fn()
           .mockRejectedValue(new Error('Connection failed')),
       },

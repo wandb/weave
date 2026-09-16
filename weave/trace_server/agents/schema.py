@@ -12,7 +12,7 @@ extraction logic that applies those conventions lives in
 import datetime
 from typing import Literal, TypeAlias
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 from weave.trace_server.ch_sentinel_values import EXPIRE_AT_NEVER, SENTINEL_EPOCH
 
@@ -46,7 +46,13 @@ class NormalizedMessage(BaseModel):
     - content: plain text for simple messages, or JSON-serialized parts
       array for multimodal/structured messages
     - finish_reason: per-message finish reason (output messages only)
+
+    Serialization JSON Schema marks defaulted fields required. In the public
+    OpenAPI document this class appears only as an AgentSpanSchema message
+    element. Ingest validation is unchanged.
     """
+
+    model_config = ConfigDict(json_schema_serialization_defaults_required=True)
 
     role: str = ""
     content: str

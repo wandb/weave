@@ -96,6 +96,17 @@ def get_current_retry_id() -> str | None:
         return None
 
 
+def _http_response(e: BaseException) -> httpx.Response | None:
+    """The HTTP response an exception carries, if any.
+
+    Read off the exception rather than matching its class, because the
+    Stainless client's `APIStatusError` does not inherit from
+    `httpx.HTTPStatusError`.
+    """
+    response = getattr(e, "response", None)
+    return response if isinstance(response, httpx.Response) else None
+
+
 def _is_retryable_exception(e: BaseException) -> bool:
     # Don't retry pydantic validation errors
     if isinstance(e, ValidationError):
@@ -109,11 +120,12 @@ def _is_retryable_exception(e: BaseException) -> bool:
         return False
 
     # Don't retry on HTTP 4xx (except 429)
-    if isinstance(e, httpx.HTTPStatusError) and e.response is not None:
-        code_class = e.response.status_code // 100
+    response = _http_response(e)
+    if response is not None:
+        code_class = response.status_code // 100
 
         # Bad request, not rate-limiting
-        if code_class == 4 and e.response.status_code != 429:
+        if code_class == 4 and response.status_code != 429:
             return False
 
     # Otherwise, retry: 5xx, OSError, ConnectionError, ConnectionResetError, IOError, etc...

@@ -45,6 +45,7 @@ import {
 } from '../../genai/common';
 
 const INVOKE = 'invoke_agent';
+const ATTR_TASK_STATUS = 'claude_agent_sdk.task.status';
 
 // ---------------------------------------------------------------------------
 // Typed SDK-message fixtures.
@@ -936,6 +937,7 @@ describe('Claude Agent SDK — OTel tracer', () => {
         outputMessages: span.attributes[ATTR_GEN_AI_OUTPUT_MESSAGES],
         providerName: span.attributes[ATTR_GEN_AI_PROVIDER_NAME],
         statusCode: span.status.code,
+        taskStatus: span.attributes[ATTR_TASK_STATUS],
         toolCallId: span.attributes[ATTR_GEN_AI_TOOL_CALL_ID],
         toolCallResult: span.attributes[ATTR_GEN_AI_TOOL_CALL_RESULT],
       }))
@@ -960,6 +962,7 @@ describe('Claude Agent SDK — OTel tracer', () => {
         outputMessages: outputMessagesJson('Alpha verification finished'),
         providerName: undefined,
         statusCode: SpanStatusCode.UNSET,
+        taskStatus: 'completed',
         toolCallId: undefined,
         toolCallResult: undefined,
       },
@@ -981,6 +984,7 @@ describe('Claude Agent SDK — OTel tracer', () => {
         outputMessages: outputMessagesJson('Beta verification finished'),
         providerName: undefined,
         statusCode: SpanStatusCode.UNSET,
+        taskStatus: 'completed',
         toolCallId: undefined,
         toolCallResult: undefined,
       },
@@ -1156,14 +1160,16 @@ describe('Claude Agent SDK — OTel tracer', () => {
         errorType: span.attributes[ATTR_ERROR_TYPE],
         statusCode: span.status.code,
         statusMessage: span.status.message,
+        taskStatus: span.attributes[ATTR_TASK_STATUS],
         toolCallId: span.attributes[ATTR_GEN_AI_TOOL_CALL_ID],
       }))
     ).toEqual([
       {
         agentId: 'task-failed',
-        errorType: 'subagent_error',
+        errorType: 'Error',
         statusCode: SpanStatusCode.ERROR,
         statusMessage: 'Subagent crashed',
+        taskStatus: 'failed',
         toolCallId: undefined,
       },
     ]);
@@ -1221,7 +1227,7 @@ describe('Claude Agent SDK — OTel tracer', () => {
     ).toEqual([
       {
         agentId: 'task-unfinished',
-        errorType: 'aborted',
+        errorType: 'Error',
         statusCode: SpanStatusCode.ERROR,
         statusMessage: 'Agent ended with open subagent span',
         toolCallId: undefined,
@@ -1498,14 +1504,16 @@ describe('Claude Agent SDK — OTel tracer', () => {
           errorType: span.attributes[ATTR_ERROR_TYPE],
           statusCode: span.status.code,
           statusMessage: span.status.message,
+          taskStatus: span.attributes[ATTR_TASK_STATUS],
         }))
     ).toEqual([
       {
         // No `agentId` in a remote launch payload, so the task handle stands in.
         agentId: 'task-remote',
-        errorType: 'subagent_error',
+        errorType: 'Error',
         statusCode: SpanStatusCode.ERROR,
         statusMessage: 'Remote agent crashed',
+        taskStatus: 'failed',
       },
     ]);
   });
@@ -1611,12 +1619,14 @@ describe('Claude Agent SDK — OTel tracer', () => {
           errorType: span.attributes[ATTR_ERROR_TYPE],
           statusCode: span.status.code,
           statusMessage: span.status.message,
+          taskStatus: span.attributes[ATTR_TASK_STATUS],
         }))
     ).toEqual([
       {
-        errorType: 'aborted',
+        errorType: 'Error',
         statusCode: SpanStatusCode.ERROR,
         statusMessage: 'Stopped by the user',
+        taskStatus: 'stopped',
       },
     ]);
   });
@@ -1663,7 +1673,7 @@ describe('Claude Agent SDK — OTel tracer', () => {
         }))
     ).toEqual([
       {
-        errorType: 'subagent_error',
+        errorType: 'Error',
         outputMessages: outputMessagesJson('subagent blew up'),
         statusCode: SpanStatusCode.ERROR,
         statusMessage: 'subagent blew up',
@@ -1707,7 +1717,7 @@ describe('Claude Agent SDK — OTel tracer', () => {
       statusCode: orphan.status.code,
     }).toEqual({
       agentDescription: 'Work started before the tracer attached',
-      errorType: 'aborted',
+      errorType: 'Error',
       model: 'claude-orphan',
       parentSpanId: root.spanContext().spanId,
       statusCode: SpanStatusCode.ERROR,
@@ -1928,7 +1938,7 @@ describe('Claude Agent SDK — OTel tracer', () => {
 
     const tool = findSpan(getExporter().getFinishedSpans(), 'execute_tool');
     expect(tool.status.code).toBe(SpanStatusCode.ERROR);
-    expect(tool.attributes[ATTR_ERROR_TYPE]).toBe('tool_error');
+    expect(tool.attributes[ATTR_ERROR_TYPE]).toBe('Error');
     expect(tool.attributes[ATTR_GEN_AI_TOOL_CALL_RESULT]).toBe(
       'command not found'
     );
@@ -1949,11 +1959,11 @@ describe('Claude Agent SDK — OTel tracer', () => {
     const invoke = findSpan(spans, INVOKE);
     expect(invoke.status.code).toBe(SpanStatusCode.ERROR);
     expect(invoke.status.message).toBe('subprocess crashed');
-    expect(invoke.attributes[ATTR_ERROR_TYPE]).toBe('agent_error');
+    expect(invoke.attributes[ATTR_ERROR_TYPE]).toBe('Error');
 
     const tool = findSpan(spans, 'execute_tool');
     expect(tool.status.code).toBe(SpanStatusCode.ERROR);
-    expect(tool.attributes[ATTR_ERROR_TYPE]).toBe('aborted');
+    expect(tool.attributes[ATTR_ERROR_TYPE]).toBe('Error');
   });
 
   test('a non-success result subtype fails the root span', () => {

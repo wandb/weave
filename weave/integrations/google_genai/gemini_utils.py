@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import inspect
 from collections.abc import Callable
 from functools import wraps
 from typing import TYPE_CHECKING, Any
@@ -9,6 +10,7 @@ from pydantic import BaseModel
 import weave
 from weave import Content
 from weave.trace.autopatch import OpSettings
+from weave.trace.box import unbox
 from weave.trace.call import Call
 from weave.trace.op import _add_accumulator
 from weave.trace.serialization.serialize import dictify
@@ -206,6 +208,52 @@ def google_genai_gemini_accumulator(
     return acc
 
 
+def _unbox_traced_values(obj: Any) -> Any:
+    """Recursively replace Weave's boxed scalars with plain Python values.
+
+    A value read out of a saved Weave object carries a ref, so a string comes back
+    as ``BoxedStr``, an int as ``BoxedInt``, and a list as a ``WeaveList`` of boxed
+    items. ``WeaveList`` and ``WeaveDict`` subclass ``list`` and ``dict``, so the
+    branches below rebuild them as plain containers on the way through.
+    """
+    if isinstance(obj, dict):
+        return {k: _unbox_traced_values(v) for k, v in obj.items()}
+    elif isinstance(obj, list):
+        return [_unbox_traced_values(v) for v in obj]
+    elif isinstance(obj, tuple):
+        return tuple(_unbox_traced_values(v) for v in obj)
+
+    return unbox(obj)
+
+
+def _unbox_inputs(fn: Callable) -> Callable:
+    """Unbox the arguments of a sync ``google.genai`` method before it runs.
+
+    ``contents`` is a union whose ``Content`` candidate sets ``from_attributes=True``
+    and has both its fields optional, so pydantic reads them off whatever object it
+    is handed and returns an empty ``Content``. A bare ``str`` is excluded from that
+    rule and matches its own branch; a subclass is not, so the value is dropped
+    without an error.
+
+    The generator branch is load-bearing: ``weave.op`` classifies the function with
+    ``inspect.isgeneratorfunction``, which ``functools.wraps`` does not carry over,
+    and only the generator path pushes the call when iteration starts.
+    """
+    if inspect.isgeneratorfunction(fn):
+
+        @wraps(fn)
+        def _generator_wrapper(*args: Any, **kwargs: Any) -> Any:
+            yield from fn(*_unbox_traced_values(args), **_unbox_traced_values(kwargs))
+
+        return _generator_wrapper
+
+    @wraps(fn)
+    def _sync_wrapper(*args: Any, **kwargs: Any) -> Any:
+        return fn(*_unbox_traced_values(args), **_unbox_traced_values(kwargs))
+
+    return _sync_wrapper
+
+
 def google_genai_gemini_wrapper_sync(
     settings: OpSettings,
 ) -> Callable[[Callable], Callable]:
@@ -214,7 +262,7 @@ def google_genai_gemini_wrapper_sync(
         if not op_kwargs.get("postprocess_inputs"):
             op_kwargs["postprocess_inputs"] = google_genai_gemini_postprocess_inputs
 
-        op = weave.op(fn, **op_kwargs)
+        op = weave.op(_unbox_inputs(fn), **op_kwargs)
         op.postprocess_output = google_genai_gemini_postprocess_output
         if op.name not in SKIP_TRACING_FUNCTIONS:
             op._set_on_finish_handler(google_genai_gemini_on_finish)
@@ -231,10 +279,13 @@ def google_genai_gemini_wrapper_async(
     settings: OpSettings,
 ) -> Callable[[Callable], Callable]:
     def wrapper(fn: Callable) -> Callable:
+        # Not _unbox_inputs: the async shell has to be an unconditional `async def`.
         def _fn_wrapper(fn: Callable) -> Callable:
             @wraps(fn)
             async def _async_wrapper(*args: Any, **kwargs: Any) -> Any:
-                return await fn(*args, **kwargs)
+                return await fn(
+                    *_unbox_traced_values(args), **_unbox_traced_values(kwargs)
+                )
 
             return _async_wrapper
 

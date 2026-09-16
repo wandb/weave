@@ -4,4 +4,3 @@ install-pnpm:
 bootstrap: install-pnpm
 	pnpm env use --global 20
 	pnpm install
-	pnpm run generate-api

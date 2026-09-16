@@ -1,4 +1,3 @@
-import {type Api as TraceServerApi} from '../../generated/traceServerApi';
 import {
   makeOpenAIImagesGenerateOp,
   openAIStreamReducer,
@@ -7,15 +6,17 @@ import {
 import {isWeaveImage} from '../../media';
 import {WeaveClient} from '../../weaveClient';
 import {makeAPIPromiseShim} from '../openaiMock';
+import {stainlessPromise} from '../helpers/stainlessPromise';
 
-// Mock WeaveClient dependencies
-jest.mock('../../generated/traceServerApi');
 jest.mock('../../wandb/wandbServerApi');
 
 describe('OpenAI Integration', () => {
   let mockOpenAI: any;
   let wrappedOpenAI: any;
-  let mockTraceServerApi: jest.Mocked<TraceServerApi<any>>;
+  let mockTraceServerApi: {
+    objects: {create: jest.Mock};
+    calls: {upsertBatch: jest.Mock};
+  };
   let _weaveClient: WeaveClient;
 
   beforeEach(() => {
@@ -43,17 +44,17 @@ describe('OpenAI Integration', () => {
 
     // Setup WeaveClient
     mockTraceServerApi = {
-      obj: {
-        objCreateObjCreatePost: jest.fn().mockResolvedValue({
-          data: {digest: 'test-digest'},
-        }),
+      objects: {
+        create: jest
+          .fn()
+          .mockReturnValue(stainlessPromise({digest: 'test-digest'})),
       },
-      call: {
-        callStartBatchCallUpsertBatchPost: jest.fn(),
+      calls: {
+        upsertBatch: jest.fn().mockReturnValue(stainlessPromise({})),
       },
-    } as any;
+    };
     _weaveClient = new WeaveClient({
-      traceServerApi: mockTraceServerApi,
+      traceServerApi: mockTraceServerApi as any,
       projectId: 'test-project',
     });
 

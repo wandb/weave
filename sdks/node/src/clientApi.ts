@@ -1,5 +1,5 @@
-import {Api as TraceServerApi} from './generated/traceServerApi';
 import {CLIENT_CAPABILITIES, CLIENT_CAPABILITIES_HEADER} from './constants';
+import {createTraceServerClient} from './traceServerClient';
 import {
   getWeaveTracerProviderProjectId,
   shutdownWeaveTracerProvider,
@@ -35,18 +35,12 @@ export async function login(apiKey: string, host?: string) {
   }
   const {traceBaseUrl} = getUrls(host);
 
-  // Test the connection to the traceServerApi
-  const testTraceServerApi = new TraceServerApi({
-    baseUrl: traceBaseUrl,
-    baseApiParams: {
-      headers: {
-        'User-Agent': `W&B Weave JS Client ${process.env.VERSION || 'unknown'}`,
-        Authorization: `Basic ${Buffer.from(`api:${apiKey}`).toString('base64')}`,
-      },
-    },
+  const testTraceServerApi = createTraceServerClient({
+    apiKey,
+    baseURL: traceBaseUrl,
   });
   try {
-    await testTraceServerApi.health.readRootHealthGet({});
+    await testTraceServerApi.services.healthCheck();
   } catch (_error) {
     throw new Error(
       'Unable to verify connection to the weave trace server with given API Key'
@@ -120,16 +114,13 @@ export async function init(
       }
     );
 
-    const traceServerApi = new TraceServerApi({
-      baseUrl: traceBaseUrl,
-      baseApiParams: {
-        headers: {
-          'User-Agent': `W&B Weave JS Client ${process.env.VERSION || 'unknown'}`,
-          [CLIENT_CAPABILITIES_HEADER]: CLIENT_CAPABILITIES,
-          Authorization: `Basic ${Buffer.from(`api:${apiKey}`).toString('base64')}`,
-        },
+    const traceServerApi = createTraceServerClient({
+      apiKey,
+      baseURL: traceBaseUrl,
+      fetch: concurrencyLimitedFetch,
+      defaultHeaders: {
+        [CLIENT_CAPABILITIES_HEADER]: CLIENT_CAPABILITIES,
       },
-      customFetch: concurrencyLimitedFetch,
     });
 
     const client = new WeaveClient({

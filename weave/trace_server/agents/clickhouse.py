@@ -44,6 +44,7 @@ from weave.trace_server.agents.schema import (
 )
 from weave.trace_server.agents.types import (
     AGENT_CUSTOM_ATTR_SOURCE_VALUE_TYPES,
+    AgentChatFeedback,
     AgentConversationChatReq,
     AgentConversationChatRes,
     AgentConversationMessagePreview,
@@ -116,6 +117,10 @@ from weave.trace_server.query_builder.agent_query_builder import (
 )
 from weave.trace_server.query_builder.agent_stats_query_builder import (
     build_agent_span_stats_query,
+)
+from weave.trace_server.sensitive_data.span_redaction import (
+    redact_pii_from_resource,
+    redact_pii_from_span,
 )
 from weave.trace_server.trace_server_common import (
     AgentFeedbackByTarget,
@@ -697,7 +702,9 @@ class AgentQueryHandler:
                     project_id=req.project_id,
                     conversation_ids=[req.conversation_id],
                 )
-                res.feedback = groups.by_conversation_id.get(req.conversation_id, [])
+                res.feedback = _as_agent_chat_feedback(
+                    groups.by_conversation_id.get(req.conversation_id, [])
+                )
             return res
 
         # Group spans by trace_id, preserving insertion order. Weave treats
@@ -739,7 +746,9 @@ class AgentQueryHandler:
                 trace_ids=[t.trace_id for t in turns],
                 span_ids=span_ids,
             )
-            res.feedback = groups.by_conversation_id.get(req.conversation_id, [])
+            res.feedback = _as_agent_chat_feedback(
+                groups.by_conversation_id.get(req.conversation_id, [])
+            )
             for turn in res.turns:
                 _fold_feedback_into_trace_chat(turn, groups)
 
@@ -831,13 +840,16 @@ class AgentWriteHandler:
         The `messages` search table is populated by a ClickHouse
         materialized view off the spans table (migration 030).
 
-        When ingest sampling is enabled (rate < 1.0), spans are parsed first
-        and whole traces are kept or dropped *before* the expensive
-        blob-strip/extraction steps run, so dropped traces never write
-        Content files. Dropped spans are neither stored nor returned (they
-        never reach the scoring Kafka emit) but still count as accepted —
-        the client sees an ordinary success. See agents/ingest_sampling.py
-        (WB-36877).
+        Every span is parsed and redacted (each shared resource once) before
+        any extraction runs, so a redaction failure rejects the request, as
+        RequestTooLarge for over-deep values, before blob-strip Content
+        writes or inserts happen for any span in it. When ingest sampling is
+        enabled (rate < 1.0), whole traces are then kept or dropped *before*
+        the expensive blob-strip/extraction steps run, so dropped traces
+        never write Content files. Dropped spans are neither stored nor
+        returned (they never reach the scoring Kafka emit) but still count as
+        accepted — the client sees an ordinary success. See
+        agents/ingest_sampling.py (WB-36877).
         """
         span_rows: list[AgentSpanCHInsertable] = []
         accepted = 0
@@ -851,7 +863,7 @@ class AgentWriteHandler:
         def parse_span(protobuf_span: Any, resource: Resource) -> Span | None:
             nonlocal rejected
             try:
-                return Span.from_proto(protobuf_span, resource)
+                span = Span.from_proto(protobuf_span, resource)
             except AttributePathConflictError as e:
                 _record_ingest_failure(
                     failure_counts,
@@ -861,6 +873,10 @@ class AgentWriteHandler:
                 rejected += 1
                 errors.append(str(e))
                 return None
+            # Outside the parse-error handler: a redaction failure rejects
+            # the whole request before sampling or any storage preparation.
+            redact_pii_from_span(span, req.sensitive_data_policy)
+            return span
 
         def extract_row(span: Span, run_id: str | None) -> AgentSpanCHInsertable | None:
             nonlocal accepted, rejected
@@ -903,33 +919,30 @@ class AgentWriteHandler:
             return genai_row
 
         sampling = ingest_sampling.request_config()
-        if not sampling.enabled:
-            # Sampler off (the default): the unmodified single-pass path.
-            for processed_span in req.processed_spans:
-                resource = Resource.from_proto(processed_span.resource_spans.resource)
-                for protobuf_scope_spans in processed_span.resource_spans.scope_spans:
-                    for protobuf_span in protobuf_scope_spans.spans:
-                        span = parse_span(protobuf_span, resource)
-                        if span is None:
-                            continue
-                        row = extract_row(span, processed_span.run_id)
-                        if row is not None:
-                            span_rows.append(row)
-        else:
-            # Pass 1 (cheap): parse everything, then decide keep/drop per
-            # trace before any blob-strip/extraction work happens.
-            parsed: list[tuple[Span, str | None]] = []
-            byte_sizes: list[int] = []
-            for processed_span in req.processed_spans:
-                resource = Resource.from_proto(processed_span.resource_spans.resource)
-                for protobuf_scope_spans in processed_span.resource_spans.scope_spans:
-                    for protobuf_span in protobuf_scope_spans.spans:
-                        span = parse_span(protobuf_span, resource)
-                        if span is None:
-                            continue
-                        parsed.append((span, processed_span.run_id))
+
+        # Pass 1: parse and redact everything, each shared resource once,
+        # before any extraction or blob-strip Content writes.
+        parsed: list[tuple[Span, str | None]] = []
+        byte_sizes: list[int] = []
+        for processed_span in req.processed_spans:
+            resource = Resource.from_proto(processed_span.resource_spans.resource)
+            redact_pii_from_resource(resource, req.sensitive_data_policy)
+            for protobuf_scope_spans in processed_span.resource_spans.scope_spans:
+                for protobuf_span in protobuf_scope_spans.spans:
+                    span = parse_span(protobuf_span, resource)
+                    if span is None:
+                        continue
+                    parsed.append((span, processed_span.run_id))
+                    if sampling.enabled:
                         byte_sizes.append(protobuf_span.ByteSize())
 
+        if not sampling.enabled:
+            # Sampler off (the default): extract every parsed span.
+            for span, run_id in parsed:
+                row = extract_row(span, run_id)
+                if row is not None:
+                    span_rows.append(row)
+        else:
             decisions = ingest_sampling.decide_spans(
                 sampling, [span for span, _ in parsed], byte_sizes
             )
@@ -1048,15 +1061,23 @@ def _build_agent_target_refs(
     return refs
 
 
+def _as_agent_chat_feedback(rows: list[dict[str, Any]]) -> list[AgentChatFeedback]:
+    return [AgentChatFeedback.model_validate(row) for row in rows]
+
+
 def _fold_feedback_into_trace_chat(
     trace_chat: AgentTraceChatRes,
     groups: AgentFeedbackByTarget,
 ) -> None:
     """Fold turn-level and step-level feedback into a trace chat response."""
-    trace_chat.feedback = groups.by_trace_id.get(trace_chat.trace_id, [])
+    trace_chat.feedback = _as_agent_chat_feedback(
+        groups.by_trace_id.get(trace_chat.trace_id, [])
+    )
     for message in trace_chat.messages:
         if message.span_id and message.span_id in groups.by_span_id:
-            message.feedback = groups.by_span_id[message.span_id]
+            message.feedback = _as_agent_chat_feedback(
+                groups.by_span_id[message.span_id]
+            )
 
 
 def _first_cell_int(result: QueryResult) -> int:

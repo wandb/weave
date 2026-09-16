@@ -90,6 +90,9 @@ class RemoteScorer(Scorer):
     outbound ``POST`` and feedback writes; it does not run by calling
     :meth:`score` in user code.
 
+    A ``RemoteScorer`` can be attached to a monitor on traced ops or on agent
+    turns. See ``examples/remote_scorer/README.md`` for the request each sends.
+
     **Authentication** can be configured with ``auth_config`` using secret-store
     references only. The SDK validates URL shape only; the worker enforces
     deployment URL policy at scoring time. If ``auth_config`` is omitted, the

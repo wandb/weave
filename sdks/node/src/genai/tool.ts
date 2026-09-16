@@ -4,7 +4,6 @@ import type {ChildSpanContext} from './common';
 import {getWeaveTracer} from './provider';
 import {SpanBase, type SpanEndOptions, type SpanInitBase} from './spanBase';
 import {
-  ATTR_ERROR_TYPE,
   ATTR_GEN_AI_CONVERSATION_ID,
   ATTR_GEN_AI_OPERATION_NAME,
   ATTR_GEN_AI_TOOL_CALL_ARGUMENTS,
@@ -25,8 +24,6 @@ export interface ToolInit extends SpanInitBase {
 export interface ToolEndOptions extends SpanEndOptions {
   /** A JSON value. Strings are recorded as-is; other values are serialized. */
   result?: JsonValue;
-  /** Stable failure classification recorded on the `error.type` attribute. */
-  errorType?: string;
 }
 
 function serializeToolValue(value: JsonValue | undefined): string | undefined {
@@ -58,7 +55,7 @@ function serializeToolValue(value: JsonValue | undefined): string | undefined {
  *   const result = await getWeather('Tokyo');
  *   tool.end({result});
  * } catch (error) {
- *   tool.end({error: error as Error, errorType: 'weather_error'});
+ *   tool.end({error: error as Error});
  *   throw error;
  * }
  */
@@ -120,9 +117,6 @@ export class Tool extends SpanBase {
     if (result !== undefined) {
       this.result = result;
       this.span.setAttribute(ATTR_GEN_AI_TOOL_CALL_RESULT, result);
-    }
-    if (opts?.errorType) {
-      this.span.setAttribute(ATTR_ERROR_TYPE, opts.errorType);
     }
     this._closeSpan(opts);
   }

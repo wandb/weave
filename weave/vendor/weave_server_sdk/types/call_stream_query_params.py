@@ -2,13 +2,26 @@
 
 from __future__ import annotations
 
-from typing import Iterable, Optional
-from typing_extensions import Literal, Required, Annotated, TypedDict
+from typing import Union, Iterable, Optional
+from typing_extensions import Literal, Required, Annotated, TypeAlias, TypedDict
 
 from .._types import SequenceNotStr
 from .._utils import PropertyInfo
+from .shared_params.eq_operation import EqOperation
+from .shared_params.gt_operation import GtOperation
+from .shared_params.in_operation import InOperation
+from .shared_params.gte_operation import GteOperation
+from .shared_params.not_operation import NotOperation
 
-__all__ = ["CallStreamQueryParams", "Filter", "Query", "SortBy"]
+__all__ = [
+    "CallStreamQueryParams",
+    "Filter",
+    "Query",
+    "QueryExpr",
+    "QueryExprLtOperation",
+    "QueryExprLteOperation",
+    "SortBy",
+]
 
 
 class CallStreamQueryParams(TypedDict, total=False):
@@ -49,6 +62,13 @@ class CallStreamQueryParams(TypedDict, total=False):
     """
     If true, the response will attempt to resolve each call's wb_user_id to a
     username for the duration of this request.
+    """
+
+    latest_only: bool
+    """
+    If true, collapse multiple physical versions of each call before applying
+    filters. This provides current logical-row semantics for calls_complete reads
+    while ReplacingMergeTree merges are pending.
     """
 
     limit: Optional[int]
@@ -94,8 +114,46 @@ class Filter(TypedDict, total=False):
     wb_user_ids: Optional[SequenceNotStr[str]]
 
 
+class QueryExprLtOperation(TypedDict, total=False):
+    """Less than comparison.
+
+    Example:
+        ```
+        {"$lt": [{"$getField": "summary.usage.tokens"}, {"$literal": 100}]}
+        ```
+    """
+
+    lt: Required[Annotated[Iterable[object], PropertyInfo(alias="$lt")]]
+
+
+class QueryExprLteOperation(TypedDict, total=False):
+    """Less than or equal comparison.
+
+    Example:
+        ```
+        {"$lte": [{"$getField": "summary.usage.tokens"}, {"$literal": 100}]}
+        ```
+    """
+
+    lte: Required[Annotated[Iterable[object], PropertyInfo(alias="$lte")]]
+
+
+QueryExpr: TypeAlias = Union[
+    "AndOperation",
+    "OrOperation",
+    NotOperation,
+    EqOperation,
+    GtOperation,
+    QueryExprLtOperation,
+    GteOperation,
+    QueryExprLteOperation,
+    InOperation,
+    "ContainsOperation",
+]
+
+
 class Query(TypedDict, total=False):
-    expr: Required[Annotated["Expr", PropertyInfo(alias="$expr")]]
+    expr: Required[Annotated[QueryExpr, PropertyInfo(alias="$expr")]]
     """Logical AND. All conditions must evaluate to true.
 
     Example:
@@ -109,4 +167,6 @@ class SortBy(TypedDict, total=False):
     field: Required[str]
 
 
-from .shared_params.expr import Expr
+from .shared_params.or_operation import OrOperation
+from .shared_params.and_operation import AndOperation
+from .shared_params.contains_operation import ContainsOperation

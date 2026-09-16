@@ -1,14 +1,13 @@
 # File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
 
-from typing import Dict, List, Optional
-from typing_extensions import TypeAlias
+from typing import Dict, Optional
 
 from .._models import BaseModel
 
-__all__ = ["V2PredictionListResponse", "V2PredictionListResponseItem"]
+__all__ = ["V2PredictionListResponse"]
 
 
-class V2PredictionListResponseItem(BaseModel):
+class V2PredictionListResponse(BaseModel):
     inputs: Dict[str, object]
     """The inputs to the prediction"""
 
@@ -26,6 +25,3 @@ class V2PredictionListResponseItem(BaseModel):
 
     wb_user_id: Optional[str] = None
     """Do not set directly. Server will automatically populate this field."""
-
-
-V2PredictionListResponse: TypeAlias = List[V2PredictionListResponseItem]

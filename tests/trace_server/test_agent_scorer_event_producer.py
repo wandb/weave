@@ -6,13 +6,19 @@ from unittest.mock import MagicMock
 
 import pytest
 
+from weave.trace_server import kafka
 from weave.trace_server.agents.kafka_events import (
     EMBED_AGENT_SPANS_TOPIC,
     SCORE_AGENT_SPANS_TOPIC,
     EmbedAgentSpansEvent,
     ScoreAgentSpansEvent,
 )
-from weave.trace_server.kafka import KafkaProducer, _bucketed_project_key
+from weave.trace_server.kafka import (
+    DELIVERY_ERROR_LOG_EVERY,
+    DELIVERY_FAILED_METRIC,
+    KafkaProducer,
+    _bucketed_project_key,
+)
 
 
 def _make_event(
@@ -110,7 +116,10 @@ def test_producer_publishes_under_buffer_limit(
     producer.max_buffer_size = 100
     producer.__len__ = MagicMock(return_value=0)
     _bind_real_methods(
-        producer, method_name, "_produce_agent_spans", "_check_buffer_pressure"
+        producer,
+        method_name,
+        "_produce_agent_spans",
+        "_check_buffer_pressure",
     )
 
     getattr(producer, method_name)(_make_event(event_class))
@@ -118,6 +127,86 @@ def test_producer_publishes_under_buffer_limit(
     producer.produce.assert_called_once()
     call_kwargs = producer.produce.call_args.kwargs
     assert call_kwargs["topic"] == topic
+    assert "on_delivery" not in call_kwargs
+
+
+@pytest.mark.disable_logging_error_check
+def test_delivery_failure_is_counted_per_topic_and_error(monkeypatch) -> None:
+    """Failed deliveries always increment the counter; logger.error is sampled."""
+    producer = MagicMock(spec=KafkaProducer)
+    producer._delivery_error_counts = {}
+    _bind_real_methods(producer, "_on_delivery")
+    emitted = MagicMock()
+    logged = MagicMock()
+    monkeypatch.setattr(kafka, "emit_counter", emitted)
+    monkeypatch.setattr(kafka.logger, "error", logged)
+    message = MagicMock()
+    message.topic.return_value = "weave.embed_agent_spans"
+    message.key.return_value = b"conv-1"
+    error = MagicMock()
+    error.name.return_value = "_MSG_TIMED_OUT"
+    error.str.return_value = "Local: Message timed out"
+
+    producer._on_delivery(None, message)
+    emitted.assert_not_called()
+    logged.assert_not_called()
+
+    producer._on_delivery(error, message)
+    emitted.assert_called_once_with(
+        DELIVERY_FAILED_METRIC,
+        1,
+        ["topic:weave.embed_agent_spans", "error:_MSG_TIMED_OUT"],
+    )
+    logged.assert_called_once_with(
+        "Kafka delivery failed topic=%s error=%s count=%s",
+        "weave.embed_agent_spans",
+        "Local: Message timed out",
+        1,
+        extra={"key": b"conv-1", "error_code": "_MSG_TIMED_OUT"},
+    )
+
+    producer._on_delivery(error, message)
+    assert emitted.call_count == 2
+    logged.assert_called_once()
+
+    for _ in range(DELIVERY_ERROR_LOG_EVERY - 2):
+        producer._on_delivery(error, message)
+
+    assert emitted.call_count == DELIVERY_ERROR_LOG_EVERY
+    assert logged.call_count == 2
+    assert logged.call_args.args[3] == DELIVERY_ERROR_LOG_EVERY
+
+    other = MagicMock()
+    other.topic.return_value = "weave.call_ended"
+    other.key.return_value = b"call-1"
+    producer._on_delivery(error, other)
+    assert emitted.call_count == DELIVERY_ERROR_LOG_EVERY + 1
+    assert logged.call_count == 3
+
+
+@pytest.mark.disable_logging_error_check
+def test_unacknowledged_message_reaches_the_delivery_counter(monkeypatch) -> None:
+    """Through librdkafka: produce() attaches the callback and flush() runs it."""
+    emitted = MagicMock()
+    monkeypatch.setattr(kafka, "emit_counter", emitted)
+    producer = KafkaProducer(
+        {
+            # Nothing listens here, so every message times out locally.
+            "bootstrap.servers": "127.0.0.1:1",
+            "message.timeout.ms": 500,
+            "log_level": 0,
+        }
+    )
+
+    producer.produce(topic="weave.embed_agent_spans", value="{}", key="conv-1")
+    remaining = producer.flush(10)
+
+    assert remaining == 0
+    emitted.assert_called_once_with(
+        DELIVERY_FAILED_METRIC,
+        1,
+        ["topic:weave.embed_agent_spans", "error:_MSG_TIMED_OUT"],
+    )
 
 
 @pytest.mark.disable_logging_error_check

@@ -49,8 +49,6 @@ def test_dataset_laziness(client):
     dataset = Dataset(rows=[{"input": i} for i in range(300)])
     log = client.server.attribute_access_log
     assert _top_level_logs(log) == [
-        "get_call_processor",
-        "get_call_processor",
         "get_feedback_processor",
         "get_feedback_processor",
     ]
@@ -80,8 +78,6 @@ def test_published_dataset_laziness(client):
     dataset = Dataset(rows=[{"input": i} for i in range(300)])
     log = client.server.attribute_access_log
     assert _top_level_logs(log) == [
-        "get_call_processor",
-        "get_call_processor",
         "get_feedback_processor",
         "get_feedback_processor",
     ]

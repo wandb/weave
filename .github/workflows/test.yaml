@@ -147,7 +147,7 @@ jobs:
             "pandas_test",
             "fastmcp",
             "smolagents",
-            # "stainless",
+            "stainless",
             "autogen_tests",
           ]
         # The Claude Agent SDK has both ClickHouse-backed calls tests and
