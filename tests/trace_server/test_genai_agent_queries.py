@@ -30,6 +30,7 @@ from weave.trace_server.agents.types import (
     AgentConversationSpansReq,
     AgentCustomAttrsSchemaReq,
     AgentGroupByRef,
+    AgentInsightFilter,
     AgentSearchReq,
     AgentSignalFilter,
     AgentSortBy,
@@ -4011,3 +4012,204 @@ def test_filter_conversations_by_signal(ch_server):
         )
     )
     assert filtered_ids(AgentSignalFilter(tags=["flagged"])) == []
+
+
+@pytest.mark.flaky(reruns=3)
+def test_filter_conversations_by_insights(ch_server):
+    project_id = _make_project_id("insight-filter")
+    now = datetime.datetime.now(tz=datetime.timezone.utc)
+    spans = [
+        _make_span(
+            project_id,
+            conversation_id=f"conv-{suffix}-{uuid.uuid4().hex[:8]}",
+            operation_name="invoke_agent",
+            started_at=now + datetime.timedelta(seconds=index),
+        )
+        for index, suffix in enumerate(("a", "b", "c"))
+    ]
+    _insert_spans(ch_server.ch_client, spans)
+    intent_ids = [uuid.uuid4() for _ in range(2)]
+    ch_server.ch_client.insert(
+        "intent_signatures",
+        data=[
+            [
+                project_id,
+                intent_ids[index],
+                category,
+                span.conversation_id,
+                span.trace_id,
+                span.span_id,
+                span.started_at,
+                span.ended_at,
+                now,
+            ]
+            for index, (span, category) in enumerate(
+                zip(spans[:2], ("information_request", "action_request"), strict=True)
+            )
+        ],
+        column_names=[
+            "project_id",
+            "id",
+            "category",
+            "conversation_id",
+            "trace_id",
+            "span_id",
+            "trace_started_at",
+            "trace_ended_at",
+            "extracted_at",
+        ],
+    )
+    ch_server.ch_client.insert(
+        "failure_signatures",
+        data=[
+            [
+                project_id,
+                uuid.uuid4(),
+                category,
+                severity,
+                span.conversation_id,
+                span.trace_id,
+                [span.trace_id],
+                span.span_id,
+                span.started_at,
+                span.ended_at,
+                now,
+            ]
+            for span, category, severity in zip(
+                spans[:2],
+                ("wrong_output", "tool_failure"),
+                ("major", ""),
+                strict=True,
+            )
+        ],
+        column_names=[
+            "project_id",
+            "id",
+            "category",
+            "severity",
+            "conversation_id",
+            "current_trace_id",
+            "affected_trace_ids",
+            "span_id",
+            "trace_started_at",
+            "trace_ended_at",
+            "extracted_at",
+        ],
+    )
+
+    old_run_id = uuid.uuid4()
+    latest_run_id = uuid.uuid4()
+    ch_server.ch_client.insert(
+        "signature_cluster_runs",
+        data=[
+            [
+                project_id,
+                run_id,
+                "intent",
+                now - datetime.timedelta(days=offset + 1),
+                now - datetime.timedelta(days=offset),
+                "succeeded",
+                now - datetime.timedelta(days=offset + 1),
+                now - datetime.timedelta(days=offset),
+            ]
+            for run_id, offset in ((old_run_id, 1), (latest_run_id, 0))
+        ],
+        column_names=[
+            "project_id",
+            "id",
+            "signature_type",
+            "window_start",
+            "window_end",
+            "status",
+            "started_at",
+            "completed_at",
+        ],
+    )
+    old_cluster_id = uuid.uuid4()
+    latest_cluster_id = uuid.uuid4()
+    ch_server.ch_client.insert(
+        "signature_cluster_assignments",
+        data=[
+            [
+                project_id,
+                run_id,
+                intent_ids[index],
+                cluster_id,
+                "intent",
+                category,
+                span.trace_id,
+                span.span_id,
+                span.conversation_id,
+                span.started_at,
+                span.ended_at,
+            ]
+            for index, (run_id, cluster_id, span, category) in enumerate(
+                (
+                    (old_run_id, old_cluster_id, spans[1], "action_request"),
+                    (
+                        latest_run_id,
+                        latest_cluster_id,
+                        spans[0],
+                        "information_request",
+                    ),
+                )
+            )
+        ],
+        column_names=[
+            "project_id",
+            "cluster_run_id",
+            "signature_record_id",
+            "cluster_id",
+            "signature_type",
+            "category",
+            "trace_id",
+            "span_id",
+            "conversation_id",
+            "trace_started_at",
+            "trace_ended_at",
+        ],
+    )
+
+    def filtered_ids(*filters: AgentInsightFilter) -> list[str]:
+        response = ch_server.agent_spans_query(
+            AgentSpansQueryReq(
+                project_id=project_id,
+                group_by=[AgentGroupByRef(source="column", key="conversation_id")],
+                insight_filters=list(filters),
+                started_after=now - datetime.timedelta(hours=1),
+                started_before=now + datetime.timedelta(hours=1),
+            )
+        )
+        return sorted(group.group_keys["conversation_id"] for group in response.groups)
+
+    assert filtered_ids(
+        AgentInsightFilter(
+            field="category",
+            signature_type="intent",
+            values=["information_request"],
+        )
+    ) == [spans[0].conversation_id]
+    assert filtered_ids(
+        AgentInsightFilter(
+            field="failure_severity",
+            signature_type="failure",
+            values=["unknown"],
+        )
+    ) == [spans[1].conversation_id]
+    assert filtered_ids(
+        AgentInsightFilter(
+            field="cluster",
+            signature_type="intent",
+            values=[str(latest_cluster_id)],
+        )
+    ) == [spans[0].conversation_id]
+    assert (
+        filtered_ids(
+            AgentInsightFilter(
+                field="cluster",
+                signature_type="intent",
+                values=[str(old_cluster_id)],
+            )
+        )
+        == []
+    )

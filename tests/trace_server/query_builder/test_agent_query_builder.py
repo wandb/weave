@@ -18,6 +18,7 @@ from weave.trace_server.agents.types import (
     AgentConversationChatReq,
     AgentCustomAttrsSchemaReq,
     AgentGroupByRef,
+    AgentInsightFilter,
     AgentSearchReq,
     AgentSignalFilter,
     AgentSortBy,
@@ -34,6 +35,9 @@ from weave.trace_server.agents.types import (
 from weave.trace_server.interface import query as tsi_query
 from weave.trace_server.interface.query import Query
 from weave.trace_server.orm import ParamBuilder
+from weave.trace_server.query_builder.agent_insight_filters import (
+    build_insight_filter_clause,
+)
 from weave.trace_server.query_builder.agent_query_builder import (
     CHAT_VIEW_COLS,
     QUALIFIED_CHAT_VIEW_COLS,
@@ -867,6 +871,45 @@ class TestMakeGroupedSpansCountQuery:
         }
         assert_sql(expected, expected_params, query, pb.get_params())
 
+    def test_group_by_conversation_id_with_insight_filter(self) -> None:
+        pb = ParamBuilder("genai")
+        query = make_spans_count_query(
+            pb,
+            AgentSpansQueryReq(
+                project_id="p1",
+                group_by=[AgentGroupByRef(source="column", key="conversation_id")],
+                insight_filters=[
+                    AgentInsightFilter(
+                        field="category",
+                        signature_type="intent",
+                        values=["information_request"],
+                    )
+                ],
+            ),
+        )
+        src = _AttrSrc(3)
+        expected = f"""
+            SELECT count() FROM (
+                SELECT s.conversation_id FROM {src.sql} s
+                WHERE s.project_id = {{genai_0:String}}
+                  AND s.conversation_id IN (
+                    SELECT conversation_id FROM intent_signatures
+                    WHERE project_id = {{genai_1:String}}
+                      AND conversation_id != ''
+                      AND category IN {{genai_2:Array(String)}}
+                    GROUP BY conversation_id
+                  )
+                GROUP BY s.conversation_id
+            )
+        """
+        expected_params = {
+            "genai_0": "p1",
+            "genai_1": "p1",
+            "genai_2": ["information_request"],
+            **src.params,
+        }
+        assert_sql(expected, expected_params, query, pb.get_params())
+
 
 # ============================================================================
 # make_spans_list_query (grouped)
@@ -1318,6 +1361,51 @@ class TestMakeGroupedSpansListQuery:
             "genai_2": 0,
             "genai_3": "p1",
             "genai_4": ["x"],
+            **src.params,
+        }
+        assert_sql(expected, expected_params, query, pb.get_params())
+
+    def test_grouped_query_with_failure_severity_filter(self) -> None:
+        pb = ParamBuilder("genai")
+        query = make_spans_list_query(
+            pb,
+            AgentSpansQueryReq(
+                project_id="p1",
+                group_by=[AgentGroupByRef(source="column", key="conversation_id")],
+                insight_filters=[
+                    AgentInsightFilter(
+                        field="failure_severity",
+                        signature_type="failure",
+                        values=["major", "unknown"],
+                    )
+                ],
+            ),
+        )
+
+        src = _AttrSrc(5)
+        expected = f"""
+            SELECT s.conversation_id AS conversation_id,
+                   {_GROUPED_AGG_TAIL}
+            FROM {src.sql} s
+            WHERE s.project_id = {{genai_0:String}}
+              AND s.conversation_id IN (
+                SELECT conversation_id FROM failure_signatures
+                WHERE project_id = {{genai_3:String}}
+                  AND conversation_id != ''
+                  AND if(empty(trimBoth(severity)), 'unknown', lower(severity))
+                      IN {{genai_4:Array(String)}}
+                GROUP BY conversation_id
+              )
+            GROUP BY conversation_id
+            ORDER BY last_seen DESC
+            LIMIT {{genai_1:UInt64}} OFFSET {{genai_2:UInt64}}
+        """
+        expected_params = {
+            "genai_0": "p1",
+            "genai_1": 100,
+            "genai_2": 0,
+            "genai_3": "p1",
+            "genai_4": ["major", "unknown"],
             **src.params,
         }
         assert_sql(expected, expected_params, query, pb.get_params())
@@ -2236,6 +2324,85 @@ def test_signal_filter_round_trip() -> None:
     assert req.signal_filters.ratings[0].op == "gte"
     assert AgentSignalFilter().is_empty() is True
     assert req.signal_filters.is_empty() is False
+
+
+def test_insight_filter_validation() -> None:
+    with pytest.raises(
+        ValidationError, match="failure_severity requires failure signatures"
+    ):
+        AgentInsightFilter(
+            field="failure_severity",
+            signature_type="intent",
+            values=["major"],
+        )
+    with pytest.raises(ValidationError):
+        AgentInsightFilter(
+            field="category",
+            signature_type="intent",
+            values=[],
+        )
+    with pytest.raises(ValidationError, match="insight_filters require group_by"):
+        AgentSpansQueryReq(
+            project_id="p1",
+            insight_filters=[
+                AgentInsightFilter(
+                    field="category",
+                    signature_type="intent",
+                    values=["information_request"],
+                )
+            ],
+        )
+
+
+def test_build_cluster_insight_filter_clause() -> None:
+    start = datetime.datetime(2026, 9, 1, tzinfo=datetime.timezone.utc)
+    end = datetime.datetime(2026, 9, 8, tzinfo=datetime.timezone.utc)
+    pb = ParamBuilder("insight")
+    clause = build_insight_filter_clause(
+        pb,
+        "project-1",
+        [
+            AgentInsightFilter(
+                field="cluster",
+                signature_type="failure",
+                values=["01994634-c680-7dc3-a40b-0383b5008d70"],
+                exclude=True,
+            )
+        ],
+        start,
+        end,
+    )
+
+    expected = """
+        s.conversation_id NOT IN (
+          SELECT conversation_id FROM signature_cluster_assignments
+          WHERE project_id = {insight_0:String}
+            AND conversation_id != ''
+            AND trace_started_at >= {insight_2:DateTime64(6)}
+            AND trace_started_at < {insight_3:DateTime64(6)}
+            AND signature_type = 'failure'
+            AND cluster_run_id = (
+              SELECT id FROM signature_cluster_runs
+              WHERE project_id = {insight_0:String}
+                AND signature_type = 'failure'
+                AND status = 'succeeded'
+              ORDER BY window_end DESC, completed_at DESC, id DESC LIMIT 1
+            )
+            AND toString(cluster_id) IN {insight_1:Array(String)}
+          GROUP BY conversation_id
+        )
+    """
+    assert_sql(
+        expected,
+        {
+            "insight_0": "project-1",
+            "insight_1": ["01994634-c680-7dc3-a40b-0383b5008d70"],
+            "insight_2": start,
+            "insight_3": end,
+        },
+        clause or "",
+        pb.get_params(),
+    )
 
 
 def test_build_signal_filter_clause() -> None:

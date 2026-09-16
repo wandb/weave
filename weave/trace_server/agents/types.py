@@ -808,6 +808,25 @@ class AgentSignalFilter(BaseModel):
         return not self.tags and not self.ratings
 
 
+class AgentInsightFilter(BaseModel):
+    """Conversation filter backed by extracted Insights data in ClickHouse.
+
+    Values within one filter are ORed, while multiple filters are ANDed. Cluster
+    values refer to IDs in the latest successful run for the signature type.
+    """
+
+    field: Literal["category", "cluster", "failure_severity"]
+    signature_type: Literal["intent", "failure"]
+    values: list[str] = Field(min_length=1, max_length=100)
+    exclude: bool = False
+
+    @model_validator(mode="after")
+    def validate_insight_filter(self) -> AgentInsightFilter:
+        if self.field == "failure_severity" and self.signature_type != "failure":
+            raise ValueError("failure_severity requires failure signatures")
+        return self
+
+
 class AgentSpansQueryReq(BaseModel):
     """Request to query agent spans for a project.
 
@@ -845,6 +864,7 @@ class AgentSpansQueryReq(BaseModel):
     started_after: datetime.datetime | None = None  # filter started_at >= start
     started_before: datetime.datetime | None = None  # filter started_at < end
     signal_filters: AgentSignalFilter | None = None
+    insight_filters: list[AgentInsightFilter] = Field(default_factory=list)
 
     @model_validator(mode="after")
     def validate_spans_query_request(self) -> AgentSpansQueryReq:
@@ -862,6 +882,8 @@ class AgentSpansQueryReq(BaseModel):
             and not self.group_by
         ):
             raise ValueError("signal_filters require group_by")
+        if self.insight_filters and not self.group_by:
+            raise ValueError("insight_filters require group_by")
         if self.group_distributions and len(self.group_by or []) != 1:
             raise ValueError("group_distributions currently support one group_by ref")
         if self.group_by and self.custom_attr_columns:

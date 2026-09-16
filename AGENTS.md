@@ -127,6 +127,11 @@ schema and the dependent Core frontend types stay aligned.
 
 ### Trace Server API / Node SDK Schema
 
+Agent conversation queries accept `insight_filters` for category, cluster, and
+failure-severity membership. Compile these as project- and time-bounded
+conversation semi-joins in `agent_insight_filters.py`; cluster membership must
+use the latest successful run for its signature type.
+
 Custom Runtime registration is a desired-state facade over the existing
 `Provider` and `ProviderModel` built-in objects. Keep `ProviderModel.provider`
 as the Provider digest and preserve `custom::<provider>::<model>` selectors;

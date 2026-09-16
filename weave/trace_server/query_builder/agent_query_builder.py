@@ -57,6 +57,9 @@ from weave.trace_server.query_builder import agent_trace_attribution
 from weave.trace_server.query_builder.agent_custom_attrs import (
     custom_attr_value_or_null,
 )
+from weave.trace_server.query_builder.agent_insight_filters import (
+    build_insight_filter_clause,
+)
 from weave.trace_server.query_builder.agent_signal_filters import (
     build_signal_filter_clause,
 )
@@ -1177,6 +1180,16 @@ def make_spans_count_query(pb: ParamBuilder, req: AgentSpansQueryReq) -> str:
     if signal_clause is not None:
         count_where = f"{count_where} AND {signal_clause}"
         attribute = True
+    insight_clause = build_insight_filter_clause(
+        pb,
+        req.project_id,
+        req.insight_filters,
+        req.started_after,
+        req.started_before,
+    )
+    if insight_clause is not None:
+        count_where = f"{count_where} AND {insight_clause}"
+        attribute = True
     source = _spans_source(pb, req, attribute=attribute)
     return (
         f"SELECT count() FROM ("
@@ -1278,6 +1291,15 @@ def make_spans_list_query(pb: ParamBuilder, req: AgentSpansQueryReq) -> str:
     grouped_where = span_filters.where
     if signal_clause is not None:
         grouped_where = f"{grouped_where} AND {signal_clause}"
+    insight_clause = build_insight_filter_clause(
+        pb,
+        req.project_id,
+        req.insight_filters,
+        req.started_after,
+        req.started_before,
+    )
+    if insight_clause is not None:
+        grouped_where = f"{grouped_where} AND {insight_clause}"
     source = _spans_source(pb, req, attribute=True, include_costs=req.include_costs)
 
     return f"""
