@@ -542,6 +542,8 @@ export interface SpanQueryParams {
 
   include_details?: boolean;
 
+  insight_filters?: Array<SpanQueryParams.InsightFilter>;
+
   limit?: number;
 
   measures?: Array<SpanQueryParams.Measure>;
@@ -745,6 +747,22 @@ export namespace SpanQueryParams {
         | 'custom_attrs_float'
         | 'custom_attrs_bool';
     }
+  }
+
+  /**
+   * Conversation filter backed by extracted Insights data in ClickHouse.
+   *
+   * Values within one filter are ORed, while multiple filters are ANDed. Cluster
+   * values refer to IDs in the latest successful run for the signature type.
+   */
+  export interface InsightFilter {
+    field: 'category' | 'cluster' | 'failure_severity';
+
+    signature_type: 'intent' | 'failure';
+
+    values: Array<string>;
+
+    exclude?: boolean;
   }
 
   /**

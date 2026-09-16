@@ -28,6 +28,7 @@ __all__ = [
     "GroupFilterMeasureFilterExprLteOperation",
     "GroupFilterMeasureValue",
     "GroupFilterGroupBy",
+    "InsightFilter",
     "Measure",
     "MeasureFilter",
     "MeasureFilterExpr",
@@ -58,6 +59,8 @@ class SpanQueryParams(TypedDict, total=False):
     include_costs: bool
 
     include_details: bool
+
+    insight_filters: Iterable[InsightFilter]
 
     limit: int
 
@@ -230,6 +233,22 @@ class GroupFilter(TypedDict, total=False):
     max: Annotated[Union[float, Union[str, datetime], None], PropertyInfo(format="iso8601")]
 
     min: Annotated[Union[float, Union[str, datetime], None], PropertyInfo(format="iso8601")]
+
+
+class InsightFilter(TypedDict, total=False):
+    """Conversation filter backed by extracted Insights data in ClickHouse.
+
+    Values within one filter are ORed, while multiple filters are ANDed. Cluster
+    values refer to IDs in the latest successful run for the signature type.
+    """
+
+    field: Required[Literal["category", "cluster", "failure_severity"]]
+
+    signature_type: Required[Literal["intent", "failure"]]
+
+    values: Required[SequenceNotStr[str]]
+
+    exclude: bool
 
 
 class MeasureFilterExprLtOperation(TypedDict, total=False):
