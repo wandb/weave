@@ -1966,3 +1966,77 @@ def test_iter_internal_refs_caps_recursion_on_deeply_nested_payload() -> None:
     # Far beyond sys.getrecursionlimit(): must not raise, must yield nothing.
     pathological = _nest_in_lists(ref, sys.getrecursionlimit() * 2)
     assert list(_iter_internal_refs(pathological)) == []
+
+
+_TURN_PROMPT = "Why did my run crash?"
+_PAGE_STATE = '{"type": "wandb_web_page_state", "url": "https://wandb.ai/e/p/runs/abc"}'
+_CLOCK = "Current date and time: 2026-09-15T14:02:00Z (Tuesday, UTC)."
+
+
+@pytest.mark.parametrize(
+    ("llm_user_messages", "expected_context"),
+    [
+        (
+            [{"role": "user", "content": f"{_PAGE_STATE}\n{_TURN_PROMPT}\n{_CLOCK}"}],
+            [f"{_PAGE_STATE}\n\n{_CLOCK}"],
+        ),
+        (
+            [
+                {"role": "user", "content": _CLOCK},
+                {"role": "user", "content": _TURN_PROMPT},
+            ],
+            [_CLOCK],
+        ),
+        (
+            [
+                {
+                    "role": "user",
+                    "content": "<system-reminder>Budget low.</system-reminder>",
+                }
+            ],
+            ["<system-reminder>Budget low.</system-reminder>"],
+        ),
+        ([{"role": "user", "content": _TURN_PROMPT}], []),
+    ],
+    ids=["wrapped-around-prompt", "separate-message", "no-overlap", "same-prompt"],
+)
+def test_turn_root_prompt_is_the_user_message_and_llm_additions_are_context(
+    llm_user_messages: list[dict], expected_context: list[str]
+) -> None:
+    """`invoke_agent` root `input_messages` is the user bubble; `chat` span extras render as `Prompt context`."""
+    spans = [
+        _span(
+            span_id="turn",
+            operation_name="invoke_agent",
+            agent_name="wandb",
+            input_messages=[{"role": "user", "content": _TURN_PROMPT}],
+        ),
+        _span(
+            span_id="llm",
+            parent_span_id="turn",
+            operation_name="chat",
+            input_messages=[
+                {"role": "system", "content": "You are the W&B assistant."},
+                *llm_user_messages,
+            ],
+            output_messages=[
+                {"role": "assistant", "content": "Your run hit an OOM at step 340."}
+            ],
+        ),
+    ]
+
+    messages = build_chat_messages(spans)
+
+    users = [_user_payload(m).text for m in messages if m.type == "user_message"]
+    context = [
+        _tool_payload(m).tool_result
+        for m in messages
+        if m.type == "tool_call" and _tool_payload(m).tool_name == "Prompt context"
+    ]
+    assistants = [
+        _assistant_payload(m).text for m in messages if m.type == "assistant_message"
+    ]
+    assert users == [_TURN_PROMPT]
+    assert context == expected_context
+    assert assistants == ["Your run hit an OOM at step 340."]
+    assert messages[0].type == "user_message"

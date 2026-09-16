@@ -59,6 +59,8 @@ _NON_USER_PROMPT_ROLES = {
 # and belongs with tool activity in the trajectory.
 _CLAUDE_TASK_NOTIFICATION_OPEN = "<task-notification>"
 _CLAUDE_TASK_NOTIFICATION_CLOSE = "</task-notification>"
+_TASK_NOTIFICATION_TOOL_NAME = "Task notification"
+_PROMPT_CONTEXT_TOOL_NAME = "Prompt context"
 _CHAT_OPERATION = "chat"
 _ASSISTANT_TEXT_OPERATION = "assistant_text"
 
@@ -303,9 +305,11 @@ def build_chat_messages(spans: list[AgentSpanSchema]) -> list[AgentChatMessage]:
     (one chat span each), so the conversation is reconstructed from the spans'
     own messages rather than assuming one user prompt per trace.
 
-    Only when the walk surfaces no user message at all — e.g. an SDK that
-    records the prompt on the enclosing `invoke_agent` span rather than the LLM
-    span — do we fall back to a synthesized leading prompt. Claude Code task
+    When the trace root is an `invoke_agent` span carrying a user message, that
+    text is the turn's prompt: it leads the timeline, and any user-role text an
+    LLM span adds on top of it (see `_turn_prompt`) renders as `Prompt context`
+    tool activity. Otherwise, only when the walk surfaces no user message at
+    all do we fall back to a synthesized leading prompt. Claude Code task
     notifications recorded only on that wrapper receive the equivalent fallback
     as tool activity.
     """
@@ -313,7 +317,7 @@ def build_chat_messages(spans: list[AgentSpanSchema]) -> list[AgentChatMessage]:
         return []
 
     tree = build_span_tree(spans)
-    traversal = ChatTraversal()
+    traversal = ChatTraversal(turn_prompt=_turn_prompt(tree))
     traversal.walk_roots(tree)
 
     messages = traversal.messages
@@ -352,6 +356,9 @@ class ChatTraversal:
     """
 
     messages: list[AgentChatMessage] = field(default_factory=list)
+    # The prompt recorded on the trace's `invoke_agent` root, when it has one.
+    # While set, LLM-span user text is harness context, not a new user turn.
+    turn_prompt: str | None = None
     # True once any per-turn user message has been emitted during the walk;
     # gates the invoke_agent leading-prompt fallback in build_chat_messages.
     emitted_user: bool = False
@@ -641,22 +648,13 @@ class ChatTraversal:
                 self._pending_agent_start = None
                 self.emitted_task_notification = True
                 self.messages.append(
-                    AgentChatMessage(
-                        type="tool_call",
-                        span_id=span.span_id,
-                        agent_name=agent_name,
-                        agent_version=span.agent_version,
-                        status_code=span.status_code,
-                        started_at=span.started_at,
-                        tool_call=AgentChatToolCall(
-                            tool_name="Task notification",
-                            tool_result=text,
-                            duration_ms=0,
-                            status=span.status_code,
-                            content_refs=media,
-                        ),
+                    _context_tool_call(
+                        span, agent_name, _TASK_NOTIFICATION_TOOL_NAME, text, media
                     )
                 )
+                continue
+            if self.turn_prompt is not None:
+                self._emit_prompt_context(span, agent_name, text, self.turn_prompt)
                 continue
             self.emitted_user = True
             # A user message marks a new turn; an unfilled agent_start from an
@@ -670,6 +668,20 @@ class ChatTraversal:
                     user_message=AgentChatUserMessage(text=text, content_refs=media),
                 )
             )
+
+    def _emit_prompt_context(
+        self, span: AgentSpanSchema, agent_name: str | None, text: str, turn_prompt: str
+    ) -> None:
+        """Emit what an LLM span's user text adds around `turn_prompt`, if anything."""
+        addition = text.replace(turn_prompt, "", 1).strip()
+        if not addition:
+            return
+
+        self.messages.append(
+            _context_tool_call(
+                span, agent_name, _PROMPT_CONTEXT_TOOL_NAME, addition, []
+            )
+        )
 
     def _walk_children(
         self, node: SpanNode, nearest_agent: str | None, depth: int
@@ -1244,22 +1256,47 @@ def _find_task_notification(
                 continue
             text = _display_text(message.content)
             media = _message_content_refs(span, [message])
-            return AgentChatMessage(
-                type="tool_call",
-                span_id=span.span_id,
-                agent_name=_own_agent_label(span),
-                agent_version=span.agent_version,
-                status_code=span.status_code,
-                started_at=span.started_at,
-                tool_call=AgentChatToolCall(
-                    tool_name="Task notification",
-                    tool_result=text,
-                    duration_ms=0,
-                    status=span.status_code,
-                    content_refs=media,
-                ),
+            return _context_tool_call(
+                span, _own_agent_label(span), _TASK_NOTIFICATION_TOOL_NAME, text, media
             )
     return None
+
+
+def _turn_prompt(roots: list[SpanNode]) -> str | None:
+    """User text on a lone `invoke_agent` root, which is the prompt the turn answers."""
+    if len(roots) != 1:
+        return None
+
+    root = roots[0].span
+    if root.operation_name != OP_INVOKE_AGENT:
+        return None
+
+    return _extract_user_text(root.input_messages, last_only=True) or None
+
+
+def _context_tool_call(
+    span: AgentSpanSchema,
+    agent_name: str | None,
+    tool_name: str,
+    text: str,
+    media: list[str],
+) -> AgentChatMessage:
+    """Project role=user text that is not a human turn as zero-duration tool activity."""
+    return AgentChatMessage(
+        type="tool_call",
+        span_id=span.span_id,
+        agent_name=agent_name,
+        agent_version=span.agent_version,
+        status_code=span.status_code,
+        started_at=span.started_at,
+        tool_call=AgentChatToolCall(
+            tool_name=tool_name,
+            tool_result=text,
+            duration_ms=0,
+            status=span.status_code,
+            content_refs=media,
+        ),
+    )
 
 
 def _coalesce_mirrored_child_assistant(
