@@ -57,6 +57,7 @@ from weave.trace_server.query_builder.agent_query_builder import (
     make_custom_attrs_schema_query,
     make_message_search_query,
     make_span_group_categorical_distributions_query,
+    make_span_group_distribution_counts_query,
     make_span_group_numeric_distributions_query,
     make_spans_count_query,
     make_spans_list_query,
@@ -1417,6 +1418,45 @@ class TestMakeGroupedSpansListQuery:
 
 
 class TestMakeSpanGroupDistributionQueries:
+    def test_distribution_queries_apply_insight_filters(self) -> None:
+        req = AgentSpansQueryReq(
+            project_id="p1",
+            group_by=[AgentGroupByRef(source="column", key="conversation_id")],
+            insight_filters=[
+                AgentInsightFilter(
+                    field="failure_severity",
+                    signature_type="failure",
+                    values=["major"],
+                )
+            ],
+        )
+        numeric_spec = AgentSpanGroupDistributionSpec(
+            alias="score_distribution",
+            value=AgentSpanValueRef(source="custom_attrs_float", key="score"),
+        )
+        categorical_spec = AgentSpanGroupDistributionSpec(
+            alias="env_distribution",
+            value=AgentSpanValueRef(source="custom_attrs_string", key="env"),
+        )
+
+        queries_and_params = []
+        for build_query in (
+            lambda pb: make_span_group_distribution_counts_query(pb, req, ["conv-a"]),
+            lambda pb: make_span_group_numeric_distributions_query(
+                pb, req, ["conv-a"], [numeric_spec]
+            ),
+            lambda pb: make_span_group_categorical_distributions_query(
+                pb, req, ["conv-a"], [categorical_spec]
+            ),
+        ):
+            pb = ParamBuilder("genai")
+            queries_and_params.append((build_query(pb), pb.get_params()))
+
+        for query, params in queries_and_params:
+            assert "s.conversation_id IN (" in query
+            assert "FROM failure_signatures" in query
+            assert ["major"] in params.values()
+
     def test_numeric_distributions_query_batches_specs(self) -> None:
         pb = ParamBuilder("genai")
         query = make_span_group_numeric_distributions_query(
