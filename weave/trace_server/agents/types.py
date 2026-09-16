@@ -821,6 +821,7 @@ class AgentInsightFilter(BaseModel):
 
     field: Literal[
         "intent_category",
+        "intent_sentiment",
         "failure_category",
         "failure_severity",
         "intent_cluster_id",

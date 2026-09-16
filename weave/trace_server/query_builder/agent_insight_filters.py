@@ -75,10 +75,12 @@ def _single_insight_filter_clause(
     else:
         table = (
             "intent_signatures"
-            if insight_filter.field == "intent_category"
+            if insight_filter.field in {"intent_category", "intent_sentiment"}
             else "failure_signatures"
         )
-        if insight_filter.field != "failure_severity":
+        if insight_filter.field == "intent_sentiment":
+            conditions.append(f"sentiment IN {values_slot}")
+        elif insight_filter.field != "failure_severity":
             conditions.append(f"category IN {values_slot}")
         else:
             conditions.append(

@@ -4036,6 +4036,7 @@ def test_filter_conversations_by_insights(ch_server):
                 project_id,
                 intent_ids[index],
                 category,
+                sentiment,
                 span.conversation_id,
                 span.trace_id,
                 span.span_id,
@@ -4043,14 +4044,20 @@ def test_filter_conversations_by_insights(ch_server):
                 span.ended_at,
                 now,
             ]
-            for index, (span, category) in enumerate(
-                zip(spans[:2], ("information_request", "action_request"), strict=True)
+            for index, (span, category, sentiment) in enumerate(
+                zip(
+                    spans[:2],
+                    ("information_request", "action_request"),
+                    ("frustrated", "satisfied"),
+                    strict=True,
+                )
             )
         ],
         column_names=[
             "project_id",
             "id",
             "category",
+            "sentiment",
             "conversation_id",
             "trace_id",
             "span_id",
@@ -4210,6 +4217,12 @@ def test_filter_conversations_by_insights(ch_server):
     ) == [spans[0].conversation_id]
     assert filtered_ids(
         AgentInsightFilter(
+            field="intent_sentiment",
+            values=["frustrated"],
+        )
+    ) == [spans[0].conversation_id]
+    assert filtered_ids(
+        AgentInsightFilter(
             field="failure_severity",
             values=["unknown"],
         )
@@ -4232,8 +4245,8 @@ def test_filter_conversations_by_insights(ch_server):
     assert (
         filtered_stats_count(
             AgentInsightFilter(
-                field="intent_category",
-                values=["information_request"],
+                field="intent_sentiment",
+                values=["frustrated"],
             )
         )
         == 1
