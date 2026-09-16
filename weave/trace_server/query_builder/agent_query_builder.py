@@ -1155,6 +1155,7 @@ def _grouped_span_membership_where_sql(
     req: AgentSpansQueryReq,
     base_where: str,
 ) -> tuple[str, bool]:
+    """Add conversation-level signal and Insights predicates to grouped spans."""
     membership_clauses = [
         clause
         for clause in (

@@ -53,6 +53,7 @@ def _single_insight_filter_clause(
     started_before: datetime.datetime | None,
     conversation_col: _ConversationColumn,
 ) -> str:
+    """Build one conversation-membership predicate from an Insights filter."""
     pid_slot = pb.add(project_id, param_type="String")
     values_slot = pb.add(insight_filter.values, param_type="Array(String)")
     conditions = [f"project_id = {pid_slot}", "conversation_id != ''"]
