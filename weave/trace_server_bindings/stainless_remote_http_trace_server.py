@@ -570,6 +570,14 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
             req,
             agent_types.AgentSpansQueryRes,
             self._stainless_client.agents.spans.query,
+            # The vendored SDK is generated from core and may lag this server's API.
+            exclude={"insight_filters"},
+            extra_body={
+                "insight_filters": [
+                    insight_filter.model_dump(by_alias=True)
+                    for insight_filter in req.insight_filters
+                ]
+            },
         )
 
     @validate_call

@@ -1322,6 +1322,16 @@ def test_create_sends_every_supported_field(
                         ]
                     }
                 },
+                group_by=[
+                    agent_types.AgentGroupByRef(source="column", key="conversation_id")
+                ],
+                insight_filters=[
+                    agent_types.AgentInsightFilter(
+                        field="failure_severity",
+                        signature_type="failure",
+                        values=["major"],
+                    )
+                ],
             ),
             {
                 "project_id": PROJECT,
@@ -1334,11 +1344,25 @@ def test_create_sends_every_supported_field(
                     }
                 },
                 "custom_attr_columns": [],
-                "group_by": None,
+                "group_by": [
+                    {
+                        "alias": None,
+                        "key": "conversation_id",
+                        "source": "column",
+                    }
+                ],
                 "group_distributions": [],
                 "group_filters": [],
                 "include_costs": False,
                 "include_details": False,
+                "insight_filters": [
+                    {
+                        "exclude": False,
+                        "field": "failure_severity",
+                        "signature_type": "failure",
+                        "values": ["major"],
+                    }
+                ],
                 "limit": 100,
                 "measures": [],
                 "offset": 0,
