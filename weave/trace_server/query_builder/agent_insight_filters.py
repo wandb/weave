@@ -3,9 +3,15 @@
 from __future__ import annotations
 
 import datetime
+from typing import Literal
 
 from weave.trace_server.agents.types import AgentInsightFilter
 from weave.trace_server.orm import ParamBuilder
+
+_ConversationColumn = Literal["s.conversation_id"]
+_CONVERSATION_COLUMN_SQL: dict[_ConversationColumn, _ConversationColumn] = {
+    "s.conversation_id": "s.conversation_id"
+}
 
 
 def build_insight_filter_clause(
@@ -14,7 +20,7 @@ def build_insight_filter_clause(
     insight_filters: list[AgentInsightFilter],
     started_after: datetime.datetime | None,
     started_before: datetime.datetime | None,
-    conversation_col: str = "s.conversation_id",
+    conversation_col: _ConversationColumn = "s.conversation_id",
 ) -> str | None:
     """Match conversations carrying every requested Insights filter.
 
@@ -24,6 +30,7 @@ def build_insight_filter_clause(
     if not insight_filters:
         return None
 
+    conversation_col_sql = _CONVERSATION_COLUMN_SQL[conversation_col]
     clauses = [
         _single_insight_filter_clause(
             pb,
@@ -31,7 +38,7 @@ def build_insight_filter_clause(
             insight_filter,
             started_after,
             started_before,
-            conversation_col,
+            conversation_col_sql,
         )
         for insight_filter in insight_filters
     ]
@@ -44,7 +51,7 @@ def _single_insight_filter_clause(
     insight_filter: AgentInsightFilter,
     started_after: datetime.datetime | None,
     started_before: datetime.datetime | None,
-    conversation_col: str,
+    conversation_col: _ConversationColumn,
 ) -> str:
     pid_slot = pb.add(project_id, param_type="String")
     values_slot = pb.add(insight_filter.values, param_type="Array(String)")

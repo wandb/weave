@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Literal
+
 from weave.trace_server.agents.types import AgentSignalFilter
 from weave.trace_server.interface.feedback_types import AGENT_SPAN_FEEDBACK_TYPES
 from weave.trace_server.orm import ParamBuilder
@@ -12,6 +14,10 @@ _OP_TO_SQL: dict[str, str] = {
     "lte": "<=",
     "lt": "<",
     "eq": "=",
+}
+_ConversationColumn = Literal["s.conversation_id"]
+_CONVERSATION_COLUMN_SQL: dict[_ConversationColumn, _ConversationColumn] = {
+    "s.conversation_id": "s.conversation_id"
 }
 
 # Derived from the write-path constant so a change to the frozenset propagates here.
@@ -27,7 +33,7 @@ def build_signal_filter_clause(
     pb: ParamBuilder,
     project_id: str,
     signal_filters: AgentSignalFilter | None,
-    conversation_col: str = "s.conversation_id",
+    conversation_col: _ConversationColumn = "s.conversation_id",
 ) -> str | None:
     """Restrict `conversation_col` to conversations carrying the requested signals.
 
@@ -41,6 +47,7 @@ def build_signal_filter_clause(
     if signal_filters is None or signal_filters.is_empty():
         return None
 
+    conversation_col_sql = _CONVERSATION_COLUMN_SQL[conversation_col]
     pid_slot = pb.add(project_id, param_type="String")
     having_terms: list[str] = []
 
@@ -61,7 +68,7 @@ def build_signal_filter_clause(
 
     having = " AND ".join(having_terms)
     return (
-        f"{conversation_col} IN (SELECT span_conversation_id FROM feedback "
+        f"{conversation_col_sql} IN (SELECT span_conversation_id FROM feedback "
         f"WHERE project_id = {pid_slot} AND {_AGENT_FEEDBACK_TYPES_SQL} "
         f"AND span_conversation_id != '' "
         f"GROUP BY span_conversation_id HAVING {having})"
