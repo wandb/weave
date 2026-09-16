@@ -4182,6 +4182,26 @@ def test_filter_conversations_by_insights(ch_server):
         )
         return sorted(group.group_keys["conversation_id"] for group in response.groups)
 
+    def filtered_stats_count(*filters: AgentInsightFilter) -> int:
+        response = ch_server.agent_spans_stats(
+            AgentSpanStatsReq(
+                project_id=project_id,
+                start=now - datetime.timedelta(hours=1),
+                end=now + datetime.timedelta(hours=1),
+                granularity=3600,
+                metrics=[
+                    AgentSpanStatsMetricSpec(
+                        alias="spans",
+                        value_type="datetime",
+                        value=AgentSpanValueRef(source="field", key="started_at"),
+                        aggregations=["count"],
+                    )
+                ],
+                insight_filters=list(filters),
+            )
+        )
+        return sum(int(row["count_spans"]) for row in response.rows)
+
     assert filtered_ids(
         AgentInsightFilter(
             field="intent_category",
@@ -4208,4 +4228,41 @@ def test_filter_conversations_by_insights(ch_server):
             )
         )
         == []
+    )
+    assert (
+        filtered_stats_count(
+            AgentInsightFilter(
+                field="intent_category",
+                values=["information_request"],
+            )
+        )
+        == 1
+    )
+    assert (
+        filtered_stats_count(
+            AgentInsightFilter(
+                field="failure_severity",
+                values=["unknown"],
+            )
+        )
+        == 1
+    )
+    assert (
+        filtered_stats_count(
+            AgentInsightFilter(
+                field="intent_cluster_id",
+                values=[str(latest_cluster_id)],
+            )
+        )
+        == 1
+    )
+    assert (
+        filtered_stats_count(
+            AgentInsightFilter(
+                field="intent_category",
+                values=["information_request"],
+                exclude=True,
+            )
+        )
+        == 2
     )

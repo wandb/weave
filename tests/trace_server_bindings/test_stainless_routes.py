@@ -469,6 +469,12 @@ def test_v2_method_reaches_its_flat_route(
                         aggregations=["sum"],
                     )
                 ],
+                insight_filters=[
+                    agent_types.AgentInsightFilter(
+                        field="failure_severity",
+                        values=["major"],
+                    )
+                ],
             ),
             "POST",
             "/agents/spans/stats",
@@ -1447,6 +1453,40 @@ def test_route_sends_every_supported_field(
 
     assert len(mock_server.requests) == 1
     assert json.loads(mock_server.requests[0].content) == expected_body
+
+
+def test_agent_spans_stats_sends_insight_filters() -> None:
+    mock_server = _mock_server(httpx.Response(200, json=V1_RESPONSE))
+    req = agent_types.AgentSpanStatsReq(
+        project_id=PROJECT,
+        start=START,
+        end=END,
+        metrics=[
+            agent_types.AgentSpanStatsMetricSpec(
+                alias="spans",
+                value_type="datetime",
+                value=agent_types.AgentSpanValueRef(source="field", key="started_at"),
+                aggregations=["count"],
+            )
+        ],
+        insight_filters=[
+            agent_types.AgentInsightFilter(
+                field="failure_severity",
+                values=["major"],
+            )
+        ],
+    )
+
+    mock_server.server.agent_spans_stats(req)
+
+    assert len(mock_server.requests) == 1
+    assert json.loads(mock_server.requests[0].content)["insight_filters"] == [
+        {
+            "exclude": False,
+            "field": "failure_severity",
+            "values": ["major"],
+        }
+    ]
 
 
 def test_stream_route_sends_every_supported_field():

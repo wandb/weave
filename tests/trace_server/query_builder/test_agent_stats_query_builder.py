@@ -8,6 +8,7 @@ from pydantic import ValidationError
 from weave.trace_server.agents.constants import MAX_AGENT_STATS_RESULT_ROWS
 from weave.trace_server.agents.types import (
     AgentGroupByRef,
+    AgentInsightFilter,
     AgentSignalFilter,
     AgentSpanGroupFilter,
     AgentSpanMeasureSpec,
@@ -146,6 +147,54 @@ def test_signal_filters_add_conversation_semi_join_and_attribution() -> None:
         "genai_2": end,
         "genai_3": "p1",
         "genai_4": ["flagged"],
+        **source_params,
+    }
+
+
+def test_insight_filters_add_windowed_conversation_semi_join_and_attribution() -> None:
+    start = datetime.datetime(2026, 1, 1, tzinfo=datetime.timezone.utc)
+    end = datetime.datetime(2026, 1, 2, tzinfo=datetime.timezone.utc)
+    pb = ParamBuilder("genai")
+
+    result = _spans_source_filter_sql(
+        pb,
+        _req(
+            insight_filters=[
+                AgentInsightFilter(
+                    field="failure_severity",
+                    values=["major"],
+                )
+            ]
+        ),
+        start,
+        end,
+    )
+
+    expected_source, source_params = _attr_src(
+        7, started_after=start, started_before=end
+    )
+    assert result == _SpanSourceFilterSQL(
+        where=(
+            "s.project_id = {genai_0:String} "
+            "AND s.started_at >= {genai_1:DateTime64(6)} "
+            "AND s.started_at < {genai_2:DateTime64(6)} "
+            "AND s.conversation_id IN (SELECT conversation_id FROM failure_signatures "
+            "WHERE project_id = {genai_3:String} AND conversation_id != '' "
+            "AND trace_started_at >= {genai_5:DateTime64(6)} "
+            "AND trace_started_at < {genai_6:DateTime64(6)} "
+            "AND if(empty(trimBoth(severity)), 'unknown', lower(severity)) "
+            "IN {genai_4:Array(String)} GROUP BY conversation_id)"
+        ),
+        source=expected_source,
+    )
+    assert pb.get_params() == {
+        "genai_0": "p1",
+        "genai_1": start,
+        "genai_2": end,
+        "genai_3": "p1",
+        "genai_4": ["major"],
+        "genai_5": start,
+        "genai_6": end,
         **source_params,
     }
 
@@ -937,3 +986,16 @@ def test_request_validation_allows_large_range_when_ungrouped() -> None:
     # span any range (used for all-time totals), so the cap does not apply.
     req = _req(end=datetime.datetime(2026, 2, 15, tzinfo=datetime.timezone.utc))
     assert req.end == datetime.datetime(2026, 2, 15, tzinfo=datetime.timezone.utc)
+
+
+def test_request_validation_rejects_large_range_with_insight_filters() -> None:
+    with pytest.raises(ValidationError):
+        _req(
+            end=datetime.datetime(2026, 2, 15, tzinfo=datetime.timezone.utc),
+            insight_filters=[
+                AgentInsightFilter(
+                    field="intent_category",
+                    values=["information_request"],
+                )
+            ],
+        )

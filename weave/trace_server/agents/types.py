@@ -384,6 +384,7 @@ class AgentSpanStatsReq(BaseModel):
     # requested signal tags/ratings. Signal timestamps are intentionally not
     # constrained by the stats window; they annotate the conversation.
     signal_filters: AgentSignalFilter | None = None
+    insight_filters: list[AgentInsightFilter] = Field(default_factory=list)
 
     @model_validator(mode="after")
     def validate_stats_request(self) -> AgentSpanStatsReq:
@@ -414,6 +415,7 @@ class AgentSpanStatsReq(BaseModel):
         apply_max_range_days = (
             bool(self.group_by)
             or bool(self.group_filters)
+            or bool(self.insight_filters)
             or numeric_bucket is not None
         )
         max_range = datetime.timedelta(days=MAX_AGENT_STATS_RANGE_DAYS)
