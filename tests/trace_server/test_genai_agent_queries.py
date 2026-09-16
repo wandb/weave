@@ -4184,30 +4184,26 @@ def test_filter_conversations_by_insights(ch_server):
 
     assert filtered_ids(
         AgentInsightFilter(
-            field="category",
-            signature_type="intent",
+            field="intent_category",
             values=["information_request"],
         )
     ) == [spans[0].conversation_id]
     assert filtered_ids(
         AgentInsightFilter(
             field="failure_severity",
-            signature_type="failure",
             values=["unknown"],
         )
     ) == [spans[1].conversation_id]
     assert filtered_ids(
         AgentInsightFilter(
-            field="cluster",
-            signature_type="intent",
+            field="intent_cluster_id",
             values=[str(latest_cluster_id)],
         )
     ) == [spans[0].conversation_id]
     assert (
         filtered_ids(
             AgentInsightFilter(
-                field="cluster",
-                signature_type="intent",
+                field="intent_cluster_id",
                 values=[str(old_cluster_id)],
             )
         )

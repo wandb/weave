@@ -57,8 +57,10 @@ def _single_insight_filter_clause(
         before_slot = pb.add(started_before, param_type="DateTime64(6)")
         conditions.append(f"trace_started_at < {before_slot}")
 
-    if insight_filter.field == "cluster":
-        signature_type = insight_filter.signature_type
+    if insight_filter.field in {"intent_cluster_id", "failure_cluster_id"}:
+        signature_type = (
+            "intent" if insight_filter.field == "intent_cluster_id" else "failure"
+        )
         conditions.extend(
             [
                 f"signature_type = '{signature_type}'",
@@ -73,8 +75,12 @@ def _single_insight_filter_clause(
         )
         table = "signature_cluster_assignments"
     else:
-        table = f"{insight_filter.signature_type}_signatures"
-        if insight_filter.field == "category":
+        table = (
+            "intent_signatures"
+            if insight_filter.field == "intent_category"
+            else "failure_signatures"
+        )
+        if insight_filter.field != "failure_severity":
             conditions.append(f"category IN {values_slot}")
         else:
             conditions.append(

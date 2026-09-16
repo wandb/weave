@@ -1328,7 +1328,6 @@ def test_create_sends_every_supported_field(
                 insight_filters=[
                     agent_types.AgentInsightFilter(
                         field="failure_severity",
-                        signature_type="failure",
                         values=["major"],
                     )
                 ],
@@ -1359,7 +1358,6 @@ def test_create_sends_every_supported_field(
                     {
                         "exclude": False,
                         "field": "failure_severity",
-                        "signature_type": "failure",
                         "values": ["major"],
                     }
                 ],

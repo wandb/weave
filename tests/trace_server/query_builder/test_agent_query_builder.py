@@ -881,8 +881,7 @@ class TestMakeGroupedSpansCountQuery:
                 group_by=[AgentGroupByRef(source="column", key="conversation_id")],
                 insight_filters=[
                     AgentInsightFilter(
-                        field="category",
-                        signature_type="intent",
+                        field="intent_category",
                         values=["information_request"],
                     )
                 ],
@@ -1376,7 +1375,6 @@ class TestMakeGroupedSpansListQuery:
                 insight_filters=[
                     AgentInsightFilter(
                         field="failure_severity",
-                        signature_type="failure",
                         values=["major", "unknown"],
                     )
                 ],
@@ -1425,7 +1423,6 @@ class TestMakeSpanGroupDistributionQueries:
             insight_filters=[
                 AgentInsightFilter(
                     field="failure_severity",
-                    signature_type="failure",
                     values=["major"],
                 )
             ],
@@ -2367,27 +2364,28 @@ def test_signal_filter_round_trip() -> None:
 
 
 def test_insight_filter_validation() -> None:
-    with pytest.raises(
-        ValidationError, match="failure_severity requires failure signatures"
-    ):
+    with pytest.raises(ValidationError):
         AgentInsightFilter(
-            field="failure_severity",
-            signature_type="intent",
+            field="category",
             values=["major"],
         )
     with pytest.raises(ValidationError):
         AgentInsightFilter(
-            field="category",
-            signature_type="intent",
+            field="intent_category",
             values=[],
+        )
+    with pytest.raises(ValidationError, match="Extra inputs are not permitted"):
+        AgentInsightFilter(
+            field="failure_severity",
+            values=["major"],
+            signature_type="failure",
         )
     with pytest.raises(ValidationError, match="insight_filters require group_by"):
         AgentSpansQueryReq(
             project_id="p1",
             insight_filters=[
                 AgentInsightFilter(
-                    field="category",
-                    signature_type="intent",
+                    field="intent_category",
                     values=["information_request"],
                 )
             ],
@@ -2403,8 +2401,7 @@ def test_build_cluster_insight_filter_clause() -> None:
         "project-1",
         [
             AgentInsightFilter(
-                field="cluster",
-                signature_type="failure",
+                field="failure_cluster_id",
                 values=["01994634-c680-7dc3-a40b-0383b5008d70"],
                 exclude=True,
             )

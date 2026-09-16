@@ -812,19 +812,23 @@ class AgentInsightFilter(BaseModel):
     """Conversation filter backed by extracted Insights data in ClickHouse.
 
     Values within one filter are ORed, while multiple filters are ANDed. Cluster
-    values refer to IDs in the latest successful run for the signature type.
+    IDs are resolved against the latest successful run for their field's type.
     """
 
-    field: Literal["category", "cluster", "failure_severity"]
-    signature_type: Literal["intent", "failure"]
-    values: list[str] = Field(min_length=1, max_length=100)
-    exclude: bool = False
+    model_config = ConfigDict(extra="forbid")
 
-    @model_validator(mode="after")
-    def validate_insight_filter(self) -> AgentInsightFilter:
-        if self.field == "failure_severity" and self.signature_type != "failure":
-            raise ValueError("failure_severity requires failure signatures")
-        return self
+    field: Literal[
+        "intent_category",
+        "failure_category",
+        "failure_severity",
+        "intent_cluster_id",
+        "failure_cluster_id",
+    ]
+    values: list[str] = Field(min_length=1, max_length=100)
+    exclude: bool = Field(
+        default=False,
+        description="Exclude conversations matching any value in this filter.",
+    )
 
 
 class AgentSpansQueryReq(BaseModel):
