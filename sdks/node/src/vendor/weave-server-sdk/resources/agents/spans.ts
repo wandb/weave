@@ -17,6 +17,13 @@ export class Spans extends APIResource {
   }
 
   /**
+   * Check token accounting on one project-authorized persisted span.
+   */
+  diagnostics(body: SpanDiagnosticsParams, options?: RequestOptions): APIPromise<SpanDiagnosticsResponse> {
+    return this._client.post('/agents/spans/diagnostics', { body, ...options });
+  }
+
+  /**
    * Query agent spans, either as raw rows or grouped aggregates.
    */
   query(body: SpanQueryParams, options?: RequestOptions): APIPromise<SpanQueryResponse> {
@@ -56,6 +63,53 @@ export namespace SpanCustomAttrsSchemaResponse {
     span_count: number;
 
     value_type: 'string' | 'int' | 'float' | 'bool';
+  }
+}
+
+/**
+ * Results cover one accounting rule on the selected span, not trace health.
+ */
+export interface SpanDiagnosticsResponse {
+  status: 'evaluated' | 'not_found' | 'not_evaluated';
+
+  findings?: Array<SpanDiagnosticsResponse.Finding>;
+
+  scope?: 'selected_span';
+}
+
+export namespace SpanDiagnosticsResponse {
+  export interface Finding {
+    excess_tokens: number;
+
+    explanation: string;
+
+    fields: Array<Finding.Field>;
+
+    span_id: string;
+
+    trace_id: string;
+
+    certainty?: 'confirmed';
+
+    code?: 'cache_tokens_exceed_input';
+
+    impact?: 'cost';
+
+    remediation?: string;
+
+    rule_version?: 1;
+
+    title?: string;
+  }
+
+  export namespace Finding {
+    export interface Field {
+      attribute_name: string;
+
+      name: 'input_tokens' | 'cache_read_input_tokens' | 'cache_creation_input_tokens';
+
+      value: number | null;
+    }
   }
 }
 
@@ -525,6 +579,14 @@ export namespace SpanCustomAttrsSchemaParams {
       $lte: Array<unknown>;
     }
   }
+}
+
+export interface SpanDiagnosticsParams {
+  project_id: string;
+
+  span_id: string;
+
+  trace_id: string;
 }
 
 export interface SpanQueryParams {
@@ -1313,9 +1375,11 @@ export namespace SpanStatsParams {
 export declare namespace Spans {
   export {
     type SpanCustomAttrsSchemaResponse as SpanCustomAttrsSchemaResponse,
+    type SpanDiagnosticsResponse as SpanDiagnosticsResponse,
     type SpanQueryResponse as SpanQueryResponse,
     type SpanStatsResponse as SpanStatsResponse,
     type SpanCustomAttrsSchemaParams as SpanCustomAttrsSchemaParams,
+    type SpanDiagnosticsParams as SpanDiagnosticsParams,
     type SpanQueryParams as SpanQueryParams,
     type SpanStatsParams as SpanStatsParams,
   };

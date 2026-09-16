@@ -15,6 +15,8 @@ import * as SpansAPI from './spans';
 import {
   SpanCustomAttrsSchemaParams,
   SpanCustomAttrsSchemaResponse,
+  SpanDiagnosticsParams,
+  SpanDiagnosticsResponse,
   SpanQueryParams,
   SpanQueryResponse,
   SpanStatsParams,
@@ -483,9 +485,11 @@ export declare namespace Agents {
   export {
     Spans as Spans,
     type SpanCustomAttrsSchemaResponse as SpanCustomAttrsSchemaResponse,
+    type SpanDiagnosticsResponse as SpanDiagnosticsResponse,
     type SpanQueryResponse as SpanQueryResponse,
     type SpanStatsResponse as SpanStatsResponse,
     type SpanCustomAttrsSchemaParams as SpanCustomAttrsSchemaParams,
+    type SpanDiagnosticsParams as SpanDiagnosticsParams,
     type SpanQueryParams as SpanQueryParams,
     type SpanStatsParams as SpanStatsParams,
   };

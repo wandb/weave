@@ -7,8 +7,10 @@ from .span_stats_params import SpanStatsParams as SpanStatsParams
 from .trace_chat_params import TraceChatParams as TraceChatParams
 from .span_query_response import SpanQueryResponse as SpanQueryResponse
 from .span_stats_response import SpanStatsResponse as SpanStatsResponse
+from .span_diagnostics_params import SpanDiagnosticsParams as SpanDiagnosticsParams
 from .conversation_chat_params import ConversationChatParams as ConversationChatParams
 from .conversation_spans_params import ConversationSpansParams as ConversationSpansParams
+from .span_diagnostics_response import SpanDiagnosticsResponse as SpanDiagnosticsResponse
 from .agent_version_query_params import AgentVersionQueryParams as AgentVersionQueryParams
 from .conversation_chat_response import ConversationChatResponse as ConversationChatResponse
 from .conversation_spans_response import ConversationSpansResponse as ConversationSpansResponse
