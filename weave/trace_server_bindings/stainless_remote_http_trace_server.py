@@ -574,7 +574,9 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
             exclude={"insight_filters"},
             extra_body={
                 "insight_filters": [
-                    insight_filter.model_dump(by_alias=True)
+                    insight_filter.model_dump(
+                        mode="json", by_alias=True, exclude_none=True
+                    )
                     for insight_filter in req.insight_filters
                 ]
             },
@@ -690,7 +692,9 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
             exclude={"insight_filters"},
             extra_body={
                 "insight_filters": [
-                    insight_filter.model_dump(by_alias=True)
+                    insight_filter.model_dump(
+                        mode="json", by_alias=True, exclude_none=True
+                    )
                     for insight_filter in req.insight_filters
                 ]
             },

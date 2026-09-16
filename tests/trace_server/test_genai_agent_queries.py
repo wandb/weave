@@ -4134,6 +4134,38 @@ def test_filter_conversations_by_insights(ch_server):
     )
     old_cluster_id = uuid.uuid4()
     latest_cluster_id = uuid.uuid4()
+    topic_id = uuid.uuid4()
+    ch_server.ch_client.insert(
+        "signature_clusters",
+        data=[
+            [
+                project_id,
+                run_id,
+                cluster_id,
+                now - datetime.timedelta(days=offset),
+                "intent",
+                topic_id,
+                category,
+                [],
+                "Information requests",
+            ]
+            for run_id, cluster_id, category, offset in (
+                (old_run_id, old_cluster_id, "action_request", 1),
+                (latest_run_id, latest_cluster_id, "information_request", 0),
+            )
+        ],
+        column_names=[
+            "project_id",
+            "cluster_run_id",
+            "id",
+            "run_window_end",
+            "signature_type",
+            "topic_id",
+            "category",
+            "centroid",
+            "label",
+        ],
+    )
     ch_server.ch_client.insert(
         "signature_cluster_assignments",
         data=[
@@ -4229,15 +4261,24 @@ def test_filter_conversations_by_insights(ch_server):
     ) == [spans[1].conversation_id]
     assert filtered_ids(
         AgentInsightFilter(
-            field="intent_cluster_id",
-            values=[str(latest_cluster_id)],
+            field="intent_topic_id",
+            values=[str(topic_id)],
+            cluster_run_id=latest_run_id,
         )
     ) == [spans[0].conversation_id]
+    assert filtered_ids(
+        AgentInsightFilter(
+            field="intent_topic_id",
+            values=[str(topic_id)],
+            cluster_run_id=old_run_id,
+        )
+    ) == [spans[1].conversation_id]
     assert (
         filtered_ids(
             AgentInsightFilter(
-                field="intent_cluster_id",
-                values=[str(old_cluster_id)],
+                field="failure_topic_id",
+                values=[str(uuid.uuid4())],
+                cluster_run_id=uuid.uuid4(),
             )
         )
         == []
@@ -4263,8 +4304,9 @@ def test_filter_conversations_by_insights(ch_server):
     assert (
         filtered_stats_count(
             AgentInsightFilter(
-                field="intent_cluster_id",
-                values=[str(latest_cluster_id)],
+                field="intent_topic_id",
+                values=[str(topic_id)],
+                cluster_run_id=latest_run_id,
             )
         )
         == 1

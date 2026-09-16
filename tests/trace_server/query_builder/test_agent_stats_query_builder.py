@@ -182,7 +182,7 @@ def test_insight_filters_add_windowed_conversation_semi_join_and_attribution() -
             "WHERE project_id = {genai_3:String} AND conversation_id != '' "
             "AND trace_started_at >= {genai_5:DateTime64(6)} "
             "AND trace_started_at < {genai_6:DateTime64(6)} "
-            "AND if(empty(trimBoth(severity)), 'unknown', lower(severity)) "
+            "AND if(empty(trimBoth(severity)), 'unknown', lower(trimBoth(severity))) "
             "IN {genai_4:Array(String)} GROUP BY conversation_id)"
         ),
         source=expected_source,

@@ -11,7 +11,8 @@ in the serialization JSON Schema. Request models stay on BaseModel.
 from __future__ import annotations
 
 import datetime
-from typing import TYPE_CHECKING, Annotated, Any, Literal
+import uuid
+from typing import TYPE_CHECKING, Annotated, Any, Literal, get_args
 
 from pydantic import (
     AwareDatetime,
@@ -66,6 +67,8 @@ SearchMessageRole = Literal[
 AgentSpanStatsValueType = Literal["datetime", "number", "boolean", "string"]
 AgentSpanStatsColumnValueType = Literal["datetime", "number", "boolean", "string"]
 AgentSpanStatsCell = datetime.datetime | str | int | float | bool | None
+AgentFailureSeverity = Literal["unknown", "info", "minor", "major"]
+AGENT_FAILURE_SEVERITIES = get_args(AgentFailureSeverity)
 AgentSpanStatsAggregation = Literal[
     "sum",
     "avg",
@@ -813,8 +816,8 @@ class AgentSignalFilter(BaseModel):
 class AgentInsightFilter(BaseModel):
     """Conversation filter backed by extracted Insights data in ClickHouse.
 
-    Values within one filter are ORed, while multiple filters are ANDed. Cluster
-    IDs are resolved against the latest successful run for their field's type.
+    Values within one filter are ORed, while multiple filters are ANDed. Topic
+    filters resolve stable topic IDs within the displayed clustering run.
     """
 
     model_config = ConfigDict(extra="forbid")
@@ -824,14 +827,53 @@ class AgentInsightFilter(BaseModel):
         "intent_sentiment",
         "failure_category",
         "failure_severity",
-        "intent_cluster_id",
-        "failure_cluster_id",
+        "intent_topic_id",
+        "failure_topic_id",
     ]
-    values: list[str] = Field(min_length=1, max_length=1000)
+    values: list[str] = Field(
+        min_length=1,
+        max_length=1000,
+        description=(
+            "Values to match. failure_severity accepts only unknown, info, minor, "
+            "or major."
+        ),
+    )
     exclude: bool = Field(
         default=False,
         description="Exclude conversations matching any value in this filter.",
     )
+    cluster_run_id: uuid.UUID | None = Field(
+        default=None,
+        description=(
+            "Clustering snapshot displayed by the client. Required for topic filters "
+            "and forbidden for other fields."
+        ),
+    )
+
+    @model_validator(mode="after")
+    def validate_values(self) -> AgentInsightFilter:
+        if self.field == "failure_severity":
+            invalid = sorted(set(self.values) - set(AGENT_FAILURE_SEVERITIES))
+            if invalid:
+                allowed = ", ".join(AGENT_FAILURE_SEVERITIES)
+                raise ValueError(
+                    f"failure_severity values must be one of: {allowed}; got: "
+                    f"{', '.join(invalid)}"
+                )
+        is_topic_filter = self.field in {"intent_topic_id", "failure_topic_id"}
+        if is_topic_filter and self.cluster_run_id is None:
+            raise ValueError("topic filters require cluster_run_id")
+        if not is_topic_filter and self.cluster_run_id is not None:
+            raise ValueError("cluster_run_id is only valid for topic filters")
+        if is_topic_filter:
+            normalized_topic_ids = []
+            for value in self.values:
+                try:
+                    normalized_topic_ids.append(str(uuid.UUID(value)))
+                except ValueError as exc:
+                    raise ValueError(f"invalid topic ID: {value}") from exc
+            self.values = normalized_topic_ids
+        return self
 
 
 class AgentSpansQueryReq(BaseModel):

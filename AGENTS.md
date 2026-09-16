@@ -144,6 +144,24 @@ Evaluation result rows merge agent span links from two sources: legacy
 trial. Keep the promoted-column hydration best-effort so eval results remain
 available during rolling deploys.
 
+Agent span queries and stats support conversation-level `insight_filters` for
+intent/failure category, intent sentiment, failure severity, and intent/failure
+topic IDs. Values within one filter are ORed, separate filters are ANDed, and
+`exclude` negates that filter's conversation-membership predicate. Span queries
+require grouping when insight filters are present; both query and stats paths
+apply their span time window to matching Insights rows. Topic filters require the
+`cluster_run_id` displayed by the client and resolve stable topic IDs to that
+run's concrete clusters; they match nothing when the run has no such topics.
+Failure-severity filters accept the
+canonical API values `unknown`, `info`, `minor`, and `major`; `unknown` matches
+the empty value stored when the judge produced no usable severity.
+Each clustering run mints new `signature_clusters.id` values; `topic_id`, not
+`cluster_id`, is the identity reconciled across runs. An assignment is therefore
+identified by its run and cluster, even though a non-noise UUID cluster ID is
+practically unique and can be used to discover its parent run.
+Until the generated Stainless client includes this request field, the binding
+must pass `insight_filters` through `extra_body` for both routes.
+
 `weave.invoking_span` (`{trace_id, span_id}`, hex) points the other way, from a
 call to the OTel span that was current when it started — an agent's
 `execute_tool` span in the case it is built for, but any ambient instrumentation

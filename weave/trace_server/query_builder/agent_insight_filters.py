@@ -17,8 +17,8 @@ def build_insight_filter_clause(
 ) -> str | None:
     """Match conversations carrying every requested Insights filter.
 
-    The request's span window also bounds matching Insights turns. Cluster IDs
-    are resolved only against the latest successful run for their signature type.
+    The request's span window also bounds matching Insights turns. Topic IDs are
+    resolved to concrete clusters in the explicitly requested clustering run.
     """
     if not insight_filters:
         return None
@@ -55,20 +55,20 @@ def _single_insight_filter_clause(
         before_slot = pb.add(started_before, param_type="DateTime64(6)")
         conditions.append(f"trace_started_at < {before_slot}")
 
-    if insight_filter.field in {"intent_cluster_id", "failure_cluster_id"}:
+    if insight_filter.field in {"intent_topic_id", "failure_topic_id"}:
         signature_type = (
-            "intent" if insight_filter.field == "intent_cluster_id" else "failure"
+            "intent" if insight_filter.field == "intent_topic_id" else "failure"
         )
+        run_slot = pb.add(str(insight_filter.cluster_run_id), param_type="UUID")
         conditions.extend(
             [
                 f"signature_type = '{signature_type}'",
-                "cluster_run_id = ("
-                "SELECT id FROM signature_cluster_runs "
+                f"cluster_run_id = {run_slot}",
+                "cluster_id IN (SELECT id FROM signature_clusters "
                 f"WHERE project_id = {pid_slot} "
+                f"AND cluster_run_id = {run_slot} "
                 f"AND signature_type = '{signature_type}' "
-                "AND status = 'succeeded' "
-                "ORDER BY window_end DESC, completed_at DESC, id DESC LIMIT 1)",
-                f"toString(cluster_id) IN {values_slot}",
+                f"AND toString(topic_id) IN {values_slot})",
             ]
         )
         table = "signature_cluster_assignments"
@@ -84,7 +84,7 @@ def _single_insight_filter_clause(
             conditions.append(f"category IN {values_slot}")
         else:
             conditions.append(
-                "if(empty(trimBoth(severity)), 'unknown', lower(severity)) "
+                "if(empty(trimBoth(severity)), 'unknown', lower(trimBoth(severity))) "
                 f"IN {values_slot}"
             )
 
