@@ -18,9 +18,15 @@ from ..._response import (
     async_to_streamed_response_wrapper,
 )
 from ..._base_client import make_request_options
-from ...types.agents import span_query_params, span_stats_params, span_custom_attrs_schema_params
+from ...types.agents import (
+    span_query_params,
+    span_stats_params,
+    span_diagnostics_params,
+    span_custom_attrs_schema_params,
+)
 from ...types.agents.span_query_response import SpanQueryResponse
 from ...types.agents.span_stats_response import SpanStatsResponse
+from ...types.agents.span_diagnostics_response import SpanDiagnosticsResponse
 from ...types.agents.span_custom_attrs_schema_response import SpanCustomAttrsSchemaResponse
 
 __all__ = ["SpansResource", "AsyncSpansResource"]
@@ -91,6 +97,47 @@ class SpansResource(SyncAPIResource):
                 extra_headers=extra_headers, extra_query=extra_query, extra_body=extra_body, timeout=timeout
             ),
             cast_to=SpanCustomAttrsSchemaResponse,
+        )
+
+    def diagnostics(
+        self,
+        *,
+        project_id: str,
+        span_id: str,
+        trace_id: str,
+        # Use the following arguments if you need to pass additional parameters to the API that aren't available via kwargs.
+        # The extra values given here take precedence over values defined on the client or passed to this method.
+        extra_headers: Headers | None = None,
+        extra_query: Query | None = None,
+        extra_body: Body | None = None,
+        timeout: float | httpx.Timeout | None | NotGiven = not_given,
+    ) -> SpanDiagnosticsResponse:
+        """
+        Check token accounting on one project-authorized persisted span.
+
+        Args:
+          extra_headers: Send extra headers
+
+          extra_query: Add additional query parameters to the request
+
+          extra_body: Add additional JSON properties to the request
+
+          timeout: Override the client-level default timeout for this request, in seconds
+        """
+        return self._post(
+            "/agents/spans/diagnostics",
+            body=maybe_transform(
+                {
+                    "project_id": project_id,
+                    "span_id": span_id,
+                    "trace_id": trace_id,
+                },
+                span_diagnostics_params.SpanDiagnosticsParams,
+            ),
+            options=make_request_options(
+                extra_headers=extra_headers, extra_query=extra_query, extra_body=extra_body, timeout=timeout
+            ),
+            cast_to=SpanDiagnosticsResponse,
         )
 
     def query(
@@ -287,6 +334,47 @@ class AsyncSpansResource(AsyncAPIResource):
             cast_to=SpanCustomAttrsSchemaResponse,
         )
 
+    async def diagnostics(
+        self,
+        *,
+        project_id: str,
+        span_id: str,
+        trace_id: str,
+        # Use the following arguments if you need to pass additional parameters to the API that aren't available via kwargs.
+        # The extra values given here take precedence over values defined on the client or passed to this method.
+        extra_headers: Headers | None = None,
+        extra_query: Query | None = None,
+        extra_body: Body | None = None,
+        timeout: float | httpx.Timeout | None | NotGiven = not_given,
+    ) -> SpanDiagnosticsResponse:
+        """
+        Check token accounting on one project-authorized persisted span.
+
+        Args:
+          extra_headers: Send extra headers
+
+          extra_query: Add additional query parameters to the request
+
+          extra_body: Add additional JSON properties to the request
+
+          timeout: Override the client-level default timeout for this request, in seconds
+        """
+        return await self._post(
+            "/agents/spans/diagnostics",
+            body=await async_maybe_transform(
+                {
+                    "project_id": project_id,
+                    "span_id": span_id,
+                    "trace_id": trace_id,
+                },
+                span_diagnostics_params.SpanDiagnosticsParams,
+            ),
+            options=make_request_options(
+                extra_headers=extra_headers, extra_query=extra_query, extra_body=extra_body, timeout=timeout
+            ),
+            cast_to=SpanDiagnosticsResponse,
+        )
+
     async def query(
         self,
         *,
@@ -421,6 +509,9 @@ class SpansResourceWithRawResponse:
         self.custom_attrs_schema = to_raw_response_wrapper(
             spans.custom_attrs_schema,
         )
+        self.diagnostics = to_raw_response_wrapper(
+            spans.diagnostics,
+        )
         self.query = to_raw_response_wrapper(
             spans.query,
         )
@@ -435,6 +526,9 @@ class AsyncSpansResourceWithRawResponse:
 
         self.custom_attrs_schema = async_to_raw_response_wrapper(
             spans.custom_attrs_schema,
+        )
+        self.diagnostics = async_to_raw_response_wrapper(
+            spans.diagnostics,
         )
         self.query = async_to_raw_response_wrapper(
             spans.query,
@@ -451,6 +545,9 @@ class SpansResourceWithStreamingResponse:
         self.custom_attrs_schema = to_streamed_response_wrapper(
             spans.custom_attrs_schema,
         )
+        self.diagnostics = to_streamed_response_wrapper(
+            spans.diagnostics,
+        )
         self.query = to_streamed_response_wrapper(
             spans.query,
         )
@@ -465,6 +562,9 @@ class AsyncSpansResourceWithStreamingResponse:
 
         self.custom_attrs_schema = async_to_streamed_response_wrapper(
             spans.custom_attrs_schema,
+        )
+        self.diagnostics = async_to_streamed_response_wrapper(
+            spans.diagnostics,
         )
         self.query = async_to_streamed_response_wrapper(
             spans.query,
