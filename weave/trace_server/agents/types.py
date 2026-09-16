@@ -824,7 +824,7 @@ class AgentInsightFilter(BaseModel):
         "intent_cluster_id",
         "failure_cluster_id",
     ]
-    values: list[str] = Field(min_length=1, max_length=100)
+    values: list[str] = Field(min_length=1, max_length=1000)
     exclude: bool = Field(
         default=False,
         description="Exclude conversations matching any value in this filter.",

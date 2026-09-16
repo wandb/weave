@@ -2374,6 +2374,11 @@ def test_insight_filter_validation() -> None:
             field="intent_category",
             values=[],
         )
+    with pytest.raises(ValidationError):
+        AgentInsightFilter(
+            field="intent_cluster_id",
+            values=[str(index) for index in range(1001)],
+        )
     with pytest.raises(ValidationError, match="Extra inputs are not permitted"):
         AgentInsightFilter(
             field="failure_severity",
