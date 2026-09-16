@@ -17,10 +17,11 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 from collections.abc import Iterator
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Any
+from typing import Any, NamedTuple
 
 from weave.shared.refs_internal import WEAVE_INTERNAL_SCHEME
 from weave.trace_server.agents.constants import (
@@ -61,8 +62,6 @@ _CLAUDE_TASK_NOTIFICATION_OPEN = "<task-notification>"
 _CLAUDE_TASK_NOTIFICATION_CLOSE = "</task-notification>"
 _TASK_NOTIFICATION_TOOL_NAME = "Task notification"
 _PROMPT_CONTEXT_TOOL_NAME = "Prompt context"
-# One trailing user message of an LLM span: (message, display text, media refs).
-_UserEntry = tuple[NormalizedMessage, str, list[str]]
 _CHAT_OPERATION = "chat"
 _ASSISTANT_TEXT_OPERATION = "assistant_text"
 
@@ -666,7 +665,7 @@ class ChatTraversal:
             if sig == self._last_user_sig:
                 continue
             self._last_user_sig = sig
-            entries.append((message, text, media))
+            entries.append(_UserEntry(message, text, media))
 
         return entries
 
@@ -714,7 +713,7 @@ class ChatTraversal:
         prompt: str,
     ) -> None:
         """Lead with the recorded prompt, then what this span's user messages add around it."""
-        self._emit_user_message(span, prompt, lead[2])
+        self._emit_user_message(span, prompt, lead.media)
 
         for entry in entries:
             message, text, media = entry
@@ -724,7 +723,7 @@ class ChatTraversal:
             # The prompt and its media are already the bubble; only the
             # surrounding text of the lead message is context.
             if entry is lead:
-                text = text.replace(prompt, "", 1).strip()
+                text = _without_prompt(text, prompt)
                 media = []
             if not text and not media:
                 continue
@@ -1325,12 +1324,38 @@ def _turn_prompt(roots: list[SpanNode]) -> str | None:
     return _extract_user_text(root.input_messages, last_only=True) or None
 
 
+class _UserEntry(NamedTuple):
+    """One trailing user message of an LLM span with its display text and media refs."""
+
+    message: NormalizedMessage
+    text: str
+    media: list[str]
+
+
 def _entry_containing(entries: list[_UserEntry], prompt: str) -> _UserEntry | None:
-    """The first user entry whose text contains `prompt`."""
+    """The first human-turn entry whose text contains `prompt`.
+
+    Substring rather than whole-line match, because harness templates wrap the
+    prompt inline (`<user>prompt</user>`). A task notification is never the
+    wrapping message even when its text happens to quote the prompt.
+    """
     for entry in entries:
-        if prompt in entry[1]:
+        if _is_claude_task_notification(entry.message):
+            continue
+        if prompt in entry.text:
             return entry
     return None
+
+
+def _without_prompt(text: str, prompt: str) -> str:
+    """`text` minus one occurrence of `prompt`, preferring the occurrence on its own line."""
+    own_line = re.search(rf"(?<![^\n]){re.escape(prompt)}(?![^\n])", text)
+    if own_line is not None:
+        start, end = own_line.span()
+        return (text[:start] + text[end:]).strip()
+
+    # Inline wrappers such as `<user>prompt</user>` have no own-line occurrence.
+    return text.replace(prompt, "", 1).strip()
 
 
 def _context_tool_call(

@@ -2253,3 +2253,55 @@ def test_recorded_prompt_splits_only_the_first_user_turn() -> None:
         ("user", f"Research this: {_TURN_PROMPT}"),
         ("assistant", "Found it."),
     ]
+
+
+_SHORT_PROMPT = "ok"
+_PAGE_STATE_WITH_TOKENS = '{"type": "wandb_web_page_state", "tab": "tokens"}'
+_NOTIFICATION_WITH_PROMPT = (
+    f"<task-notification>{_TURN_PROMPT} subagent finished</task-notification>"
+)
+
+
+@pytest.mark.parametrize(
+    ("root_prompt", "llm_user_messages", "expected"),
+    [
+        (
+            _SHORT_PROMPT,
+            [
+                {
+                    "role": "user",
+                    "content": f"{_PAGE_STATE_WITH_TOKENS}\n{_SHORT_PROMPT}\n{_CLOCK}",
+                }
+            ],
+            [
+                ("user", _SHORT_PROMPT),
+                ("agent_start", "wandb"),
+                ("Prompt context", f"{_PAGE_STATE_WITH_TOKENS}\n\n{_CLOCK}"),
+                ("assistant", _ANSWER),
+            ],
+        ),
+        (
+            _TURN_PROMPT,
+            [
+                {"role": "user", "content": _NOTIFICATION_WITH_PROMPT},
+                {"role": "user", "content": _COMPOSITE},
+            ],
+            [
+                ("user", _TURN_PROMPT),
+                ("agent_start", "wandb"),
+                ("Task notification", _NOTIFICATION_WITH_PROMPT),
+                ("Prompt context", f"{_PAGE_STATE}\n\n{_CLOCK}"),
+                ("assistant", _ANSWER),
+            ],
+        ),
+    ],
+    ids=["prompt-also-inside-harness-json", "prompt-also-inside-task-notification"],
+)
+def test_recorded_prompt_split_removes_the_prompt_line_not_a_lookalike_substring(
+    root_prompt: str, llm_user_messages: list[dict], expected: list[tuple[str, str]]
+) -> None:
+    """The occurrence removed from the wrapping message is the one on its own line, and a task notification never becomes the wrapping message."""
+    root_input = [{"role": "user", "content": root_prompt}]
+    spans = _turn(root_input, [_SYSTEM, *llm_user_messages])
+
+    assert _timeline(build_chat_messages(spans)) == expected
