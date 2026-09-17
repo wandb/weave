@@ -144,29 +144,6 @@ Evaluation result rows merge agent span links from two sources: legacy
 trial. Keep the promoted-column hydration best-effort so eval results remain
 available during rolling deploys.
 
-Agent span queries and stats support conversation-level `insight_filters` for
-intent/failure category, intent sentiment, failure severity, and intent/failure
-topic IDs. Values within one filter are ORed, separate filters are ANDed, and
-`exclude` negates that filter's conversation-membership predicate. Span queries
-require grouping when insight filters are present; both query and stats paths
-apply their span time window to matching Insights rows. Topic filters accept only
-stable topic IDs; clustering run IDs are an internal storage detail and must not
-cross the API boundary. The server resolves a topic to concrete clusters across
-successful runs, and a topic matches nothing when no successful run contains it.
-Failure-severity filters accept exactly `info`, `major`, and `minor`; their
-source of truth is
-[`severity.yaml`](https://github.com/wandb/core/blob/master/services/weave-trace/src/workers/insights/configs/taxonomies/severity.yaml).
-User-sentiment filters accept exactly `frustrated`, `dissatisfied`, `neutral`,
-`satisfied`, and `delighted`; keep frontend options and API validation aligned
-to that ordered taxonomy. Its source of truth is
-[`sentiment.yaml`](https://github.com/wandb/core/blob/master/services/weave-trace/src/workers/insights/configs/taxonomies/sentiment.yaml).
-Each clustering run mints new `signature_clusters.id` values; `topic_id`, not
-`cluster_id`, is the identity reconciled across runs. An assignment is therefore
-identified by its run and cluster, even though a non-noise UUID cluster ID is
-practically unique and can be used to discover its parent run.
-Until the generated Stainless client includes this request field, the binding
-must pass `insight_filters` through `extra_body` for both routes.
-
 `weave.invoking_span` (`{trace_id, span_id}`, hex) points the other way, from a
 call to the OTel span that was current when it started — an agent's
 `execute_tool` span in the case it is built for, but any ambient instrumentation
@@ -212,9 +189,6 @@ If `sdks/node/node_modules` is missing, run `pnpm install --frozen-lockfile` in 
 - Set `CallsQueryReq.latest_only=True` when correctness requires filtering the
   current logical version. It enables ClickHouse `FINAL` for that request, so
   use it for bounded correctness-sensitive reads rather than broad list scans.
-- Trace-server ClickHouse client initialization first runs `EXISTS DATABASE`
-  and only creates a missing database. This preserves local auto-setup while
-  allowing production read-only credentials to query an existing database.
 
 ### Assert on the complete payload (no substring / membership checks)
 

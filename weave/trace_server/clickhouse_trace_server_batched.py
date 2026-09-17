@@ -7518,15 +7518,13 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         return self._thread_local.ch_client
 
     def _ensure_database(self, client: CHClient) -> None:
-        """Ensure the configured database exists once per process."""
+        """Run CREATE DATABASE IF NOT EXISTS once per process."""
         if self._database_ensured:
             return
         with self._init_lock:
             if self._database_ensured:
                 return
-            database_exists = client.command(f"EXISTS DATABASE {self._database}")
-            if not database_exists:
-                client.command(f"CREATE DATABASE IF NOT EXISTS {self._database}")
+            client.command(f"CREATE DATABASE IF NOT EXISTS {self._database}")
             self._database_ensured = True
 
     def _mint_client(self, send_receive_timeout: int | None = None) -> CHClient:
