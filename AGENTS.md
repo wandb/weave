@@ -118,6 +118,12 @@ Never edit it by hand — regenerate it in core, then re-run
 `sdks/node/src/vendor/weave-server-sdk/` and is refreshed the same way with
 `scripts/vendor_node_weave_server_sdk.py`. See `sdks/node/src/vendor/README.md`.
 
+Because the Python client lands one sync behind, a field you add to a request
+model reaches the server before the generated method declares it. The binding
+closes that gap on its own: a field the generated method does not declare is
+sent through `extra_body`. The exception is a GET route, which carries no body,
+so the binding raises there rather than drop the field.
+
 Persisted `AgentDashboard` objects intentionally use a closed, discriminated
 schema. Supported panel variants and their configuration fields must be added
 to `builtin_object_classes/agent_dashboard.py`; do not replace panel settings
