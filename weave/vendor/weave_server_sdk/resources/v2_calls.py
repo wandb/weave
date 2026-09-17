@@ -6,7 +6,7 @@ from typing import Iterable
 
 import httpx
 
-from ..types import v2_call_complete_params
+from ..types import v2_call_end_params, v2_call_start_params, v2_call_complete_params
 from .._types import Body, Query, Headers, NotGiven, not_given
 from .._utils import path_template, maybe_transform, async_maybe_transform
 from .._compat import cached_property
@@ -18,6 +18,7 @@ from .._response import (
     async_to_streamed_response_wrapper,
 )
 from .._base_client import make_request_options
+from ..types.v2_call_start_response import V2CallStartResponse
 
 __all__ = ["V2CallsResource", "AsyncV2CallsResource"]
 
@@ -83,6 +84,92 @@ class V2CallsResource(SyncAPIResource):
             cast_to=object,
         )
 
+    def end(
+        self,
+        project: str,
+        *,
+        entity: str,
+        end: v2_call_end_params.End,
+        # Use the following arguments if you need to pass additional parameters to the API that aren't available via kwargs.
+        # The extra values given here take precedence over values defined on the client or passed to this method.
+        extra_headers: Headers | None = None,
+        extra_query: Query | None = None,
+        extra_body: Body | None = None,
+        timeout: float | httpx.Timeout | None | NotGiven = not_given,
+    ) -> object:
+        """
+        End a single call (v2 API).
+
+        This is used for eager ops like Evaluation.evaluate that need their end sent
+        separately from their start.
+
+        Args:
+          end: Deprecated alias. `started_at` now lives on the parent
+              `EndedCallSchemaForInsert`; prefer that. Kept so external SDK pins on the
+              `WithStartedAt` name keep importing. Remove once all in-tree callers migrate.
+
+          extra_headers: Send extra headers
+
+          extra_query: Add additional query parameters to the request
+
+          extra_body: Add additional JSON properties to the request
+
+          timeout: Override the client-level default timeout for this request, in seconds
+        """
+        if not entity:
+            raise ValueError(f"Expected a non-empty value for `entity` but received {entity!r}")
+        if not project:
+            raise ValueError(f"Expected a non-empty value for `project` but received {project!r}")
+        return self._post(
+            path_template("/v2/{entity}/{project}/call/end", entity=entity, project=project),
+            body=maybe_transform({"end": end}, v2_call_end_params.V2CallEndParams),
+            options=make_request_options(
+                extra_headers=extra_headers, extra_query=extra_query, extra_body=extra_body, timeout=timeout
+            ),
+            cast_to=object,
+        )
+
+    def start(
+        self,
+        project: str,
+        *,
+        entity: str,
+        start: v2_call_start_params.Start,
+        # Use the following arguments if you need to pass additional parameters to the API that aren't available via kwargs.
+        # The extra values given here take precedence over values defined on the client or passed to this method.
+        extra_headers: Headers | None = None,
+        extra_query: Query | None = None,
+        extra_body: Body | None = None,
+        timeout: float | httpx.Timeout | None | NotGiven = not_given,
+    ) -> V2CallStartResponse:
+        """
+        Start a single call (v2 API).
+
+        This is used for eager ops like Evaluation.evaluate that need their start to be
+        visible immediately in the UI.
+
+        Args:
+          extra_headers: Send extra headers
+
+          extra_query: Add additional query parameters to the request
+
+          extra_body: Add additional JSON properties to the request
+
+          timeout: Override the client-level default timeout for this request, in seconds
+        """
+        if not entity:
+            raise ValueError(f"Expected a non-empty value for `entity` but received {entity!r}")
+        if not project:
+            raise ValueError(f"Expected a non-empty value for `project` but received {project!r}")
+        return self._post(
+            path_template("/v2/{entity}/{project}/call/start", entity=entity, project=project),
+            body=maybe_transform({"start": start}, v2_call_start_params.V2CallStartParams),
+            options=make_request_options(
+                extra_headers=extra_headers, extra_query=extra_query, extra_body=extra_body, timeout=timeout
+            ),
+            cast_to=V2CallStartResponse,
+        )
+
 
 class AsyncV2CallsResource(AsyncAPIResource):
     @cached_property
@@ -145,6 +232,92 @@ class AsyncV2CallsResource(AsyncAPIResource):
             cast_to=object,
         )
 
+    async def end(
+        self,
+        project: str,
+        *,
+        entity: str,
+        end: v2_call_end_params.End,
+        # Use the following arguments if you need to pass additional parameters to the API that aren't available via kwargs.
+        # The extra values given here take precedence over values defined on the client or passed to this method.
+        extra_headers: Headers | None = None,
+        extra_query: Query | None = None,
+        extra_body: Body | None = None,
+        timeout: float | httpx.Timeout | None | NotGiven = not_given,
+    ) -> object:
+        """
+        End a single call (v2 API).
+
+        This is used for eager ops like Evaluation.evaluate that need their end sent
+        separately from their start.
+
+        Args:
+          end: Deprecated alias. `started_at` now lives on the parent
+              `EndedCallSchemaForInsert`; prefer that. Kept so external SDK pins on the
+              `WithStartedAt` name keep importing. Remove once all in-tree callers migrate.
+
+          extra_headers: Send extra headers
+
+          extra_query: Add additional query parameters to the request
+
+          extra_body: Add additional JSON properties to the request
+
+          timeout: Override the client-level default timeout for this request, in seconds
+        """
+        if not entity:
+            raise ValueError(f"Expected a non-empty value for `entity` but received {entity!r}")
+        if not project:
+            raise ValueError(f"Expected a non-empty value for `project` but received {project!r}")
+        return await self._post(
+            path_template("/v2/{entity}/{project}/call/end", entity=entity, project=project),
+            body=await async_maybe_transform({"end": end}, v2_call_end_params.V2CallEndParams),
+            options=make_request_options(
+                extra_headers=extra_headers, extra_query=extra_query, extra_body=extra_body, timeout=timeout
+            ),
+            cast_to=object,
+        )
+
+    async def start(
+        self,
+        project: str,
+        *,
+        entity: str,
+        start: v2_call_start_params.Start,
+        # Use the following arguments if you need to pass additional parameters to the API that aren't available via kwargs.
+        # The extra values given here take precedence over values defined on the client or passed to this method.
+        extra_headers: Headers | None = None,
+        extra_query: Query | None = None,
+        extra_body: Body | None = None,
+        timeout: float | httpx.Timeout | None | NotGiven = not_given,
+    ) -> V2CallStartResponse:
+        """
+        Start a single call (v2 API).
+
+        This is used for eager ops like Evaluation.evaluate that need their start to be
+        visible immediately in the UI.
+
+        Args:
+          extra_headers: Send extra headers
+
+          extra_query: Add additional query parameters to the request
+
+          extra_body: Add additional JSON properties to the request
+
+          timeout: Override the client-level default timeout for this request, in seconds
+        """
+        if not entity:
+            raise ValueError(f"Expected a non-empty value for `entity` but received {entity!r}")
+        if not project:
+            raise ValueError(f"Expected a non-empty value for `project` but received {project!r}")
+        return await self._post(
+            path_template("/v2/{entity}/{project}/call/start", entity=entity, project=project),
+            body=await async_maybe_transform({"start": start}, v2_call_start_params.V2CallStartParams),
+            options=make_request_options(
+                extra_headers=extra_headers, extra_query=extra_query, extra_body=extra_body, timeout=timeout
+            ),
+            cast_to=V2CallStartResponse,
+        )
+
 
 class V2CallsResourceWithRawResponse:
     def __init__(self, v2_calls: V2CallsResource) -> None:
@@ -152,6 +325,12 @@ class V2CallsResourceWithRawResponse:
 
         self.complete = to_raw_response_wrapper(
             v2_calls.complete,
+        )
+        self.end = to_raw_response_wrapper(
+            v2_calls.end,
+        )
+        self.start = to_raw_response_wrapper(
+            v2_calls.start,
         )
 
 
@@ -162,6 +341,12 @@ class AsyncV2CallsResourceWithRawResponse:
         self.complete = async_to_raw_response_wrapper(
             v2_calls.complete,
         )
+        self.end = async_to_raw_response_wrapper(
+            v2_calls.end,
+        )
+        self.start = async_to_raw_response_wrapper(
+            v2_calls.start,
+        )
 
 
 class V2CallsResourceWithStreamingResponse:
@@ -171,6 +356,12 @@ class V2CallsResourceWithStreamingResponse:
         self.complete = to_streamed_response_wrapper(
             v2_calls.complete,
         )
+        self.end = to_streamed_response_wrapper(
+            v2_calls.end,
+        )
+        self.start = to_streamed_response_wrapper(
+            v2_calls.start,
+        )
 
 
 class AsyncV2CallsResourceWithStreamingResponse:
@@ -179,4 +370,10 @@ class AsyncV2CallsResourceWithStreamingResponse:
 
         self.complete = async_to_streamed_response_wrapper(
             v2_calls.complete,
+        )
+        self.end = async_to_streamed_response_wrapper(
+            v2_calls.end,
+        )
+        self.start = async_to_streamed_response_wrapper(
+            v2_calls.start,
         )

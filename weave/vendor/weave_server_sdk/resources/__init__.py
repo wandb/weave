@@ -112,6 +112,14 @@ from .projects import (
     ProjectsResourceWithStreamingResponse,
     AsyncProjectsResourceWithStreamingResponse,
 )
+from .registry import (
+    RegistryResource,
+    AsyncRegistryResource,
+    RegistryResourceWithRawResponse,
+    AsyncRegistryResourceWithRawResponse,
+    RegistryResourceWithStreamingResponse,
+    AsyncRegistryResourceWithStreamingResponse,
+)
 from .services import (
     ServicesResource,
     AsyncServicesResource,
@@ -396,6 +404,12 @@ __all__ = [
     "AsyncV2CallsResourceWithRawResponse",
     "V2CallsResourceWithStreamingResponse",
     "AsyncV2CallsResourceWithStreamingResponse",
+    "RegistryResource",
+    "AsyncRegistryResource",
+    "RegistryResourceWithRawResponse",
+    "AsyncRegistryResourceWithRawResponse",
+    "RegistryResourceWithStreamingResponse",
+    "AsyncRegistryResourceWithStreamingResponse",
     "V2RuntimesResource",
     "AsyncV2RuntimesResource",
     "V2RuntimesResourceWithRawResponse",

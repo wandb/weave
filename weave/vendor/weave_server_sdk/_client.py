@@ -51,6 +51,7 @@ if TYPE_CHECKING:
         threads,
         feedback,
         projects,
+        registry,
         services,
         v2_calls,
         v2_models,
@@ -78,6 +79,7 @@ if TYPE_CHECKING:
     from .resources.v2_ops import V2OpsResource, AsyncV2OpsResource
     from .resources.threads import ThreadsResource, AsyncThreadsResource
     from .resources.feedback import FeedbackResource, AsyncFeedbackResource
+    from .resources.registry import RegistryResource, AsyncRegistryResource
     from .resources.services import ServicesResource, AsyncServicesResource
     from .resources.v2_calls import V2CallsResource, AsyncV2CallsResource
     from .resources.v2_models import V2ModelsResource, AsyncV2ModelsResource
@@ -346,6 +348,12 @@ class WeaveTrace(SyncAPIClient):
         from .resources.v2_calls import V2CallsResource
 
         return V2CallsResource(self)
+
+    @cached_property
+    def registry(self) -> RegistryResource:
+        from .resources.registry import RegistryResource
+
+        return RegistryResource(self)
 
     @cached_property
     def v2_runtimes(self) -> V2RuntimesResource:
@@ -714,6 +722,12 @@ class AsyncWeaveTrace(AsyncAPIClient):
         return AsyncV2CallsResource(self)
 
     @cached_property
+    def registry(self) -> AsyncRegistryResource:
+        from .resources.registry import AsyncRegistryResource
+
+        return AsyncRegistryResource(self)
+
+    @cached_property
     def v2_runtimes(self) -> AsyncV2RuntimesResource:
         from .resources.v2_runtimes import AsyncV2RuntimesResource
 
@@ -1010,6 +1024,12 @@ class WeaveTraceWithRawResponse:
         return V2CallsResourceWithRawResponse(self._client.v2_calls)
 
     @cached_property
+    def registry(self) -> registry.RegistryResourceWithRawResponse:
+        from .resources.registry import RegistryResourceWithRawResponse
+
+        return RegistryResourceWithRawResponse(self._client.registry)
+
+    @cached_property
     def v2_runtimes(self) -> v2_runtimes.V2RuntimesResourceWithRawResponse:
         from .resources.v2_runtimes import V2RuntimesResourceWithRawResponse
 
@@ -1189,6 +1209,12 @@ class AsyncWeaveTraceWithRawResponse:
         from .resources.v2_calls import AsyncV2CallsResourceWithRawResponse
 
         return AsyncV2CallsResourceWithRawResponse(self._client.v2_calls)
+
+    @cached_property
+    def registry(self) -> registry.AsyncRegistryResourceWithRawResponse:
+        from .resources.registry import AsyncRegistryResourceWithRawResponse
+
+        return AsyncRegistryResourceWithRawResponse(self._client.registry)
 
     @cached_property
     def v2_runtimes(self) -> v2_runtimes.AsyncV2RuntimesResourceWithRawResponse:
@@ -1372,6 +1398,12 @@ class WeaveTraceWithStreamedResponse:
         return V2CallsResourceWithStreamingResponse(self._client.v2_calls)
 
     @cached_property
+    def registry(self) -> registry.RegistryResourceWithStreamingResponse:
+        from .resources.registry import RegistryResourceWithStreamingResponse
+
+        return RegistryResourceWithStreamingResponse(self._client.registry)
+
+    @cached_property
     def v2_runtimes(self) -> v2_runtimes.V2RuntimesResourceWithStreamingResponse:
         from .resources.v2_runtimes import V2RuntimesResourceWithStreamingResponse
 
@@ -1551,6 +1583,12 @@ class AsyncWeaveTraceWithStreamedResponse:
         from .resources.v2_calls import AsyncV2CallsResourceWithStreamingResponse
 
         return AsyncV2CallsResourceWithStreamingResponse(self._client.v2_calls)
+
+    @cached_property
+    def registry(self) -> registry.AsyncRegistryResourceWithStreamingResponse:
+        from .resources.registry import AsyncRegistryResourceWithStreamingResponse
+
+        return AsyncRegistryResourceWithStreamingResponse(self._client.registry)
 
     @cached_property
     def v2_runtimes(self) -> v2_runtimes.AsyncV2RuntimesResourceWithStreamingResponse:

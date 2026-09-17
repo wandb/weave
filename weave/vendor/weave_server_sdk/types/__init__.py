@@ -5,6 +5,7 @@ from __future__ import annotations
 from . import shared
 from .. import _compat
 from .shared import (
+    Feedback as Feedback,
     Operation as Operation,
     ConvertSpec as ConvertSpec,
     EqOperation as EqOperation,
@@ -41,6 +42,7 @@ from .file_create_params import FileCreateParams as FileCreateParams
 from .object_read_params import ObjectReadParams as ObjectReadParams
 from .table_query_params import TableQueryParams as TableQueryParams
 from .trace_usage_params import TraceUsageParams as TraceUsageParams
+from .v2_call_end_params import V2CallEndParams as V2CallEndParams
 from .agent_search_params import AgentSearchParams as AgentSearchParams
 from .call_start_response import CallStartResponse as CallStartResponse
 from .call_stats_response import CallStatsResponse as CallStatsResponse
@@ -65,8 +67,10 @@ from .object_create_params import ObjectCreateParams as ObjectCreateParams
 from .object_delete_params import ObjectDeleteParams as ObjectDeleteParams
 from .object_read_response import ObjectReadResponse as ObjectReadResponse
 from .project_stats_params import ProjectStatsParams as ProjectStatsParams
+from .registry_link_params import RegistryLinkParams as RegistryLinkParams
 from .table_query_response import TableQueryResponse as TableQueryResponse
 from .trace_usage_response import TraceUsageResponse as TraceUsageResponse
+from .v2_call_start_params import V2CallStartParams as V2CallStartParams
 from .v2_model_list_params import V2ModelListParams as V2ModelListParams
 from .v2_score_list_params import V2ScoreListParams as V2ScoreListParams
 from .agent_search_response import AgentSearchResponse as AgentSearchResponse
@@ -85,6 +89,8 @@ from .feedback_create_params import FeedbackCreateParams as FeedbackCreateParams
 from .object_create_response import ObjectCreateResponse as ObjectCreateResponse
 from .object_delete_response import ObjectDeleteResponse as ObjectDeleteResponse
 from .project_stats_response import ProjectStatsResponse as ProjectStatsResponse
+from .registry_link_response import RegistryLinkResponse as RegistryLinkResponse
+from .v2_call_start_response import V2CallStartResponse as V2CallStartResponse
 from .v2_dataset_list_params import V2DatasetListParams as V2DatasetListParams
 from .v2_model_create_params import V2ModelCreateParams as V2ModelCreateParams
 from .v2_model_delete_params import V2ModelDeleteParams as V2ModelDeleteParams
