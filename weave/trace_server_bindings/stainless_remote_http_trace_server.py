@@ -570,6 +570,16 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
             req,
             agent_types.AgentSpansQueryRes,
             self._stainless_client.agents.spans.query,
+            # The vendored SDK is generated from core and may lag this server's API.
+            exclude={"insight_filters"},
+            extra_body={
+                "insight_filters": [
+                    insight_filter.model_dump(
+                        mode="json", by_alias=True, exclude_none=True
+                    )
+                    for insight_filter in req.insight_filters
+                ]
+            },
         )
 
     @validate_call
@@ -678,6 +688,16 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
             req,
             agent_types.AgentSpanStatsRes,
             self._stainless_client.agents.spans.stats,
+            # The vendored SDK is generated from core and may lag this server's API.
+            exclude={"insight_filters"},
+            extra_body={
+                "insight_filters": [
+                    insight_filter.model_dump(
+                        mode="json", by_alias=True, exclude_none=True
+                    )
+                    for insight_filter in req.insight_filters
+                ]
+            },
         )
 
     @validate_call

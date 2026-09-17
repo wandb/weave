@@ -469,6 +469,16 @@ def test_v2_method_reaches_its_flat_route(
                         aggregations=["sum"],
                     )
                 ],
+                insight_filters=[
+                    agent_types.AgentInsightFilter(
+                        field="failure_severity",
+                        values=["major"],
+                    ),
+                    agent_types.AgentInsightFilter(
+                        field="intent_topic_id",
+                        values=["01994634-c680-7dc3-a40b-0383b5008d70"],
+                    ),
+                ],
             ),
             "POST",
             "/agents/spans/stats",
@@ -1322,6 +1332,19 @@ def test_create_sends_every_supported_field(
                         ]
                     }
                 },
+                group_by=[
+                    agent_types.AgentGroupByRef(source="column", key="conversation_id")
+                ],
+                insight_filters=[
+                    agent_types.AgentInsightFilter(
+                        field="failure_severity",
+                        values=["major"],
+                    ),
+                    agent_types.AgentInsightFilter(
+                        field="intent_topic_id",
+                        values=["01994634-c680-7dc3-a40b-0383b5008d70"],
+                    ),
+                ],
             ),
             {
                 "project_id": PROJECT,
@@ -1331,14 +1354,32 @@ def test_create_sends_every_supported_field(
                             {"$getField": "attributes.model"},
                             {"$literal": "gpt-4o"},
                         ]
-                    }
+                    },
                 },
                 "custom_attr_columns": [],
-                "group_by": None,
+                "group_by": [
+                    {
+                        "alias": None,
+                        "key": "conversation_id",
+                        "source": "column",
+                    }
+                ],
                 "group_distributions": [],
                 "group_filters": [],
                 "include_costs": False,
                 "include_details": False,
+                "insight_filters": [
+                    {
+                        "exclude": False,
+                        "field": "failure_severity",
+                        "values": ["major"],
+                    },
+                    {
+                        "exclude": False,
+                        "field": "intent_topic_id",
+                        "values": ["01994634-c680-7dc3-a40b-0383b5008d70"],
+                    },
+                ],
                 "limit": 100,
                 "measures": [],
                 "offset": 0,
@@ -1425,6 +1466,49 @@ def test_route_sends_every_supported_field(
 
     assert len(mock_server.requests) == 1
     assert json.loads(mock_server.requests[0].content) == expected_body
+
+
+def test_agent_spans_stats_sends_insight_filters() -> None:
+    mock_server = _mock_server(httpx.Response(200, json=V1_RESPONSE))
+    req = agent_types.AgentSpanStatsReq(
+        project_id=PROJECT,
+        start=START,
+        end=END,
+        metrics=[
+            agent_types.AgentSpanStatsMetricSpec(
+                alias="spans",
+                value_type="datetime",
+                value=agent_types.AgentSpanValueRef(source="field", key="started_at"),
+                aggregations=["count"],
+            )
+        ],
+        insight_filters=[
+            agent_types.AgentInsightFilter(
+                field="failure_severity",
+                values=["major"],
+            ),
+            agent_types.AgentInsightFilter(
+                field="intent_topic_id",
+                values=["01994634-c680-7dc3-a40b-0383b5008d70"],
+            ),
+        ],
+    )
+
+    mock_server.server.agent_spans_stats(req)
+
+    assert len(mock_server.requests) == 1
+    assert json.loads(mock_server.requests[0].content)["insight_filters"] == [
+        {
+            "exclude": False,
+            "field": "failure_severity",
+            "values": ["major"],
+        },
+        {
+            "exclude": False,
+            "field": "intent_topic_id",
+            "values": ["01994634-c680-7dc3-a40b-0383b5008d70"],
+        },
+    ]
 
 
 def test_stream_route_sends_every_supported_field():

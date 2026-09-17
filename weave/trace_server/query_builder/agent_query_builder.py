@@ -57,6 +57,9 @@ from weave.trace_server.query_builder import agent_trace_attribution
 from weave.trace_server.query_builder.agent_custom_attrs import (
     custom_attr_value_or_null,
 )
+from weave.trace_server.query_builder.agent_insight_filters import (
+    build_insight_filter_clause,
+)
 from weave.trace_server.query_builder.agent_signal_filters import (
     build_signal_filter_clause,
 )
@@ -1147,6 +1150,31 @@ _GROUPED_SPAN_AGGREGATES: str = """count() AS span_count,
                max(s.started_at) AS last_seen"""
 
 
+def _grouped_span_membership_where_sql(
+    pb: ParamBuilder,
+    req: AgentSpansQueryReq,
+    base_where: str,
+) -> tuple[str, bool]:
+    """Add conversation-level signal and Insights predicates to grouped spans."""
+    membership_clauses = [
+        clause
+        for clause in (
+            build_signal_filter_clause(pb, req.project_id, req.signal_filters),
+            build_insight_filter_clause(
+                pb,
+                req.project_id,
+                req.insight_filters,
+                req.started_after,
+                req.started_before,
+            ),
+        )
+        if clause is not None
+    ]
+    if not membership_clauses:
+        return base_where, False
+    return " AND ".join([base_where, *membership_clauses]), True
+
+
 def make_spans_count_query(pb: ParamBuilder, req: AgentSpansQueryReq) -> str:
     """Count spans matching the request, or count of distinct groups if grouped."""
     # Count only needs trace attribution when identity participates in matching
@@ -1172,10 +1200,10 @@ def make_spans_count_query(pb: ParamBuilder, req: AgentSpansQueryReq) -> str:
     # Apply the signal semi-join here too, so total_count matches the filtered list
     # (an unfiltered count produces phantom empty pages). Filtering on the attributed
     # conversation_id forces attribution even when the query wouldn't otherwise need it.
-    signal_clause = build_signal_filter_clause(pb, req.project_id, req.signal_filters)
-    count_where = span_filters.where
-    if signal_clause is not None:
-        count_where = f"{count_where} AND {signal_clause}"
+    count_where, membership_requires_attribution = _grouped_span_membership_where_sql(
+        pb, req, span_filters.where
+    )
+    if membership_requires_attribution:
         attribute = True
     source = _spans_source(pb, req, attribute=attribute)
     return (
@@ -1274,10 +1302,7 @@ def make_spans_list_query(pb: ParamBuilder, req: AgentSpansQueryReq) -> str:
     ensure_group_filters_match(group_filters, req.group_by, context="spans list")
     having = group_filters_having_sql(pb, group_filters)
     having_sql = f"HAVING {having}" if having else ""
-    signal_clause = build_signal_filter_clause(pb, req.project_id, req.signal_filters)
-    grouped_where = span_filters.where
-    if signal_clause is not None:
-        grouped_where = f"{grouped_where} AND {signal_clause}"
+    grouped_where, _ = _grouped_span_membership_where_sql(pb, req, span_filters.where)
     source = _spans_source(pb, req, attribute=True, include_costs=req.include_costs)
 
     return f"""
@@ -1491,12 +1516,21 @@ def make_span_group_distribution_counts_query(
     """Count filtered spans per returned group row."""
     span_filters = _spans_filter_sql(pb, req)
     context = _span_group_distribution_context(pb, req, group_values)
-    source = _spans_source(pb, req, attribute=_spans_query_references_identity(req))
+    distribution_where, membership_requires_attribution = (
+        _grouped_span_membership_where_sql(pb, req, span_filters.where)
+    )
+    source = _spans_source(
+        pb,
+        req,
+        attribute=(
+            _spans_query_references_identity(req) or membership_requires_attribution
+        ),
+    )
     return f"""
         SELECT {context.group_key_sql} AS group_key,
                count() AS total_count
         FROM {source} s
-        WHERE {span_filters.where}
+        WHERE {distribution_where}
           AND {context.group_key_sql} IN {context.group_values_slot}
         GROUP BY group_key
     """
@@ -1521,7 +1555,16 @@ def make_span_group_numeric_distributions_query(
         numeric_specs,
         get_limit=lambda spec: spec.bins,
     )
-    source = _spans_source(pb, req, attribute=_spans_query_references_identity(req))
+    distribution_where, membership_requires_attribution = (
+        _grouped_span_membership_where_sql(pb, req, span_filters.where)
+    )
+    source = _spans_source(
+        pb,
+        req,
+        attribute=(
+            _spans_query_references_identity(req) or membership_requires_attribution
+        ),
+    )
     spec_alias_sql = "tupleElement(spec, 1)"
     spec_source_sql = "tupleElement(spec, 2)"
     spec_key_sql = "tupleElement(spec, 3)"
@@ -1575,7 +1618,7 @@ def make_span_group_numeric_distributions_query(
                      {value_sql} AS value
               FROM {source} s
               ARRAY JOIN {specs_sql} AS spec
-              WHERE {span_filters.where}
+              WHERE {distribution_where}
                 AND {context.group_key_sql} IN {context.group_values_slot}
                 AND {map_contains_sql}
             )
@@ -1656,7 +1699,16 @@ def make_span_group_categorical_distributions_query(
         categorical_specs,
         get_limit=lambda spec: spec.top_n,
     )
-    source = _spans_source(pb, req, attribute=_spans_query_references_identity(req))
+    distribution_where, membership_requires_attribution = (
+        _grouped_span_membership_where_sql(pb, req, span_filters.where)
+    )
+    source = _spans_source(
+        pb,
+        req,
+        attribute=(
+            _spans_query_references_identity(req) or membership_requires_attribution
+        ),
+    )
     spec_alias_sql = "tupleElement(spec, 1)"
     spec_source_sql = "tupleElement(spec, 2)"
     spec_key_sql = "tupleElement(spec, 3)"
@@ -1691,7 +1743,7 @@ def make_span_group_categorical_distributions_query(
                      {value_sql} AS raw_value
               FROM {source} s
               ARRAY JOIN {specs_sql} AS spec
-              WHERE {span_filters.where}
+              WHERE {distribution_where}
                 AND {context.group_key_sql} IN {context.group_values_slot}
                 AND {map_contains_sql}
             )
