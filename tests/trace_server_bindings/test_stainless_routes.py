@@ -22,6 +22,7 @@ from weave.trace_server.agents import types as agent_types
 from weave.trace_server_bindings.stainless_remote_http_trace_server import (
     StainlessRemoteHTTPTraceServer,
 )
+from weave.trace_server_bindings.stainless_request_kwargs import UnsendableFieldError
 from weave.vendor.weave_server_sdk import Client as StainlessClient
 
 BASE_URL = "http://example.com"
@@ -1446,6 +1447,127 @@ def test_stream_route_sends_every_supported_field():
         "offset": None,
         "name": None,
         "sort_by": None,
+    }
+
+
+class _CallsQueryStatsReqWithNewField(tsi.CallsQueryStatsReq):
+    """A request model that is one vendor sync ahead of the generated client.
+
+    The field is a date because the vendor serialises `extra_body` with a plain JSON
+    encoder, which a date does not survive unless the binding dumps it in JSON mode.
+    """
+
+    probe_field: datetime.date = START.date()
+
+
+class _TagsListReqWithNewField(tsi.TagsListReq):
+    """The same, on a route the generated client sends as a GET."""
+
+    probe_field: datetime.date = START.date()
+
+
+def test_a_field_the_generated_client_does_not_declare_rides_extra_body():
+    """Test that a field the vendored client has not caught up with still reaches the server."""
+    mock_server = _mock_server(
+        httpx.Response(200, json={"count": 0, "has_more": False})
+    )
+
+    mock_server.server.calls_query_stats(
+        _CallsQueryStatsReqWithNewField(project_id=PROJECT)
+    )
+
+    assert len(mock_server.requests) == 1
+    assert json.loads(mock_server.requests[0].content) == {
+        "project_id": PROJECT,
+        "filter": None,
+        "query": None,
+        "limit": None,
+        "include_total_storage_size": False,
+        "expand_columns": None,
+        "probe_field": "2026-08-20",
+    }
+
+
+def test_a_field_the_generated_client_does_not_declare_raises_on_a_get_route():
+    """Test that the binding refuses to lose such a field where the body is dropped."""
+    mock_server = _mock_server(httpx.Response(200, json=V1_RESPONSE))
+
+    with pytest.raises(UnsendableFieldError, match="TagsResource.list"):
+        mock_server.server.tags_list(_TagsListReqWithNewField(project_id=PROJECT))
+
+    assert mock_server.requests == []
+
+
+def test_feedback_create_drops_none_valued_fields():
+    """Test that the route dumping its own request keeps dropping None values."""
+    mock_server = _mock_server(
+        httpx.Response(
+            200,
+            json={
+                "id": "f1",
+                "created_at": "2026-08-20T00:00:00Z",
+                "wb_user_id": "user-id",
+                "payload": {},
+            },
+        )
+    )
+
+    mock_server.server.feedback_create(
+        tsi.FeedbackCreateReq(
+            project_id=PROJECT,
+            weave_ref="weave:///entity/project/call/c1",
+            feedback_type="note",
+            payload={"note": "short memo"},
+            id="f1",
+        )
+    )
+
+    assert len(mock_server.requests) == 1
+    assert json.loads(mock_server.requests[0].content) == {
+        "project_id": PROJECT,
+        "weave_ref": "weave:///entity/project/call/c1",
+        "feedback_type": "note",
+        "payload": {"note": "short memo"},
+        "scorer_tags": [],
+        "scorer_tag_reasons": {},
+        "scorer_tag_confidences": {},
+        "scorer_ratings": {},
+        "scorer_rating_reasons": {},
+        "scorer_rating_confidences": {},
+        "span_agent_name": "",
+        "span_agent_version": "",
+        "span_status_code": "UNSET",
+        "span_conversation_id": "",
+        "span_trace_id": "",
+        "scorer_trace_id": "",
+    }
+
+
+def test_calls_query_stream_sends_every_supported_field():
+    """Test that the main read path, which dumps its own request, sends every field."""
+    mock_server = _mock_server(
+        httpx.Response(200, content=b"", headers={"content-type": "application/jsonl"})
+    )
+
+    list(mock_server.server.calls_query_stream(tsi.CallsQueryReq(project_id=PROJECT)))
+
+    assert len(mock_server.requests) == 1
+    assert json.loads(mock_server.requests[0].content) == {
+        "project_id": PROJECT,
+        "filter": None,
+        "limit": None,
+        "offset": None,
+        "latest_only": False,
+        "sort_by": None,
+        "query": None,
+        "include_costs": False,
+        "include_feedback": False,
+        "include_storage_size": False,
+        "include_total_storage_size": False,
+        "include_usernames": False,
+        "columns": None,
+        "expand_columns": None,
+        "return_expanded_column_values": True,
     }
 
 

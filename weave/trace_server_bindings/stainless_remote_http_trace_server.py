@@ -38,6 +38,9 @@ from weave.trace_server_bindings.models import (
     EndBatchItem,
     StartBatchItem,
 )
+from weave.trace_server_bindings.stainless_request_kwargs import (
+    build_request_kwargs,
+)
 from weave.utils.project_id import from_project_id
 from weave.utils.retry import get_current_retry_id, with_retry
 from weave.vendor.weave_server_sdk import APIStatusError, DefaultHttpxClient
@@ -181,10 +184,10 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         if exclude_set:
             dump_kwargs["exclude"] = exclude_set
 
-        req_dict = req.model_dump(**dump_kwargs)
+        kwargs = build_request_kwargs(req, stainless_api, **dump_kwargs)
         response = stainless_api(
             extra_headers=self._compose_headers(),
-            **req_dict,
+            **kwargs,
             **extra_kwargs,
         )
         # An empty response schema is generated as a bare `object`: a plain dict.
@@ -486,10 +489,13 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
                     # Fall back to individual feedback creation calls
                     for item in batch_req.batch:
                         try:
-                            item_dict = item.model_dump(
-                                exclude={"id", "created_at"}, exclude_none=True
+                            item_kwargs = build_request_kwargs(
+                                item,
+                                self._stainless_client.feedback.create,
+                                exclude={"id", "created_at"},
+                                exclude_none=True,
                             )
-                            self._stainless_client.feedback.create(**item_dict)
+                            self._stainless_client.feedback.create(**item_kwargs)
                         except Exception as individual_error:
                             logger.warning(
                                 "Failed to create individual feedback: %s",
@@ -835,9 +841,11 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
             CallSchema instances.
         """
         self._update_client_headers()
-        req_dict = req.model_dump(by_alias=True)
+        kwargs = build_request_kwargs(
+            req, self._stainless_client.calls.stream_query, by_alias=True
+        )
         # Use stream_query endpoint
-        response = self._stainless_client.calls.stream_query(**req_dict)
+        response = self._stainless_client.calls.stream_query(**kwargs)
         for item in response:
             yield tsi.CallSchema.model_validate(item)
 
@@ -1291,10 +1299,14 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
             )
         else:
             self._update_client_headers()
-            req_dict = req.model_dump(
-                exclude={"id", "created_at"}, exclude_none=True, by_alias=True
+            kwargs = build_request_kwargs(
+                req,
+                self._stainless_client.feedback.create,
+                exclude={"id", "created_at"},
+                exclude_none=True,
+                by_alias=True,
             )
-            response = self._stainless_client.feedback.create(**req_dict)
+            response = self._stainless_client.feedback.create(**kwargs)
             return tsi.FeedbackCreateRes.model_validate(response.model_dump())
 
     @validate_call
@@ -1500,8 +1512,10 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
             Dictionary chunks of the streamed response.
         """
         self._update_client_headers()
-        req_dict = req.model_dump(by_alias=True)
-        response = self._stainless_client.completions.create_stream(**req_dict)
+        kwargs = build_request_kwargs(
+            req, self._stainless_client.completions.create_stream, by_alias=True
+        )
+        response = self._stainless_client.completions.create_stream(**kwargs)
         for item in response:
             yield item.model_dump(by_alias=True, exclude_unset=True)
 
@@ -1642,8 +1656,10 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
             ThreadSchema instances.
         """
         self._update_client_headers()
-        req_dict = req.model_dump(by_alias=True)
-        response: Any = self._stainless_client.threads.stream_query(**req_dict)
+        kwargs = build_request_kwargs(
+            req, self._stainless_client.threads.stream_query, by_alias=True
+        )
+        response: Any = self._stainless_client.threads.stream_query(**kwargs)
         for item in response:
             yield tsi.ThreadSchema.model_validate(item.model_dump())
 
@@ -1679,8 +1695,10 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
             AnnotationQueueSchema instances.
         """
         self._update_client_headers()
-        req_dict = req.model_dump(by_alias=True)
-        response: Any = self._stainless_client.annotation_queues.query(**req_dict)
+        kwargs = build_request_kwargs(
+            req, self._stainless_client.annotation_queues.query, by_alias=True
+        )
+        response: Any = self._stainless_client.annotation_queues.query(**kwargs)
         for item in response:
             yield tsi.AnnotationQueueSchema.model_validate(item.model_dump())
 
