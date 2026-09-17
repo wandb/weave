@@ -15,6 +15,7 @@ from pydantic import ValidationError
 
 from weave.trace_server.agents.span_costs import cost_augmented_source_sql
 from weave.trace_server.agents.types import (
+    AGENT_INTENT_SENTIMENTS,
     AgentConversationChatReq,
     AgentCustomAttrsSchemaReq,
     AgentGroupByRef,
@@ -2401,13 +2402,7 @@ def test_insight_filter_validation() -> None:
             field="failure_severity",
             values=["unknown"],
         )
-    for sentiment in (
-        "frustrated",
-        "dissatisfied",
-        "neutral",
-        "satisfied",
-        "delighted",
-    ):
+    for sentiment in AGENT_INTENT_SENTIMENTS:
         insight_filter = AgentInsightFilter(
             field="intent_sentiment",
             values=[sentiment],
@@ -2416,8 +2411,8 @@ def test_insight_filter_validation() -> None:
     with pytest.raises(
         ValidationError,
         match=(
-            "intent_sentiment values must be one of: frustrated, dissatisfied, "
-            "neutral, satisfied, delighted; got: positive"
+            "intent_sentiment values must be one of: "
+            f"{', '.join(AGENT_INTENT_SENTIMENTS)}; got: positive"
         ),
     ):
         AgentInsightFilter(

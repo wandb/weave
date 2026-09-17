@@ -69,6 +69,7 @@ AgentSpanStatsColumnValueType = Literal["datetime", "number", "boolean", "string
 AgentSpanStatsCell = datetime.datetime | str | int | float | bool | None
 AgentFailureSeverity = Literal["info", "major", "minor"]
 AGENT_FAILURE_SEVERITIES = get_args(AgentFailureSeverity)
+# Source: https://github.com/wandb/core/blob/master/services/weave-trace/src/workers/insights/configs/taxonomies/sentiment.yaml
 AgentIntentSentiment = Literal[
     "frustrated",
     "dissatisfied",
@@ -842,8 +843,8 @@ class AgentInsightFilter(BaseModel):
         min_length=1,
         max_length=1000,
         description=(
-            "Values to match. intent_sentiment accepts only frustrated, "
-            "dissatisfied, neutral, satisfied, or delighted; failure_severity "
+            "Values to match. intent_sentiment accepts only "
+            f"{', '.join(AGENT_INTENT_SENTIMENTS)}; failure_severity "
             "accepts only info, major, or minor."
         ),
     )

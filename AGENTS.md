@@ -156,7 +156,8 @@ successful runs, and a topic matches nothing when no successful run contains it.
 Failure-severity filters accept exactly `info`, `major`, and `minor`.
 User-sentiment filters accept exactly `frustrated`, `dissatisfied`, `neutral`,
 `satisfied`, and `delighted`; keep frontend options and API validation aligned
-to that ordered taxonomy.
+to that ordered taxonomy. Its source of truth is
+[`sentiment.yaml`](https://github.com/wandb/core/blob/master/services/weave-trace/src/workers/insights/configs/taxonomies/sentiment.yaml).
 Each clustering run mints new `signature_clusters.id` values; `topic_id`, not
 `cluster_id`, is the identity reconciled across runs. An assignment is therefore
 identified by its run and cluster, even though a non-noise UUID cluster ID is
