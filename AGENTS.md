@@ -153,7 +153,9 @@ apply their span time window to matching Insights rows. Topic filters accept onl
 stable topic IDs; clustering run IDs are an internal storage detail and must not
 cross the API boundary. The server resolves a topic to concrete clusters across
 successful runs, and a topic matches nothing when no successful run contains it.
-Failure-severity filters accept exactly `info`, `major`, and `minor`.
+Failure-severity filters accept exactly `info`, `major`, and `minor`; their
+source of truth is
+[`severity.yaml`](https://github.com/wandb/core/blob/master/services/weave-trace/src/workers/insights/configs/taxonomies/severity.yaml).
 User-sentiment filters accept exactly `frustrated`, `dissatisfied`, `neutral`,
 `satisfied`, and `delighted`; keep frontend options and API validation aligned
 to that ordered taxonomy. Its source of truth is

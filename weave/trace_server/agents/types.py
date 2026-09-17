@@ -67,6 +67,7 @@ SearchMessageRole = Literal[
 AgentSpanStatsValueType = Literal["datetime", "number", "boolean", "string"]
 AgentSpanStatsColumnValueType = Literal["datetime", "number", "boolean", "string"]
 AgentSpanStatsCell = datetime.datetime | str | int | float | bool | None
+# Source: https://github.com/wandb/core/blob/master/services/weave-trace/src/workers/insights/configs/taxonomies/severity.yaml
 AgentFailureSeverity = Literal["info", "major", "minor"]
 AGENT_FAILURE_SEVERITIES = get_args(AgentFailureSeverity)
 # Source: https://github.com/wandb/core/blob/master/services/weave-trace/src/workers/insights/configs/taxonomies/sentiment.yaml
