@@ -29,6 +29,10 @@ from weave.trace_server.sensitive_data.span_redaction import (
 )
 
 NOW = datetime.datetime(2026, 8, 12, tzinfo=datetime.timezone.utc)
+_EMAIL_A = '<WEAVE_REDACTED type="EMAIL_ADDRESS" hint="a***" />'
+_PHONE_4 = '<WEAVE_REDACTED type="PHONE_NUMBER" hint="4***" />'
+_SSN_1 = '<WEAVE_REDACTED type="US_SSN" hint="1***" />'
+_CARD_4 = '<WEAVE_REDACTED type="CREDIT_CARD" hint="4***" />'
 
 
 def test_call_start_redacts_content_but_not_structural_fields() -> None:
@@ -37,11 +41,11 @@ def test_call_start_redacts_content_but_not_structural_fields() -> None:
     redacted = redact_call_start(req, SensitiveDataPolicy.PII_V1)
 
     assert isinstance(redacted, tsi.CallStartReq)
-    assert redacted.start.inputs == {"email": "<EMAIL_ADDRESS>"}
-    assert redacted.start.attributes == {"phone": "<PHONE_NUMBER>"}
-    assert redacted.start.otel_dump == {"ssn": "<US_SSN>"}
-    assert redacted.start.display_name == "Contact <EMAIL_ADDRESS>"
-    assert redacted.start.op_name == "<EMAIL_ADDRESS>"
+    assert redacted.start.inputs == {"email": _EMAIL_A}
+    assert redacted.start.attributes == {"phone": _PHONE_4}
+    assert redacted.start.otel_dump == {"ssn": _SSN_1}
+    assert redacted.start.display_name == f"Contact {_EMAIL_A}"
+    assert redacted.start.op_name == _EMAIL_A
     assert redacted.start.project_id == "ada@example.com/project"
     assert req.start.inputs == {"email": "ada@example.com"}
 
@@ -68,15 +72,15 @@ def test_call_end_update_and_complete_redact_content() -> None:
     redacted_update = redact_call_update(update_req, SensitiveDataPolicy.PII_V1)
     redacted_complete = redact_calls_complete(complete_req, SensitiveDataPolicy.PII_V1)
 
-    assert redacted_end.end.output == {"card": "<CREDIT_CARD>"}
-    assert redacted_end.end.summary == {"contact": "<EMAIL_ADDRESS>"}
-    assert redacted_end.end.exception == "Failed for <EMAIL_ADDRESS>"
-    assert redacted_update.display_name == "Email <EMAIL_ADDRESS>"
+    assert redacted_end.end.output == {"card": _CARD_4}
+    assert redacted_end.end.summary == {"contact": _EMAIL_A}
+    assert redacted_end.end.exception == f"Failed for {_EMAIL_A}"
+    assert redacted_update.display_name == f"Email {_EMAIL_A}"
     assert redacted_update.project_id == "ada@example.com/project"
     assert redacted_update.call_id == "ada@example.com"
-    assert redacted_complete.batch[0].inputs == {"email": "<EMAIL_ADDRESS>"}
-    assert redacted_complete.batch[0].output == {"card": "<CREDIT_CARD>"}
-    assert redacted_complete.batch[0].op_name == "<EMAIL_ADDRESS>"
+    assert redacted_complete.batch[0].inputs == {"email": _EMAIL_A}
+    assert redacted_complete.batch[0].output == {"card": _CARD_4}
+    assert redacted_complete.batch[0].op_name == _EMAIL_A
 
 
 def test_off_policy_skips_the_walker() -> None:
@@ -185,30 +189,30 @@ def _redacted_span(resource_attributes: dict[str, str]) -> Span:
     """The full expected shape of `_span_with_pii()` after redaction."""
     return Span(
         resource=SpanResource(attributes=resource_attributes),
-        name="surface for <EMAIL_ADDRESS>",
+        name=f"surface for {_EMAIL_A}",
         trace_id="a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1",
         span_id="b2b2b2b2b2b2b2b2",
         start_time_unix_nano=1,
         end_time_unix_nano=2,
         attributes={
-            "gen_ai.prompt": "Email <EMAIL_ADDRESS>",
+            "gen_ai.prompt": f"Email {_EMAIL_A}",
             "payload": {"image": "data:image/png;base64,QUJD"},
         },
         events=[
             Event(
-                name="notify <PHONE_NUMBER>",
+                name=f"notify {_PHONE_4}",
                 timestamp=1,
-                attributes={"note": "call <PHONE_NUMBER>"},
+                attributes={"note": f"call {_PHONE_4}"},
             )
         ],
         links=[
             Link(
                 trace_id="c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3",
                 span_id="d4d4d4d4d4d4d4d4",
-                attributes={"context": "ssn <US_SSN>"},
+                attributes={"context": f"ssn {_SSN_1}"},
             )
         ],
-        status=Status(code=StatusCode.ERROR, message="card <CREDIT_CARD>"),
+        status=Status(code=StatusCode.ERROR, message=f"card {_CARD_4}"),
     )
 
 
@@ -225,9 +229,7 @@ def test_redacts_pii_from_every_span_container() -> None:
     assert span.resource is not None
     redact_pii_from_resource(span.resource, SensitiveDataPolicy.PII_V1)
 
-    assert span == _redacted_span(
-        resource_attributes={"service.owner": "<EMAIL_ADDRESS>"}
-    )
+    assert span == _redacted_span(resource_attributes={"service.owner": _EMAIL_A})
 
 
 def test_span_redaction_off_policy_is_a_noop() -> None:

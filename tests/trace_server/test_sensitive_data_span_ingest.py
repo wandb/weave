@@ -30,6 +30,10 @@ _PII_ATTR_VALUE = "Email ada@example.com"
 _PII_STATUS_MESSAGE = "card 4111 1111 1111 1111"
 _PII_RESOURCE_VALUE = "call (415) 555-2671"
 _PII_CONVERSATION_NAME = "chat with ada@example.com"
+_EMAIL_A = '<WEAVE_REDACTED type="EMAIL_ADDRESS" hint="a***" />'
+_PHONE_4 = '<WEAVE_REDACTED type="PHONE_NUMBER" hint="4***" />'
+_SSN_1 = '<WEAVE_REDACTED type="US_SSN" hint="1***" />'
+_CARD_4 = '<WEAVE_REDACTED type="CREDIT_CARD" hint="4***" />'
 
 # One PII value per derived content column, so every column is observed.
 _PII_CONTENT_ATTRS = {
@@ -144,27 +148,24 @@ def test_pii_policy_redacts_stored_span_details(ch_server) -> None:
     assert res.rejected_spans == 0
     row = _stored_span_details(ch_server, project_id)
     dump = json.loads(row.raw_span_dump)
-    assert row.span_name == "ingest for <EMAIL_ADDRESS>"
-    assert dump["name"] == "ingest for <EMAIL_ADDRESS>"
-    assert dump["events"][0]["name"] == "notify <PHONE_NUMBER>"
-    assert dump["attributes"]["gen_ai"]["prompt"] == "Email <EMAIL_ADDRESS>"
-    assert dump["resource"]["attributes"] == {
-        "service": {"owner": "call <PHONE_NUMBER>"}
-    }
-    assert dump["status"]["message"] == "card <CREDIT_CARD>"
-    assert row.status_message == "card <CREDIT_CARD>"
-    assert row.conversation_name == "chat with <EMAIL_ADDRESS>"
-    assert row.system_instructions == ["obey <EMAIL_ADDRESS>"]
-    assert row.input_messages[0].content == "hi from <EMAIL_ADDRESS>"
-    assert row.output_messages[0].content == "reply to <EMAIL_ADDRESS>"
-    assert row.reasoning_content == "think <US_SSN>"
-    assert row.tool_call_arguments == '{"query": "email <EMAIL_ADDRESS>"}'
-    assert row.tool_call_result == '{"answer": "call <PHONE_NUMBER>"}'
-    assert (
-        row.tool_definitions
-        == '[{"name": "lookup", "description": "for <CREDIT_CARD>"}]'
+    assert row.span_name == f"ingest for {_EMAIL_A}"
+    assert dump["name"] == f"ingest for {_EMAIL_A}"
+    assert dump["events"][0]["name"] == f"notify {_PHONE_4}"
+    assert dump["attributes"]["gen_ai"]["prompt"] == f"Email {_EMAIL_A}"
+    assert dump["resource"]["attributes"] == {"service": {"owner": f"call {_PHONE_4}"}}
+    assert dump["status"]["message"] == f"card {_CARD_4}"
+    assert row.status_message == f"card {_CARD_4}"
+    assert row.conversation_name == f"chat with {_EMAIL_A}"
+    assert row.system_instructions == [f"obey {_EMAIL_A}"]
+    assert row.input_messages[0].content == f"hi from {_EMAIL_A}"
+    assert row.output_messages[0].content == f"reply to {_EMAIL_A}"
+    assert row.reasoning_content == f"think {_SSN_1}"
+    assert row.tool_call_arguments == json.dumps({"query": f"email {_EMAIL_A}"})
+    assert row.tool_call_result == json.dumps({"answer": f"call {_PHONE_4}"})
+    assert row.tool_definitions == json.dumps(
+        [{"name": "lookup", "description": f"for {_CARD_4}"}]
     )
-    assert row.compaction_summary == "card <CREDIT_CARD>"
+    assert row.compaction_summary == f"card {_CARD_4}"
 
 
 def test_pii_policy_redacts_before_ingest_sampling(
@@ -181,12 +182,12 @@ def test_pii_policy_redacts_before_ingest_sampling(
     ) -> list[ingest_sampling.SpanDecision]:
         nonlocal observed_redacted_span
         observed_redacted_span = True
-        assert spans[0].attributes["gen_ai"]["prompt"] == "Email <EMAIL_ADDRESS>"
+        assert spans[0].attributes["gen_ai"]["prompt"] == f"Email {_EMAIL_A}"
         assert spans[0].resource is not None
         assert spans[0].resource.attributes == {
-            "service": {"owner": "call <PHONE_NUMBER>"}
+            "service": {"owner": f"call {_PHONE_4}"}
         }
-        assert spans[0].status.message == "card <CREDIT_CARD>"
+        assert spans[0].status.message == f"card {_CARD_4}"
         return original_decide_spans(config, spans, byte_sizes)
 
     monkeypatch.setattr(ingest_sampling, "decide_spans", inspect_sampled_spans)

@@ -11,6 +11,19 @@ from weave.trace_server.errors import RequestTooLarge
 from weave.trace_server.sensitive_data.detectors import redact_pii_string
 from weave.trace_server.sensitive_data.walker import redact_pii_value
 
+_EMAIL_A = '<WEAVE_REDACTED type="EMAIL_ADDRESS" hint="a***" />'
+_EMAIL_E = '<WEAVE_REDACTED type="EMAIL_ADDRESS" hint="e***" />'
+_EMAIL_F = '<WEAVE_REDACTED type="EMAIL_ADDRESS" hint="f***" />'
+_EMAIL_G = '<WEAVE_REDACTED type="EMAIL_ADDRESS" hint="g***" />'
+_EMAIL_J = '<WEAVE_REDACTED type="EMAIL_ADDRESS" hint="j***" />'
+_EMAIL_L = '<WEAVE_REDACTED type="EMAIL_ADDRESS" hint="l***" />'
+_EMAIL_O = '<WEAVE_REDACTED type="EMAIL_ADDRESS" hint="o***" />'
+_EMAIL_P = '<WEAVE_REDACTED type="EMAIL_ADDRESS" hint="p***" />'
+_PHONE_1 = '<WEAVE_REDACTED type="PHONE_NUMBER" hint="1***" />'
+_PHONE_4 = '<WEAVE_REDACTED type="PHONE_NUMBER" hint="4***" />'
+_SSN_1 = '<WEAVE_REDACTED type="US_SSN" hint="1***" />'
+_CARD_4 = '<WEAVE_REDACTED type="CREDIT_CARD" hint="4***" />'
+
 
 class _StructuralLabel(str, Enum):
     EMAIL_SHAPED = "ada@example.com"
@@ -34,33 +47,33 @@ def _assert_nesting_rejected(value: object) -> None:
     assert str(exc_info.value) == "Sensitive-data nesting limit exceeded"
 
 
-def test_redacts_supported_pii_with_typed_markers() -> None:
+def test_redacts_supported_pii_with_typed_markers_and_hints() -> None:
     text = (
         "Email ada.lovelace@example.com, phone (415) 555-2671, SSN 123-45-6789, "
         "card 4111 1111 1111 1111, international +44 20 7946 0958."
     )
 
     assert redact_pii_string(text) == (
-        "Email <EMAIL_ADDRESS>, phone <PHONE_NUMBER>, SSN <US_SSN>, "
-        "card <CREDIT_CARD>, international <PHONE_NUMBER>."
+        f"Email {_EMAIL_A}, phone {_PHONE_4}, SSN {_SSN_1}, "
+        f"card {_CARD_4}, international {_PHONE_4}."
     )
 
 
 def test_redacts_compact_luhn_valid_card() -> None:
-    assert redact_pii_string("4111111111111111") == "<CREDIT_CARD>"
+    assert redact_pii_string("4111111111111111") == _CARD_4
 
 
 def test_redacts_compact_e164_phone() -> None:
-    assert redact_pii_string("Call +14155552671") == ("Call <PHONE_NUMBER>")
+    assert redact_pii_string("Call +14155552671") == f"Call {_PHONE_1}"
 
 
 @pytest.mark.parametrize(
     ("text", "expected"),
     [
-        ("界ada@example.com界", "界<EMAIL_ADDRESS>界"),
-        ("界(415) 555-2671界", "界<PHONE_NUMBER>界"),
-        ("界123-45-6789界", "界<US_SSN>界"),
-        ("界4111 1111 1111 1111界", "界<CREDIT_CARD>界"),
+        ("界ada@example.com界", f"界{_EMAIL_A}界"),
+        ("界(415) 555-2671界", f"界{_PHONE_4}界"),
+        ("界123-45-6789界", f"界{_SSN_1}界"),
+        ("界4111 1111 1111 1111界", f"界{_CARD_4}界"),
     ],
 )
 def test_unicode_neighbors_cannot_hide_ascii_pii(text: str, expected: str) -> None:
@@ -70,13 +83,18 @@ def test_unicode_neighbors_cannot_hide_ascii_pii(text: str, expected: str) -> No
 @pytest.mark.parametrize(
     ("text", "expected"),
     [
-        ("jane.doe@example.com", "<EMAIL_ADDRESS>"),
-        ("a.b@x.co", "<EMAIL_ADDRESS>"),
-        ("first.middle.last@sub.example.com", "<EMAIL_ADDRESS>"),
-        ("Contact jane.doe@example.com today", "Contact <EMAIL_ADDRESS> today"),
+        ("jane.doe@example.com", _EMAIL_J),
+        ("a.b@x.co", _EMAIL_A),
+        ("first.middle.last@sub.example.com", _EMAIL_F),
+        ("Contact jane.doe@example.com today", f"Contact {_EMAIL_J} today"),
+        (
+            "!tag@example.com",
+            '<WEAVE_REDACTED type="EMAIL_ADDRESS" hint="t***" />',
+        ),
+        ("!@example.com", '<WEAVE_REDACTED type="EMAIL_ADDRESS" hint="***" />'),
     ],
 )
-def test_redacts_emails_with_dotted_local_parts(text: str, expected: str) -> None:
+def test_redacts_emails_with_bounded_local_part_hints(text: str, expected: str) -> None:
     assert redact_pii_string(text) == expected
 
 
@@ -128,7 +146,7 @@ def test_walker_is_copy_on_write_and_does_not_scan_keys() -> None:
 
     assert redacted == {
         "ada@example.com": "dictionary key",
-        "contact": "<EMAIL_ADDRESS>",
+        "contact": _EMAIL_A,
         "clean": {"message": "hello"},
     }
     assert redacted is not payload
@@ -151,7 +169,7 @@ def test_walker_fuses_credential_key_and_pii_redaction() -> None:
         "api_key": REDACTED_VALUE,
         "nested": [
             {"secret_access_key": REDACTED_VALUE},
-            {"contact": "<EMAIL_ADDRESS>"},
+            {"contact": _EMAIL_G},
         ],
     }
     assert payload == {
@@ -172,8 +190,8 @@ def test_walker_redacts_json_escaped_values_without_scanning_keys() -> None:
 
     assert redact_pii_value(value) == (
         '{"ada@example.com":"dictionary key",'
-        '"contact":"<EMAIL_ADDRESS>",'
-        '"phone":"<PHONE_NUMBER>"}'
+        '"contact":"<WEAVE_REDACTED type=\\"EMAIL_ADDRESS\\" hint=\\"a***\\" />",'
+        '"phone":"<WEAVE_REDACTED type=\\"PHONE_NUMBER\\" hint=\\"4***\\" />"}'
     )
 
 
@@ -201,11 +219,11 @@ def test_walker_copies_models_and_tuples_only_along_changed_paths() -> None:
     redacted = redact_pii_value(payload)
 
     assert redacted is not payload
-    assert redacted.values == (clean_list, "<EMAIL_ADDRESS>")
+    assert redacted.values == (clean_list, _EMAIL_A)
     assert redacted.values is not payload.values
     assert redacted.values[0] is clean_list
     assert redacted.excluded == "grace@example.com"
-    assert redacted.model_extra == {"extra_contact": "<EMAIL_ADDRESS>"}
+    assert redacted.model_extra == {"extra_contact": _EMAIL_L}
     assert payload.model_extra == {"extra_contact": "linus@example.com"}
 
 
@@ -227,7 +245,7 @@ def test_walker_preserves_refs_base64_data_urls_and_inline_base64() -> None:
 @pytest.mark.parametrize("prefix", ["data:", "DATA:"])
 def test_walker_scans_plaintext_data_urls(prefix: str) -> None:
     assert redact_pii_value(f"{prefix}text/plain,ada@example.com") == (
-        f"{prefix}text/plain,<EMAIL_ADDRESS>"
+        f"{prefix}text/plain,{_EMAIL_A}"
     )
 
 
@@ -236,15 +254,15 @@ def test_walker_scans_plaintext_data_urls(prefix: str) -> None:
     [
         (
             "weave:///not-a-complete-ref ada@example.com",
-            "weave:///not-a-complete-ref <EMAIL_ADDRESS>",
+            f"weave:///not-a-complete-ref {_EMAIL_A}",
         ),
         (
             "weave-trace-internal:///missing-kind ada@example.com",
-            "weave-trace-internal:///missing-kind <EMAIL_ADDRESS>",
+            f"weave-trace-internal:///missing-kind {_EMAIL_A}",
         ),
         (
             "weave-private:///not-canonical ada@example.com",
-            "weave-private:///not-canonical <EMAIL_ADDRESS>",
+            f"weave-private:///not-canonical {_EMAIL_A}",
         ),
     ],
 )
@@ -253,18 +271,28 @@ def test_walker_scans_malformed_ref_prefixes(value: str, expected: str) -> None:
 
 
 @pytest.mark.parametrize(
-    "value",
+    ("value", "expected"),
     [
-        "weave:///entity/project/object/ada@example.com:",
-        "weave-trace-internal:///project/object/ada@example.com:",
-        "weave-private://///object/ada@example.com:",
+        (
+            "weave:///entity/project/object/ada@example.com:",
+            f"weave:{_EMAIL_E}:",
+        ),
+        (
+            "weave-trace-internal:///project/object/ada@example.com:",
+            f"weave-trace-internal:{_EMAIL_P}:",
+        ),
+        (
+            "weave-private://///object/ada@example.com:",
+            f"weave-private:{_EMAIL_O}:",
+        ),
     ],
 )
-def test_walker_scans_refs_with_missing_required_parts(value: str) -> None:
+def test_walker_scans_refs_with_missing_required_parts(
+    value: str, expected: str
+) -> None:
     redacted = redact_pii_value(value)
 
-    assert "ada@example.com" not in redacted
-    assert "<EMAIL_ADDRESS>" in redacted
+    assert redacted == expected
 
 
 @pytest.mark.parametrize(
@@ -272,14 +300,14 @@ def test_walker_scans_refs_with_missing_required_parts(value: str) -> None:
     [
         (
             "data: not a URL; email ada@example.com",
-            "data: not a URL; email <EMAIL_ADDRESS>",
+            f"data: not a URL; email {_EMAIL_A}",
         ),
         (
             "data:image/png;base64,ada@example.comA",
-            "data:image/png;base64,<EMAIL_ADDRESS>",
+            f"data:image/png;base64,{_EMAIL_A}",
         ),
-        ("/4111111111111111/" + "A" * (8192 - 18), "/<CREDIT_CARD>/"),
-        ("/4111111111111111/" + "A" * (8193 - 18), "/<CREDIT_CARD>/"),
+        ("/4111111111111111/" + "A" * (8192 - 18), f"/{_CARD_4}/"),
+        ("/4111111111111111/" + "A" * (8193 - 18), f"/{_CARD_4}/"),
     ],
     ids=[
         "invalid-data-url",
