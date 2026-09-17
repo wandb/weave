@@ -7,6 +7,7 @@ from tests.trace.server_utils import find_server_layer
 from tests.trace.util import NOT_CLICKHOUSE_BACKEND
 from tests.trace_server.conftest import TEST_ENTITY
 from tests.trace_server.conftest_lib.trace_server_external_adapter import b64
+from tests.trace_server.helpers import seed_legacy_residence
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.clickhouse_trace_server_batched import ClickHouseTraceServer
 from weave.trace_server.export_targets import (
@@ -156,6 +157,9 @@ def test_targets_project_isolation_and_visibility(
     # enough to make its AggregateFunction state Parquet-compatible.
     legacy_project = f"{TEST_ENTITY}/export_targets_legacy"
     internal_legacy = b64(legacy_project)
+    seed_call_id = seed_legacy_residence(
+        clickhouse_trace_server.ch_client, internal_legacy
+    )
     legacy_call_id = str(uuid.uuid4())
     started_at = datetime.datetime.now(datetime.timezone.utc)
     trace_server.call_start(
@@ -195,7 +199,7 @@ def test_targets_project_isolation_and_visibility(
         internal_legacy,
         ReadTable.CALLS_MERGED,
     )
-    assert {row["id"] for row in legacy_rows} == {legacy_call_id}
+    assert {row["id"] for row in legacy_rows} == {seed_call_id, legacy_call_id}
     assert {row["project_id"] for row in legacy_rows} == {internal_legacy}
     parquet = clickhouse_trace_server.ch_client.raw_query(
         f"{legacy_query} FORMAT Parquet",

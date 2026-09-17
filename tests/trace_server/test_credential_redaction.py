@@ -23,6 +23,7 @@ from opentelemetry.proto.trace.v1.trace_pb2 import (
 )
 
 from tests.trace_server.conftest_lib.trace_server_external_adapter import b64
+from tests.trace_server.helpers import seed_legacy_residence
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.clickhouse.schema_converters import (
     complete_call_to_ch_insertable,
@@ -359,6 +360,7 @@ def test_call_start_batch_stores_redacted_columns(auto_routed_ch_server) -> None
     internal server directly with a pre-encoded project id.
     """
     internal_project_id = b64(f"{TEST_ENTITY}/batch_{uuid.uuid4().hex[:8]}")
+    seed_legacy_residence(auto_routed_ch_server.ch_client, internal_project_id)
     call_id = str(uuid.uuid4())
 
     auto_routed_ch_server.call_start_batch(
@@ -458,6 +460,7 @@ def _write_via_calls_complete(server: Any, project_id: str, call_id: str) -> Non
     ],
     ids=["call_start", "call_end_then_start", "calls_complete"],
 )
+@pytest.mark.usefixtures("legacy_calls_mode")
 def test_call_read_returns_redacted_client_authored_columns(
     trace_server, write
 ) -> None:

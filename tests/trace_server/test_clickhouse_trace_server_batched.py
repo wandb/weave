@@ -1429,9 +1429,9 @@ def test_call_batch_clears_on_insert_failure():
     mock_ch_client = MagicMock()
     mock_ch_client.command.return_value = None
     mock_ch_client.insert.side_effect = _MockInsertError("Connection refused")
-    # Mock query to return empty project (no data in calls_complete or calls_merged)
+    # Mock residence as MERGED_ONLY so V1 call_start reaches the insert.
     mock_query_result = MagicMock()
-    mock_query_result.result_rows = [(None, None)]
+    mock_query_result.result_rows = [(None, 1)]
     mock_ch_client.query.return_value = mock_query_result
 
     project_id = base64.b64encode(b"test_entity/test_project").decode("utf-8")
@@ -1476,7 +1476,8 @@ def server_with_mock_kafka():
         if "started_at" in query:
             result.result_rows = [(dt.datetime.now(dt.timezone.utc),)]
         else:
-            result.result_rows = [(None, None)]
+            # MERGED_ONLY residence so V1 call_end reaches the insert path.
+            result.result_rows = [(None, 1)]
         return result
 
     mock_ch_client.query.side_effect = _query_side_effect

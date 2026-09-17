@@ -17,6 +17,25 @@ def make_project_id(prefix: str) -> str:
     return base64.b64encode(raw.encode()).decode()
 
 
+def seed_legacy_residence(ch_client: CHClient, project_id: str) -> str:
+    """Insert one calls_merged row so V1 writes to `project_id` keep routing there.
+
+    Returns the seeded call id so callers can exclude it from row assertions.
+    """
+    call_id = str(uuid.uuid4())
+    ch_client.command(
+        "INSERT INTO calls_merged (project_id, id, op_name, started_at, trace_id, parent_id) "
+        "VALUES ({project_id:String}, {id:String}, 'seed', now(), {trace_id:String}, '')",
+        parameters={
+            "project_id": project_id,
+            "id": call_id,
+            "trace_id": str(uuid.uuid4()),
+        },
+    )
+
+    return call_id
+
+
 def force_optimize(ch_client: CHClient, table: str) -> None:
     """OPTIMIZE `table` for test merge-consistency, distributed-mode aware.
 

@@ -55,11 +55,11 @@ def count_queries(ch_client):
         "expect_dual_residency_warning",
     ),
     [
-        # EMPTY: V1 -> MERGED (new projects), V2 -> COMPLETE (new projects)
+        # EMPTY: V1 -> COMPLETE (triggers upgrade error), V2 -> COMPLETE (new projects)
         (
             [],
             ReadTable.CALLS_COMPLETE,
-            WriteTarget.CALLS_MERGED,
+            WriteTarget.CALLS_COMPLETE,
             WriteTarget.CALLS_COMPLETE,
             False,
         ),
@@ -205,35 +205,6 @@ def test_empty_residence_expires_after_ttl(client, trace_server, monkeypatch):
         clock["t"] += pv.EMPTY_RESIDENCE_CACHE_TTL_SECS + 1
         resolver.resolve_read_table(empty_proj, ch_server.ch_client)
         assert get_count() == 2  # re-probed after TTL
-
-
-@pytest.mark.skipif(
-    NOT_CLICKHOUSE_BACKEND, reason="ClickHouse-only: table routing/residence"
-)
-def test_cached_empty_does_not_mask_write(client, trace_server):
-    """A read that cached EMPTY must not hide a subsequent write's data.
-
-    A read caches EMPTY (routing reads to calls_complete); a legacy V1 write then
-    lands in calls_merged. The write resolution evicts the cached EMPTY so the next
-    read re-probes and routes to calls_merged (read-your-writes).
-    """
-    ch_server = trace_server._internal_trace_server
-    resolver = ch_server.table_routing_resolver
-    resolver._mode = CallsStorageServerMode.AUTO
-
-    proj = make_project_id("cached_empty_then_write")
-    assert (
-        resolver.resolve_read_table(proj, ch_server.ch_client)
-        == ReadTable.CALLS_COMPLETE
-    )
-    assert (
-        resolver.resolve_v1_write_target(proj, ch_server.ch_client)
-        == WriteTarget.CALLS_MERGED
-    )
-    insert_call(ch_server.ch_client, "calls_merged", proj)
-    assert (
-        resolver.resolve_read_table(proj, ch_server.ch_client) == ReadTable.CALLS_MERGED
-    )
 
 
 @pytest.mark.skipif(

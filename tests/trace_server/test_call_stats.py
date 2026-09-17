@@ -24,6 +24,9 @@ from weave.trace_server.trace_server_interface import (
     UsageMetricSpec,
 )
 
+# Calls are seeded through V1 endpoints, which only fresh legacy-routed projects accept.
+pytestmark = pytest.mark.usefixtures("legacy_calls_mode")
+
 # Fixed base time used by all tests: 2025-01-15 12:00:00 UTC.
 # Chosen to sit well inside an hour boundary so data never straddles buckets.
 _BASE_TIME = datetime.datetime(2025, 1, 15, 12, 0, 0, tzinfo=datetime.timezone.utc)

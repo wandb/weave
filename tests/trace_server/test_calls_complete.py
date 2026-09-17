@@ -1111,6 +1111,7 @@ def test_call_start_batch_batches_content_object_inserts(
     """
     project_id = f"{TEST_ENTITY}/call_start_batch_batched_objects"
     internal_project_id = b64(project_id)
+    _insert_merged_call(clickhouse_trace_server.ch_client, internal_project_id)
 
     raw_a = b"a" * (AUTO_CONVERSION_MIN_SIZE + 10)
     raw_b = b"b" * (AUTO_CONVERSION_MIN_SIZE + 10)
@@ -1188,6 +1189,7 @@ def test_call_start_batch_content_obj_failure_skips_calls_insert(
     call_parts row is written referencing an object that never landed.
     """
     internal_project_id = b64(f"{TEST_ENTITY}/call_start_batch_obj_failure")
+    _insert_merged_call(clickhouse_trace_server.ch_client, internal_project_id)
 
     raw = b"a" * (AUTO_CONVERSION_MIN_SIZE + 10)
     data_uri = f"data:image/png;base64,{base64.b64encode(raw).decode('ascii')}"
@@ -1234,6 +1236,8 @@ def test_call_start_batch_tolerates_content_object_name_collision(
     """
     seed_project_id = b64(f"{TEST_ENTITY}/call_start_batch_collision_seed")
     internal_project_id = b64(f"{TEST_ENTITY}/call_start_batch_collision")
+    for legacy_project_id in (seed_project_id, internal_project_id):
+        _insert_merged_call(clickhouse_trace_server.ch_client, legacy_project_id)
 
     raw_a = b"a" * (AUTO_CONVERSION_MIN_SIZE + 10)
     raw_b = b"b" * (AUTO_CONVERSION_MIN_SIZE + 10)
@@ -1697,13 +1701,51 @@ def test_call_end_v2_mismatched_started_at_still_finishes(
 def test_call_start_and_end_require_calls_complete_mode(
     trace_server, clickhouse_trace_server
 ):
-    """Test that v1 call_start/call_end write to calls_merged for new projects."""
+    """V1 call_start/call_end on a new project raise the upgrade error and write nothing."""
     project_id = f"{TEST_ENTITY}/calls_complete_v1_start"
     internal_project_id = b64(project_id)
+    with pytest.raises(CallsCompleteModeRequired) as exc_info:
+        trace_server.call_start(
+            tsi.CallStartReq(
+                start=tsi.StartedCallSchemaForInsert(
+                    project_id=project_id,
+                    id=str(uuid.uuid4()),
+                    trace_id=str(uuid.uuid4()),
+                    op_name="test_op",
+                    started_at=datetime.datetime.now(),
+                    attributes={},
+                    inputs={},
+                )
+            )
+        )
+    assert "upgrade your SDK" in str(exc_info.value)
+    with pytest.raises(CallsCompleteModeRequired):
+        trace_server.call_end(
+            tsi.CallEndReq(
+                end=tsi.EndedCallSchemaForInsert(
+                    project_id=project_id,
+                    id=str(uuid.uuid4()),
+                    ended_at=datetime.datetime.now(),
+                    summary={"usage": {}, "status_counts": {}},
+                )
+            )
+        )
+    for table in ("calls_complete", "calls_merged"):
+        assert (
+            _count_project_rows(
+                clickhouse_trace_server.ch_client, table, internal_project_id
+            )
+            == 0
+        )
+
+    # A project that already holds legacy data keeps accepting V1 writes.
+    legacy_project_id = f"{TEST_ENTITY}/calls_complete_v1_legacy"
+    legacy_internal_project_id = b64(legacy_project_id)
+    _insert_merged_call(clickhouse_trace_server.ch_client, legacy_internal_project_id)
     trace_server.call_start(
         tsi.CallStartReq(
             start=tsi.StartedCallSchemaForInsert(
-                project_id=project_id,
+                project_id=legacy_project_id,
                 id=str(uuid.uuid4()),
                 trace_id=str(uuid.uuid4()),
                 op_name="test_op",
@@ -1715,45 +1757,12 @@ def test_call_start_and_end_require_calls_complete_mode(
     )
     assert (
         _count_project_rows(
-            clickhouse_trace_server.ch_client, "calls_complete", internal_project_id
+            clickhouse_trace_server.ch_client,
+            "calls_merged",
+            legacy_internal_project_id,
         )
-        == 0
+        == 2
     )
-    assert (
-        _count_project_rows(
-            clickhouse_trace_server.ch_client, "calls_merged", internal_project_id
-        )
-        == 1
-    )
-    calls = _fetch_calls_stream(trace_server, project_id)
-    assert len(calls) == 1
-
-    end_project_id = f"{TEST_ENTITY}/calls_complete_v1_end"
-    end_internal_project_id = b64(end_project_id)
-    trace_server.call_end(
-        tsi.CallEndReq(
-            end=tsi.EndedCallSchemaForInsert(
-                project_id=end_project_id,
-                id=str(uuid.uuid4()),
-                ended_at=datetime.datetime.now(),
-                summary={"usage": {}, "status_counts": {}},
-            )
-        )
-    )
-    assert (
-        _count_project_rows(
-            clickhouse_trace_server.ch_client, "calls_complete", end_internal_project_id
-        )
-        == 0
-    )
-    assert (
-        _count_project_rows(
-            clickhouse_trace_server.ch_client, "calls_merged", end_internal_project_id
-        )
-        == 1
-    )
-    calls = _fetch_calls_stream(trace_server, end_project_id)
-    assert len(calls) == 0
 
 
 @pytest.mark.parametrize(

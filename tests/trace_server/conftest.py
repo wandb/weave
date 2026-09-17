@@ -29,6 +29,7 @@ from weave.trace_server.clickhouse_trace_server_batched import ClickHouseTraceSe
 from weave.trace_server.in_memory_trace_server import InMemoryTraceServer
 from weave.trace_server.parallel_bucket_uploads import BucketUploadBatch
 from weave.trace_server.project_version import project_version
+from weave.trace_server.project_version.types import CallsStorageServerMode
 from weave.trace_server.secret_fetcher_context import secret_fetcher_context
 
 pytest_plugins = ["tests.trace_server.conftest_lib.clickhouse_server"]
@@ -379,6 +380,21 @@ def trace_server(
     elif backend == "fake":
         return get_fake_trace_server()
     raise ValueError(f"Invalid trace server: {backend}")
+
+
+@pytest.fixture
+def legacy_calls_mode(trace_server):
+    """Route the ClickHouse server FORCE_LEGACY so V1 writes may seed fresh projects."""
+    server = trace_server._internal_trace_server
+    if not isinstance(server, ClickHouseTraceServer):
+        yield
+        return
+
+    resolver = server.table_routing_resolver
+    previous_mode = resolver._mode
+    resolver._mode = CallsStorageServerMode.FORCE_LEGACY
+    yield
+    resolver._mode = previous_mode
 
 
 @pytest.fixture

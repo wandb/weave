@@ -19,6 +19,7 @@ import pytest
 
 from tests.trace.util import NOT_CLICKHOUSE_BACKEND
 from tests.trace_server.conftest_lib.trace_server_external_adapter import b64
+from tests.trace_server.helpers import seed_legacy_residence
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.ch_sentinel_values import EXPIRE_AT_NEVER
 from weave.trace_server.clickhouse_trace_server_batched import ClickHouseTraceServer
@@ -139,6 +140,7 @@ def test_ttl_call_start_end_sets_expire_at(
     Asserts on the two call_parts rows (start and end).
     """
     external_project_id, internal_project_id = _make_project("start_end")
+    seed_legacy_residence(internal_server.ch_client, internal_project_id)
     _set_retention_days(internal_server, internal_project_id, retention_days)
 
     call_id = str(uuid.uuid4())
@@ -193,6 +195,7 @@ def test_ttl_call_start_batch_sets_expire_at(
     server directly with pre-encoded project ids.
     """
     _, internal_project_id = _make_project("batch")
+    seed_legacy_residence(internal_server.ch_client, internal_project_id)
     _set_retention_days(internal_server, internal_project_id, retention_days)
 
     call_id = str(uuid.uuid4())
