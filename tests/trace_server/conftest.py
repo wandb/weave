@@ -226,6 +226,11 @@ def _ch_session_server(
     management_db = f"db_management{db_suffix}"
 
     os.environ["WF_CLICKHOUSE_DATABASE"] = unique_db
+    # The in-process client writes through V1 endpoints, which AUTO now routes
+    # to calls_complete; keep the suite on calls_merged until read parity lands.
+    os.environ.setdefault(
+        "PROJECT_VERSION_MODE", CallsStorageServerMode.FORCE_LEGACY.value
+    )
 
     id_converter = DummyIdConverter()
     ch_server = clickhouse_trace_server_batched.ClickHouseTraceServer(

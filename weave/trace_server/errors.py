@@ -99,8 +99,7 @@ class CallsCompleteModeRequired(InvalidRequest):
         self.project_id = project_id
         self.min_sdk_version = min_sdk_version
         super().__init__(
-            f"The project '{project_id}' requires the more performant 'complete' write mode; "
-            f"legacy call endpoints are only accepted for projects that already hold legacy data. "
+            f"The project '{project_id}' has been created in the more performant 'complete' mode. "
             f"Please upgrade your SDK to at least: {min_sdk_version} to write to this project."
         )
 

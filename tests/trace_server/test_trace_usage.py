@@ -8,9 +8,6 @@ from weave.trace import weave_client
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server import usage_utils
 
-# Calls are seeded through V1 endpoints, which only fresh legacy-routed projects accept.
-pytestmark = pytest.mark.usefixtures("legacy_calls_mode")
-
 _REQUIRED_COST_FIELDS = (
     "prompt_tokens",
     "input_tokens",

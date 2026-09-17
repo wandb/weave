@@ -11,7 +11,6 @@ from weave.trace_server.errors import NotFoundError
 from weave.trace_server.interface import query as tsi_query
 
 
-@pytest.mark.usefixtures("legacy_calls_mode")
 def test_call_update_out_of_order(client: weave_client.WeaveClient):
     # Here, we are going to do an out of order sequence:
     # 1. Name a call
@@ -111,7 +110,6 @@ def test_call_end_v2_requires_existing_start(client: weave_client.WeaveClient) -
 @pytest.mark.skipif(
     NOT_CLICKHOUSE_BACKEND, reason="ClickHouse-only: calls_merged columns"
 )
-@pytest.mark.usefixtures("legacy_calls_mode")
 def test_call_end_started_at_anchors_sortable_datetime(
     client: weave_client.WeaveClient, end_arrives_first: bool
 ) -> None:

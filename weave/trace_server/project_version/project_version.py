@@ -59,9 +59,8 @@ class TableRoutingResolver:
     def _get_residence(
         self, project_id: str, ch_client: CHClient, *, cache_empty: bool = True
     ) -> ProjectDataResidence:
-        # cache_empty=False on write paths: EMPTY must be ground-truth (a stale
-        # EMPTY would misroute a V1 write into calls_merged past an upgrade error),
-        # so skip the read cache and evict any entry instead of populating it.
+        # cache_empty=False on write paths: skip the EMPTY read cache and evict
+        # any entry so a post-write read re-probes instead of serving stale EMPTY.
         with _project_residence_cache_lock:
             cached = _project_residence_cache.get(project_id)
             if cached is None and cache_empty:
@@ -144,8 +143,8 @@ class TableRoutingResolver:
         """Resolve write target for V1 (legacy) API calls.
 
         V1 writes go to MERGED only when the project already holds calls_merged
-        data. For EMPTY, COMPLETE_ONLY, or BOTH, the caller should raise an error
-        to prompt users to upgrade their SDK.
+        data; every other residence writes COMPLETE so new projects never seed
+        the legacy table.
 
         Args:
             project_id: The internal project ID.
@@ -176,8 +175,7 @@ class TableRoutingResolver:
             return WriteTarget.CALLS_MERGED
 
         if self._mode == CallsStorageServerMode.AUTO:
-            # Only a project that already holds calls_merged data keeps accepting V1
-            # writes. New projects return COMPLETE so the caller raises an upgrade error.
+            # Only a project that already holds calls_merged data keeps writing there.
             if residence == ProjectDataResidence.MERGED_ONLY:
                 return WriteTarget.CALLS_MERGED
             return WriteTarget.CALLS_COMPLETE

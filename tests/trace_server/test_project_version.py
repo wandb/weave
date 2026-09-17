@@ -55,7 +55,7 @@ def count_queries(ch_client):
         "expect_dual_residency_warning",
     ),
     [
-        # EMPTY: V1 -> COMPLETE (triggers upgrade error), V2 -> COMPLETE (new projects)
+        # EMPTY: V1 -> COMPLETE (new projects), V2 -> COMPLETE (new projects)
         (
             [],
             ReadTable.CALLS_COMPLETE,

@@ -46,9 +46,6 @@ from weave.trace_server.trace_server_interface import (
 from weave.trace_server.workers.evaluate_model_worker import evaluate_model_worker
 from weave.utils.project_id import from_project_id, to_project_id
 
-# Calls are seeded through V1 endpoints, which only fresh legacy-routed projects accept.
-pytestmark = pytest.mark.usefixtures("legacy_calls_mode")
-
 
 @pytest.mark.asyncio
 async def test_evaluation_status(client):

@@ -18,7 +18,6 @@ from weave.trace_server.calls_query_builder.utils import param_slot
 from weave.trace_server.ch_sentinel_values import EXPIRE_AT_NEVER, SENTINEL_EPOCH
 from weave.trace_server.clickhouse_trace_server_batched import ClickHouseTraceServer
 from weave.trace_server.errors import (
-    CallsCompleteModeRequired,
     NotFoundError,
     RequestTooLarge,
 )
@@ -415,7 +414,7 @@ def test_calls_complete_routing_both_residence_state(
     1. Normal API usage cannot create a BOTH state (routing prevents it)
     2. When BOTH state exists (via direct SQL), reads come from calls_complete
     3. When BOTH state exists, V2 writes go to calls_complete
-    4. When BOTH state exists, V1 writes raise CallsCompleteModeRequired
+    4. When BOTH state exists, V1 writes land in calls_complete
     5. The system handles this gracefully without crashes
     """
     project_id = f"{TEST_ENTITY}/calls_complete_both_residence"
@@ -593,57 +592,60 @@ def test_calls_complete_routing_both_residence_state(
     )
 
     # =========================================================================
-    # PART 6: Verify V1 endpoints raise CallsCompleteModeRequired in BOTH state
+    # PART 6: V1 endpoints write to calls_complete in BOTH state
     # =========================================================================
-    # V1 write target should be COMPLETE (signaling error should be raised)
-    # because BOTH state has calls_complete data
     v1_write_target = resolver.resolve_v1_write_target(
         internal_project_id, clickhouse_trace_server.ch_client
     )
-    assert v1_write_target == WriteTarget.CALLS_COMPLETE, (
-        "V1 write target should be CALLS_COMPLETE for BOTH state to trigger error"
+    assert v1_write_target == WriteTarget.CALLS_COMPLETE
+
+    v1_call_id = str(uuid.uuid4())
+    trace_server.call_start(
+        tsi.CallStartReq(
+            start=tsi.StartedCallSchemaForInsert(
+                project_id=project_id,
+                id=v1_call_id,
+                trace_id=str(uuid.uuid4()),
+                op_name="test_op_v1",
+                started_at=datetime.datetime.now(datetime.timezone.utc),
+                attributes={},
+                inputs={},
+            )
+        )
     )
-
-    # V1 call_start should raise error for projects with calls_complete data
-    with pytest.raises(CallsCompleteModeRequired):
-        trace_server.call_start(
-            tsi.CallStartReq(
-                start=tsi.StartedCallSchemaForInsert(
-                    project_id=project_id,
-                    id=str(uuid.uuid4()),
-                    trace_id=str(uuid.uuid4()),
-                    op_name="test_op_v1",
-                    started_at=datetime.datetime.now(datetime.timezone.utc),
-                    attributes={},
-                    inputs={},
-                )
+    trace_server.call_end(
+        tsi.CallEndReq(
+            end=tsi.EndedCallSchemaForInsert(
+                project_id=project_id,
+                id=v1_call_id,
+                ended_at=datetime.datetime.now(datetime.timezone.utc),
+                output={"result": "v1"},
+                summary={"usage": {}, "status_counts": {}},
             )
         )
-
-    # V1 call_end should also raise error
-    with pytest.raises(CallsCompleteModeRequired):
-        trace_server.call_end(
-            tsi.CallEndReq(
-                end=tsi.EndedCallSchemaForInsert(
-                    project_id=project_id,
-                    id=str(uuid.uuid4()),
-                    ended_at=datetime.datetime.now(datetime.timezone.utc),
-                    summary={"usage": {}, "status_counts": {}},
-                )
-            )
+    )
+    assert (
+        _count_project_rows(
+            clickhouse_trace_server.ch_client, "calls_complete", internal_project_id
         )
+        == 4
+    )
 
     # =========================================================================
     # PART 7: Verify final data shape
     # =========================================================================
     # Verify all calls_complete entries are visible via read API
     calls = _fetch_calls_stream(trace_server, project_id)
-    assert len(calls) == 3, f"Expected 3 calls visible, got {len(calls)}"
+    assert len(calls) == 4, f"Expected 4 calls visible, got {len(calls)}"
 
     visible_ids = {c.id for c in calls}
     assert complete_call_id in visible_ids
     assert new_complete_call_id in visible_ids
     assert v2_start_call_id in visible_ids
+    v1_call = _find_call_by_id(calls, v1_call_id)
+    assert v1_call is not None
+    assert v1_call.output == {"result": "v1"}
+    assert v1_call.ended_at is not None
 
     # Verify the V2 call has correct data shape
     v2_call = _find_call_by_id(calls, v2_start_call_id)
@@ -670,8 +672,8 @@ def test_calls_complete_routing_both_residence_state(
         _count_project_rows(
             clickhouse_trace_server.ch_client, "calls_complete", internal_project_id
         )
-        == 3
-    ), "calls_complete should have 3 rows"
+        == 4
+    ), "calls_complete should have 4 rows"
 
 
 def test_calls_complete_converts_data_uri_inputs_and_outputs(
@@ -1189,7 +1191,6 @@ def test_call_start_batch_content_obj_failure_skips_calls_insert(
     call_parts row is written referencing an object that never landed.
     """
     internal_project_id = b64(f"{TEST_ENTITY}/call_start_batch_obj_failure")
-    _insert_merged_call(clickhouse_trace_server.ch_client, internal_project_id)
 
     raw = b"a" * (AUTO_CONVERSION_MIN_SIZE + 10)
     data_uri = f"data:image/png;base64,{base64.b64encode(raw).decode('ascii')}"
@@ -1698,71 +1699,83 @@ def test_call_end_v2_mismatched_started_at_still_finishes(
         )
 
 
-def test_call_start_and_end_require_calls_complete_mode(
-    trace_server, clickhouse_trace_server
-):
-    """V1 call_start/call_end on a new project raise the upgrade error and write nothing."""
-    project_id = f"{TEST_ENTITY}/calls_complete_v1_start"
+def test_v1_writes_land_in_calls_complete(trace_server, clickhouse_trace_server):
+    """V1 start/end/batch on a new project write calls_complete, never calls_merged."""
+    project_id = f"{TEST_ENTITY}/calls_complete_v1_writes"
     internal_project_id = b64(project_id)
-    with pytest.raises(CallsCompleteModeRequired) as exc_info:
-        trace_server.call_start(
-            tsi.CallStartReq(
-                start=tsi.StartedCallSchemaForInsert(
-                    project_id=project_id,
-                    id=str(uuid.uuid4()),
-                    trace_id=str(uuid.uuid4()),
-                    op_name="test_op",
-                    started_at=datetime.datetime.now(),
-                    attributes={},
-                    inputs={},
-                )
+    started_at = datetime.datetime.now(datetime.timezone.utc)
+    ended_at = started_at + datetime.timedelta(seconds=1)
+
+    def start_req(call_id: str) -> tsi.CallStartReq:
+        return tsi.CallStartReq(
+            start=tsi.StartedCallSchemaForInsert(
+                project_id=project_id,
+                id=call_id,
+                trace_id=call_id,
+                op_name="test_op",
+                started_at=started_at,
+                attributes={},
+                inputs={"n": 1},
             )
-        )
-    assert "upgrade your SDK" in str(exc_info.value)
-    with pytest.raises(CallsCompleteModeRequired):
-        trace_server.call_end(
-            tsi.CallEndReq(
-                end=tsi.EndedCallSchemaForInsert(
-                    project_id=project_id,
-                    id=str(uuid.uuid4()),
-                    ended_at=datetime.datetime.now(),
-                    summary={"usage": {}, "status_counts": {}},
-                )
-            )
-        )
-    for table in ("calls_complete", "calls_merged"):
-        assert (
-            _count_project_rows(
-                clickhouse_trace_server.ch_client, table, internal_project_id
-            )
-            == 0
         )
 
-    # A project that already holds legacy data keeps accepting V1 writes.
-    legacy_project_id = f"{TEST_ENTITY}/calls_complete_v1_legacy"
-    legacy_internal_project_id = b64(legacy_project_id)
-    _insert_merged_call(clickhouse_trace_server.ch_client, legacy_internal_project_id)
-    trace_server.call_start(
-        tsi.CallStartReq(
-            start=tsi.StartedCallSchemaForInsert(
-                project_id=legacy_project_id,
-                id=str(uuid.uuid4()),
-                trace_id=str(uuid.uuid4()),
-                op_name="test_op",
-                started_at=datetime.datetime.now(),
-                attributes={},
-                inputs={},
+    def end_req(call_id: str) -> tsi.CallEndReq:
+        return tsi.CallEndReq(
+            end=tsi.EndedCallSchemaForInsert(
+                project_id=project_id,
+                id=call_id,
+                ended_at=ended_at,
+                output={"result": call_id},
+                summary={"usage": {}, "status_counts": {}},
             )
         )
+
+    # Standalone start then end: an unfinished row that the end patches.
+    single_id = str(uuid.uuid4())
+    trace_server.call_start(start_req(single_id))
+    assert _fetch_calls_stream(trace_server, project_id)[0].ended_at is None
+    trace_server.call_end(end_req(single_id))
+
+    # A batch carrying both halves of one call writes a single finished row;
+    # the lone start in the same batch stays unfinished.
+    paired_id = str(uuid.uuid4())
+    lone_id = str(uuid.uuid4())
+    batch_res = trace_server.call_start_batch(
+        tsi.CallCreateBatchReq(
+            batch=[
+                tsi.CallBatchStartMode(req=start_req(paired_id)),
+                tsi.CallBatchStartMode(req=start_req(lone_id)),
+                tsi.CallBatchEndMode(req=end_req(paired_id)),
+            ]
+        )
+    )
+    assert [type(r) for r in batch_res.res] == [
+        tsi.CallStartRes,
+        tsi.CallStartRes,
+        tsi.CallEndRes,
+    ]
+
+    # An end for a call that was never started has no row to patch and is dropped.
+    trace_server.call_end(end_req(str(uuid.uuid4())))
+
+    assert (
+        _count_project_rows(
+            clickhouse_trace_server.ch_client, "calls_merged", internal_project_id
+        )
+        == 0
     )
     assert (
         _count_project_rows(
-            clickhouse_trace_server.ch_client,
-            "calls_merged",
-            legacy_internal_project_id,
+            clickhouse_trace_server.ch_client, "calls_complete", internal_project_id
         )
-        == 2
+        == 3
     )
+    calls = {c.id: c for c in _fetch_calls_stream(trace_server, project_id)}
+    assert set(calls) == {single_id, paired_id, lone_id}
+    assert calls[single_id].output == {"result": single_id}
+    assert calls[paired_id].output == {"result": paired_id}
+    assert calls[paired_id].ended_at is not None
+    assert calls[lone_id].ended_at is None
 
 
 @pytest.mark.parametrize(
@@ -1819,85 +1832,6 @@ def test_calls_query_routing_by_residence(
     )
     calls = _fetch_calls_stream(trace_server, project_id)
     assert len(calls) == expected_count
-
-
-def test_v1_call_start_raises_calls_complete_mode_required(
-    trace_server, clickhouse_trace_server
-):
-    """Verify v1 call_start raises CallsCompleteModeRequired for calls_complete projects.
-
-    When a project is in calls_complete mode (has existing data in calls_complete),
-    attempting to use the legacy v1 call_start API should raise an error directing
-    the user to upgrade their SDK.
-    """
-    project_id = f"{TEST_ENTITY}/calls_complete_v1_error_start"
-
-    # Seed the project with calls_complete data to establish it as a calls_complete project
-    seed_call = _make_completed_call(
-        project_id,
-        str(uuid.uuid4()),
-        str(uuid.uuid4()),
-        datetime.datetime.now(datetime.timezone.utc),
-        datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(seconds=1),
-    )
-    trace_server.calls_complete(tsi.CallsUpsertCompleteReq(batch=[seed_call]))
-
-    # Now attempt v1 call_start - should raise CallsCompleteModeRequired
-    with pytest.raises(CallsCompleteModeRequired) as exc_info:
-        trace_server.call_start(
-            tsi.CallStartReq(
-                start=tsi.StartedCallSchemaForInsert(
-                    project_id=project_id,
-                    id=str(uuid.uuid4()),
-                    trace_id=str(uuid.uuid4()),
-                    op_name="test_op",
-                    started_at=datetime.datetime.now(datetime.timezone.utc),
-                    attributes={},
-                    inputs={},
-                )
-            )
-        )
-
-    # Verify error contains helpful information
-    assert "complete" in str(exc_info.value).lower()
-
-
-def test_v1_call_end_raises_calls_complete_mode_required(
-    trace_server, clickhouse_trace_server
-):
-    """Verify v1 call_end raises CallsCompleteModeRequired for calls_complete projects.
-
-    When a project is in calls_complete mode (has existing data in calls_complete),
-    attempting to use the legacy v1 call_end API should raise an error directing
-    the user to upgrade their SDK.
-    """
-    project_id = f"{TEST_ENTITY}/calls_complete_v1_error_end"
-
-    # Seed the project with calls_complete data to establish it as a calls_complete project
-    seed_call = _make_completed_call(
-        project_id,
-        str(uuid.uuid4()),
-        str(uuid.uuid4()),
-        datetime.datetime.now(datetime.timezone.utc),
-        datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(seconds=1),
-    )
-    trace_server.calls_complete(tsi.CallsUpsertCompleteReq(batch=[seed_call]))
-
-    # Now attempt v1 call_end - should raise CallsCompleteModeRequired
-    with pytest.raises(CallsCompleteModeRequired) as exc_info:
-        trace_server.call_end(
-            tsi.CallEndReq(
-                end=tsi.EndedCallSchemaForInsert(
-                    project_id=project_id,
-                    id=str(uuid.uuid4()),
-                    ended_at=datetime.datetime.now(datetime.timezone.utc),
-                    summary={"usage": {}, "status_counts": {}},
-                )
-            )
-        )
-
-    # Verify error contains helpful information
-    assert "complete" in str(exc_info.value).lower()
 
 
 def test_calls_complete_query_with_status_filter(trace_server, clickhouse_trace_server):

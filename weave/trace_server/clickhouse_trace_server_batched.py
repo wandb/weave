@@ -187,7 +187,6 @@ from weave.trace_server.datadog import (
 from weave.trace_server.dataset_sources import DatasetSourcesHandler
 from weave.trace_server.digest_validation import validate_expected_digest
 from weave.trace_server.errors import (
-    CallsCompleteModeRequired,
     InsertTooLarge,
     InvalidRequest,
     MissingLLMApiKeyError,
@@ -1083,18 +1082,100 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
             raw_by_ref = self._resolve_pending_content_objs(pending_objs)
 
-            res = []
             for item in req.batch:
                 if raw_by_ref:
                     restore_raw_content_values(item.req, raw_by_ref)
-                if item.mode == "start":
-                    res.append(self._call_start_processed(item.req))
-                elif item.mode == "end":
-                    res.append(self._call_end_processed(item.req))
-                else:
-                    raise ValueError("Invalid mode")
+
+            res = self._write_v1_batch(req.batch)
         pending_objs.publish_refs()
         return tsi.CallCreateBatchRes(res=res)
+
+    def _write_v1_batch(
+        self, batch: list[tsi.CallBatchStartMode | tsi.CallBatchEndMode]
+    ) -> list[tsi.CallStartRes | tsi.CallEndRes]:
+        """Write V1 batch items, folding a start and its end into one complete row.
+
+        A start whose end lands in the same batch and routes to calls_complete
+        is written once as a finished row, skipping the end-time UPDATE.
+        """
+        end_index_by_start: dict[int, int] = {}
+        start_index_by_key: dict[tuple[str, str], int] = {}
+        for index, item in enumerate(batch):
+            if isinstance(item, tsi.CallBatchStartMode):
+                start = item.req.start
+                if start.id is None:
+                    continue
+                if self._v1_writes_calls_complete(start.project_id):
+                    start_index_by_key[start.project_id, start.id] = index
+            elif isinstance(item, tsi.CallBatchEndMode):
+                key = (item.req.end.project_id, item.req.end.id)
+                start_index = start_index_by_key.pop(key, None)
+                if start_index is not None:
+                    end_index_by_start[start_index] = index
+            else:
+                raise TypeError("Invalid mode")
+
+        paired_end_indexes = set(end_index_by_start.values())
+        res: list[tsi.CallStartRes | tsi.CallEndRes] = []
+        for index, item in enumerate(batch):
+            if isinstance(item, tsi.CallBatchStartMode) and index in end_index_by_start:
+                end_item = batch[end_index_by_start[index]]
+                assert isinstance(end_item, tsi.CallBatchEndMode)
+                res.append(self._write_paired_v1_call(item.req.start, end_item.req.end))
+            elif isinstance(item, tsi.CallBatchStartMode):
+                res.append(self._call_start_processed(item.req))
+            elif index in paired_end_indexes:
+                res.append(tsi.CallEndRes())
+            else:
+                res.append(self._call_end_processed(item.req))
+
+        return res
+
+    def _write_paired_v1_call(
+        self,
+        start: tsi.StartedCallSchemaForInsert,
+        end: tsi.EndedCallSchemaForInsert,
+    ) -> tsi.CallStartRes:
+        """Insert a V1 start and end that arrived together as one calls_complete row."""
+        retention_days = get_project_retention_days(start.project_id, self.ch_client)
+        ch_call = start_end_calls_to_ch_complete_insertable(start, end, retention_days)
+        self._insert_call_complete(ch_call)
+        maybe_enqueue_minimal_call_end(
+            self.kafka_producer,
+            start.project_id,
+            ch_call.id,
+            end.ended_at,
+            self._flush_immediately,
+        )
+
+        return tsi.CallStartRes(id=ch_call.id, trace_id=ch_call.trace_id)
+
+    def _end_v1_call_in_calls_complete(
+        self, end_call: tsi.EndedCallSchemaForInsert
+    ) -> None:
+        """Patch a V1 end onto its calls_complete start row.
+
+        An end with no start row is dropped with a warning rather than failing
+        the batch it arrived in; calls_merged never surfaced such ends either.
+        """
+        try:
+            self._update_call_end_in_calls_complete(end_call)
+        except NotFoundError:
+            logger.warning(
+                "Dropping V1 call_end with no start row: project=%s call=%s",
+                end_call.project_id,
+                end_call.id,
+            )
+            set_current_span_dd_tags(
+                {"weave_trace_server.v1_end_without_start": "true"}
+            )
+
+    def _v1_writes_calls_complete(self, project_id: str) -> bool:
+        write_target = self.table_routing_resolver.resolve_v1_write_target(
+            project_id, self.ch_client
+        )
+
+        return write_target == WriteTarget.CALLS_COMPLETE
 
     @tag_db_insert_path("call_start")
     def call_start(self, req: tsi.CallStartReq) -> tsi.CallStartRes:
@@ -1113,17 +1194,12 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         )
         ch_call = start_call_for_insert_to_ch_insertable(req.start, retention_days)
 
-        # Check write target - v1 call_start cannot write to calls_complete
-        write_target = self.table_routing_resolver.resolve_v1_write_target(
-            ch_call.project_id,
-            self.ch_client,
-        )
-        if write_target == WriteTarget.CALLS_COMPLETE:
-            raise CallsCompleteModeRequired(ch_call.project_id)
-
-        # Inserts the call into the clickhouse database, verifying that
-        # the call does not already exist
-        self._insert_call(ch_call)
+        # A calls_complete project takes the start as an unfinished row; the end
+        # later patches it in, the same as call_start_v2.
+        if self._v1_writes_calls_complete(ch_call.project_id):
+            self._insert_call_complete(start_call_insertable_to_complete_start(ch_call))
+        else:
+            self._insert_call(ch_call)
 
         # Returns the id of the newly created call
         return tsi.CallStartRes(
@@ -1146,23 +1222,14 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         publish: bool = True,
     ) -> tsi.CallEndRes:
         """Insert an end whose content was already offloaded (batch or inline)."""
-        # Converts the user-provided call details into a clickhouse schema.
-        # This does validation and conversion of the input data as well
-        # as enforcing business rules and defaults
-        retention_days = get_project_retention_days(req.end.project_id, self.ch_client)
-        ch_call = end_call_for_insert_to_ch_insertable(req.end, retention_days)
-
-        # Check write target - v1 call_end cannot write to calls_complete
-        write_target = self.table_routing_resolver.resolve_v1_write_target(
-            ch_call.project_id,
-            self.ch_client,
-        )
-        if write_target == WriteTarget.CALLS_COMPLETE:
-            raise CallsCompleteModeRequired(ch_call.project_id)
-
-        # Inserts the call into the clickhouse database, verifying that
-        # the call does not already exist
-        self._insert_call(ch_call)
+        if self._v1_writes_calls_complete(req.end.project_id):
+            self._end_v1_call_in_calls_complete(req.end)
+        else:
+            retention_days = get_project_retention_days(
+                req.end.project_id, self.ch_client
+            )
+            ch_call = end_call_for_insert_to_ch_insertable(req.end, retention_days)
+            self._insert_call(ch_call)
 
         if publish:
             maybe_enqueue_minimal_call_end(

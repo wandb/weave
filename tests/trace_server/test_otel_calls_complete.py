@@ -37,7 +37,6 @@ from weave.shared import refs_internal as ri
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.calls_query_builder.utils import param_slot
 from weave.trace_server.clickhouse_trace_server_batched import ClickHouseTraceServer
-from weave.trace_server.errors import CallsCompleteModeRequired
 from weave.trace_server.orm import ParamBuilder
 from weave.trace_server.project_version.types import CallsStorageServerMode
 
@@ -244,7 +243,7 @@ def test_otel_export_establishes_residence_for_subsequent_calls(
     """OTel export to empty project establishes calls_complete residence.
 
     After OTel writes to calls_complete, subsequent V2 API calls should also
-    go to calls_complete, and V1 API should raise CallsCompleteModeRequired.
+    go to calls_complete, and so should V1 API calls.
     """
     project_id = f"{TEST_ENTITY}/otel_establishes_residence"
     internal_project_id = b64(project_id)
@@ -282,21 +281,24 @@ def test_otel_export_establishes_residence_for_subsequent_calls(
     )
     assert complete_after_v2 == 2, "V2 call should go to calls_complete"
 
-    # V1 API should raise error since project is now calls_complete mode
-    with pytest.raises(CallsCompleteModeRequired):
-        trace_server.call_start(
-            tsi.CallStartReq(
-                start=tsi.StartedCallSchemaForInsert(
-                    project_id=project_id,
-                    id=str(uuid.uuid4()),
-                    trace_id=str(uuid.uuid4()),
-                    op_name="v1_op",
-                    started_at=datetime.datetime.now(datetime.timezone.utc),
-                    attributes={},
-                    inputs={},
-                )
+    # V1 API writes also go to calls_complete now that residence is established
+    trace_server.call_start(
+        tsi.CallStartReq(
+            start=tsi.StartedCallSchemaForInsert(
+                project_id=project_id,
+                id=str(uuid.uuid4()),
+                trace_id=str(uuid.uuid4()),
+                op_name="v1_op",
+                started_at=datetime.datetime.now(datetime.timezone.utc),
+                attributes={},
+                inputs={},
             )
         )
+    )
+    complete_after_v1 = _count_project_rows(
+        clickhouse_trace_server.ch_client, "calls_complete", internal_project_id
+    )
+    assert complete_after_v1 == 3, "V1 call should go to calls_complete"
 
 
 def test_otel_export_multiple_spans_batch(trace_server, clickhouse_trace_server):
@@ -469,52 +471,6 @@ def test_otel_export_reuses_existing_real_op(trace_server, clickhouse_trace_serv
     ).objs
     assert len(objs) == 1
     assert objs[0].digest == real_op.digest
-
-
-def test_v1_api_raises_error_for_otel_established_project(
-    trace_server, clickhouse_trace_server
-):
-    """V1 call_start and call_end raise CallsCompleteModeRequired for OTel projects.
-
-    When OTel has established a project as calls_complete mode, legacy V1 APIs
-    should fail with a clear error message directing users to upgrade.
-    """
-    project_id = f"{TEST_ENTITY}/otel_v1_error"
-
-    # OTel establishes project in calls_complete mode
-    req = _create_otel_export_req(project_id)
-    trace_server.otel_export(req)
-
-    # This will only fail if OTel wrote to calls_complete (not calls_merged)
-    # V1 call_start should raise
-    with pytest.raises(CallsCompleteModeRequired) as exc_info:
-        trace_server.call_start(
-            tsi.CallStartReq(
-                start=tsi.StartedCallSchemaForInsert(
-                    project_id=project_id,
-                    id=str(uuid.uuid4()),
-                    trace_id=str(uuid.uuid4()),
-                    op_name="v1_op",
-                    started_at=datetime.datetime.now(datetime.timezone.utc),
-                    attributes={},
-                    inputs={},
-                )
-            )
-        )
-    assert "complete" in str(exc_info.value).lower()
-
-    # V1 call_end should also raise
-    with pytest.raises(CallsCompleteModeRequired):
-        trace_server.call_end(
-            tsi.CallEndReq(
-                end=tsi.EndedCallSchemaForInsert(
-                    project_id=project_id,
-                    id=str(uuid.uuid4()),
-                    ended_at=datetime.datetime.now(datetime.timezone.utc),
-                    summary={"usage": {}, "status_counts": {}},
-                )
-            )
-        )
 
 
 def test_otel_export_null_sentinel_fields_to_calls_complete(
