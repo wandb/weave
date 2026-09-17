@@ -477,7 +477,6 @@ def test_v2_method_reaches_its_flat_route(
                     agent_types.AgentInsightFilter(
                         field="intent_topic_id",
                         values=["01994634-c680-7dc3-a40b-0383b5008d70"],
-                        cluster_run_id="01994634-c680-7dc3-a40b-0383b5008d71",
                     ),
                 ],
             ),
@@ -1340,7 +1339,11 @@ def test_create_sends_every_supported_field(
                     agent_types.AgentInsightFilter(
                         field="failure_severity",
                         values=["major"],
-                    )
+                    ),
+                    agent_types.AgentInsightFilter(
+                        field="intent_topic_id",
+                        values=["01994634-c680-7dc3-a40b-0383b5008d70"],
+                    ),
                 ],
             ),
             {
@@ -1351,7 +1354,7 @@ def test_create_sends_every_supported_field(
                             {"$getField": "attributes.model"},
                             {"$literal": "gpt-4o"},
                         ]
-                    }
+                    },
                 },
                 "custom_attr_columns": [],
                 "group_by": [
@@ -1372,11 +1375,10 @@ def test_create_sends_every_supported_field(
                         "values": ["major"],
                     },
                     {
-                        "cluster_run_id": "01994634-c680-7dc3-a40b-0383b5008d71",
                         "exclude": False,
                         "field": "intent_topic_id",
                         "values": ["01994634-c680-7dc3-a40b-0383b5008d70"],
-                    }
+                    },
                 ],
                 "limit": 100,
                 "measures": [],
@@ -1488,7 +1490,6 @@ def test_agent_spans_stats_sends_insight_filters() -> None:
             agent_types.AgentInsightFilter(
                 field="intent_topic_id",
                 values=["01994634-c680-7dc3-a40b-0383b5008d70"],
-                cluster_run_id="01994634-c680-7dc3-a40b-0383b5008d71",
             ),
         ],
     )
@@ -1503,11 +1504,10 @@ def test_agent_spans_stats_sends_insight_filters() -> None:
             "values": ["major"],
         },
         {
-            "cluster_run_id": "01994634-c680-7dc3-a40b-0383b5008d71",
             "exclude": False,
             "field": "intent_topic_id",
             "values": ["01994634-c680-7dc3-a40b-0383b5008d70"],
-        }
+        },
     ]
 
 

@@ -1375,7 +1375,7 @@ class TestMakeGroupedSpansListQuery:
                 insight_filters=[
                     AgentInsightFilter(
                         field="failure_severity",
-                        values=["major", "unknown"],
+                        values=["major", "minor"],
                     )
                 ],
             ),
@@ -1404,7 +1404,7 @@ class TestMakeGroupedSpansListQuery:
             "genai_1": 100,
             "genai_2": 0,
             "genai_3": "p1",
-            "genai_4": ["major", "unknown"],
+            "genai_4": ["major", "minor"],
             **src.params,
         }
         assert_sql(expected, expected_params, query, pb.get_params())
@@ -2378,7 +2378,6 @@ def test_insight_filter_validation() -> None:
         AgentInsightFilter(
             field="intent_topic_id",
             values=[str(index) for index in range(1001)],
-            cluster_run_id="01994634-c680-7dc3-a40b-0383b5008d70",
         )
     with pytest.raises(ValidationError, match="Extra inputs are not permitted"):
         AgentInsightFilter(
@@ -2386,7 +2385,7 @@ def test_insight_filter_validation() -> None:
             values=["major"],
             signature_type="failure",
         )
-    for severity in ("unknown", "info", "minor", "major"):
+    for severity in ("info", "major", "minor"):
         insight_filter = AgentInsightFilter(
             field="failure_severity",
             values=[severity],
@@ -2395,32 +2394,40 @@ def test_insight_filter_validation() -> None:
     with pytest.raises(
         ValidationError,
         match=(
-            "failure_severity values must be one of: unknown, info, minor, major; "
-            "got: critical"
+            "failure_severity values must be one of: info, major, minor; got: unknown"
         ),
     ):
         AgentInsightFilter(
             field="failure_severity",
-            values=["critical"],
+            values=["unknown"],
         )
-    with pytest.raises(ValidationError, match="topic filters require cluster_run_id"):
-        AgentInsightFilter(
-            field="intent_topic_id",
-            values=["01994634-c680-7dc3-a40b-0383b5008d70"],
+    for sentiment in (
+        "frustrated",
+        "dissatisfied",
+        "neutral",
+        "satisfied",
+        "delighted",
+    ):
+        insight_filter = AgentInsightFilter(
+            field="intent_sentiment",
+            values=[sentiment],
         )
+        assert insight_filter.values == [sentiment]
     with pytest.raises(
-        ValidationError, match="cluster_run_id is only valid for topic filters"
+        ValidationError,
+        match=(
+            "intent_sentiment values must be one of: frustrated, dissatisfied, "
+            "neutral, satisfied, delighted; got: positive"
+        ),
     ):
         AgentInsightFilter(
-            field="intent_category",
-            values=["information_request"],
-            cluster_run_id="01994634-c680-7dc3-a40b-0383b5008d70",
+            field="intent_sentiment",
+            values=["positive"],
         )
     with pytest.raises(ValidationError, match="invalid topic ID: not-a-uuid"):
         AgentInsightFilter(
             field="intent_topic_id",
             values=["not-a-uuid"],
-            cluster_run_id="01994634-c680-7dc3-a40b-0383b5008d70",
         )
     with pytest.raises(ValidationError, match="insight_filters require group_by"):
         AgentSpansQueryReq(
@@ -2446,7 +2453,6 @@ def test_build_topic_insight_filter_clause() -> None:
                 field="failure_topic_id",
                 values=["01994634-c680-7dc3-a40b-0383b5008d70"],
                 exclude=True,
-                cluster_run_id="01994634-c680-7dc3-a40b-0383b5008d71",
             )
         ],
         start,
@@ -2461,12 +2467,15 @@ def test_build_topic_insight_filter_clause() -> None:
             AND trace_started_at >= {insight_2:DateTime64(6)}
             AND trace_started_at < {insight_3:DateTime64(6)}
             AND signature_type = 'failure'
-            AND cluster_run_id = {insight_4:UUID}
-            AND cluster_id IN (
-              SELECT id FROM signature_clusters
+            AND (cluster_run_id, cluster_id) IN (
+              SELECT cluster_run_id, id FROM signature_clusters
               WHERE project_id = {insight_0:String}
-                AND cluster_run_id = {insight_4:UUID}
                 AND signature_type = 'failure'
+                AND cluster_run_id IN (
+                  SELECT id FROM signature_cluster_runs
+                  WHERE project_id = {insight_0:String}
+                    AND signature_type = 'failure'
+                    AND status = 'succeeded')
                 AND toString(topic_id) IN {insight_1:Array(String)})
           GROUP BY conversation_id
         )
@@ -2478,7 +2487,6 @@ def test_build_topic_insight_filter_clause() -> None:
             "insight_1": ["01994634-c680-7dc3-a40b-0383b5008d70"],
             "insight_2": start,
             "insight_3": end,
-            "insight_4": "01994634-c680-7dc3-a40b-0383b5008d71",
         },
         clause or "",
         pb.get_params(),

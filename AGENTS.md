@@ -149,12 +149,14 @@ intent/failure category, intent sentiment, failure severity, and intent/failure
 topic IDs. Values within one filter are ORed, separate filters are ANDed, and
 `exclude` negates that filter's conversation-membership predicate. Span queries
 require grouping when insight filters are present; both query and stats paths
-apply their span time window to matching Insights rows. Topic filters require the
-`cluster_run_id` displayed by the client and resolve stable topic IDs to that
-run's concrete clusters; they match nothing when the run has no such topics.
-Failure-severity filters accept the
-canonical API values `unknown`, `info`, `minor`, and `major`; `unknown` matches
-the empty value stored when the judge produced no usable severity.
+apply their span time window to matching Insights rows. Topic filters accept only
+stable topic IDs; clustering run IDs are an internal storage detail and must not
+cross the API boundary. The server resolves a topic to concrete clusters across
+successful runs, and a topic matches nothing when no successful run contains it.
+Failure-severity filters accept exactly `info`, `major`, and `minor`.
+User-sentiment filters accept exactly `frustrated`, `dissatisfied`, `neutral`,
+`satisfied`, and `delighted`; keep frontend options and API validation aligned
+to that ordered taxonomy.
 Each clustering run mints new `signature_clusters.id` values; `topic_id`, not
 `cluster_id`, is the identity reconciled across runs. An assignment is therefore
 identified by its run and cluster, even though a non-noise UUID cluster ID is
@@ -207,6 +209,9 @@ If `sdks/node/node_modules` is missing, run `pnpm install --frozen-lockfile` in 
 - Set `CallsQueryReq.latest_only=True` when correctness requires filtering the
   current logical version. It enables ClickHouse `FINAL` for that request, so
   use it for bounded correctness-sensitive reads rather than broad list scans.
+- Trace-server ClickHouse client initialization first runs `EXISTS DATABASE`
+  and only creates a missing database. This preserves local auto-setup while
+  allowing production read-only credentials to query an existing database.
 
 ### Assert on the complete payload (no substring / membership checks)
 

@@ -4085,7 +4085,7 @@ def test_filter_conversations_by_insights(ch_server):
             for span, category, severity in zip(
                 spans[:2],
                 ("wrong_output", "tool_failure"),
-                ("major", ""),
+                ("major", "minor"),
                 strict=True,
             )
         ],
@@ -4256,29 +4256,20 @@ def test_filter_conversations_by_insights(ch_server):
     assert filtered_ids(
         AgentInsightFilter(
             field="failure_severity",
-            values=["unknown"],
+            values=["minor"],
         )
     ) == [spans[1].conversation_id]
     assert filtered_ids(
         AgentInsightFilter(
             field="intent_topic_id",
             values=[str(topic_id)],
-            cluster_run_id=latest_run_id,
         )
-    ) == [spans[0].conversation_id]
-    assert filtered_ids(
-        AgentInsightFilter(
-            field="intent_topic_id",
-            values=[str(topic_id)],
-            cluster_run_id=old_run_id,
-        )
-    ) == [spans[1].conversation_id]
+    ) == sorted([spans[0].conversation_id, spans[1].conversation_id])
     assert (
         filtered_ids(
             AgentInsightFilter(
                 field="failure_topic_id",
                 values=[str(uuid.uuid4())],
-                cluster_run_id=uuid.uuid4(),
             )
         )
         == []
@@ -4296,7 +4287,7 @@ def test_filter_conversations_by_insights(ch_server):
         filtered_stats_count(
             AgentInsightFilter(
                 field="failure_severity",
-                values=["unknown"],
+                values=["minor"],
             )
         )
         == 1
@@ -4306,10 +4297,9 @@ def test_filter_conversations_by_insights(ch_server):
             AgentInsightFilter(
                 field="intent_topic_id",
                 values=[str(topic_id)],
-                cluster_run_id=latest_run_id,
             )
         )
-        == 1
+        == 2
     )
     assert (
         filtered_stats_count(

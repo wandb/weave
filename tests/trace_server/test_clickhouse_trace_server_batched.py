@@ -7,6 +7,7 @@ import uuid
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone
 from unittest.mock import MagicMock, Mock, patch
+from unittest.mock import call as mock_call
 
 import clickhouse_connect
 import pytest
@@ -2327,6 +2328,33 @@ def test_mint_client_forwards_send_receive_timeout():
             kwargs["send_receive_timeout"]
             == ch_settings.MIGRATION_CLIENT_SEND_RECEIVE_TIMEOUT_SEC
         )
+
+
+def test_ensure_database_skips_create_when_database_exists():
+    server = chts.ClickHouseTraceServer(host="test_host", database="test_database")
+    client = MagicMock()
+    client.command.return_value = 1
+
+    server._ensure_database(client)
+
+    assert client.command.call_args_list == [
+        mock_call("EXISTS DATABASE test_database"),
+    ]
+    assert server._database_ensured is True
+
+
+def test_ensure_database_creates_missing_database():
+    server = chts.ClickHouseTraceServer(host="test_host", database="test_database")
+    client = MagicMock()
+    client.command.side_effect = [0, None]
+
+    server._ensure_database(client)
+
+    assert client.command.call_args_list == [
+        mock_call("EXISTS DATABASE test_database"),
+        mock_call("CREATE DATABASE IF NOT EXISTS test_database"),
+    ]
+    assert server._database_ensured is True
 
 
 def test_mint_client_omits_send_receive_timeout_by_default():

@@ -17,8 +17,8 @@ def build_insight_filter_clause(
 ) -> str | None:
     """Match conversations carrying every requested Insights filter.
 
-    The request's span window also bounds matching Insights turns. Topic IDs are
-    resolved to concrete clusters in the explicitly requested clustering run.
+    The request's span window also bounds matching Insights turns. Stable topic
+    IDs are resolved to concrete clusters across successful clustering runs.
     """
     if not insight_filters:
         return None
@@ -59,15 +59,17 @@ def _single_insight_filter_clause(
         signature_type = (
             "intent" if insight_filter.field == "intent_topic_id" else "failure"
         )
-        run_slot = pb.add(str(insight_filter.cluster_run_id), param_type="UUID")
         conditions.extend(
             [
                 f"signature_type = '{signature_type}'",
-                f"cluster_run_id = {run_slot}",
-                "cluster_id IN (SELECT id FROM signature_clusters "
+                "(cluster_run_id, cluster_id) IN ("
+                "SELECT cluster_run_id, id FROM signature_clusters "
                 f"WHERE project_id = {pid_slot} "
-                f"AND cluster_run_id = {run_slot} "
                 f"AND signature_type = '{signature_type}' "
+                "AND cluster_run_id IN (SELECT id FROM signature_cluster_runs "
+                f"WHERE project_id = {pid_slot} "
+                f"AND signature_type = '{signature_type}' "
+                "AND status = 'succeeded') "
                 f"AND toString(topic_id) IN {values_slot})",
             ]
         )
