@@ -7,6 +7,9 @@ ALTER TABLE signature_cluster_runs
         DEFAULT 'pending';
 
 ALTER TABLE signature_clusters
+    DROP COLUMN IF EXISTS admission_floor;
+
+ALTER TABLE signature_clusters
     DROP COLUMN IF EXISTS title;
 
 ALTER TABLE intent_signatures

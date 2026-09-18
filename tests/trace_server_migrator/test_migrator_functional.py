@@ -1059,6 +1059,7 @@ def test_signature_cluster_tables_schema_and_retry(ch_client):
                 ("category", "LowCardinality(String)"),
                 ("centroid", "Array(Float32)"),
                 ("title", "String"),
+                ("admission_floor", "Float32"),
                 ("label", "String"),
                 ("description", "String"),
                 ("occurrence_count", "UInt64"),
