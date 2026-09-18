@@ -629,6 +629,9 @@ allow_indirect_imports = true
 # listed here because the root cannot be a forbidden module without also
 # forbidding trace_server's internal imports; every file that does so also
 # leaks via a client subpackage below, so none escape the contract.
+# After the builtin move, llm_structured_model still imports the client SDK
+# from weave.shared. Those rows left this list because the source is no longer
+# weave.trace_server. The coupling is real and not enforced here.
 ignore_imports = [
   "weave.trace_server.isolated_client_executor -> weave.trace.context.weave_client_context",
   "weave.trace_server.isolated_client_executor -> weave.trace.weave_client",

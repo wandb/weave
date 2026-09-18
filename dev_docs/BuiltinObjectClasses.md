@@ -177,7 +177,7 @@ Run `make synchronize-base-object-schemas` to ensure the frontend TypeScript typ
 ```mermaid
 graph TD
     subgraph Schema Definition
-        F["weave/trace_server/interface/<br>base_object_classes/your_schema.py"] --> |defines| P[Pydantic BaseObject]
+        F["weave/shared/interface/<br>builtin_object_classes/your_schema.py"] --> |defines| P[Pydantic BaseObject]
         P --> |register_base_object| R["builtin_object_registry.py"]
     end
 
