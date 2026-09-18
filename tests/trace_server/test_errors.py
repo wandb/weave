@@ -8,6 +8,8 @@ from clickhouse_connect.driver.exceptions import (
 from gql.transport.exceptions import TransportServerError
 from pydantic import ValidationError
 
+from weave.shared import errors as errors_shared
+from weave.trace_server import errors as errors_legacy
 from weave.trace_server.errors import (
     BadQueryParameterError,
     InvalidFieldError,
@@ -283,3 +285,11 @@ def test_object_name_type_collision_omits_a_name_that_fits(
             "cannot share types, publish this object under a different name."
         )
     }
+
+
+def test_shared_errors_is_the_same_objects() -> None:
+    assert errors_shared.ObjectDeletedError is errors_legacy.ObjectDeletedError
+    assert errors_shared.DigestMismatchError is errors_legacy.DigestMismatchError
+    assert (
+        errors_shared.handle_server_exception is errors_legacy.handle_server_exception
+    )
