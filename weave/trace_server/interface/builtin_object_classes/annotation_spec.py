@@ -1,3 +1,7 @@
-"""Canonical location is ``weave.shared.interface.builtin_object_classes.annotation_spec``. This module re-exports it."""
+"""Canonical location is ``weave.shared.interface.builtin_object_classes.annotation_spec``. This module is that module."""
 
-from weave.shared.interface.builtin_object_classes.annotation_spec import *  # noqa: F403
+import sys
+
+from weave.shared.interface.builtin_object_classes import annotation_spec as _canonical
+
+sys.modules[__name__] = _canonical

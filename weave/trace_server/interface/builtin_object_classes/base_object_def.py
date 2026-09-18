@@ -1,3 +1,7 @@
-"""Canonical location is ``weave.shared.interface.builtin_object_classes.base_object_def``. This module re-exports it."""
+"""Canonical location is ``weave.shared.interface.builtin_object_classes.base_object_def``. This module is that module."""
 
-from weave.shared.interface.builtin_object_classes.base_object_def import *  # noqa: F403
+import sys
+
+from weave.shared.interface.builtin_object_classes import base_object_def as _canonical
+
+sys.modules[__name__] = _canonical

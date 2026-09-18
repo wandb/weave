@@ -1,3 +1,9 @@
-"""Canonical location is ``weave.shared.interface.builtin_object_classes.builtin_object_registry``. This module re-exports it."""
+"""Canonical location is ``weave.shared.interface.builtin_object_classes.builtin_object_registry``. This module is that module."""
 
-from weave.shared.interface.builtin_object_classes.builtin_object_registry import *  # noqa: F403
+import sys
+
+from weave.shared.interface.builtin_object_classes import (
+    builtin_object_registry as _canonical,
+)
+
+sys.modules[__name__] = _canonical

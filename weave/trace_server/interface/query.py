@@ -1,3 +1,7 @@
-"""Canonical location is ``weave.shared.interface.query``. This module re-exports it."""
+"""Canonical location is ``weave.shared.interface.query``. This module is that module."""
 
-from weave.shared.interface.query import *  # noqa: F403
+import sys
+
+from weave.shared.interface import query as _canonical
+
+sys.modules[__name__] = _canonical

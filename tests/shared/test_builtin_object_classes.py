@@ -4,6 +4,7 @@ from weave.shared.interface.builtin_object_classes import (
     annotation_spec,
     builtin_object_registry,
     leaderboard,
+    llm_structured_model,
     saved_view,
     test_only_example,
 )
@@ -15,6 +16,9 @@ from weave.trace_server.interface.builtin_object_classes import (
 )
 from weave.trace_server.interface.builtin_object_classes import (
     leaderboard as leaderboard_legacy,
+)
+from weave.trace_server.interface.builtin_object_classes import (
+    llm_structured_model as llm_structured_model_legacy,
 )
 from weave.trace_server.interface.builtin_object_classes import (
     saved_view as saved_view_legacy,
@@ -39,4 +43,8 @@ def test_trace_server_builtin_object_classes_reexport_the_same_objects() -> None
     assert (
         builtin_object_registry.BUILTIN_OBJECT_REGISTRY
         is builtin_object_registry_legacy.BUILTIN_OBJECT_REGISTRY
+    )
+    assert (
+        llm_structured_model._prepare_llm_messages
+        is llm_structured_model_legacy._prepare_llm_messages
     )
