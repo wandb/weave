@@ -604,7 +604,8 @@ def network_proxy_client(client, monkeypatch):
     We probably will want to flesh this out more in the future, but this is a
     starting point.
     """
-    app = FastAPI()
+    # Match production: deployed SDKs can send JSON without Content-Type.
+    app = FastAPI(strict_content_type=False)
 
     records = []
 

@@ -23,9 +23,6 @@ from tests.trace.util import (
     DatetimeMatcher,
     RegexStringMatcher,
 )
-from tests.trace_server.conftest_lib.trace_server_external_adapter import (
-    UserInjectingExternalTraceServer,
-)
 from tests.trace_server.helpers import force_optimize
 from weave import Evaluation
 from weave.integrations.integration_utilities import op_name_from_call
@@ -4630,16 +4627,8 @@ def test_get_calls_columns_wb_run_id(client, monkeypatch):
     assert calls[0].wb_run_id == mock_run_id
 
 
-def test_get_calls_include_usernames(client, monkeypatch):
-    external_server = find_server_layer(client.server, UserInjectingExternalTraceServer)
-    internal_user_id = external_server._idc.ext_to_int_user_id(client.entity)
-
-    # Username resolution happens in the external adapter after wb_user_id has
-    # been translated to the internal id, so stub that resolver directly.
-    def resolve_username(user_id: str) -> str | None:
-        return "resolved-user" if user_id == internal_user_id else None
-
-    monkeypatch.setattr(external_server, "_username_resolver", resolve_username)
+def test_get_calls_include_usernames(client, configure_username_resolver):
+    configure_username_resolver({client.entity: "resolved-user"})
 
     @weave.op
     def test_op(x: int) -> int:

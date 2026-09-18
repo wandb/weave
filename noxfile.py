@@ -215,7 +215,11 @@ def tests(session: nox.Session, shard: str):
     default_test_dirs = [f"tests/integrations/{shard}/"]
     test_dirs_dict = {
         "custom": [],
-        "sdk_unit": ["tests/shared/", "tests/trace_server_bindings/"],
+        "sdk_unit": [
+            "tests/trace/test_id_converter.py",
+            "tests/shared/",
+            "tests/trace_server_bindings/",
+        ],
         "flow": ["tests/flow/"],
         "trace_server": [
             "tests/trace_server/",

@@ -372,3 +372,29 @@ def reset_project_residence_cache():
     reset_residence_caches()
     yield
     reset_residence_caches()
+
+
+@pytest.fixture
+def force_optimize_if_clickhouse():
+    from tests.trace_server.helpers import force_optimize_if_clickhouse as optimize
+
+    return optimize
+
+
+@pytest.fixture
+def configure_username_resolver(client, monkeypatch):
+    from tests.trace.server_utils import find_server_layer
+    from tests.trace_server.conftest_lib.trace_server_external_adapter import (
+        UserInjectingExternalTraceServer,
+    )
+
+    external_server = find_server_layer(client.server, UserInjectingExternalTraceServer)
+
+    def configure(usernames: dict[str, str]) -> None:
+        internal_names = {
+            external_server._idc.ext_to_int_user_id(user): name
+            for user, name in usernames.items()
+        }
+        monkeypatch.setattr(external_server, "_username_resolver", internal_names.get)
+
+    return configure
