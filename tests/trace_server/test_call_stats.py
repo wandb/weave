@@ -452,6 +452,13 @@ def test_call_stats_time_buckets(client: weave_client.WeaveClient):
                     aggregations=[AggregationType.SUM],
                 ),
             ],
+            call_metrics=[
+                CallMetricSpec(
+                    metric="call_count",
+                    aggregations=[AggregationType.SUM],
+                ),
+            ],
+            filter=CallsFilter(op_names=[op_name]),
         )
     )
 
@@ -467,6 +474,15 @@ def test_call_stats_time_buckets(client: weave_client.WeaveClient):
     expected_total = sum(u["prompt_tokens"] for u in bucket1_usage + bucket2_usage)
     assert total_sum == expected_total, (
         f"Expected total {expected_total}, got {total_sum}"
+    )
+
+    expected_counts = [len(bucket1_usage), len(bucket2_usage)]
+    counts = [b["count"] for b in buckets_with_data]
+    assert counts == expected_counts, f"Expected counts {expected_counts}, got {counts}"
+
+    call_counts = [b["count"] for b in result.call_buckets if b["count"]]
+    assert call_counts == expected_counts, (
+        f"Expected call counts {expected_counts}, got {call_counts}"
     )
 
 

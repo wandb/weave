@@ -68,6 +68,13 @@ RESPONSE_DEFAULTS_REQUIRED = ConfigDict(
     json_schema_serialization_defaults_required=True
 )
 
+# A model with no properties is not an empty object to Stainless, it is a schema with no
+# type information, so the generated clients give the response no type at all. This marks it
+# as empty and leaves the wire alone.
+STAINLESS_EMPTY_OBJECT = ConfigDict(
+    json_schema_extra={"x-stainless-empty-object": True}
+)
+
 
 class BaseModelStrict(BaseModel):
     """API model that tolerates and reports unknown additive fields."""
