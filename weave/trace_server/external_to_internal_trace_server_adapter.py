@@ -349,14 +349,21 @@ class ExternalTraceServer:
         internal_project_id: str,
         tolerate_external_refs: bool = False,
     ) -> Any:
-        req_conv = universal_ext_to_int_ref_converter(
+        # Both conversions walk every field of the payload and may call out to
+        # the id converter. On a thread they interleave with other requests
+        # under the GIL; on the loop a large response would stall all of them.
+        req_conv = await asyncio.to_thread(
+            universal_ext_to_int_ref_converter,
             req,
             self._idc.ext_to_int_project_id,
             verify_internal_project_id=self._make_project_verifier(internal_project_id),
         )
         res = await self._call(method, req_conv)
-        return universal_int_to_ext_ref_converter(
-            res, self._idc.int_to_ext_project_id, tolerate_external_refs
+        return await asyncio.to_thread(
+            universal_int_to_ext_ref_converter,
+            res,
+            self._idc.int_to_ext_project_id,
+            tolerate_external_refs,
         )
 
     async def _astream_ref_apply(
@@ -396,6 +403,14 @@ class ExternalTraceServer:
 
     # Standard API Below:
     async def otel_export(self, req: tsi.OTelExportReq) -> tsi.OTelExportRes:
+        # Deep-copying and walking a whole OTLP batch is CPU-bound; keep it off
+        # the loop like the ref conversions in `_aref_apply`.
+        req = await asyncio.to_thread(self._prepare_otel_export, req)
+        return await self._aref_apply(
+            self._internal_trace_server.otel_export, req, req.project_id
+        )
+
+    def _prepare_otel_export(self, req: tsi.OTelExportReq) -> tsi.OTelExportReq:
         req = req.model_copy(deep=True)
         # Convert project_id at request level
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)
@@ -412,13 +427,10 @@ class ExternalTraceServer:
             req.wb_user_id = self._idc.ext_to_int_user_id(req.wb_user_id)
 
         # Convert refs carried in the raw protobuf span attributes (embedded in
-        # message content, typed ref arrays, etc.) — `_ref_apply` below can't
+        # message content, typed ref arrays, etc.) — `_ref_apply` can't
         # descend into `ResourceSpans`. See `_rewrite_processed_spans_refs_inplace`.
         self._rewrite_processed_spans_refs_inplace(req.processed_spans, req.project_id)
-
-        return await self._aref_apply(
-            self._internal_trace_server.otel_export, req, req.project_id
-        )
+        return req
 
     async def call_start(self, req: tsi.CallStartReq) -> tsi.CallStartRes:
         req = req.model_copy(deep=True)
@@ -1570,6 +1582,18 @@ class ExternalTraceServer:
         *,
         enable_llm_powered_features: bool = True,
     ) -> tsi.agent_types.GenAIOTelExportRes:
+        await asyncio.to_thread(self._prepare_genai_otel_export, req)
+        res = await self._call(
+            self._internal_trace_server.genai_otel_export,
+            req,
+            enable_llm_powered_features=enable_llm_powered_features,
+        )
+
+        return res
+
+    def _prepare_genai_otel_export(
+        self, req: tsi.agent_types.GenAIOTelExportReq
+    ) -> None:
         # Capture the entity before conversion, while `project_id` is still
         # `entity/project`: recovering it downstream costs a gorilla round-trip.
         req.entity_name = req.project_id.split("/", 1)[0] or None
@@ -1581,13 +1605,6 @@ class ExternalTraceServer:
         # This path doesn't use `_ref_apply`, so rewrite refs carried in the raw
         # protobuf span attributes here. See `_rewrite_processed_spans_refs_inplace`.
         self._rewrite_processed_spans_refs_inplace(req.processed_spans, req.project_id)
-        res = await self._call(
-            self._internal_trace_server.genai_otel_export,
-            req,
-            enable_llm_powered_features=enable_llm_powered_features,
-        )
-
-        return res
 
     async def agent_spans_query(
         self, req: tsi.agent_types.AgentSpansQueryReq
