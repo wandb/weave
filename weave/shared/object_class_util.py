@@ -57,9 +57,10 @@ class ProcessIncomingObjectResult(TypedDict):
 
 
 def _get_builtin_object_registry() -> dict[str, type[BaseModel]]:
-    # Circular import avoidance: importing this eagerly during `import weave`
-    # can recurse through builtin object class modules before weave is initialized.
-    from weave.trace.base_objects import BUILTIN_OBJECT_REGISTRY
+    # Circular import avoidance: builtin schemas depend on shared object helpers.
+    from weave.shared.trace_server.interface.builtin_object_classes.builtin_object_registry import (
+        BUILTIN_OBJECT_REGISTRY,
+    )
 
     return BUILTIN_OBJECT_REGISTRY
 
@@ -147,7 +148,10 @@ def process_incoming_object_val(
 def dump_object(val: BaseModel) -> dict:
     cls = val.__class__
     cls_name = val.__class__.__name__
-    bases = [c.__name__ for c in cls.mro()[1:-1]]
+    # Schema-only builtin classes retain the historical stored SDK hierarchy.
+    bases = list(getattr(cls, "__weave_serialized_bases__", ())) or [
+        c.__name__ for c in cls.mro()[1:-1]
+    ]
 
     dump = {}
     # Order matters here due to the way we calculate the digest!
