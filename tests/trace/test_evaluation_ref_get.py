@@ -1,11 +1,9 @@
 import weave
-from weave.scorers import LLMAsAJudgeScorer
-from weave.trace_server.interface.builtin_object_classes.builtin_object_registry import (
+from weave.flow.llm_structured_model import (
     LLMStructuredCompletionModel,
-)
-from weave.trace_server.interface.builtin_object_classes.llm_structured_model import (
     LLMStructuredCompletionModelDefaultParams,
 )
+from weave.scorers import LLMAsAJudgeScorer
 
 
 def test_publish_and_load_evaluation(weave_active):
