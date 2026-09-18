@@ -11,18 +11,18 @@ from weave.trace_server.errors import RequestTooLarge
 from weave.trace_server.sensitive_data.detectors import redact_pii_string
 from weave.trace_server.sensitive_data.walker import redact_pii_value
 
-_EMAIL_A = '<WEAVE_REDACTED type="EMAIL_ADDRESS" hint="a***" />'
-_EMAIL_E = '<WEAVE_REDACTED type="EMAIL_ADDRESS" hint="e***" />'
-_EMAIL_F = '<WEAVE_REDACTED type="EMAIL_ADDRESS" hint="f***" />'
-_EMAIL_G = '<WEAVE_REDACTED type="EMAIL_ADDRESS" hint="g***" />'
-_EMAIL_J = '<WEAVE_REDACTED type="EMAIL_ADDRESS" hint="j***" />'
-_EMAIL_L = '<WEAVE_REDACTED type="EMAIL_ADDRESS" hint="l***" />'
-_EMAIL_O = '<WEAVE_REDACTED type="EMAIL_ADDRESS" hint="o***" />'
-_EMAIL_P = '<WEAVE_REDACTED type="EMAIL_ADDRESS" hint="p***" />'
-_PHONE_1 = '<WEAVE_REDACTED type="PHONE_NUMBER" hint="1***" />'
-_PHONE_4 = '<WEAVE_REDACTED type="PHONE_NUMBER" hint="4***" />'
-_SSN_1 = '<WEAVE_REDACTED type="US_SSN" hint="1***" />'
-_CARD_4 = '<WEAVE_REDACTED type="CREDIT_CARD" hint="4***" />'
+_EMAIL_A = '<REDACTED type="EMAIL_ADDRESS" hint="a***" />'
+_EMAIL_E = '<REDACTED type="EMAIL_ADDRESS" hint="e***" />'
+_EMAIL_F = '<REDACTED type="EMAIL_ADDRESS" hint="f***" />'
+_EMAIL_G = '<REDACTED type="EMAIL_ADDRESS" hint="g***" />'
+_EMAIL_J = '<REDACTED type="EMAIL_ADDRESS" hint="j***" />'
+_EMAIL_L = '<REDACTED type="EMAIL_ADDRESS" hint="l***" />'
+_EMAIL_O = '<REDACTED type="EMAIL_ADDRESS" hint="o***" />'
+_EMAIL_P = '<REDACTED type="EMAIL_ADDRESS" hint="p***" />'
+_PHONE_1 = '<REDACTED type="PHONE_NUMBER" hint="1***" />'
+_PHONE_4 = '<REDACTED type="PHONE_NUMBER" hint="4***" />'
+_SSN_1 = '<REDACTED type="US_SSN" hint="1***" />'
+_CARD_4 = '<REDACTED type="CREDIT_CARD" hint="4***" />'
 
 
 class _StructuralLabel(str, Enum):
@@ -89,9 +89,9 @@ def test_unicode_neighbors_cannot_hide_ascii_pii(text: str, expected: str) -> No
         ("Contact jane.doe@example.com today", f"Contact {_EMAIL_J} today"),
         (
             "!tag@example.com",
-            '<WEAVE_REDACTED type="EMAIL_ADDRESS" hint="t***" />',
+            '<REDACTED type="EMAIL_ADDRESS" hint="t***" />',
         ),
-        ("!@example.com", '<WEAVE_REDACTED type="EMAIL_ADDRESS" hint="***" />'),
+        ("!@example.com", '<REDACTED type="EMAIL_ADDRESS" hint="***" />'),
     ],
 )
 def test_redacts_emails_with_bounded_local_part_hints(text: str, expected: str) -> None:
@@ -190,8 +190,8 @@ def test_walker_redacts_json_escaped_values_without_scanning_keys() -> None:
 
     assert redact_pii_value(value) == (
         '{"ada@example.com":"dictionary key",'
-        '"contact":"<WEAVE_REDACTED type=\\"EMAIL_ADDRESS\\" hint=\\"a***\\" />",'
-        '"phone":"<WEAVE_REDACTED type=\\"PHONE_NUMBER\\" hint=\\"4***\\" />"}'
+        '"contact":"<REDACTED type=\\"EMAIL_ADDRESS\\" hint=\\"a***\\" />",'
+        '"phone":"<REDACTED type=\\"PHONE_NUMBER\\" hint=\\"4***\\" />"}'
     )
 
 

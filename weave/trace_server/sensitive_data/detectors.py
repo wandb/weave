@@ -18,7 +18,7 @@ from typing import Literal, NamedTuple
 
 PIIEntity = Literal["EMAIL_ADDRESS", "PHONE_NUMBER", "US_SSN", "CREDIT_CARD"]
 
-_REDACTION_MARKER_TEMPLATE = '<WEAVE_REDACTED type="{entity}" hint="{hint}" />'
+_REDACTION_MARKER_TEMPLATE = '<REDACTED type="{entity}" hint="{hint}" />'
 _HINT_MASK = "***"
 _HINT_CHARACTER_RE = re.compile(r"[A-Za-z0-9]", re.ASCII)
 
@@ -125,7 +125,7 @@ def _iter_numeric_detections(text: str) -> Iterator[Detection]:
 
 
 def redact_pii_string(text: str) -> str:
-    """Replace supported PII spans with typed Weave markers and bounded hints."""
+    """Replace supported PII spans with typed redaction markers and bounded hints."""
     parts: list[str] = []
     cursor = 0
     for detection in _iter_detections(text):

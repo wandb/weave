@@ -29,10 +29,10 @@ from weave.trace_server.sensitive_data.span_redaction import (
 )
 
 NOW = datetime.datetime(2026, 8, 12, tzinfo=datetime.timezone.utc)
-_EMAIL_A = '<WEAVE_REDACTED type="EMAIL_ADDRESS" hint="a***" />'
-_PHONE_4 = '<WEAVE_REDACTED type="PHONE_NUMBER" hint="4***" />'
-_SSN_1 = '<WEAVE_REDACTED type="US_SSN" hint="1***" />'
-_CARD_4 = '<WEAVE_REDACTED type="CREDIT_CARD" hint="4***" />'
+_EMAIL_A = '<REDACTED type="EMAIL_ADDRESS" hint="a***" />'
+_PHONE_4 = '<REDACTED type="PHONE_NUMBER" hint="4***" />'
+_SSN_1 = '<REDACTED type="US_SSN" hint="1***" />'
+_CARD_4 = '<REDACTED type="CREDIT_CARD" hint="4***" />'
 
 
 def test_call_start_redacts_content_but_not_structural_fields() -> None:

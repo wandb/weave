@@ -756,7 +756,7 @@ deterministic.
   200, including decoded JSON-string re-entry, and over-nested or cyclic values
   raise `RequestTooLarge` instead of exhausting the Python stack.
 - `pii-v1` string replacements use
-  `<WEAVE_REDACTED type="..." hint="x***" />`. The hint retains at most the
+  `<REDACTED type="..." hint="x***" />`. The hint retains at most the
   first ASCII letter or digit and always uses three mask characters; email
   hints inspect only the local part. Do not expose the original length, email
   domain, separators, or trailing digits in this marker.

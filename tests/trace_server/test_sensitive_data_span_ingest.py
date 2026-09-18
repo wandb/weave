@@ -30,10 +30,10 @@ _PII_ATTR_VALUE = "Email ada@example.com"
 _PII_STATUS_MESSAGE = "card 4111 1111 1111 1111"
 _PII_RESOURCE_VALUE = "call (415) 555-2671"
 _PII_CONVERSATION_NAME = "chat with ada@example.com"
-_EMAIL_A = '<WEAVE_REDACTED type="EMAIL_ADDRESS" hint="a***" />'
-_PHONE_4 = '<WEAVE_REDACTED type="PHONE_NUMBER" hint="4***" />'
-_SSN_1 = '<WEAVE_REDACTED type="US_SSN" hint="1***" />'
-_CARD_4 = '<WEAVE_REDACTED type="CREDIT_CARD" hint="4***" />'
+_EMAIL_A = '<REDACTED type="EMAIL_ADDRESS" hint="a***" />'
+_PHONE_4 = '<REDACTED type="PHONE_NUMBER" hint="4***" />'
+_SSN_1 = '<REDACTED type="US_SSN" hint="1***" />'
+_CARD_4 = '<REDACTED type="CREDIT_CARD" hint="4***" />'
 
 # One PII value per derived content column, so every column is observed.
 _PII_CONTENT_ATTRS = {
