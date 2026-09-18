@@ -8,3 +8,9 @@ ALTER TABLE signature_cluster_runs
 
 ALTER TABLE signature_clusters
     DROP COLUMN IF EXISTS title;
+
+ALTER TABLE intent_signatures
+    DROP COLUMN IF EXISTS sentiment_target;
+
+ALTER TABLE intent_signatures
+    DROP COLUMN IF EXISTS completion_criterion;
