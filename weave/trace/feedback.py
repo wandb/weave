@@ -6,6 +6,7 @@ import json
 from collections.abc import Iterable, Iterator
 from typing import Any
 
+from weave.shared.interface.query import Query
 from weave.trace import util
 from weave.trace.context import weave_client_context
 from weave.trace.display import display
@@ -21,7 +22,6 @@ from weave.trace.refs import (
     Ref,
 )
 from weave.trace_server import trace_server_interface as tsi
-from weave.trace_server.interface.query import Query
 from weave.utils.project_id import to_project_id
 
 # Mirrors weave.trace_server.interface.feedback_types; the client/server import

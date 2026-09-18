@@ -1,10 +1,8 @@
-import pydantic
+"""Canonical location is ``weave.shared.interface.builtin_object_classes.base_object_def``. This module is that module."""
 
-RefStr = str
+import sys
 
+from weave.shared.interface.builtin_object_classes import base_object_def as _canonical
+from weave.shared.interface.builtin_object_classes.base_object_def import *  # noqa: F403
 
-# This is just an alternative to weave.Object for the server side.
-# I _think_ this will go away once we have the full weave system on the server
-class BaseObject(pydantic.BaseModel):
-    name: str | None = None
-    description: str | None = None
+sys.modules[__name__] = _canonical
