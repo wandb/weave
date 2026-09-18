@@ -1,53 +1,10 @@
-"""ComparisonView builtin object class for saving comparison view configurations.
+"""Compatibility imports; definitions live in weave.shared.trace_server."""
 
-This allows users to save and restore comparison configurations including
-evaluation call IDs and selected metrics.
-"""
+from weave.shared.trace_server.interface.builtin_object_classes.comparison_view import (
+    BaseModel,
+    ComparisonView,
+    ComparisonViewDefinition,
+    base_object_def,
+)
 
-from pydantic import BaseModel
-
-from weave.trace_server.interface.builtin_object_classes import base_object_def
-
-
-class ComparisonViewDefinition(BaseModel):
-    """Definition of a comparison view's configuration.
-
-    Args:
-        evaluation_call_ids (list[str]): List of evaluation call IDs being compared.
-        selected_metrics (list[str] | None): List of metrics that are visible in plots.
-        column_visibility (dict[str, bool] | None): Results-table column visibility
-            keyed by column field. Absent/empty means the default columns.
-
-    Examples:
-        >>> definition = ComparisonViewDefinition(
-        ...     evaluation_call_ids=["call_1", "call_2"],
-        ...     selected_metrics=["accuracy", "f1_score"]
-        ... )
-    """
-
-    evaluation_call_ids: list[str]
-    selected_metrics: list[str] | None = None
-    column_visibility: dict[str, bool] | None = None
-
-
-class ComparisonView(base_object_def.BaseObject):
-    """A saved comparison view configuration.
-
-    Args:
-        label (str): Human-readable name for the comparison view.
-        definition (ComparisonViewDefinition): The view's configuration.
-
-    Examples:
-        >>> view = ComparisonView(
-        ...     label="My Comparison",
-        ...     definition=ComparisonViewDefinition(
-        ...         evaluation_call_ids=["call_1", "call_2"]
-        ...     )
-        ... )
-    """
-
-    label: str
-    definition: ComparisonViewDefinition
-
-
-__all__ = ["ComparisonView", "ComparisonViewDefinition"]
+__all__ = ["BaseModel", "ComparisonView", "ComparisonViewDefinition", "base_object_def"]

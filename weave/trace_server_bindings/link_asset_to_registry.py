@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from weave.shared.trace_server.common_interface import BaseModelStrict
 from weave.trace.env import weave_trace_server_url
-from weave.trace_server.common_interface import BaseModelStrict
 from weave.trace_server_bindings.http_utils import handle_response_error
 from weave.utils import http_requests
 from weave.wandb_interface.context import get_wandb_auth_context

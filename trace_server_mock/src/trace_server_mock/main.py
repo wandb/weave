@@ -38,13 +38,13 @@ from fastapi import FastAPI, Query
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
-from weave.trace_server import trace_server_interface as tsi
+from weave.shared.trace_server import trace_server_interface as tsi
 
 # UUIDv7 generator from production weave. Time-ordered IDs sort by creation
 # time, matching the format the real trace server emits (and avoiding a new
 # dependency on `uuid_utils`, which the production code intentionally
 # avoids per `weave/trace_server/ids.py`'s header comment).
-from weave.trace_server.ids import generate_id
+from weave.shared.trace_server.ids import generate_id
 
 from .store import CallStore
 
