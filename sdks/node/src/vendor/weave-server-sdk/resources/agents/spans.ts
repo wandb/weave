@@ -542,6 +542,8 @@ export interface SpanQueryParams {
 
   include_details?: boolean;
 
+  insight_filters?: Array<SpanQueryParams.InsightFilter>;
+
   limit?: number;
 
   measures?: Array<SpanQueryParams.Measure>;
@@ -748,6 +750,34 @@ export namespace SpanQueryParams {
   }
 
   /**
+   * Conversation filter backed by extracted Insights data in ClickHouse.
+   *
+   * Values within one filter are ORed, while multiple filters are ANDed. Topic
+   * filters use stable topic IDs that span successful clustering runs.
+   */
+  export interface InsightFilter {
+    field:
+      | 'intent_category'
+      | 'intent_sentiment'
+      | 'failure_category'
+      | 'failure_severity'
+      | 'intent_topic_id'
+      | 'failure_topic_id';
+
+    /**
+     * Values to match. intent_sentiment accepts only frustrated, dissatisfied,
+     * neutral, satisfied, delighted; failure_severity accepts only info, major, or
+     * minor.
+     */
+    values: Array<string>;
+
+    /**
+     * Exclude conversations matching any value in this filter.
+     */
+    exclude?: boolean;
+  }
+
+  /**
    * One aggregate measure computed over spans in a group or bucket.
    */
   export interface Measure {
@@ -914,6 +944,8 @@ export interface SpanStatsParams {
   group_filters?: Array<SpanStatsParams.GroupFilter>;
 
   group_limit?: number;
+
+  insight_filters?: Array<SpanStatsParams.InsightFilter>;
 
   metrics?: Array<SpanStatsParams.Metric>;
 
@@ -1212,6 +1244,34 @@ export namespace SpanStatsParams {
         | 'custom_attrs_float'
         | 'custom_attrs_bool';
     }
+  }
+
+  /**
+   * Conversation filter backed by extracted Insights data in ClickHouse.
+   *
+   * Values within one filter are ORed, while multiple filters are ANDed. Topic
+   * filters use stable topic IDs that span successful clustering runs.
+   */
+  export interface InsightFilter {
+    field:
+      | 'intent_category'
+      | 'intent_sentiment'
+      | 'failure_category'
+      | 'failure_severity'
+      | 'intent_topic_id'
+      | 'failure_topic_id';
+
+    /**
+     * Values to match. intent_sentiment accepts only frustrated, dissatisfied,
+     * neutral, satisfied, delighted; failure_severity accepts only info, major, or
+     * minor.
+     */
+    values: Array<string>;
+
+    /**
+     * Exclude conversations matching any value in this filter.
+     */
+    exclude?: boolean;
   }
 
   /**
