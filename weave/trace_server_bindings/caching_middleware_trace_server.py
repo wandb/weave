@@ -12,13 +12,13 @@ from pydantic import BaseModel
 from typing_extensions import Self
 
 from weave import version
+from weave.shared import trace_server_interface as tsi
 from weave.trace.refs import ObjectRef, Ref
 from weave.trace.settings import (
     server_cache_dir,
     server_cache_size_limit,
     use_server_cache,
 )
-from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server_bindings.caches import DiskCache, LRUCache, StackedCache
 from weave.trace_server_bindings.client_interface import TraceServerClientInterface
 from weave.trace_server_bindings.delegating_trace_server import (

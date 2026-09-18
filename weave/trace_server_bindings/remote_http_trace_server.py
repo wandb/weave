@@ -12,16 +12,17 @@ from pydantic.json_schema import SkipJsonSchema
 from typing_extensions import Self
 
 from weave.shared import http_service_interface as his
+from weave.shared import trace_server_interface as tsi
 from weave.shared.ids import generate_id
+from weave.shared.project_id import from_project_id
 from weave.shared.service_interface import ServerInfoRes
+from weave.shared.trace_server_interface import agent_types
 from weave.trace.env import weave_trace_server_url
 from weave.trace.settings import (
     max_calls_queue_size,
     should_enable_disk_fallback,
     should_use_calls_complete,
 )
-from weave.trace_server import trace_server_interface as tsi
-from weave.trace_server.trace_server_interface import agent_types
 from weave.trace_server_bindings.async_batch_processor import AsyncBatchProcessor
 from weave.trace_server_bindings.call_batch_processor import CallBatchProcessor
 from weave.trace_server_bindings.client_interface import TraceServerClientInterface
@@ -44,7 +45,6 @@ from weave.trace_server_bindings.models import (
     StartBatchItem,
 )
 from weave.utils import http_requests
-from weave.utils.project_id import from_project_id
 from weave.utils.retry import get_current_retry_id, with_retry
 from weave.wandb_interface import project_creator
 from weave.wandb_interface.auth import WandbCredentials

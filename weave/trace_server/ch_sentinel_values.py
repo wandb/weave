@@ -29,15 +29,12 @@ from __future__ import annotations
 import datetime
 from typing import TYPE_CHECKING, Any
 
+from weave.shared.datetime_sentinels import EXPIRE_AT_NEVER, SENTINEL_EPOCH
 from weave.trace_server.project_version.types import ReadTable
 
 if TYPE_CHECKING:
     from weave.trace_server.orm import ParamBuilder
 
-SENTINEL_EPOCH = datetime.datetime(1970, 1, 1, tzinfo=datetime.timezone.utc)
-# expire_at uses a far-future sentinel so that ClickHouse's TTL DELETE clause
-# (toDateTime(expire_at) DELETE) does not see "no TTL" rows as already expired.
-EXPIRE_AT_NEVER = datetime.datetime(2100, 1, 1, tzinfo=datetime.timezone.utc)
 SENTINEL_STRING = ""
 SENTINEL_INT = 0
 
