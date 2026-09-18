@@ -5,6 +5,7 @@ from typing_extensions import NotRequired, Self, TypedDict
 
 from weave.flow.casting import Scorer
 from weave.object.obj import Object
+from weave.shared.interface.query import Query
 from weave.trace.api import ObjectRef, publish
 from weave.trace.context.weave_client_context import (
     get_weave_client,
@@ -13,7 +14,6 @@ from weave.trace.context.weave_client_context import (
 from weave.trace.objectify import register_object
 from weave.trace.refs import OpRef, Ref
 from weave.trace.vals import WeaveObject
-from weave.trace_server.interface.query import Query
 
 DebounceAggregationField: TypeAlias = Literal["trace_id", "thread_id"]
 DebounceAggregationMethod: TypeAlias = Literal["last_message", "all_messages"]
