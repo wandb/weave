@@ -310,10 +310,10 @@ def _disable_query_condition_cache() -> None:
 def get_ch_trace_server(
     _ch_session_server: ClickHouseSessionState | None,
     request,
-) -> Callable[[], UserInjectingExternalTraceServer]:
+) -> Callable[[], SyncTraceServerFacade]:
     """Function-scoped CH fixture factory. Reuses session-scoped DB, truncates between tests."""
 
-    def ch_trace_server_inner() -> UserInjectingExternalTraceServer:
+    def ch_trace_server_inner() -> SyncTraceServerFacade:
         if _ch_session_server is None:
             pytest.skip("ClickHouse session not available")
 
@@ -336,10 +336,7 @@ def get_ch_trace_server(
         server._evaluate_model_dispatcher = EvaluateModelTestDispatcher(
             id_converter=id_converter
         )
-        # Sync callers see the server through the facade, as production will.
-        return externalize_trace_server(
-            SyncTraceServerFacade(server), TEST_ENTITY, id_converter=id_converter
-        )
+        return externalize_trace_server(server, TEST_ENTITY, id_converter=id_converter)
 
     return ch_trace_server_inner
 
@@ -347,8 +344,8 @@ def get_ch_trace_server(
 @pytest.fixture
 def get_fake_trace_server(
     request,
-) -> Callable[[], UserInjectingExternalTraceServer]:
-    def fake_trace_server_inner() -> UserInjectingExternalTraceServer:
+) -> Callable[[], SyncTraceServerFacade]:
+    def fake_trace_server_inner() -> SyncTraceServerFacade:
         id_converter = DummyIdConverter()
         fake_server = InMemoryTraceServer(
             evaluate_model_dispatcher=EvaluateModelTestDispatcher(
@@ -390,22 +387,21 @@ def ch_server(request, trace_server):
     """Extract the ClickHouseTraceServer from the test fixture, or skip."""
     if get_trace_server_flag(request) != "clickhouse":
         pytest.skip("ClickHouse-only test")
-    server = trace_server._internal_trace_server
-    assert isinstance(server, SyncTraceServerFacade)
-    assert isinstance(server._inner, ClickHouseTraceServer)
-    return server
+    server = trace_server._inner._internal_trace_server
+    assert isinstance(server, ClickHouseTraceServer)
+    return SyncTraceServerFacade(server)
 
 
 @pytest.fixture
 def internal_server(client):
     """Return the innermost sync-callable server from the middleware chain.
 
-    For ClickHouse that is the facade over `ClickHouseTraceServer`, so tests
+    For ClickHouse that is a facade over `ClickHouseTraceServer`, so tests
     keep calling methods without `await` as those methods become coroutines.
     """
-    for layer_type in (InMemoryTraceServer, SyncTraceServerFacade):
+    for layer_type in (InMemoryTraceServer, ClickHouseTraceServer):
         try:
-            return find_server_layer(client.server, layer_type)
+            return SyncTraceServerFacade(find_server_layer(client.server, layer_type))
         except TypeError:
             continue
     raise TypeError(

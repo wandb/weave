@@ -24,6 +24,7 @@ from weave.trace_server.ch_sentinel_values import EXPIRE_AT_NEVER
 from weave.trace_server.clickhouse_trace_server_batched import ClickHouseTraceServer
 from weave.trace_server.errors import InvalidRequest
 from weave.trace_server.project_version.types import CallsStorageServerMode
+from weave.trace_server.sync_facade import SyncTraceServerFacade
 from weave.trace_server.ttl_settings import reset_ttl_cache
 
 TEST_ENTITY = "ttl_entity"
@@ -51,9 +52,9 @@ def _clear_ttl_cache():
 @pytest.fixture
 def internal_server(trace_server):
     server = trace_server._internal_trace_server
-    assert isinstance(server._inner, ClickHouseTraceServer)
+    assert isinstance(server, ClickHouseTraceServer)
     server.table_routing_resolver._mode = CallsStorageServerMode.AUTO
-    return server
+    return SyncTraceServerFacade(server)
 
 
 def _set_retention_days(

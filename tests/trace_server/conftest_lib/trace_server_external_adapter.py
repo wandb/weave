@@ -1,4 +1,5 @@
 import base64
+from typing import Any
 
 from weave.trace_server import (
     external_to_internal_trace_server_adapter,
@@ -8,6 +9,7 @@ from weave.trace_server.service_interface import (
     ProjectsInfoReq,
     ProjectsInfoRes,
 )
+from weave.trace_server.sync_facade import SyncTraceServerFacade
 
 
 class TwoWayMapping:
@@ -107,84 +109,88 @@ class UserInjectingExternalTraceServer(
         """
         self._user_id = user_id
 
-    def call_start(self, req: tsi.CallStartReq) -> tsi.CallStartRes:
+    async def call_start(self, req: tsi.CallStartReq) -> tsi.CallStartRes:
         req.start.wb_user_id = self._user_id
-        return super().call_start(req)
+        return await super().call_start(req)
 
-    def call_start_batch(self, req: tsi.CallCreateBatchReq) -> tsi.CallCreateBatchRes:
+    async def call_start_batch(
+        self, req: tsi.CallCreateBatchReq
+    ) -> tsi.CallCreateBatchRes:
         for item in req.batch:
             if isinstance(item, tsi.CallBatchStartMode):
                 item.req.start.wb_user_id = self._user_id
-        return super().call_start_batch(req)
+        return await super().call_start_batch(req)
 
-    def calls_delete(self, req: tsi.CallsDeleteReq) -> tsi.CallsDeleteRes:
+    async def calls_delete(self, req: tsi.CallsDeleteReq) -> tsi.CallsDeleteRes:
         req.wb_user_id = self._user_id
-        return super().calls_delete(req)
+        return await super().calls_delete(req)
 
-    def call_update(self, req: tsi.CallUpdateReq) -> tsi.CallUpdateRes:
+    async def call_update(self, req: tsi.CallUpdateReq) -> tsi.CallUpdateRes:
         req.wb_user_id = self._user_id
-        return super().call_update(req)
+        return await super().call_update(req)
 
-    def feedback_create(self, req: tsi.FeedbackCreateReq) -> tsi.FeedbackCreateRes:
+    async def feedback_create(
+        self, req: tsi.FeedbackCreateReq
+    ) -> tsi.FeedbackCreateRes:
         req.wb_user_id = self._user_id
-        return super().feedback_create(req)
+        return await super().feedback_create(req)
 
-    def feedback_create_batch(
+    async def feedback_create_batch(
         self, req: tsi.FeedbackCreateBatchReq
     ) -> tsi.FeedbackCreateBatchRes:
         for feedback_req in req.batch:
             feedback_req.wb_user_id = self._user_id
-        return super().feedback_create_batch(req)
+        return await super().feedback_create_batch(req)
 
-    def cost_create(self, req: tsi.CostCreateReq) -> tsi.CostCreateRes:
+    async def cost_create(self, req: tsi.CostCreateReq) -> tsi.CostCreateRes:
         req.wb_user_id = self._user_id
-        return super().cost_create(req)
+        return await super().cost_create(req)
 
-    def annotation_queue_create(
+    async def annotation_queue_create(
         self, req: tsi.AnnotationQueueCreateReq
     ) -> tsi.AnnotationQueueCreateRes:
         req.wb_user_id = req.wb_user_id or self._user_id
-        return super().annotation_queue_create(req)
+        return await super().annotation_queue_create(req)
 
-    def annotation_queue_update(
+    async def annotation_queue_update(
         self, req: tsi.AnnotationQueueUpdateReq
     ) -> tsi.AnnotationQueueUpdateRes:
         req.wb_user_id = req.wb_user_id or self._user_id
-        return super().annotation_queue_update(req)
+        return await super().annotation_queue_update(req)
 
-    def annotation_queue_add_calls(
+    async def annotation_queue_add_calls(
         self, req: tsi.AnnotationQueueAddCallsReq
     ) -> tsi.AnnotationQueueAddCallsRes:
         req.wb_user_id = req.wb_user_id or self._user_id
-        return super().annotation_queue_add_calls(req)
+        return await super().annotation_queue_add_calls(req)
 
-    def obj_create(self, req: tsi.ObjCreateReq) -> tsi.ObjCreateRes:
+    async def obj_create(self, req: tsi.ObjCreateReq) -> tsi.ObjCreateRes:
         req.obj.wb_user_id = self._user_id
-        return super().obj_create(req)
+        return await super().obj_create(req)
 
-    def evaluate_model(self, req: tsi.EvaluateModelReq) -> tsi.EvaluateModelRes:
+    async def evaluate_model(self, req: tsi.EvaluateModelReq) -> tsi.EvaluateModelRes:
         req.wb_user_id = self._user_id
-        return super().evaluate_model(req)
+        return await super().evaluate_model(req)
 
-    def evaluation_run_delete(
+    async def evaluation_run_delete(
         self, req: tsi.EvaluationRunDeleteReq
     ) -> tsi.EvaluationRunDeleteRes:
         req.wb_user_id = self._user_id
-        return super().evaluation_run_delete(req)
+        return await super().evaluation_run_delete(req)
 
-    def evaluation_run_finish(
+    async def evaluation_run_finish(
         self, req: tsi.EvaluationRunFinishReq
     ) -> tsi.EvaluationRunFinishRes:
         req.wb_user_id = self._user_id
-        return super().evaluation_run_finish(req)
+        return await super().evaluation_run_finish(req)
 
-    def prediction_delete(
+    async def prediction_delete(
         self, req: tsi.PredictionDeleteReq
     ) -> tsi.PredictionDeleteRes:
         req.wb_user_id = self._user_id
-        return super().prediction_delete(req)
+        return await super().prediction_delete(req)
 
-    def projects_info(self, req: ProjectsInfoReq) -> list[ProjectsInfoRes]:
+    async def projects_info(self, req: ProjectsInfoReq) -> list[ProjectsInfoRes]:
         return [
             ProjectsInfoRes(
                 external_project_id=pid,
@@ -193,36 +199,39 @@ class UserInjectingExternalTraceServer(
             for pid in req.project_ids
         ]
 
-    def score_delete(self, req: tsi.ScoreDeleteReq) -> tsi.ScoreDeleteRes:
+    async def score_delete(self, req: tsi.ScoreDeleteReq) -> tsi.ScoreDeleteRes:
         req.wb_user_id = self._user_id
-        return super().score_delete(req)
+        return await super().score_delete(req)
 
-    def obj_add_tags(self, req: tsi.ObjAddTagsReq) -> tsi.ObjAddTagsRes:
+    async def obj_add_tags(self, req: tsi.ObjAddTagsReq) -> tsi.ObjAddTagsRes:
         req.wb_user_id = self._user_id
-        return super().obj_add_tags(req)
+        return await super().obj_add_tags(req)
 
-    def obj_remove_tags(self, req: tsi.ObjRemoveTagsReq) -> tsi.ObjRemoveTagsRes:
+    async def obj_remove_tags(self, req: tsi.ObjRemoveTagsReq) -> tsi.ObjRemoveTagsRes:
         req.wb_user_id = self._user_id
-        return super().obj_remove_tags(req)
+        return await super().obj_remove_tags(req)
 
-    def obj_set_aliases(self, req: tsi.ObjSetAliasesReq) -> tsi.ObjSetAliasesRes:
+    async def obj_set_aliases(self, req: tsi.ObjSetAliasesReq) -> tsi.ObjSetAliasesRes:
         req.wb_user_id = self._user_id
-        return super().obj_set_aliases(req)
+        return await super().obj_set_aliases(req)
 
-    def obj_remove_aliases(
+    async def obj_remove_aliases(
         self, req: tsi.ObjRemoveAliasesReq
     ) -> tsi.ObjRemoveAliasesRes:
         req.wb_user_id = self._user_id
-        return super().obj_remove_aliases(req)
+        return await super().obj_remove_aliases(req)
 
 
 def externalize_trace_server(
-    trace_server: tsi.TraceServerInterface,
+    trace_server: Any,
     user_id: str = "test_user",
     id_converter: external_to_internal_trace_server_adapter.IdConverter | None = None,
-) -> UserInjectingExternalTraceServer:
-    return UserInjectingExternalTraceServer(
-        trace_server,
-        id_converter or DummyIdConverter(),
-        user_id,
+) -> SyncTraceServerFacade:
+    """Wrap `trace_server` in the async external adapter, then in the sync facade."""
+    return SyncTraceServerFacade(
+        UserInjectingExternalTraceServer(
+            trace_server,
+            id_converter or DummyIdConverter(),
+            user_id,
+        )
     )
