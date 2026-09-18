@@ -11,6 +11,7 @@ from pydantic import BaseModel, Field, validate_call
 from pydantic.json_schema import SkipJsonSchema
 from typing_extensions import Self
 
+from weave.shared.ids import generate_id
 from weave.trace.env import weave_trace_server_url
 from weave.trace.settings import (
     max_calls_queue_size,
@@ -19,7 +20,6 @@ from weave.trace.settings import (
 )
 from weave.trace_server import http_service_interface as his
 from weave.trace_server import trace_server_interface as tsi
-from weave.trace_server.ids import generate_id
 from weave.trace_server.service_interface import ServerInfoRes
 from weave.trace_server.trace_server_interface import agent_types
 from weave.trace_server_bindings.async_batch_processor import AsyncBatchProcessor
