@@ -1,11 +1,6 @@
 from typing import Any
 
-from weave.trace_server.interface.query import (
-    GetFieldOperator,
-    LiteralOperation,
-    NotOperation,
-    Operand,
-)
+from weave.shared.query import GetFieldOperator, LiteralOperation, NotOperation, Operand
 
 
 def get_field_expr(field: str) -> GetFieldOperator:
