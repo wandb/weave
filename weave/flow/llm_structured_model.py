@@ -28,7 +28,10 @@ from weave.trace.op import op
 def cast_to_llm_structured_model_params(
     obj: Any,
 ) -> LLMStructuredCompletionModelDefaultParams:
-    if isinstance(obj, vals.Traceable):
+    # Dict-like traceables must not dereference fields that Pydantic would ignore.
+    if not isinstance(
+        obj, (LLMStructuredCompletionModelDefaultParams, dict)
+    ) and isinstance(obj, vals.Traceable):
         obj = vals.unwrap(obj)
     return validate_default_params(obj)
 

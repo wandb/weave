@@ -18,6 +18,7 @@ from weave.flow.llm_structured_model import (
 )
 from weave.prompt.prompt import MessagesPrompt
 from weave.trace import object_record, vals
+from weave.trace.refs import ObjectRef
 from weave.trace.weave_client import WeaveClient
 from weave.trace_server import trace_server_interface as tsi
 
@@ -837,4 +838,15 @@ def test_cast_to_llm_structured_model_params_handles_weave_object():
     result = cast_to_llm_structured_model_params(weave_obj)
     assert isinstance(result, LLMStructuredCompletionModelDefaultParams)
     assert result.response_format == "json_object"
+    assert result.temperature == 0.5
+
+
+def test_cast_params_does_not_resolve_ignored_refs(client: WeaveClient) -> None:
+    missing_ref = ObjectRef(
+        entity=client.entity, project=client.project, name="missing", _digest="missing"
+    )
+    params = vals.WeaveDict(
+        {"temperature": 0.5, "ignored": missing_ref}, server=client.server
+    )
+    result = cast_to_llm_structured_model_params(params)
     assert result.temperature == 0.5
