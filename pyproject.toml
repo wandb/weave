@@ -576,22 +576,12 @@ too-many-positional-arguments = "ignore"
 not-iterable = "ignore"
 
 # ---------------------------------------------------------------------------
-# import-linter: enforce the trace-server / client / workers import boundaries.
-#
-# Goal: the trace server (`weave.trace_server`) and the Weave client SDK
-# (everything else under `weave`) must not import each other, and workers must
-# additionally not reach into the client SDK. `weave.shared` is the intentional
-# neutral zone that both sides may import.
-#
-# The repo is currently entangled, so every existing cross-boundary import is
-# listed under each contract's `ignore_imports` as a TEMPORARY allowance. Those
-# lists ARE the untangling backlog: as we decouple the repo we delete entries
-# (and fix the code), never add. `unmatched_ignore_imports_alerting` is left at
-# its default (error), so a stale ignore that no longer matches a real import
-# fails the linter and forces the list to stay honest.
-#
-# `allow_indirect_imports = true` keeps each contract focused on *direct*
-# imports, so every ignored entry maps to a concrete `import` statement to fix.
+# import-linter: keep trace-server implementations, SDK workloads and shared
+# contracts separate. Shared definitions cannot depend on either side, even
+# indirectly. The client/server contracts check direct imports; package-root
+# initialization is outside these explicit-module dependency rules.
+# No exemptions: passive contracts belong in shared; executable SDK workloads
+# belong in their client modules, with server-side dispatch defined separately.
 # ---------------------------------------------------------------------------
 [tool.importlinter]
 root_package = "weave"
@@ -624,15 +614,6 @@ forbidden_modules = [
   "weave.wandb_interface",
 ]
 allow_indirect_imports = true
-# TEMPORARY: existing trace_server -> client imports to untangle. Do not add.
-# NOTE: bare `from weave import ...` / `import weave` (the root package) is not
-# listed here because the root cannot be a forbidden module without also
-# forbidding trace_server's internal imports; every file that does so also
-# leaks via a client subpackage below, so none escape the contract.
-ignore_imports = [
-  "weave.trace_server.isolated_client_executor -> weave.trace.context.weave_client_context",
-  "weave.trace_server.isolated_client_executor -> weave.trace.weave_client",
-]
 
 [[tool.importlinter.contracts]]
 name = "Weave client SDK must not import the trace server"
@@ -662,13 +643,6 @@ source_modules = [
 ]
 forbidden_modules = ["weave.trace_server"]
 allow_indirect_imports = true
-# TEMPORARY: existing client -> trace_server imports to untangle. Do not add.
-# Most of these reach for the server's interface/contract surface
-# (trace_server_interface, service_interface, common_interface, interface.*,
-# constants, errors, ids) — the natural target to extract into a neutral
-# contract package as untangling proceeds.
-ignore_imports = [
-]
 
 [[tool.importlinter.contracts]]
 name = "Workers must not import the Weave client SDK"
@@ -698,11 +672,6 @@ forbidden_modules = [
   "weave.wandb_interface",
 ]
 allow_indirect_imports = true
-# TEMPORARY: existing workers -> client imports to untangle. Do not add.
-# These also appear in the trace_server -> client contract above (workers are a
-# subpackage of trace_server); both must clear before either ignore is removed.
-ignore_imports = [
-]
 
 [[tool.importlinter.contracts]]
 name = "Shared contracts must not import SDK or server implementations"
