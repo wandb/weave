@@ -4864,6 +4864,7 @@ def test_obj_query_with_storage_size_clickhouse(client):
 def test_call_query_stream_with_costs_and_storage_size(
     client, force_optimize_if_clickhouse
 ):
+    @weave.op
     def child_op(a: int, b: int) -> dict[str, Any]:
         return {
             "result": {"a + b": a + b},
