@@ -1,13 +1,7 @@
-"""Canonical location is ``weave.shared.errors``. This module re-exports it."""
+"""Canonical location is ``weave.shared.errors``. This module is that module."""
 
-# import * skips names starting with _, but core calls tse._get_error_registry().
+import sys
+
 from weave.shared import errors as _canonical
 
-globals().update(
-    {
-        name: getattr(_canonical, name)
-        for name in dir(_canonical)
-        if not (name.startswith("__") and name.endswith("__"))
-    }
-)
-del _canonical
+sys.modules[__name__] = _canonical
