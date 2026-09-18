@@ -29,12 +29,14 @@ from weave.shared.digest import (
     compute_row_digest,
     compute_table_digest,
 )
+from weave.shared.errors import DigestMismatchError, InvalidExternalRef
 from weave.shared.feedback_types import (
     RUNNABLE_FEEDBACK_TYPE_PREFIX,
     runnable_feedback_output_selector,
     runnable_feedback_runnable_ref_selector,
 )
 from weave.shared.ids import generate_id
+from weave.shared.refs_conversion import universal_ext_to_int_ref_converter
 from weave.telemetry import trace_sentry
 from weave.trace import settings
 from weave.trace.call import (
@@ -121,8 +123,6 @@ from weave.trace.wandb_run_context import (
     get_global_wb_run_context,
 )
 from weave.trace.weave_client_send_file_cache import WeaveClientSendFileCache
-from weave.trace_server.errors import DigestMismatchError, InvalidExternalRef
-from weave.trace_server.trace_server_converter import universal_ext_to_int_ref_converter
 from weave.trace_server.trace_server_interface import (
     AliasesListReq,
     AnnotationQueueAddCallsReq,
