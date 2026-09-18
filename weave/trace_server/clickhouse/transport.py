@@ -52,6 +52,13 @@ CLICKHOUSE_SECURE_PORT = 8443
 # async analogue of the thread pool's width.
 ASYNC_CH_CONNECTOR_LIMIT = 200
 ASYNC_CH_CONNECTOR_LIMIT_PER_HOST = 100
+# Shorter than ClickHouse's HTTP keep_alive_timeout (10 s by default, and on
+# ClickHouse Cloud). aiohttp reuses a pooled connection without checking that
+# the server still holds it open, so a connection the server already closed
+# fails with ServerDisconnectedError and the driver retries on a fresh TLS
+# handshake. urllib3 probes the socket first and never pays this. Closing our
+# side earlier keeps every reused connection one the server still knows.
+ASYNC_CH_KEEPALIVE_TIMEOUT_SECONDS = 5.0
 
 
 @dataclass(frozen=True)
@@ -215,6 +222,8 @@ class AsyncClickHouseTransport:
 
     def __init__(self, config: ClickHouseConfig) -> None:
         self._config = config
+        # The database is created once per process, not once per loop's client.
+        self._database_ensured = False
         # Weak keys: a loop that is garbage collected takes its entry with it.
         self._clients: weakref.WeakKeyDictionary[
             asyncio.AbstractEventLoop, AsyncClient
@@ -252,16 +261,19 @@ class AsyncClickHouseTransport:
             autogenerate_query_id=False,
             connector_limit=ASYNC_CH_CONNECTOR_LIMIT,
             connector_limit_per_host=ASYNC_CH_CONNECTOR_LIMIT_PER_HOST,
+            keepalive_timeout=ASYNC_CH_KEEPALIVE_TIMEOUT_SECONDS,
         )
         # The session exists before the database does. Anything that stops us
         # returning it -- a failed CREATE DATABASE, or cancellation -- has to
         # close it here, or `start()` retries and leaks another connector each
         # time. BaseException so CancelledError is covered too.
-        try:
-            await aensure_database(client, self._config.database)
-        except BaseException:
-            await client.close()
-            raise
+        if not self._database_ensured:
+            try:
+                await aensure_database(client, self._config.database)
+            except BaseException:
+                await client.close()
+                raise
+            self._database_ensured = True
         client.database = self._config.database
         return client
 

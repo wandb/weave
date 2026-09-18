@@ -1,6 +1,6 @@
 import datetime
 import json
-from typing import Any
+from typing import Any, Protocol
 from zoneinfo import ZoneInfo
 
 import emoji
@@ -9,6 +9,17 @@ from pydantic import ValidationError
 from weave.shared import refs_internal as ri
 from weave.trace_server import clickhouse_trace_server_settings as ch_settings
 from weave.trace_server import trace_server_interface as tsi
+
+
+class FeedbackValidationServer(Protocol):
+    """The two reads feedback validation needs from the server."""
+
+    def refs_read_batch(self, req: tsi.RefsReadBatchReq) -> tsi.RefsReadBatchRes: ...
+    def annotation_queue_read(
+        self, req: tsi.AnnotationQueueReadReq
+    ) -> tsi.AnnotationQueueReadRes: ...
+
+
 from weave.trace_server.emoji_util import detone_emojis
 from weave.trace_server.errors import InvalidRequest, NotFoundError
 from weave.trace_server.ids import generate_id
@@ -105,7 +116,7 @@ def process_feedback_payload(
 
 
 def validate_feedback_create_req(
-    req: tsi.FeedbackCreateReq, trace_server: tsi.TraceServerInterface
+    req: tsi.FeedbackCreateReq, trace_server: FeedbackValidationServer
 ) -> None:
     payload_schema = FEEDBACK_PAYLOAD_SCHEMAS.get(req.feedback_type)
     if payload_schema:
