@@ -15,10 +15,10 @@ from tests.trace_server.conftest_lib.trace_server_external_adapter import (
 from tests.trace_server.workers.evaluate_model_test_worker import (
     EvaluateModelTestDispatcher,
 )
+from weave.shared import common_interface
 from weave.trace_server import (
     base64_content_conversion,
     clickhouse_trace_server_batched,
-    common_interface,
 )
 from weave.trace_server import clickhouse_trace_server_migrator as wf_migrator
 from weave.trace_server import (

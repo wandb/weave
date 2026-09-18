@@ -7,8 +7,8 @@ from unittest.mock import MagicMock
 import pytest
 from pydantic import Field, ValidationError
 
+from weave.shared import common_interface
 from weave.shared.trace_server_interface_util import extract_refs_from_values
-from weave.trace_server import common_interface
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.common_interface import BaseModelStrict
 from weave.trace_server.errors import NotFoundError
