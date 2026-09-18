@@ -669,9 +669,8 @@ forbidden_modules = ["weave.trace_server"]
 allow_indirect_imports = true
 # TEMPORARY: existing client -> trace_server imports to untangle. Do not add.
 # Most of these reach for the server's interface/contract surface
-# (trace_server_interface, service_interface, common_interface)
-# the natural target to extract into a neutral contract package as
-# untangling proceeds.
+# (trace_server_interface, service_interface, common_interface).
+# The natural target is a neutral contract package as untangling proceeds.
 ignore_imports = [
   "weave.durability.wal_sender -> weave.trace_server.trace_server_interface",
   "weave.evaluation.eval -> weave.trace_server.trace_server_interface",

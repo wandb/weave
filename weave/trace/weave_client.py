@@ -2271,7 +2271,7 @@ class WeaveClient:
 
             # Find all feedback objects with a specific feedback type with
             # mongo-style query.
-            from weave.trace_server.interface.query import Query
+            from weave.shared.interface.query import Query
 
             query = Query(
                 **{
