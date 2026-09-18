@@ -4,6 +4,10 @@ The first version covers plausible ASCII email addresses, formatted North
 American phone numbers, formatted international phone numbers, compact
 ``+``-prefixed numbers containing 10 to 15 digits, dashed US SSNs, and
 13-to-19-digit card candidates that pass Luhn validation.
+
+Redaction markers identify the entity type and retain at most the first ASCII
+letter or digit as a fixed-width hint. Email hints only inspect the local part,
+so markers never retain the address length or domain.
 """
 
 from __future__ import annotations
@@ -14,12 +18,9 @@ from typing import Literal, NamedTuple
 
 PIIEntity = Literal["EMAIL_ADDRESS", "PHONE_NUMBER", "US_SSN", "CREDIT_CARD"]
 
-REPLACEMENT_MARKERS: dict[PIIEntity, str] = {
-    "EMAIL_ADDRESS": "<EMAIL_ADDRESS>",
-    "PHONE_NUMBER": "<PHONE_NUMBER>",
-    "US_SSN": "<US_SSN>",
-    "CREDIT_CARD": "<CREDIT_CARD>",
-}
+_REDACTION_MARKER_TEMPLATE = '<REDACTED type="{entity}" hint="{hint}" />'
+_HINT_MASK = "***"
+_HINT_CHARACTER_RE = re.compile(r"[A-Za-z0-9]", re.ASCII)
 
 _DETECTOR_PRIORITY: dict[PIIEntity, int] = {
     "EMAIL_ADDRESS": 0,
@@ -124,17 +125,33 @@ def _iter_numeric_detections(text: str) -> Iterator[Detection]:
 
 
 def redact_pii_string(text: str) -> str:
-    """Replace supported PII spans with stable typed markers."""
+    """Replace supported PII spans with typed redaction markers and bounded hints."""
     parts: list[str] = []
     cursor = 0
     for detection in _iter_detections(text):
         parts.append(text[cursor : detection.start])
-        parts.append(REPLACEMENT_MARKERS[detection.entity])
+        parts.append(
+            _redaction_marker(
+                detection.entity,
+                text[detection.start : detection.end],
+            )
+        )
         cursor = detection.end
     if not parts:
         return text
     parts.append(text[cursor:])
     return "".join(parts)
+
+
+def _redaction_marker(entity: PIIEntity, value: str) -> str:
+    hint_value = value.rsplit("@", 1)[0] if entity == "EMAIL_ADDRESS" else value
+    hint_character = _HINT_CHARACTER_RE.search(hint_value)
+    hint = (
+        f"{hint_character.group(0)}{_HINT_MASK}"
+        if hint_character is not None
+        else _HINT_MASK
+    )
+    return _REDACTION_MARKER_TEMPLATE.format(entity=entity, hint=hint)
 
 
 def _valid_email(candidate: str) -> bool:
