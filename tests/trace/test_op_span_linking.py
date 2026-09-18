@@ -14,9 +14,9 @@ from opentelemetry.sdk.trace.sampling import Decision, StaticSampler
 from opentelemetry.trace import NonRecordingSpan, Span, SpanContext, TraceFlags
 
 import weave
+from weave.shared import tracing as server_tracing
 from weave.trace.call import Call
 from weave.trace_server import trace_server_interface as tsi
-from weave.trace_server import tracing as server_tracing
 from weave.trace_server.constants import INVOKING_SPAN_ATTR_KEY
 
 FORGED = {"trace_id": "f" * 32, "span_id": "f" * 16}
