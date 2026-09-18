@@ -13,8 +13,8 @@ from fastapi.responses import StreamingResponse
 from fastapi.testclient import TestClient
 
 import weave
+from tests.trace.server_utils import TEST_ENTITY, get_trace_server_flag
 from tests.trace.util import DummyTestException
-from tests.trace_server.conftest import TEST_ENTITY, get_trace_server_flag
 from weave.trace import weave_client, weave_init
 from weave.trace.context import weave_client_context
 from weave.trace.context.call_context import set_call_stack
@@ -28,10 +28,19 @@ from weave.trace_server_bindings.caching_middleware_trace_server import (
 from weave.trace_server_bindings.call_batch_processor import CallBatchProcessor
 from weave.trace_server_bindings.remote_http_trace_server import RemoteHTTPTraceServer
 
-pytest_plugins = [
-    "tests.trace_server.conftest",
-    "tests.trace_server.conftest_lib.clickhouse_server",
-]
+pytest_plugins = ["tests.trace.backend_options"]
+_backend_plugin = os.environ.get(
+    "WEAVE_TEST_BACKEND_PLUGIN", "tests.trace_server.conftest"
+)
+if _backend_plugin != "none":
+    pytest_plugins.append(_backend_plugin)
+    if _backend_plugin == "tests.trace_server.conftest":
+        pytest_plugins.extend(
+            [
+                "tests.trace_server.conftest_lib.clickhouse_server",
+                "tests.trace_server.sdk_storage_fixtures",
+            ]
+        )
 
 # Force testing to never report wandb sentry events
 os.environ["WANDB_ERROR_REPORTING"] = "false"
@@ -60,12 +69,29 @@ def reset_serializer_load_refs():
     from weave.trace.ref_util import remove_ref
     from weave.trace.serialization.serializer import SERIALIZERS
 
+    # Builtin Ops outlive the disposable database, even when the project ID is reused.
+    for operation in (
+        weave.Evaluation.evaluate,
+        weave.Evaluation.predict_and_score,
+        weave.Evaluation.summarize,
+        weave.Scorer.summarize,
+    ):
+        remove_ref(operation)
+
     # Before test: clear refs from serializer load functions
     for serializer in SERIALIZERS:
         if isinstance(serializer.load, Op):
             remove_ref(serializer.load)
 
     yield
+
+    for operation in (
+        weave.Evaluation.evaluate,
+        weave.Evaluation.predict_and_score,
+        weave.Evaluation.summarize,
+        weave.Scorer.summarize,
+    ):
+        remove_ref(operation)
 
     # After test: clear refs again to prevent pollution to other tests
     for serializer in SERIALIZERS:

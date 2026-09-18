@@ -7,8 +7,7 @@ import re
 import time
 from contextlib import contextmanager
 
-from tests.trace.server_utils import find_server_layer
-from weave.trace_server.clickhouse_trace_server_batched import ClickHouseTraceServer
+from tests.trace.server_utils import server_has_layer
 
 # Condition string for `pytest.mark.skipif`: True when the selected
 # trace-server backend is not a real ClickHouse server (e.g. the in-memory
@@ -39,11 +38,15 @@ def client_is_clickhouse(client):
     that assert ClickHouse *internals* (raw SQL, table routing, batching,
     bucket file storage), which the fake does not reproduce.
     """
-    try:
-        find_server_layer(client.server, ClickHouseTraceServer)
-    except TypeError:
-        return False
-    return True
+    return server_has_layer(
+        client.server,
+        frozenset(
+            {
+                "weave.trace_server.clickhouse_trace_server_batched.ClickHouseTraceServer",
+                "src.trace_server_backend.clickhouse_trace_server_batched.ClickHouseTraceServer",
+            }
+        ),
+    )
 
 
 class AnyStrMatcher:  # noqa: PLW1641
