@@ -45,6 +45,7 @@ KNOWN_SERVER_ATTRS = frozenset(
         "_use_async_insert",
         "_use_replicated_tables",
         "_user",
+        "_write_batch_var",
     }
 )
 
