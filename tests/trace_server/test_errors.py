@@ -293,3 +293,4 @@ def test_shared_errors_is_the_same_objects() -> None:
     assert (
         errors_shared.handle_server_exception is errors_legacy.handle_server_exception
     )
+    assert errors_shared._get_error_registry is errors_legacy._get_error_registry
