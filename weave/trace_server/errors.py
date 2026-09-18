@@ -3,5 +3,6 @@
 import sys
 
 from weave.shared import errors as _canonical
+from weave.shared.errors import *  # noqa: F403
 
 sys.modules[__name__] = _canonical
