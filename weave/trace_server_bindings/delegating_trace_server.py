@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from typing import Any
 
-from weave.trace_server import trace_server_interface as tsi
-from weave.trace_server.service_interface import ServiceInterface
+from weave.shared.trace_server import trace_server_interface as tsi
+from weave.shared.trace_server.service_interface import ServiceInterface
 
 _TRACE_SERVER_METHOD_NAMES = frozenset(
     {

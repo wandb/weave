@@ -92,11 +92,11 @@ from weave.flow.saved_view import SavedView
 from weave.flow.scorer import Scorer
 from weave.object.obj import Object
 from weave.prompt.prompt import EasyPrompt, MessagesPrompt, Prompt, StringPrompt
+from weave.shared.trace_server.trace_server_interface import CustomRuntimeID
 from weave.trace.log_call import log_call
 from weave.trace.urls import otel_traces_endpoint
 from weave.trace.util import Thread as Thread
 from weave.trace.util import ThreadPoolExecutor as ThreadPoolExecutor
-from weave.trace_server.trace_server_interface import CustomRuntimeID
 from weave.type_handlers.Audio.audio import Audio
 from weave.type_handlers.File.file import File
 from weave.type_handlers.Markdown.markdown import Markdown

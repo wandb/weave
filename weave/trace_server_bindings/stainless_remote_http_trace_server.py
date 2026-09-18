@@ -9,6 +9,10 @@ from zoneinfo import ZoneInfo
 from pydantic import BaseModel, validate_call
 from typing_extensions import Self
 
+from weave.shared.trace_server import trace_server_interface as tsi
+from weave.shared.trace_server.ids import generate_id
+from weave.shared.trace_server.service_interface import ServerInfoRes
+from weave.shared.trace_server.trace_server_interface import agent_types
 from weave.trace.env import ssl_verify, weave_trace_server_url
 from weave.trace.settings import (
     http_timeout,
@@ -16,10 +20,6 @@ from weave.trace.settings import (
     should_enable_disk_fallback,
     should_use_calls_complete,
 )
-from weave.trace_server import trace_server_interface as tsi
-from weave.trace_server.ids import generate_id
-from weave.trace_server.service_interface import ServerInfoRes
-from weave.trace_server.trace_server_interface import agent_types
 from weave.trace_server_bindings.async_batch_processor import AsyncBatchProcessor
 from weave.trace_server_bindings.call_batch_processor import CallBatchProcessor
 from weave.trace_server_bindings.client_interface import TraceServerClientInterface

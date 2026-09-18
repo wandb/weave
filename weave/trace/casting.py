@@ -2,9 +2,9 @@ from typing import Annotated, Any
 
 import pydantic
 
-from weave.trace_server.common_interface import SortBy
-from weave.trace_server.interface.query import Query
-from weave.trace_server.trace_server_interface import CallsFilter
+from weave.shared.trace_server.common_interface import SortBy
+from weave.shared.trace_server.interface.query import Query
+from weave.shared.trace_server.trace_server_interface import CallsFilter
 
 
 def cast_to_calls_filter(obj: Any) -> CallsFilter:
