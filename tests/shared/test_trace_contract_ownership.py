@@ -6,6 +6,8 @@ from pathlib import Path
 import pytest
 from pydantic.errors import PydanticInvalidForJsonSchema
 
+pytestmark = pytest.mark.trace_server
+
 
 @pytest.mark.parametrize(
     ("module", "name"),

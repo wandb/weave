@@ -1,7 +1,7 @@
 """Unit tests for GenAI semantic convention definitions."""
 
 from weave.shared import otel_span_attrs
-from weave.trace_server.agents import semconv
+from weave.shared.trace_server.agents import semconv
 
 
 def test_all_attribute_constants_are_registered() -> None:
