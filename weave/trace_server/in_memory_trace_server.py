@@ -40,6 +40,7 @@ from weave.shared.digest import (
     compute_table_digest,
 )
 from weave.shared.object_class_util import get_object_name
+from weave.shared.trace_server.evaluate_model_dispatcher import EvaluateModelDispatcher
 from weave.shared.trace_server_interface_util import (
     WILDCARD_ARTIFACT_VERSION_AND_PATH,
     assert_non_null_wb_user_id,
@@ -154,9 +155,6 @@ from weave.trace_server.ttl_settings import (
     invalidate_ttl_cache,
 )
 from weave.trace_server.validation import object_id_validator
-from weave.trace_server.workers.evaluate_model_worker.evaluate_model_worker import (
-    EvaluateModelDispatcher,
-)
 
 logger = logging.getLogger(__name__)
 

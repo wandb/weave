@@ -1,16 +1,16 @@
 import asyncio
-from abc import ABC, abstractmethod
 
 import weave
 from weave.evaluation.eval import Evaluation
 from weave.scorers.llm_as_a_judge_scorer import LLMAsAJudgeScorer
+from weave.shared.trace_server.evaluate_model_dispatcher import EvaluateModelDispatcher
+from weave.shared.trace_server.trace_server_interface import EvaluateModelArgs
 from weave.trace.context.weave_client_context import require_secure_weave_client
 from weave.trace.refs import Ref
 from weave.trace.weave_client import WeaveClient
 from weave.trace_server.interface.builtin_object_classes.llm_structured_model import (
     LLMStructuredCompletionModel,
 )
-from weave.trace_server.trace_server_interface import EvaluateModelArgs
 from weave.trace_server.tracing import traced
 
 EVALUATE_MODEL_WORKER_MARKER = {"_weave_eval_meta": {"evaluate_model_worker": True}}
@@ -21,12 +21,6 @@ EVALUATE_MODEL_WORKER_MARKER = {"_weave_eval_meta": {"evaluate_model_worker": Tr
 # trace_server_interface alongside RescoringArgs so both job types can share
 # the EvalWorkerJob discriminated union.
 __all__ = ["EvaluateModelArgs", "EvaluateModelDispatcher", "evaluate_model"]
-
-
-class EvaluateModelDispatcher(ABC):
-    @abstractmethod
-    def dispatch(self, args: EvaluateModelArgs) -> None:
-        pass
 
 
 def evaluate_model(args: EvaluateModelArgs) -> None:

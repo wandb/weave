@@ -3,6 +3,7 @@ from __future__ import annotations
 import os
 from collections.abc import Callable
 from dataclasses import dataclass
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -29,9 +30,10 @@ from weave.trace_server.clickhouse_trace_server_batched import ClickHouseTraceSe
 from weave.trace_server.in_memory_trace_server import InMemoryTraceServer
 from weave.trace_server.parallel_bucket_uploads import BucketUploadBatch
 from weave.trace_server.project_version import project_version
+from weave.trace_server.project_version.project_version import (
+    reset_project_residence_cache as reset_residence_caches,
+)
 from weave.trace_server.secret_fetcher_context import secret_fetcher_context
-
-pytest_plugins = ["tests.trace_server.conftest_lib.clickhouse_server"]
 
 
 @dataclass(frozen=True)
@@ -403,3 +405,25 @@ def internal_server(client):
         "No known internal trace server (InMemoryTraceServer or "
         "ClickHouseTraceServer) found in the client's middleware chain"
     )
+
+
+@pytest.fixture(autouse=True)
+def patch_kafka_producer():
+    """Patch the Kafka producer. Without this, attempt to connect to the brokers will fail.
+    This is ok but this introduces a `message.timeout.ms` (500ms) delay in each test.
+
+    If a test needs to test the Kafka producer, they should orride this patch explicitly.
+    """
+    with patch(
+        "weave.trace_server.kafka.KafkaProducer.from_env",
+        return_value=MagicMock(),
+    ):
+        yield
+
+
+@pytest.fixture(autouse=True)
+def reset_project_residence_cache():
+    """Clear residence caches (populated LRU + empty TTL) between tests."""
+    reset_residence_caches()
+    yield
+    reset_residence_caches()

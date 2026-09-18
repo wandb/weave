@@ -38,6 +38,7 @@ from weave.shared.digest import (
     compute_table_digest,
 )
 from weave.shared.object_class_util import get_object_name
+from weave.shared.trace_server.evaluate_model_dispatcher import EvaluateModelDispatcher
 from weave.shared.trace_server_interface_util import (
     assert_non_null_wb_user_id,
     extract_refs_from_values,
@@ -339,9 +340,6 @@ from weave.trace_server.ttl_settings import (
     RETENTION_DAYS_NO_TTL,
     get_project_retention_days,
     invalidate_ttl_cache,
-)
-from weave.trace_server.workers.evaluate_model_worker.evaluate_model_worker import (
-    EvaluateModelDispatcher,
 )
 
 logger = logging.getLogger(__name__)
