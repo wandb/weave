@@ -21,21 +21,20 @@ Contract for `@traced(name)`:
     `traced_generator` for streaming.
 
 Contract for `traced_generator(name)`:
-  - Like `@traced` but `yield from`s inside the span body so the span covers
-    the full iteration lifetime.
+  - Like `@traced` but iterates inside the span body so the span covers the
+    full iteration lifetime. Both generator and async-generator shapes are
+    supported.
   - `GeneratorExit` (consumer disconnect) is treated as normal completion.
-  - Async generators are refused — `yield from` doesn't work on them and we
-    don't have a streaming-async use case today.
 """
 
 from __future__ import annotations
 
 import asyncio
 import inspect
-from collections.abc import Callable, Generator, Iterator
+from collections.abc import AsyncGenerator, AsyncIterator, Callable, Generator, Iterator
 from contextlib import contextmanager
 from functools import wraps
-from typing import Any, TypeVar, cast
+from typing import Any, ParamSpec, TypeVar, cast, overload
 
 from opentelemetry import context as otel_context
 from opentelemetry import trace
@@ -43,6 +42,8 @@ from opentelemetry import trace
 from weave.shared.otel_context_keys import WEAVE_SERVER_SPAN_KEY
 
 F = TypeVar("F", bound=Callable[..., Any])
+P = ParamSpec("P")
+T = TypeVar("T")
 
 # Module-scope tracer: re-resolving `get_tracer(...)` per wrapper call costs
 # ~7us/span (measured), and these decorators run on hot CH-query paths with
@@ -81,11 +82,11 @@ def _reject_unsupported_shape(
             f"{fn.__qualname__!r}: the span would end on generator-creation "
             "rather than on exhaustion. Use @traced_generator instead."
         )
-    if inspect.isasyncgenfunction(fn):
+    if inspect.isasyncgenfunction(fn) and "generator" not in allow:
         raise TypeError(
             f"{decorator_name} cannot decorate async generator function "
-            f"{fn.__qualname__!r}: `yield from` does not work on async "
-            "generators. No streaming-async use case is supported today."
+            f"{fn.__qualname__!r}: the span would end on generator-creation "
+            "rather than on exhaustion. Use @traced_generator instead."
         )
 
 
@@ -124,25 +125,35 @@ def traced(name: str) -> Callable[[F], F]:
     return deco
 
 
-def traced_generator(
-    name: str,
-) -> Callable[
-    [Callable[..., Iterator[Any]]], Callable[..., Generator[Any, None, None]]
-]:
-    """Wrap a generator function in an OTel span that spans the full iteration.
+class _TracedGenerator:
+    """The decorator `traced_generator(name)` returns; overloaded by shape."""
 
-    Drop-in replacement for `weave.trace_server.datadog.generator_trace`. Use
-    on streaming endpoints where the function `yield`s rows incrementally.
+    def __init__(self, name: str) -> None:
+        self._name = name
 
-    `GeneratorExit` (consumer calling `gen.close()` or HTTP client disconnect)
-    is treated as normal completion: OTel's `use_span` only catches
-    `Exception`, not `BaseException`.
-    """
+    @overload
+    def __call__(
+        self, fn: Callable[P, AsyncIterator[T]]
+    ) -> Callable[P, AsyncGenerator[T, None]]: ...
 
-    def decorator(
-        fn: Callable[..., Iterator[Any]],
-    ) -> Callable[..., Generator[Any, None, None]]:
+    @overload
+    def __call__(
+        self, fn: Callable[P, Iterator[T]]
+    ) -> Callable[P, Generator[T, None, None]]: ...
+
+    def __call__(self, fn: Callable[..., Any]) -> Callable[..., Any]:
         _reject_unsupported_shape(fn, "@traced_generator", allow="generator")
+        name = self._name
+
+        if inspect.isasyncgenfunction(fn):
+
+            @wraps(fn)
+            async def awrapper(*args: Any, **kwargs: Any) -> AsyncGenerator[Any, None]:
+                with _server_span(name):
+                    async for item in fn(*args, **kwargs):
+                        yield item
+
+            return awrapper
 
         @wraps(fn)
         def wrapper(*args: Any, **kwargs: Any) -> Generator[Any, None, None]:
@@ -151,4 +162,16 @@ def traced_generator(
 
         return wrapper
 
-    return decorator
+
+def traced_generator(name: str) -> _TracedGenerator:
+    """Wrap a generator function in an OTel span that spans the full iteration.
+
+    Drop-in replacement for `weave.trace_server.datadog.generator_trace`. Use
+    on streaming endpoints where the function `yield`s rows incrementally.
+    Accepts generator and async-generator functions.
+
+    `GeneratorExit` (consumer calling `gen.close()` or HTTP client disconnect)
+    is treated as normal completion: OTel's `use_span` only catches
+    `Exception`, not `BaseException`.
+    """
+    return _TracedGenerator(name)
