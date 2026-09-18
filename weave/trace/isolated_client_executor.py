@@ -50,7 +50,7 @@ from weave.trace.context.weave_client_context import (
 )
 from weave.trace.weave_client import WeaveClient
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("weave.trace_server.isolated_client_executor")
 
 # =============================================================================
 # Constants
