@@ -7,6 +7,9 @@ from pydantic import BaseModel
 from typing_extensions import Self
 
 from weave.shared import query as tsi_query
+from weave.shared import trace_server_interface as tsi
+from weave.shared.builtin_object_classes.saved_view import Column, Pin
+from weave.shared.builtin_object_classes.saved_view import SavedView as SavedViewBase
 from weave.shared.common_interface import SortBy
 from weave.trace import urls
 from weave.trace.api import publish as weave_publish
@@ -19,11 +22,6 @@ from weave.trace.display.rich import pydantic_util
 from weave.trace.refs import ObjectRef, OpRef
 from weave.trace.traverse import ObjectPath, get_paths
 from weave.trace.vals import WeaveObject
-from weave.trace_server import trace_server_interface as tsi
-from weave.trace_server.interface.builtin_object_classes.saved_view import Column, Pin
-from weave.trace_server.interface.builtin_object_classes.saved_view import (
-    SavedView as SavedViewBase,
-)
 
 KNOWN_COLUMNS = [
     "id",

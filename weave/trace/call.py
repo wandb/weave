@@ -10,7 +10,15 @@ from typing import TYPE_CHECKING, Any, TypedDict
 from weave.evaluation.eval_meta import EVAL_META_KEY
 from weave.shared.common_interface import SortBy
 from weave.shared.constants import EVALUATION_RUN_OP_NAME, MAX_DISPLAY_NAME_LENGTH
+from weave.shared.project_id import from_project_id
 from weave.shared.query import Query
+from weave.shared.trace_server_interface import (
+    CallSchema,
+    CallsFilter,
+    CallsQueryReq,
+    CallsQueryStatsReq,
+    TraceServerInterface,
+)
 from weave.trace import urls
 from weave.trace.context import weave_client_context
 from weave.trace.feedback import RefFeedbackQuery
@@ -21,16 +29,8 @@ from weave.trace.refs import CallRef, ObjectRef, OpRef
 from weave.trace.serialization.serialize import from_json
 from weave.trace.util import log_once
 from weave.trace.vals import WeaveObject
-from weave.trace_server.trace_server_interface import (
-    CallSchema,
-    CallsFilter,
-    CallsQueryReq,
-    CallsQueryStatsReq,
-    TraceServerInterface,
-)
 from weave.utils.attributes_dict import AttributesDict
 from weave.utils.paginated_iterator import PaginatedIterator
-from weave.utils.project_id import from_project_id
 
 if TYPE_CHECKING:
     from weave.flow.scorer import ApplyScorerResult, Scorer
