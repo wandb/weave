@@ -2,6 +2,7 @@
 
 import time
 
+from weave.shared.ids import generate_id as generate_id_shared
 from weave.trace_server.ids import generate_id
 
 
@@ -71,6 +72,4 @@ def test_uuid_hex_lowercase():
 
 
 def test_shared_ids_is_the_same_function():
-    from weave.shared.ids import generate_id as generate_id_shared
-
     assert generate_id is generate_id_shared

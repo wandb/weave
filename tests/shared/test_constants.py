@@ -1,5 +1,9 @@
+import pytest
+
 from weave.shared import constants
 from weave.trace_server import constants as constants_legacy
+
+pytestmark = pytest.mark.trace_server
 
 
 def test_object_name_length_is_unchanged() -> None:
