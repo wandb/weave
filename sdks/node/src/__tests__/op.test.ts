@@ -2,6 +2,8 @@ import {op} from 'weave';
 import type {Op} from 'weave/opType';
 // Import the actual module
 import * as clientApi from 'weave/clientApi';
+import {TRACE_CALL_EMOJI} from 'weave/constants';
+import {setGlobalDomain} from 'weave/urls';
 
 // Function to create a fresh mock client for each call
 const createFreshMockClient = () => ({
@@ -148,6 +150,24 @@ describe('op wrappers', () => {
     const boundMethod = op(instance, instance.instanceMethod);
     expect((boundMethod as Op<any>).__name).toBe('MyClass.instanceMethod');
     await expect(boundMethod(3)).resolves.toBe(30);
+  });
+
+  it('percent-encodes the project name in the printed call link', async () => {
+    setGlobalDomain('wandb.ai');
+    getGlobalClientSpy.mockImplementationOnce(() => ({
+      ...createFreshMockClient(),
+      projectId: 'wandb/my project',
+      settings: {printCallLink: true},
+    }));
+    const consoleLogSpy = jest.spyOn(console, 'log').mockImplementation();
+
+    await op(async (a: number) => a)(1);
+
+    expect(consoleLogSpy).toHaveBeenCalledWith(
+      `${TRACE_CALL_EMOJI} https://wandb.ai/wandb/my%20project/r/call/mockCallId`
+    );
+
+    consoleLogSpy.mockRestore();
   });
 
   it('runs original function without tracking if weave not initialized', async () => {

@@ -1,5 +1,5 @@
 import {type Call} from './call';
-import {getGlobalDomain} from './urls';
+import {encodeProjectId, encodeURIPath, getGlobalDomain} from './urls';
 import {type WeaveObject} from './weaveObject';
 
 export type ParameterNamesOption = 'useParam0Object' | string[] | undefined;
@@ -120,7 +120,7 @@ export class OpRef {
 
   public ui_url() {
     const domain = getGlobalDomain();
-    return `https://${domain}/${this.projectId}/weave/ops/${this.objectId}/versions/${this.digest}`;
+    return `https://${domain}/${encodeProjectId(this.projectId)}/weave/ops/${encodeURIPath(this.objectId)}/versions/${this.digest}`;
   }
 
   public async get() {

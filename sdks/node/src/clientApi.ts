@@ -5,7 +5,7 @@ import {
   shutdownWeaveTracerProvider,
 } from './genai/provider';
 import {makeSettings, type Settings} from './settings';
-import {defaultHost, getUrls, setGlobalDomain} from './urls';
+import {defaultHost, encodeProjectId, getUrls, setGlobalDomain} from './urls';
 import {ConcurrencyLimiter} from './utils/concurrencyLimit';
 import {Netrc} from './utils/netrc';
 import {createFetchWithRetry} from './utils/retry';
@@ -142,7 +142,9 @@ export async function init(
     setGlobalClient(client);
     setGlobalDomain(domain);
     registerExitFlush();
-    console.log(`View Weave data at https://${domain}/${projectId}/weave`);
+    console.log(
+      `View Weave data at https://${domain}/${encodeProjectId(projectId)}/weave`
+    );
     return client;
   } catch (error) {
     console.error('Error during initialization:', error);
