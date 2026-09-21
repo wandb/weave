@@ -236,6 +236,7 @@ filterwarnings = [
 ]
 addopts = "-v"
 markers = [
+  "requires_backend: requires an explicitly selected backend fixture implementation",
   "trace_server: alias for `trace_server` fixture used for CI dispatching. Do not use directly in code.",
   "disable_logging_error_check: means that the test expects logging errors (and the default assertion for no logging errors will fail)",
   "timeout: marks tests with a timeout in seconds (via pytest-timeout)",
@@ -431,6 +432,16 @@ enable = [".rules.op_deco", ".rules.legacy_methods"]
 disable = ["fixit.rules"]
 
 [dependency-groups]
+sdk_unit = [
+  "pytest>=8.2.0",
+  "pytest-asyncio>=0.23.6",
+  "pytest-cov>=5.0.0",
+  "pytest-rerunfailures>=14.0",
+  "pytest-timeout>=2.3.1",
+  "fastapi>=0.110.0",
+  "httpx",
+  "opentelemetry-proto>=1.28.0",
+]
 dev = [
   # linting
   "prek",
@@ -630,10 +641,9 @@ allow_indirect_imports = true
 # forbidding trace_server's internal imports; every file that does so also
 # leaks via a client subpackage below, so none escape the contract.
 ignore_imports = [
-  "weave.trace_server.interface.builtin_object_classes.llm_structured_model -> weave.prompt.prompt",
-  "weave.trace_server.interface.builtin_object_classes.llm_structured_model -> weave.trace.context.weave_client_context",
-  "weave.trace_server.interface.builtin_object_classes.llm_structured_model -> weave.trace.vals",
-  "weave.trace_server.interface.builtin_object_classes.llm_structured_model -> weave.utils.project_id",
+  # Finite legacy SDK import paths; backend consumers use shared schemas.
+  "weave.trace_server.interface.builtin_object_classes.llm_structured_model -> weave.flow.llm_structured_model",
+  "weave.trace_server.interface.builtin_object_classes.builtin_object_registry -> weave.trace.base_objects",
   "weave.trace_server.isolated_client_executor -> weave.trace.context.weave_client_context",
   "weave.trace_server.isolated_client_executor -> weave.trace.weave_client",
   "weave.trace_server.workers.evaluate_model_worker.evaluate_model_worker -> weave.evaluation.eval",
@@ -677,9 +687,6 @@ allow_indirect_imports = true
 # constants, errors, ids) — the natural target to extract into a neutral
 # contract package as untangling proceeds.
 ignore_imports = [
-  "weave.scorers.llm_as_a_judge_scorer -> weave.trace_server.interface.builtin_object_classes.llm_structured_model",
-  "weave.trace.base_objects -> weave.trace_server.interface.builtin_object_classes.builtin_object_registry",
-  "weave.trace.serialization.serialize -> weave.trace_server.interface.builtin_object_classes.builtin_object_registry",
 ]
 
 [[tool.importlinter.contracts]]
@@ -724,6 +731,6 @@ ignore_imports = [
 [[tool.importlinter.contracts]]
 name = "Shared trace contracts must not import SDK execution or backend code"
 type = "forbidden"
-source_modules = ["weave.shared.trace_server"]
+source_modules = ["weave.shared"]
 forbidden_modules = ["weave.agent", "weave.chat", "weave.compat", "weave.conversation", "weave.dataset", "weave.durability", "weave.evaluation", "weave.flow", "weave.initialization", "weave.integrations", "weave.object", "weave.prompt", "weave.scorers", "weave.session", "weave.telemetry", "weave.trace", "weave.trace_server_bindings", "weave.type_handlers", "weave.type_wrappers", "weave.utils", "weave.wandb_interface", "weave.trace_server"]
 allow_indirect_imports = true

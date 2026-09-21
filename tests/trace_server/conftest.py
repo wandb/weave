@@ -3,10 +3,15 @@ from __future__ import annotations
 import os
 from collections.abc import Callable
 from dataclasses import dataclass
+from unittest.mock import MagicMock, patch
 
 import pytest
 
-from tests.trace.server_utils import TEST_ENTITY, find_server_layer
+from tests.trace.server_utils import (
+    TEST_ENTITY,
+    find_server_layer,
+    get_trace_server_flag,
+)
 from tests.trace_server.conftest_lib.trace_server_external_adapter import (
     DummyIdConverter,
     UserInjectingExternalTraceServer,
@@ -29,9 +34,10 @@ from weave.trace_server.clickhouse_trace_server_batched import ClickHouseTraceSe
 from weave.trace_server.in_memory_trace_server import InMemoryTraceServer
 from weave.trace_server.parallel_bucket_uploads import BucketUploadBatch
 from weave.trace_server.project_version import project_version
+from weave.trace_server.project_version.project_version import (
+    reset_project_residence_cache as reset_residence_caches,
+)
 from weave.trace_server.secret_fetcher_context import secret_fetcher_context
-
-pytest_plugins = ["tests.trace_server.conftest_lib.clickhouse_server"]
 
 
 @dataclass(frozen=True)
@@ -43,65 +49,6 @@ class ClickHouseSessionState:
     unique_db: str
     # Tables that should be truncated between tests (excludes views)
     truncatable_tables: list[str]
-
-
-def pytest_addoption(parser):
-    try:
-        parser.addoption(
-            "--trace-server",
-            action="store",
-            default="clickhouse",
-            help="Specify the backend to use: clickhouse or fake (in-memory)",
-        )
-        parser.addoption(
-            "--ch",
-            "--clickhouse",
-            action="store_true",
-            help="Use clickhouse server (shorthand for --trace-server=clickhouse)",
-        )
-        parser.addoption(
-            "--clickhouse-process",
-            action="store",
-            default="false",
-            help="Use a clickhouse process instead of a container",
-        )
-        parser.addoption(
-            "--remote-http-trace-server",
-            action="store",
-            default="remote",
-            help="Specify the remote HTTP trace server implementation: remote or stainless",
-        )
-    except ValueError:
-        pass
-
-
-def pytest_collection_modifyitems(config, items):
-    # Add the trace_server marker to:
-    # 1. All tests in the trace_server directory (regardless of fixture usage)
-    # 2. All tests that use the trace_server fixture (for tests outside this directory)
-    # Note: Filtering based on remote-http-trace-server flag is handled in tests/trace_server_bindings/conftest.py
-    for item in items:
-        # Check if the test is in the trace_server directory by checking parent directories
-        if "trace_server" in item.path.parts:
-            item.add_marker(pytest.mark.trace_server)
-        # Also mark tests that use the trace_server fixture (for tests outside this dir)
-        elif "trace_server" in item.fixturenames:
-            item.add_marker(pytest.mark.trace_server)
-
-
-def get_trace_server_flag(request):
-    if request.config.getoption("--clickhouse"):
-        return "clickhouse"
-    return request.config.getoption("--trace-server")
-
-
-def get_remote_http_trace_server_flag(request):
-    """Get the remote HTTP trace server implementation to use.
-
-    Returns:
-        str: Either 'remote' for RemoteHTTPTraceServer or 'stainless' for StainlessRemoteHTTPTraceServer
-    """
-    return request.config.getoption("--remote-http-trace-server")
 
 
 @pytest.fixture(autouse=True)
@@ -403,3 +350,51 @@ def internal_server(client):
         "No known internal trace server (InMemoryTraceServer or "
         "ClickHouseTraceServer) found in the client's middleware chain"
     )
+
+
+@pytest.fixture(autouse=True)
+def patch_kafka_producer():
+    """Patch the Kafka producer. Without this, attempt to connect to the brokers will fail.
+    This is ok but this introduces a `message.timeout.ms` (500ms) delay in each test.
+
+    If a test needs to test the Kafka producer, they should orride this patch explicitly.
+    """
+    with patch(
+        "weave.trace_server.kafka.KafkaProducer.from_env",
+        return_value=MagicMock(),
+    ):
+        yield
+
+
+@pytest.fixture(autouse=True)
+def reset_project_residence_cache():
+    """Clear residence caches (populated LRU + empty TTL) between tests."""
+    reset_residence_caches()
+    yield
+    reset_residence_caches()
+
+
+@pytest.fixture
+def force_optimize_if_clickhouse():
+    from tests.trace_server.helpers import force_optimize_if_clickhouse as optimize
+
+    return optimize
+
+
+@pytest.fixture
+def configure_username_resolver(client, monkeypatch):
+    from tests.trace.server_utils import find_server_layer
+    from tests.trace_server.conftest_lib.trace_server_external_adapter import (
+        UserInjectingExternalTraceServer,
+    )
+
+    external_server = find_server_layer(client.server, UserInjectingExternalTraceServer)
+
+    def configure(usernames: dict[str, str]) -> None:
+        internal_names = {
+            external_server._idc.ext_to_int_user_id(user): name
+            for user, name in usernames.items()
+        }
+        monkeypatch.setattr(external_server, "_username_resolver", internal_names.get)
+
+    return configure

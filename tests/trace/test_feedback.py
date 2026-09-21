@@ -3,10 +3,10 @@ import datetime
 import pytest
 
 import weave
-from tests.trace.util import NOT_CLICKHOUSE_BACKEND
-from tests.trace_server.conftest_lib.trace_server_external_adapter import (
+from tests.trace.id_converter import (
     DummyIdConverter,
 )
+from tests.trace.util import NOT_CLICKHOUSE_BACKEND
 from weave import AnnotationSpec
 from weave.trace.weave_client import WeaveClient, get_ref
 from weave.trace_server import trace_server_interface as tsi

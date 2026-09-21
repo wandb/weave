@@ -55,6 +55,7 @@ SHARDS_WITHOUT_EXTRAS = {
     "trace",
     "trace_calls_merged_only",
     "trace_no_server",
+    "sdk_unit",
     "trace_server",
     "trace_server_bindings",
     "trace_server_migrator",
@@ -119,6 +120,7 @@ SHARDS_WITHOUT_EXTRAS = {
         "trace",
         "trace_calls_merged_only",
         "trace_no_server",
+        "sdk_unit",
         "stainless",
     ],
 )
@@ -132,6 +134,16 @@ def tests(session: nox.Session, shard: str):
     # Use --active to sync to the active nox virtual environment
     # Test-related shards (ending in _test/_tests) are dependency groups, not extras
     sync_args = ["uv", "sync", "--active", "--group", "test", "--frozen"]
+    if shard == "sdk_unit":
+        sync_args = [
+            "uv",
+            "sync",
+            "--active",
+            "--no-default-groups",
+            "--group",
+            "sdk_unit",
+            "--frozen",
+        ]
 
     if shard not in SHARDS_WITHOUT_EXTRAS:
         sync_args.extend(["--extra", shard])
@@ -203,8 +215,17 @@ def tests(session: nox.Session, shard: str):
     default_test_dirs = [f"tests/integrations/{shard}/"]
     test_dirs_dict = {
         "custom": [],
+        "sdk_unit": [
+            "tests/trace/test_id_converter.py",
+            "tests/shared/",
+            "tests/trace_server_bindings/",
+        ],
         "flow": ["tests/flow/"],
-        "trace_server": ["tests/trace_server/", "tests/shared/"],
+        "trace_server": [
+            "tests/trace_server/",
+            "tests/shared/",
+            "tests/trace/data_serialization/",
+        ],
         "trace_server_bindings": ["tests/trace_server_bindings/"],
         "trace_server_migrator": ["tests/trace_server_migrator/"],
         "stainless": ["tests/trace_server_bindings/"],
@@ -266,6 +287,10 @@ def tests(session: nox.Session, shard: str):
 
     if shard in {"trace", "trace_calls_merged_only"}:
         pytest_args.extend(["-m", "trace_server"])
+
+    if shard == "sdk_unit":
+        env["WEAVE_TEST_BACKEND_PLUGIN"] = "none"
+        pytest_args.extend(["-m", "not requires_backend"])
 
     if shard == "trace_no_server":
         pytest_args.extend(["-m", "not trace_server"])

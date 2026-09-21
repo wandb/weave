@@ -13,16 +13,13 @@ from fastapi.responses import StreamingResponse
 from fastapi.testclient import TestClient
 
 import weave
+from tests.trace.server_utils import TEST_ENTITY, get_trace_server_flag
 from tests.trace.util import DummyTestException
-from tests.trace_server.conftest import TEST_ENTITY, get_trace_server_flag
 from weave.trace import weave_client, weave_init
 from weave.trace.context import weave_client_context
 from weave.trace.context.call_context import set_call_stack
 from weave.trace.settings import replace_settings
 from weave.trace_server import trace_server_interface as tsi
-from weave.trace_server.project_version.project_version import (
-    reset_project_residence_cache as reset_residence_caches,
-)
 from weave.trace_server_bindings import remote_http_trace_server
 from weave.trace_server_bindings.async_batch_processor import AsyncBatchProcessor
 from weave.trace_server_bindings.caching_middleware_trace_server import (
@@ -31,7 +28,19 @@ from weave.trace_server_bindings.caching_middleware_trace_server import (
 from weave.trace_server_bindings.call_batch_processor import CallBatchProcessor
 from weave.trace_server_bindings.remote_http_trace_server import RemoteHTTPTraceServer
 
-pytest_plugins = ["tests.trace_server.conftest"]
+pytest_plugins = ["tests.trace.backend_options"]
+_backend_plugin = os.environ.get(
+    "WEAVE_TEST_BACKEND_PLUGIN", "tests.trace_server.conftest"
+)
+if _backend_plugin != "none":
+    pytest_plugins.append(_backend_plugin)
+    if _backend_plugin == "tests.trace_server.conftest":
+        pytest_plugins.extend(
+            [
+                "tests.trace_server.conftest_lib.clickhouse_server",
+                "tests.trace_server.sdk_storage_fixtures",
+            ]
+        )
 
 # Force testing to never report wandb sentry events
 os.environ["WANDB_ERROR_REPORTING"] = "false"
@@ -42,20 +51,6 @@ os.environ["WANDB_ERROR_REPORTING"] = "false"
 # including flush overhead).  On ClickHouse with concurrent eval rows the
 # flush contention can exceed 1s on loaded CI runners.
 LATENCY_TOL = 10 if sys.platform == "win32" else 2
-
-
-@pytest.fixture(autouse=True)
-def patch_kafka_producer():
-    """Patch the Kafka producer. Without this, attempt to connect to the brokers will fail.
-    This is ok but this introduces a `message.timeout.ms` (500ms) delay in each test.
-
-    If a test needs to test the Kafka producer, they should orride this patch explicitly.
-    """
-    with patch(
-        "weave.trace_server.kafka.KafkaProducer.from_env",
-        return_value=MagicMock(),
-    ):
-        yield
 
 
 @pytest.fixture(autouse=True)
@@ -74,6 +69,15 @@ def reset_serializer_load_refs():
     from weave.trace.ref_util import remove_ref
     from weave.trace.serialization.serializer import SERIALIZERS
 
+    # Builtin Ops outlive the disposable database, even when the project ID is reused.
+    for operation in (
+        weave.Evaluation.evaluate,
+        weave.Evaluation.predict_and_score,
+        weave.Evaluation.summarize,
+        weave.Scorer.summarize,
+    ):
+        remove_ref(operation)
+
     # Before test: clear refs from serializer load functions
     for serializer in SERIALIZERS:
         if isinstance(serializer.load, Op):
@@ -81,18 +85,18 @@ def reset_serializer_load_refs():
 
     yield
 
+    for operation in (
+        weave.Evaluation.evaluate,
+        weave.Evaluation.predict_and_score,
+        weave.Evaluation.summarize,
+        weave.Scorer.summarize,
+    ):
+        remove_ref(operation)
+
     # After test: clear refs again to prevent pollution to other tests
     for serializer in SERIALIZERS:
         if isinstance(serializer.load, Op):
             remove_ref(serializer.load)
-
-
-@pytest.fixture(autouse=True)
-def reset_project_residence_cache():
-    """Clear residence caches (populated LRU + empty TTL) between tests."""
-    reset_residence_caches()
-    yield
-    reset_residence_caches()
 
 
 @pytest.fixture(autouse=True)
@@ -600,7 +604,8 @@ def network_proxy_client(client, monkeypatch):
     We probably will want to flesh this out more in the future, but this is a
     starting point.
     """
-    app = FastAPI()
+    # Match production: deployed SDKs can send JSON without Content-Type.
+    app = FastAPI(strict_content_type=False)
 
     records = []
 

@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterator
 from typing import TypeVar
 
-from weave.trace_server import trace_server_interface as tsi
+from weave.shared.trace_server import trace_server_interface as tsi
 
 T = TypeVar("T")
 
@@ -14,28 +15,54 @@ TEST_ENTITY = "shawn"
 _NEXT_SERVER_ATTRS = ("server", "_next_trace_server", "_internal_trace_server")
 
 
-def find_server_layer(server: tsi.TraceServerInterface, layer_type: type[T]) -> T:
-    """Walk the middleware chain and return the first instance of layer_type.
-
-    Each wrapper in the test server stack stores its inner server under a
-    different attribute name.  This function checks them all so callers
-    don't need to know the wrapping order.
-    """
+def _server_layers(
+    server: tsi.TraceServerInterface,
+) -> Iterator[tsi.TraceServerInterface]:
     current: tsi.TraceServerInterface | None = server
     visited: set[int] = set()
     while current is not None:
-        if isinstance(current, layer_type):
-            return current
-        obj_id = id(current)
-        if obj_id in visited:
-            break
-        visited.add(obj_id)
+        if id(current) in visited:
+            return
+        visited.add(id(current))
+        yield current
         next_layer = None
         for attr in _NEXT_SERVER_ATTRS:
             next_layer = getattr(current, attr, None)
             if next_layer is not None:
                 break
         current = next_layer
+
+
+def find_server_layer(server: tsi.TraceServerInterface, layer_type: type[T]) -> T:
+    for current in _server_layers(server):
+        if isinstance(current, layer_type):
+            return current
     raise TypeError(
         f"Could not find {layer_type.__name__} in the server middleware chain"
     )
+
+
+def server_has_layer(
+    server: tsi.TraceServerInterface, qualified_names: frozenset[str]
+) -> bool:
+    """Identify a real backend without importing its optional implementation."""
+    return any(
+        f"{base.__module__}.{base.__qualname__}" in qualified_names
+        for current in _server_layers(server)
+        for base in type(current).__mro__
+    )
+
+
+def get_trace_server_flag(request):
+    if request.config.getoption("--clickhouse"):
+        return "clickhouse"
+    return request.config.getoption("--trace-server")
+
+
+def get_remote_http_trace_server_flag(request):
+    """Get the remote HTTP trace server implementation to use.
+
+    Returns:
+        str: Either 'remote' for RemoteHTTPTraceServer or 'stainless' for StainlessRemoteHTTPTraceServer
+    """
+    return request.config.getoption("--remote-http-trace-server")

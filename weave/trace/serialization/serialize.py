@@ -442,7 +442,7 @@ def from_json(obj: Any, project_id: str, server: TraceServerInterface) -> Any:
 
             return custom_objs.decode_custom_obj(encoded)
         elif isinstance(val_type, str) and obj.get("_class_name") == val_type:
-            from weave.trace_server.interface.builtin_object_classes.builtin_object_registry import (
+            from weave.trace.base_objects import (
                 BUILTIN_OBJECT_REGISTRY,
             )
 

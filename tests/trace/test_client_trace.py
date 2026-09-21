@@ -20,6 +20,9 @@ from pydantic import BaseModel, ValidationError
 
 import weave
 import weave.trace.call
+from tests.trace.id_converter import (
+    DummyIdConverter,
+)
 from tests.trace.server_utils import find_server_layer
 from tests.trace.util import (
     NOT_CLICKHOUSE_BACKEND,
@@ -29,10 +32,7 @@ from tests.trace.util import (
     MaybeStringMatcher,
     get_info_loglines,
 )
-from tests.trace_server.conftest_lib.trace_server_external_adapter import (
-    DummyIdConverter,
-)
-from tests.trace_server.helpers import force_optimize, force_optimize_if_clickhouse
+from tests.trace_server.helpers import force_optimize
 from weave import Thread, ThreadPoolExecutor
 from weave.shared.refs_internal import extra_value_quoter
 from weave.shared.trace_server_interface_util import (
@@ -4585,7 +4585,7 @@ def clickhouse_client(client):
     return ch_server.ch_client
 
 
-def test_calls_query_with_storage_size_clickhouse(client):
+def test_calls_query_with_storage_size_clickhouse(client, force_optimize_if_clickhouse):
     """Test querying calls with storage size information."""
 
     @weave.op
@@ -4618,7 +4618,9 @@ def test_calls_query_with_storage_size_clickhouse(client):
     assert call.storage_size_bytes is not None
 
 
-def test_calls_query_with_total_storage_size_clickhouse(client):
+def test_calls_query_with_total_storage_size_clickhouse(
+    client, force_optimize_if_clickhouse
+):
     """Test querying calls with total storage size."""
 
     @weave.op
@@ -4669,7 +4671,9 @@ def test_calls_query_with_total_storage_size_clickhouse(client):
     )  # Child should not have total size
 
 
-def test_calls_query_with_both_storage_sizes_clickhouse(client):
+def test_calls_query_with_both_storage_sizes_clickhouse(
+    client, force_optimize_if_clickhouse
+):
     """Test querying calls with total storage size."""
 
     @weave.op
@@ -4720,7 +4724,7 @@ def test_calls_query_with_both_storage_sizes_clickhouse(client):
     assert child_call.total_storage_size_bytes is None
 
 
-def test_total_storage_size_is_project_scoped(client):
+def test_total_storage_size_is_project_scoped(client, force_optimize_if_clickhouse):
     project_id = get_client_project_id(client)
     entity, _ = from_project_id(project_id)
     other_project_id = to_project_id(entity, f"total-storage-other-{uuid.uuid4().hex}")
@@ -4857,7 +4861,9 @@ def test_obj_query_with_storage_size_clickhouse(client):
     assert queried_obj_without_size.size_bytes is None
 
 
-def test_call_query_stream_with_costs_and_storage_size(client):
+def test_call_query_stream_with_costs_and_storage_size(
+    client, force_optimize_if_clickhouse
+):
     @weave.op
     def child_op(a: int, b: int) -> dict[str, Any]:
         return {
@@ -5318,7 +5324,9 @@ def test_calls_query_thread_ids_filter_returns_matching_thread(client):
     assert res.calls[0].thread_id == thread_2
 
 
-def test_calls_query_stats_total_storage_size_clickhouse(client):
+def test_calls_query_stats_total_storage_size_clickhouse(
+    client, force_optimize_if_clickhouse
+):
     """Test querying calls with total storage size."""
 
     @weave.op

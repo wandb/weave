@@ -1,6 +1,9 @@
 from unittest.mock import patch
 
 import weave
+from weave.flow.llm_structured_model import (
+    LLMStructuredCompletionModelDefaultParams,
+)
 from weave.flow.scorer import Scorer
 from weave.prompt.prompt import MessagesPrompt
 from weave.scorers import LLMAsAJudgeScorer
@@ -9,9 +12,6 @@ from weave.trace.refs import ObjectRef
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.interface.builtin_object_classes.builtin_object_registry import (
     LLMStructuredCompletionModel,
-)
-from weave.trace_server.interface.builtin_object_classes.llm_structured_model import (
-    LLMStructuredCompletionModelDefaultParams,
 )
 
 
