@@ -21,7 +21,7 @@ from tests.trace_server_bindings.conftest import (
     generate_end,
     generate_start,
 )
-from weave.trace_server import common_interface
+from weave.shared import common_interface
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server_bindings.call_batch_processor import CallBatchProcessor
 from weave.trace_server_bindings.models import (

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Protocol
 
-from weave.trace_server.service_interface import ServiceInterface
+from weave.shared.service_interface import ServiceInterface
 from weave.trace_server.trace_server_interface import FullTraceServerInterface
 
 
