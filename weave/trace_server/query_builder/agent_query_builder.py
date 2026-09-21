@@ -1928,11 +1928,9 @@ def make_agent_versions_list_query(pb: ParamBuilder, req: AgentVersionsQueryReq)
 def make_message_search_query(pb: ParamBuilder, req: AgentSearchReq) -> str:
     """Search messages by content + span-level filters.
 
-    Single-table scan against the `messages` table populated by an MV off
-    `spans`. Content is stored inline (ClickHouse columnar compression
-    handles repetition); `content_digest` is available for read-side dedup
-    via GROUP BY when the caller wants unique content rather than unique
-    occurrences.
+    Collapse repeated (role, content_digest) messages within each conversation
+    before pagination. Return the first occurrence, ordered by latest activity.
+    Messages without a conversation ID are deduplicated within their trace.
     """
     filters = _search_filter_sql(pb, req)
     # Bounds (`0 <= limit <= MAX_SEARCH_LIMIT`, `offset >= 0`) are
@@ -1950,13 +1948,24 @@ def make_message_search_query(pb: ParamBuilder, req: AgentSearchReq) -> str:
     # the Python API surface (AgentSearchMatchedMessage.content_digest: str)
     # keeps a portable text representation.
     return f"""
-        SELECT conversation_id, conversation_name, agent_name,
-               span_id, trace_id, role,
-               {content_expr} AS content,
-               lower(hex(content_digest)) AS content_digest, started_at
-        FROM messages
-        WHERE {filters.where}
-        ORDER BY started_at DESC
+        SELECT conversation_id,
+               first_match.1 AS conversation_name, first_match.2 AS agent_name,
+               first_match.3 AS span_id, first_match.4 AS trace_id, role,
+               first_match.5 AS content,
+               lower(hex(content_digest)) AS content_digest,
+               first_match.6 AS started_at, last_activity
+        FROM (
+            SELECT conversation_id, role, content_digest,
+                   argMin(tuple(conversation_name, agent_name, span_id, trace_id,
+                                {content_expr}, started_at),
+                          tuple(started_at, span_id)) AS first_match,
+                   max(started_at) AS last_activity
+            FROM messages
+            WHERE {filters.where}
+            GROUP BY conversation_id, if(conversation_id = '', trace_id, ''),
+                     role, content_digest
+        )
+        ORDER BY last_activity DESC, conversation_id, role, content_digest, trace_id, span_id
         LIMIT {limit_slot} OFFSET {offset_slot}
     """
 

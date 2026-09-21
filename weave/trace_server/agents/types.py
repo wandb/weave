@@ -1071,6 +1071,8 @@ class AgentSearchReq(BaseModel):
     started_after: datetime.datetime | None = None
     started_before: datetime.datetime | None = None
 
+    # Pagination counts distinct (role, content) messages per conversation.
+    # Each hit points to its first matching occurrence within the filters.
     limit: int = Field(default=DEFAULT_SEARCH_LIMIT, ge=0, le=MAX_SEARCH_LIMIT)
     offset: int = Field(default=0, ge=0)
 

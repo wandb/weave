@@ -617,13 +617,14 @@ class AgentQueryHandler:
         for r in rows:
             cid = safe_str(r.get("conversation_id")) or NO_CONVERSATION_LABEL
             started_at = _datetime_or_min(r.get("started_at"))
+            last_activity = _datetime_or_min(r.get("last_activity"))
             if cid not in convs:
                 convs[cid] = AgentSearchConversationResult(
                     conversation_id=cid,
                     conversation_name=safe_str(r.get("conversation_name")),
                     agent_name=safe_str(r.get("agent_name")),
                     matched_messages=[],
-                    last_activity=started_at,
+                    last_activity=last_activity,
                 )
             convs[cid].matched_messages.append(
                 AgentSearchMatchedMessage(
@@ -638,7 +639,7 @@ class AgentQueryHandler:
             # Track the most recent match across all rows for this
             # conversation so the sidebar sort order is stable regardless
             # of row arrival order.
-            convs[cid].last_activity = max(convs[cid].last_activity, started_at)
+            convs[cid].last_activity = max(convs[cid].last_activity, last_activity)
 
         results = sorted(
             convs.values(),

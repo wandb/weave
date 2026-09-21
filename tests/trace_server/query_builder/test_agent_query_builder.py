@@ -2058,14 +2058,25 @@ class TestMakeMessageSearchQuery:
         )
 
         expected = """
-            SELECT conversation_id, conversation_name, agent_name,
-                   span_id, trace_id, role,
-                   substring(content, 1, 500) AS content,
-                   lower(hex(content_digest)) AS content_digest, started_at
-            FROM messages
-            WHERE project_id = {genai_0:String}
+            SELECT conversation_id,
+                   first_match.1 AS conversation_name, first_match.2 AS agent_name,
+                   first_match.3 AS span_id, first_match.4 AS trace_id, role,
+                   first_match.5 AS content,
+                   lower(hex(content_digest)) AS content_digest,
+                   first_match.6 AS started_at, last_activity
+            FROM (
+                SELECT conversation_id, role, content_digest,
+                       argMin(tuple(conversation_name, agent_name, span_id, trace_id,
+                                    substring(content, 1, 500), started_at),
+                              tuple(started_at, span_id)) AS first_match,
+                       max(started_at) AS last_activity
+                FROM messages
+                WHERE project_id = {genai_0:String}
             AND content LIKE {genai_1:String}
-            ORDER BY started_at DESC
+                GROUP BY conversation_id, if(conversation_id = '', trace_id, ''),
+                         role, content_digest
+            )
+            ORDER BY last_activity DESC, conversation_id, role, content_digest, trace_id, span_id
             LIMIT {genai_2:UInt64} OFFSET {genai_3:UInt64}
         """
         expected_params = {
@@ -2090,17 +2101,28 @@ class TestMakeMessageSearchQuery:
         )
 
         expected = """
-            SELECT conversation_id, conversation_name, agent_name,
-                   span_id, trace_id, role,
-                   substring(content, 1, 500) AS content,
-                   lower(hex(content_digest)) AS content_digest, started_at
-            FROM messages
-            WHERE project_id = {genai_0:String}
+            SELECT conversation_id,
+                   first_match.1 AS conversation_name, first_match.2 AS agent_name,
+                   first_match.3 AS span_id, first_match.4 AS trace_id, role,
+                   first_match.5 AS content,
+                   lower(hex(content_digest)) AS content_digest,
+                   first_match.6 AS started_at, last_activity
+            FROM (
+                SELECT conversation_id, role, content_digest,
+                       argMin(tuple(conversation_name, agent_name, span_id, trace_id,
+                                    substring(content, 1, 500), started_at),
+                              tuple(started_at, span_id)) AS first_match,
+                       max(started_at) AS last_activity
+                FROM messages
+                WHERE project_id = {genai_0:String}
             AND content LIKE {genai_1:String}
               AND role IN {genai_2:Array(String)}
               AND agent_name = {genai_3:String}
               AND conversation_id = {genai_4:String}
-            ORDER BY started_at DESC
+                GROUP BY conversation_id, if(conversation_id = '', trace_id, ''),
+                         role, content_digest
+            )
+            ORDER BY last_activity DESC, conversation_id, role, content_digest, trace_id, span_id
             LIMIT {genai_5:UInt64} OFFSET {genai_6:UInt64}
         """
         expected_params = {
@@ -2122,15 +2144,26 @@ class TestMakeMessageSearchQuery:
         )
 
         expected = """
-            SELECT conversation_id, conversation_name, agent_name,
-                   span_id, trace_id, role,
-                   substring(content, 1, 500) AS content,
-                   lower(hex(content_digest)) AS content_digest, started_at
-            FROM messages
-            WHERE project_id = {genai_0:String}
+            SELECT conversation_id,
+                   first_match.1 AS conversation_name, first_match.2 AS agent_name,
+                   first_match.3 AS span_id, first_match.4 AS trace_id, role,
+                   first_match.5 AS content,
+                   lower(hex(content_digest)) AS content_digest,
+                   first_match.6 AS started_at, last_activity
+            FROM (
+                SELECT conversation_id, role, content_digest,
+                       argMin(tuple(conversation_name, agent_name, span_id, trace_id,
+                                    substring(content, 1, 500), started_at),
+                              tuple(started_at, span_id)) AS first_match,
+                       max(started_at) AS last_activity
+                FROM messages
+                WHERE project_id = {genai_0:String}
             AND content LIKE {genai_1:String}
               AND role IN {genai_2:Array(String)}
-            ORDER BY started_at DESC
+                GROUP BY conversation_id, if(conversation_id = '', trace_id, ''),
+                         role, content_digest
+            )
+            ORDER BY last_activity DESC, conversation_id, role, content_digest, trace_id, span_id
             LIMIT {genai_3:UInt64} OFFSET {genai_4:UInt64}
         """
         expected_params = {
@@ -2167,15 +2200,26 @@ class TestMakeMessageSearchQuery:
         )
 
         expected = """
-            SELECT conversation_id, conversation_name, agent_name,
-                   span_id, trace_id, role,
-                   content AS content,
-                   lower(hex(content_digest)) AS content_digest, started_at
-            FROM messages
-            WHERE project_id = {genai_0:String}
+            SELECT conversation_id,
+                   first_match.1 AS conversation_name, first_match.2 AS agent_name,
+                   first_match.3 AS span_id, first_match.4 AS trace_id, role,
+                   first_match.5 AS content,
+                   lower(hex(content_digest)) AS content_digest,
+                   first_match.6 AS started_at, last_activity
+            FROM (
+                SELECT conversation_id, role, content_digest,
+                       argMin(tuple(conversation_name, agent_name, span_id, trace_id,
+                                    content, started_at),
+                              tuple(started_at, span_id)) AS first_match,
+                       max(started_at) AS last_activity
+                FROM messages
+                WHERE project_id = {genai_0:String}
               AND trace_id = {genai_1:String}
               AND role IN {genai_2:Array(String)}
-            ORDER BY started_at DESC
+                GROUP BY conversation_id, if(conversation_id = '', trace_id, ''),
+                         role, content_digest
+            )
+            ORDER BY last_activity DESC, conversation_id, role, content_digest, trace_id, span_id
             LIMIT {genai_3:UInt64} OFFSET {genai_4:UInt64}
         """
         expected_params = {

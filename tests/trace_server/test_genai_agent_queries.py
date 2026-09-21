@@ -2860,10 +2860,7 @@ def test_message_search(ch_server):
 
 
 def test_message_search_shared_digest_across_spans(ch_server):
-    """Two spans carrying identical output message content should produce
-    two rows in `messages` that share a single content_digest — enabling
-    read-side dedup via GROUP BY content_digest when desired.
-    """
+    """Equal content in separate conversations remains separately selectable."""
     project_id = _make_project_id("search_dedup")
     now = datetime.datetime.now(tz=datetime.timezone.utc)
 
@@ -2887,12 +2884,110 @@ def test_message_search_shared_digest_across_spans(ch_server):
     res = ch_server.agent_search(
         AgentSearchReq(project_id=project_id, query="Identical assistant")
     )
-    # One row per occurrence across two conversations
+    # One match per conversation, even though the content is identical.
     total_matches = sum(len(r.matched_messages) for r in res.results)
     assert total_matches == 2
     # Both occurrences share a single content_digest
     digests = {m.content_digest for r in res.results for m in r.matched_messages}
     assert len(digests) == 1
+
+
+def test_message_search_deduplicates_before_pagination(ch_server):
+    project_id = _make_project_id("search_first_occurrence")
+    now = datetime.datetime.now(tz=datetime.timezone.utc)
+    repeated = [
+        _make_span(
+            project_id,
+            conversation_id="repeated-conv",
+            conversation_name="Original conversation",
+            output_messages=[
+                NormalizedMessage(role="assistant", content="timeout repeated")
+            ],
+            started_at=now + datetime.timedelta(seconds=index),
+        )
+        for index in range(25)
+    ]
+    older = _make_span(
+        project_id,
+        conversation_id="repeated-conv",
+        output_messages=[NormalizedMessage(role="assistant", content="timeout older")],
+        started_at=now - datetime.timedelta(seconds=1),
+    )
+    other = _make_span(
+        project_id,
+        conversation_id="other-conv",
+        output_messages=[NormalizedMessage(role="assistant", content="timeout other")],
+        started_at=now + datetime.timedelta(seconds=10),
+    )
+    _insert_spans(ch_server.ch_client, [*reversed(repeated), older, other])
+
+    res = ch_server.agent_search(AgentSearchReq(project_id=project_id, query="timeout"))
+
+    assert [r.conversation_id for r in res.results] == ["repeated-conv", "other-conv"]
+    assert res.total_conversations == 2
+    assert res.results[0].conversation_name == "Original conversation"
+    assert (
+        res.results[0].last_activity.replace(tzinfo=datetime.timezone.utc)
+        == repeated[-1].started_at
+    )
+    assert [
+        (
+            m.span_id,
+            m.trace_id,
+            m.role,
+            m.content_preview,
+            m.started_at.replace(tzinfo=datetime.timezone.utc),
+        )
+        for r in res.results
+        for m in r.matched_messages
+    ] == [
+        (
+            span.span_id,
+            span.trace_id,
+            "assistant",
+            span.output_messages[0].content,
+            span.started_at,
+        )
+        for span in [repeated[0], older, other]
+    ]
+
+    first_page = ch_server.agent_search(
+        AgentSearchReq(project_id=project_id, query="timeout", limit=2)
+    )
+    second_page = ch_server.agent_search(
+        AgentSearchReq(project_id=project_id, query="timeout", limit=2, offset=2)
+    )
+    assert [m.span_id for r in first_page.results for m in r.matched_messages] == [
+        repeated[0].span_id,
+        other.span_id,
+    ]
+    assert [m.span_id for r in second_page.results for m in r.matched_messages] == [
+        older.span_id
+    ]
+
+
+@pytest.mark.parametrize("conversation_id", ["shared-conversation", ""])
+def test_message_search_deduplication_scope(ch_server, conversation_id):
+    project_id = _make_project_id("search_scope")
+    now = datetime.datetime.now(tz=datetime.timezone.utc)
+    spans = [
+        _make_span(
+            project_id,
+            conversation_id=conversation_id,
+            input_messages=[NormalizedMessage(role=role, content="same message")],
+            started_at=now + datetime.timedelta(seconds=index),
+        )
+        for index, role in enumerate(["user", "assistant", "assistant"])
+    ]
+    _insert_spans(ch_server.ch_client, spans)
+
+    res = ch_server.agent_search(
+        AgentSearchReq(project_id=project_id, query="same message")
+    )
+    assert [(m.span_id, m.role) for r in res.results for m in r.matched_messages] == [
+        (span.span_id, span.input_messages[0].role)
+        for span in ([spans[1], spans[0]] if conversation_id else list(reversed(spans)))
+    ]
 
 
 def test_message_search_trace_id_full_content(ch_server):
