@@ -676,31 +676,9 @@ allow_indirect_imports = true
 # constants, errors, ids) — the natural target to extract into a neutral
 # contract package as untangling proceeds.
 ignore_imports = [
-  "weave.durability.wal_sender -> weave.trace_server.trace_server_interface",
-  "weave.evaluation.eval -> weave.trace_server.trace_server_interface",
-  "weave.flow.leaderboard -> weave.trace_server.trace_server_interface",
-  "weave.flow.saved_view -> weave.trace_server.interface.builtin_object_classes.saved_view",
-  "weave.flow.saved_view -> weave.trace_server.trace_server_interface",
   "weave.scorers.llm_as_a_judge_scorer -> weave.trace_server.interface.builtin_object_classes.llm_structured_model",
   "weave.trace.base_objects -> weave.trace_server.interface.builtin_object_classes.builtin_object_registry",
-  "weave.trace.call -> weave.trace_server.trace_server_interface",
-  "weave.trace.casting -> weave.trace_server.trace_server_interface",
-  "weave.trace.feedback -> weave.trace_server.trace_server_interface",
-  "weave.trace.project_id_resolver -> weave.trace_server.trace_server_interface",
-  "weave.trace.serialization.custom_objs -> weave.trace_server.trace_server_interface",
   "weave.trace.serialization.serialize -> weave.trace_server.interface.builtin_object_classes.builtin_object_registry",
-  "weave.trace.serialization.serialize -> weave.trace_server.trace_server_interface",
-  "weave.trace.vals -> weave.trace_server.trace_server_interface",
-  "weave.trace.weave_client -> weave.trace_server.trace_server_interface",
-  "weave.trace.weave_client_send_file_cache -> weave.trace_server.trace_server_interface",
-  "weave.trace_server_bindings.caching_middleware_trace_server -> weave.trace_server.trace_server_interface",
-  "weave.trace_server_bindings.call_batch_processor -> weave.trace_server.trace_server_interface",
-  "weave.trace_server_bindings.client_interface -> weave.trace_server.trace_server_interface",
-  "weave.trace_server_bindings.delegating_trace_server -> weave.trace_server.trace_server_interface",
-  "weave.trace_server_bindings.http_utils -> weave.trace_server.trace_server_interface",
-  "weave.trace_server_bindings.models -> weave.trace_server.trace_server_interface",
-  "weave.trace_server_bindings.remote_http_trace_server -> weave.trace_server.trace_server_interface",
-  "weave.trace_server_bindings.stainless_remote_http_trace_server -> weave.trace_server.trace_server_interface",
 ]
 
 [[tool.importlinter.contracts]]

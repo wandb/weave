@@ -4,7 +4,7 @@ import pydantic
 
 from weave.shared.common_interface import SortBy
 from weave.shared.query import Query
-from weave.trace_server.trace_server_interface import CallsFilter
+from weave.shared.trace_server_interface import CallsFilter
 
 
 def cast_to_calls_filter(obj: Any) -> CallsFilter:

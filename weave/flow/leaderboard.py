@@ -5,9 +5,9 @@ from typing import Any
 
 from weave.shared.builtin_object_classes import leaderboard
 from weave.shared.project_id import from_project_id
+from weave.shared.trace_server_interface import CallsFilter
 from weave.trace.refs import OpRef
 from weave.trace.weave_client import WeaveClient, get_ref
-from weave.trace_server.trace_server_interface import CallsFilter
 
 
 @dataclass(slots=True, frozen=True)
