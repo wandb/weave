@@ -11,6 +11,10 @@
     "litellm_provider": "coreweave",
     "api_key_name": "WANDB_API_KEY"
   },
+  "google/gemma-4-26B-A4B-it": {
+    "litellm_provider": "coreweave",
+    "api_key_name": "WANDB_API_KEY"
+  },
   "ibm-granite/granite-4.2-8b": {
     "litellm_provider": "coreweave",
     "api_key_name": "WANDB_API_KEY"
@@ -151,6 +155,10 @@
     "litellm_provider": "coreweave",
     "api_key_name": "WANDB_API_KEY"
   },
+  "deepseek-ai/DeepSeek-V4.1-Flash": {
+    "litellm_provider": "coreweave",
+    "api_key_name": "WANDB_API_KEY"
+  },
   "deepseek-ai/DeepSeek-V4-Flash": {
     "litellm_provider": "coreweave",
     "api_key_name": "WANDB_API_KEY"
@@ -252,6 +260,10 @@
     "api_key_name": "BEDROCK_API_KEY"
   },
   "writer.palmyra-x5-v1:0": {
+    "litellm_provider": "bedrock_converse",
+    "api_key_name": "BEDROCK_API_KEY"
+  },
+  "writer.palmyra-vision-7b": {
     "litellm_provider": "bedrock_converse",
     "api_key_name": "BEDROCK_API_KEY"
   },
@@ -767,6 +779,10 @@
     "litellm_provider": "azure_ai",
     "api_key_name": "AZURE_API_KEY"
   },
+  "azure_ai/gpt-image-2": {
+    "litellm_provider": "azure_ai",
+    "api_key_name": "AZURE_API_KEY"
+  },
   "azure_ai/codex-mini": {
     "litellm_provider": "azure_ai",
     "api_key_name": "AZURE_API_KEY"
@@ -776,6 +792,10 @@
     "api_key_name": "AZURE_API_KEY"
   },
   "azure_ai/gpt-5.5-2026-04-23": {
+    "litellm_provider": "azure_ai",
+    "api_key_name": "AZURE_API_KEY"
+  },
+  "azure_ai/gpt-5.5-2026-04-24": {
     "litellm_provider": "azure_ai",
     "api_key_name": "AZURE_API_KEY"
   },
@@ -1275,7 +1295,15 @@
     "litellm_provider": "azure",
     "api_key_name": "AZURE_API_KEY"
   },
+  "azure/gpt-5.6-sol-2026-07-09": {
+    "litellm_provider": "azure",
+    "api_key_name": "AZURE_API_KEY"
+  },
   "azure/gpt-5.6-terra": {
+    "litellm_provider": "azure",
+    "api_key_name": "AZURE_API_KEY"
+  },
+  "azure/gpt-5.6-terra-2026-07-09": {
     "litellm_provider": "azure",
     "api_key_name": "AZURE_API_KEY"
   },
@@ -1283,7 +1311,23 @@
     "litellm_provider": "azure",
     "api_key_name": "AZURE_API_KEY"
   },
+  "azure/gpt-5.6-luna-2026-07-09": {
+    "litellm_provider": "azure",
+    "api_key_name": "AZURE_API_KEY"
+  },
   "azure/gpt-6-astra": {
+    "litellm_provider": "azure",
+    "api_key_name": "AZURE_API_KEY"
+  },
+  "azure/gpt-6-astra-2026-09-03": {
+    "litellm_provider": "azure",
+    "api_key_name": "AZURE_API_KEY"
+  },
+  "azure/gpt-chat-latest": {
+    "litellm_provider": "azure",
+    "api_key_name": "AZURE_API_KEY"
+  },
+  "azure/chat-latest": {
     "litellm_provider": "azure",
     "api_key_name": "AZURE_API_KEY"
   },
@@ -1304,6 +1348,10 @@
     "api_key_name": "AZURE_API_KEY"
   },
   "azure/us/gpt-6-astra": {
+    "litellm_provider": "azure",
+    "api_key_name": "AZURE_API_KEY"
+  },
+  "azure/us/gpt-chat-latest": {
     "litellm_provider": "azure",
     "api_key_name": "AZURE_API_KEY"
   },
@@ -1339,11 +1387,23 @@
     "litellm_provider": "azure",
     "api_key_name": "AZURE_API_KEY"
   },
+  "azure/gpt-5.5-2026-04-24": {
+    "litellm_provider": "azure",
+    "api_key_name": "AZURE_API_KEY"
+  },
   "azure/us/gpt-5.5-2026-04-23": {
     "litellm_provider": "azure",
     "api_key_name": "AZURE_API_KEY"
   },
+  "azure/us/gpt-5.5-2026-04-24": {
+    "litellm_provider": "azure",
+    "api_key_name": "AZURE_API_KEY"
+  },
   "azure/eu/gpt-5.5-2026-04-23": {
+    "litellm_provider": "azure",
+    "api_key_name": "AZURE_API_KEY"
+  },
+  "azure/eu/gpt-5.5-2026-04-24": {
     "litellm_provider": "azure",
     "api_key_name": "AZURE_API_KEY"
   },
@@ -1436,6 +1496,14 @@
     "api_key_name": "AZURE_API_KEY"
   },
   "azure/gpt-image-2": {
+    "litellm_provider": "azure",
+    "api_key_name": "AZURE_API_KEY"
+  },
+  "azure/gpt-image-2.5-flare": {
+    "litellm_provider": "azure",
+    "api_key_name": "AZURE_API_KEY"
+  },
+  "azure/gpt-image-2.5-sunburst": {
     "litellm_provider": "azure",
     "api_key_name": "AZURE_API_KEY"
   },
@@ -1711,6 +1779,10 @@
     "litellm_provider": "azure_ai",
     "api_key_name": "AZURE_API_KEY"
   },
+  "azure_ai/FLUX.2-flex": {
+    "litellm_provider": "azure_ai",
+    "api_key_name": "AZURE_API_KEY"
+  },
   "azure_ai/FW-DeepSeek-V3.2": {
     "litellm_provider": "azure_ai",
     "api_key_name": "AZURE_API_KEY"
@@ -1776,6 +1848,10 @@
     "api_key_name": "AZURE_API_KEY"
   },
   "azure_ai/MAI-Image-2.5-Flash": {
+    "litellm_provider": "azure_ai",
+    "api_key_name": "AZURE_API_KEY"
+  },
+  "azure_ai/MAI-Image-2.5-Pro": {
     "litellm_provider": "azure_ai",
     "api_key_name": "AZURE_API_KEY"
   },
@@ -2859,8 +2935,8 @@
     "api_key_name": "BEDROCK_API_KEY"
   },
   "computer-use-preview": {
-    "litellm_provider": "azure",
-    "api_key_name": "AZURE_API_KEY"
+    "litellm_provider": "openai",
+    "api_key_name": "OPENAI_API_KEY"
   },
   "dall-e-2": {
     "litellm_provider": "openai",
@@ -3051,6 +3127,10 @@
     "api_key_name": "FIREWORKS_API_KEY"
   },
   "fireworks_ai/accounts/fireworks/models/deepseek-v4-pro-0813": {
+    "litellm_provider": "fireworks_ai",
+    "api_key_name": "FIREWORKS_API_KEY"
+  },
+  "fireworks_ai/deepseek-v4-pro-0813": {
     "litellm_provider": "fireworks_ai",
     "api_key_name": "FIREWORKS_API_KEY"
   },
@@ -4778,6 +4858,18 @@
     "litellm_provider": "mistral",
     "api_key_name": "MISTRAL_API_KEY"
   },
+  "mistral/zai-glm-5-3": {
+    "litellm_provider": "mistral",
+    "api_key_name": "MISTRAL_API_KEY"
+  },
+  "mistral/zai-glm-5": {
+    "litellm_provider": "mistral",
+    "api_key_name": "MISTRAL_API_KEY"
+  },
+  "mistral/zai-glm-latest": {
+    "litellm_provider": "mistral",
+    "api_key_name": "MISTRAL_API_KEY"
+  },
   "mistral/glm-5-2": {
     "litellm_provider": "mistral",
     "api_key_name": "MISTRAL_API_KEY"
@@ -5208,6 +5300,30 @@
   },
   "qwen.qwen3-next-80b-a3b": {
     "litellm_provider": "bedrock_converse",
+    "api_key_name": "BEDROCK_API_KEY"
+  },
+  "bedrock/ap-northeast-1/qwen.qwen3-next-80b-a3b": {
+    "litellm_provider": "bedrock",
+    "api_key_name": "BEDROCK_API_KEY"
+  },
+  "bedrock/ap-south-1/qwen.qwen3-next-80b-a3b": {
+    "litellm_provider": "bedrock",
+    "api_key_name": "BEDROCK_API_KEY"
+  },
+  "bedrock/ap-southeast-2/qwen.qwen3-next-80b-a3b": {
+    "litellm_provider": "bedrock",
+    "api_key_name": "BEDROCK_API_KEY"
+  },
+  "bedrock/eu-west-1/qwen.qwen3-next-80b-a3b": {
+    "litellm_provider": "bedrock",
+    "api_key_name": "BEDROCK_API_KEY"
+  },
+  "bedrock/eu-west-2/qwen.qwen3-next-80b-a3b": {
+    "litellm_provider": "bedrock",
+    "api_key_name": "BEDROCK_API_KEY"
+  },
+  "bedrock/sa-east-1/qwen.qwen3-next-80b-a3b": {
+    "litellm_provider": "bedrock",
     "api_key_name": "BEDROCK_API_KEY"
   },
   "qwen.qwen3-vl-235b-a22b": {
@@ -6810,6 +6926,14 @@
     "litellm_provider": "gemini",
     "api_key_name": "GEMINI_API_KEY"
   },
+  "gemini-3.8-live": {
+    "litellm_provider": "gemini",
+    "api_key_name": "GEMINI_API_KEY"
+  },
+  "gemini-3.8-live-extended-thinking": {
+    "litellm_provider": "gemini",
+    "api_key_name": "GEMINI_API_KEY"
+  },
   "gemini/gemini-2.5-flash-native-audio-latest": {
     "litellm_provider": "gemini",
     "api_key_name": "GEMINI_API_KEY"
@@ -6910,6 +7034,10 @@
     "litellm_provider": "bedrock",
     "api_key_name": "BEDROCK_API_KEY"
   },
+  "deepseek-flash": {
+    "litellm_provider": "deepseek",
+    "api_key_name": "DEEPSEEK_API_KEY"
+  },
   "deepseek-v4-flash": {
     "litellm_provider": "deepseek",
     "api_key_name": "DEEPSEEK_API_KEY"
@@ -6919,6 +7047,10 @@
     "api_key_name": "DEEPSEEK_API_KEY"
   },
   "deepseek-v4-pro": {
+    "litellm_provider": "deepseek",
+    "api_key_name": "DEEPSEEK_API_KEY"
+  },
+  "deepseek/deepseek-flash": {
     "litellm_provider": "deepseek",
     "api_key_name": "DEEPSEEK_API_KEY"
   },
@@ -6951,6 +7083,10 @@
     "api_key_name": "OPENAI_API_KEY"
   },
   "gpt-live-transcribe": {
+    "litellm_provider": "openai",
+    "api_key_name": "OPENAI_API_KEY"
+  },
+  "gpt-live-1": {
     "litellm_provider": "openai",
     "api_key_name": "OPENAI_API_KEY"
   },
@@ -7026,6 +7162,10 @@
     "litellm_provider": "fireworks_ai",
     "api_key_name": "FIREWORKS_API_KEY"
   },
+  "fireworks_ai/accounts/fireworks/models/deepseek-v4p1-flash": {
+    "litellm_provider": "fireworks_ai",
+    "api_key_name": "FIREWORKS_API_KEY"
+  },
   "fireworks_ai/accounts/fireworks/models/deepseek-v4-flash-vision-exp": {
     "litellm_provider": "fireworks_ai",
     "api_key_name": "FIREWORKS_API_KEY"
@@ -7035,6 +7175,10 @@
     "api_key_name": "FIREWORKS_API_KEY"
   },
   "fireworks_ai/deepseek-v4-flash-0731": {
+    "litellm_provider": "fireworks_ai",
+    "api_key_name": "FIREWORKS_API_KEY"
+  },
+  "fireworks_ai/deepseek-v4p1-flash": {
     "litellm_provider": "fireworks_ai",
     "api_key_name": "FIREWORKS_API_KEY"
   },
@@ -7170,6 +7314,14 @@
     "litellm_provider": "xai",
     "api_key_name": "XAI_API_KEY"
   },
+  "xai/grok-voice-transcribe-1.0": {
+    "litellm_provider": "xai",
+    "api_key_name": "XAI_API_KEY"
+  },
+  "xai/grok-voice-transcribe-2.0": {
+    "litellm_provider": "xai",
+    "api_key_name": "XAI_API_KEY"
+  },
   "low/1024-x-1024/grok-imagine-image-2.0": {
     "litellm_provider": "xai",
     "api_key_name": "XAI_API_KEY"
@@ -7254,7 +7406,23 @@
     "litellm_provider": "fireworks_ai",
     "api_key_name": "FIREWORKS_API_KEY"
   },
+  "fireworks_ai/glm-5p3": {
+    "litellm_provider": "fireworks_ai",
+    "api_key_name": "FIREWORKS_API_KEY"
+  },
+  "fireworks_ai/accounts/fireworks/routers/glm-5p3-fast": {
+    "litellm_provider": "fireworks_ai",
+    "api_key_name": "FIREWORKS_API_KEY"
+  },
+  "fireworks_ai/glm-5p3-fast": {
+    "litellm_provider": "fireworks_ai",
+    "api_key_name": "FIREWORKS_API_KEY"
+  },
   "fireworks_ai/accounts/fireworks/models/glm-5p3-flash": {
+    "litellm_provider": "fireworks_ai",
+    "api_key_name": "FIREWORKS_API_KEY"
+  },
+  "fireworks_ai/glm-5p3-flash": {
     "litellm_provider": "fireworks_ai",
     "api_key_name": "FIREWORKS_API_KEY"
   },
@@ -7377,5 +7545,285 @@
   "gemini/lyria-3.5": {
     "litellm_provider": "gemini",
     "api_key_name": "GEMINI_API_KEY"
+  },
+  "vertex_ai/gemini-2.5-flash-native-audio": {
+    "litellm_provider": "vertex_ai",
+    "api_key_name": "VERTEXAI_JSON_CREDENTIALS"
+  },
+  "vertex_ai/gemini-2.5-flash-preview-tts": {
+    "litellm_provider": "vertex_ai",
+    "api_key_name": "VERTEXAI_JSON_CREDENTIALS"
+  },
+  "vertex_ai/gemini-3.1-flash-live-preview": {
+    "litellm_provider": "vertex_ai",
+    "api_key_name": "VERTEXAI_JSON_CREDENTIALS"
+  },
+  "vertex_ai/gemini-3.1-flash-tts-preview": {
+    "litellm_provider": "vertex_ai",
+    "api_key_name": "VERTEXAI_JSON_CREDENTIALS"
+  },
+  "vertex_ai/gemini-3.5-transcribe": {
+    "litellm_provider": "vertex_ai",
+    "api_key_name": "VERTEXAI_JSON_CREDENTIALS"
+  },
+  "vertex_ai/gemini-3.5-transcribe-live": {
+    "litellm_provider": "vertex_ai",
+    "api_key_name": "VERTEXAI_JSON_CREDENTIALS"
+  },
+  "vertex_ai/gemini-omni-1.1-flash": {
+    "litellm_provider": "vertex_ai",
+    "api_key_name": "VERTEXAI_JSON_CREDENTIALS"
+  },
+  "vertex_ai/gemini-robotics-er-2": {
+    "litellm_provider": "vertex_ai",
+    "api_key_name": "VERTEXAI_JSON_CREDENTIALS"
+  },
+  "vertex_ai/gemma-4-26b-a4b-it": {
+    "litellm_provider": "vertex_ai",
+    "api_key_name": "VERTEXAI_JSON_CREDENTIALS"
+  },
+  "gpt-5.5-cyber": {
+    "litellm_provider": "openai",
+    "api_key_name": "OPENAI_API_KEY"
+  },
+  "gpt-rosalind-research": {
+    "litellm_provider": "openai",
+    "api_key_name": "OPENAI_API_KEY"
+  },
+  "azure/eu/codex-mini": {
+    "litellm_provider": "azure",
+    "api_key_name": "AZURE_API_KEY"
+  },
+  "azure/eu/computer-use-preview": {
+    "litellm_provider": "azure",
+    "api_key_name": "AZURE_API_KEY"
+  },
+  "azure/eu/gpt-4.1": {
+    "litellm_provider": "azure",
+    "api_key_name": "AZURE_API_KEY"
+  },
+  "azure/eu/gpt-4.1-mini": {
+    "litellm_provider": "azure",
+    "api_key_name": "AZURE_API_KEY"
+  },
+  "azure/eu/gpt-4.1-nano": {
+    "litellm_provider": "azure",
+    "api_key_name": "AZURE_API_KEY"
+  },
+  "azure/eu/gpt-4o-2024-05-13": {
+    "litellm_provider": "azure",
+    "api_key_name": "AZURE_API_KEY"
+  },
+  "azure/eu/gpt-5": {
+    "litellm_provider": "azure",
+    "api_key_name": "AZURE_API_KEY"
+  },
+  "azure/eu/gpt-5-codex": {
+    "litellm_provider": "azure",
+    "api_key_name": "AZURE_API_KEY"
+  },
+  "azure/eu/gpt-5-mini": {
+    "litellm_provider": "azure",
+    "api_key_name": "AZURE_API_KEY"
+  },
+  "azure/eu/gpt-5-nano": {
+    "litellm_provider": "azure",
+    "api_key_name": "AZURE_API_KEY"
+  },
+  "azure/eu/gpt-5-pro": {
+    "litellm_provider": "azure",
+    "api_key_name": "AZURE_API_KEY"
+  },
+  "azure/eu/gpt-5.1-codex-max": {
+    "litellm_provider": "azure",
+    "api_key_name": "AZURE_API_KEY"
+  },
+  "azure/eu/gpt-5.2": {
+    "litellm_provider": "azure",
+    "api_key_name": "AZURE_API_KEY"
+  },
+  "azure/eu/gpt-5.2-chat": {
+    "litellm_provider": "azure",
+    "api_key_name": "AZURE_API_KEY"
+  },
+  "azure/eu/gpt-5.2-codex": {
+    "litellm_provider": "azure",
+    "api_key_name": "AZURE_API_KEY"
+  },
+  "azure/eu/gpt-5.2-pro": {
+    "litellm_provider": "azure",
+    "api_key_name": "AZURE_API_KEY"
+  },
+  "azure/eu/gpt-5.3-chat": {
+    "litellm_provider": "azure",
+    "api_key_name": "AZURE_API_KEY"
+  },
+  "azure/eu/gpt-5.3-codex": {
+    "litellm_provider": "azure",
+    "api_key_name": "AZURE_API_KEY"
+  },
+  "azure/eu/gpt-5.4-mini": {
+    "litellm_provider": "azure",
+    "api_key_name": "AZURE_API_KEY"
+  },
+  "azure/eu/gpt-5.4-nano": {
+    "litellm_provider": "azure",
+    "api_key_name": "AZURE_API_KEY"
+  },
+  "azure/eu/gpt-5.4-pro": {
+    "litellm_provider": "azure",
+    "api_key_name": "AZURE_API_KEY"
+  },
+  "azure/eu/gpt-6-astra": {
+    "litellm_provider": "azure",
+    "api_key_name": "AZURE_API_KEY"
+  },
+  "azure/eu/o1-mini": {
+    "litellm_provider": "azure",
+    "api_key_name": "AZURE_API_KEY"
+  },
+  "azure/eu/o1-preview": {
+    "litellm_provider": "azure",
+    "api_key_name": "AZURE_API_KEY"
+  },
+  "azure/eu/o3-2025-04-16": {
+    "litellm_provider": "azure",
+    "api_key_name": "AZURE_API_KEY"
+  },
+  "azure/eu/o3-deep-research": {
+    "litellm_provider": "azure",
+    "api_key_name": "AZURE_API_KEY"
+  },
+  "azure/eu/o4-mini-2025-04-16": {
+    "litellm_provider": "azure",
+    "api_key_name": "AZURE_API_KEY"
+  },
+  "azure/eu/text-embedding-3-large": {
+    "litellm_provider": "azure",
+    "api_key_name": "AZURE_API_KEY"
+  },
+  "azure/eu/text-embedding-3-small": {
+    "litellm_provider": "azure",
+    "api_key_name": "AZURE_API_KEY"
+  },
+  "azure/eu/text-embedding-ada-002": {
+    "litellm_provider": "azure",
+    "api_key_name": "AZURE_API_KEY"
+  },
+  "gemini/gemini-3.8-live": {
+    "litellm_provider": "gemini",
+    "api_key_name": "GEMINI_API_KEY"
+  },
+  "gemini/gemini-3.8-live-extended-thinking": {
+    "litellm_provider": "gemini",
+    "api_key_name": "GEMINI_API_KEY"
+  },
+  "azure/us/codex-mini": {
+    "litellm_provider": "azure",
+    "api_key_name": "AZURE_API_KEY"
+  },
+  "azure/us/computer-use-preview": {
+    "litellm_provider": "azure",
+    "api_key_name": "AZURE_API_KEY"
+  },
+  "azure/us/gpt-4.1": {
+    "litellm_provider": "azure",
+    "api_key_name": "AZURE_API_KEY"
+  },
+  "azure/us/gpt-4.1-mini": {
+    "litellm_provider": "azure",
+    "api_key_name": "AZURE_API_KEY"
+  },
+  "azure/us/gpt-4.1-nano": {
+    "litellm_provider": "azure",
+    "api_key_name": "AZURE_API_KEY"
+  },
+  "azure/us/gpt-4o-2024-05-13": {
+    "litellm_provider": "azure",
+    "api_key_name": "AZURE_API_KEY"
+  },
+  "azure/us/gpt-5": {
+    "litellm_provider": "azure",
+    "api_key_name": "AZURE_API_KEY"
+  },
+  "azure/us/gpt-5-codex": {
+    "litellm_provider": "azure",
+    "api_key_name": "AZURE_API_KEY"
+  },
+  "azure/us/gpt-5-mini": {
+    "litellm_provider": "azure",
+    "api_key_name": "AZURE_API_KEY"
+  },
+  "azure/us/gpt-5-nano": {
+    "litellm_provider": "azure",
+    "api_key_name": "AZURE_API_KEY"
+  },
+  "azure/us/gpt-5-pro": {
+    "litellm_provider": "azure",
+    "api_key_name": "AZURE_API_KEY"
+  },
+  "azure/us/gpt-5.1-codex-max": {
+    "litellm_provider": "azure",
+    "api_key_name": "AZURE_API_KEY"
+  },
+  "azure/us/gpt-5.2": {
+    "litellm_provider": "azure",
+    "api_key_name": "AZURE_API_KEY"
+  },
+  "azure/us/gpt-5.2-chat": {
+    "litellm_provider": "azure",
+    "api_key_name": "AZURE_API_KEY"
+  },
+  "azure/us/gpt-5.2-codex": {
+    "litellm_provider": "azure",
+    "api_key_name": "AZURE_API_KEY"
+  },
+  "azure/us/gpt-5.2-pro": {
+    "litellm_provider": "azure",
+    "api_key_name": "AZURE_API_KEY"
+  },
+  "azure/us/gpt-5.3-chat": {
+    "litellm_provider": "azure",
+    "api_key_name": "AZURE_API_KEY"
+  },
+  "azure/us/gpt-5.3-codex": {
+    "litellm_provider": "azure",
+    "api_key_name": "AZURE_API_KEY"
+  },
+  "azure/us/gpt-5.4-mini": {
+    "litellm_provider": "azure",
+    "api_key_name": "AZURE_API_KEY"
+  },
+  "azure/us/gpt-5.4-nano": {
+    "litellm_provider": "azure",
+    "api_key_name": "AZURE_API_KEY"
+  },
+  "azure/us/gpt-5.4-pro": {
+    "litellm_provider": "azure",
+    "api_key_name": "AZURE_API_KEY"
+  },
+  "azure/us/o1-mini": {
+    "litellm_provider": "azure",
+    "api_key_name": "AZURE_API_KEY"
+  },
+  "azure/us/o1-preview": {
+    "litellm_provider": "azure",
+    "api_key_name": "AZURE_API_KEY"
+  },
+  "azure/us/o3-deep-research": {
+    "litellm_provider": "azure",
+    "api_key_name": "AZURE_API_KEY"
+  },
+  "azure/us/text-embedding-3-large": {
+    "litellm_provider": "azure",
+    "api_key_name": "AZURE_API_KEY"
+  },
+  "azure/us/text-embedding-3-small": {
+    "litellm_provider": "azure",
+    "api_key_name": "AZURE_API_KEY"
+  },
+  "azure/us/text-embedding-ada-002": {
+    "litellm_provider": "azure",
+    "api_key_name": "AZURE_API_KEY"
   }
 }
