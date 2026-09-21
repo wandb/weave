@@ -2,6 +2,10 @@ from typing import Any, TypedDict
 
 from pydantic import BaseModel
 
+from weave.shared.builtin_object_classes.base_object_def import BaseObject
+from weave.shared.builtin_object_classes.builtin_object_registry import (
+    BUILTIN_OBJECT_REGISTRY,
+)
 from weave.shared.pydantic_util import pydantic_asdict_one_level
 
 """
@@ -56,14 +60,6 @@ class ProcessIncomingObjectResult(TypedDict):
     leaf_object_class: str | None
 
 
-def _get_builtin_object_registry() -> dict[str, type[BaseModel]]:
-    # Circular import avoidance: importing this eagerly during `import weave`
-    # can recurse through builtin object class modules before weave is initialized.
-    from weave.trace.base_objects import BUILTIN_OBJECT_REGISTRY
-
-    return BUILTIN_OBJECT_REGISTRY
-
-
 def process_incoming_object_val(
     val: Any, req_builtin_object_class: str | None = None
 ) -> ProcessIncomingObjectResult:
@@ -114,7 +110,7 @@ def process_incoming_object_val(
     # and set the correct bases information. This is an important case: the user is asking us to ensure that they payload is valid and
     # stored correctly. We need to validate the payload and write the correct bases information.
     if req_builtin_object_class is not None:
-        if builtin_object_class := _get_builtin_object_registry().get(
+        if builtin_object_class := BUILTIN_OBJECT_REGISTRY.get(
             req_builtin_object_class
         ):
             # TODO: in the next iteration of this code path, this is where we need to actually publish the object
@@ -147,7 +143,10 @@ def process_incoming_object_val(
 def dump_object(val: BaseModel) -> dict:
     cls = val.__class__
     cls_name = val.__class__.__name__
-    bases = [c.__name__ for c in cls.mro()[1:-1]]
+    if isinstance(val, BaseObject) and val._weave_serialized_bases is not None:
+        bases = list(val._weave_serialized_bases)
+    else:
+        bases = [c.__name__ for c in cls.mro()[1:-1]]
 
     dump = {}
     # Order matters here due to the way we calculate the digest!

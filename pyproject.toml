@@ -630,16 +630,8 @@ allow_indirect_imports = true
 # forbidding trace_server's internal imports; every file that does so also
 # leaks via a client subpackage below, so none escape the contract.
 ignore_imports = [
-  "weave.trace_server.interface.builtin_object_classes.llm_structured_model -> weave.prompt.prompt",
-  "weave.trace_server.interface.builtin_object_classes.llm_structured_model -> weave.trace.context.weave_client_context",
-  "weave.trace_server.interface.builtin_object_classes.llm_structured_model -> weave.trace.vals",
   "weave.trace_server.isolated_client_executor -> weave.trace.context.weave_client_context",
   "weave.trace_server.isolated_client_executor -> weave.trace.weave_client",
-  "weave.trace_server.workers.evaluate_model_worker.evaluate_model_worker -> weave.evaluation.eval",
-  "weave.trace_server.workers.evaluate_model_worker.evaluate_model_worker -> weave.scorers.llm_as_a_judge_scorer",
-  "weave.trace_server.workers.evaluate_model_worker.evaluate_model_worker -> weave.trace.context.weave_client_context",
-  "weave.trace_server.workers.evaluate_model_worker.evaluate_model_worker -> weave.trace.refs",
-  "weave.trace_server.workers.evaluate_model_worker.evaluate_model_worker -> weave.trace.weave_client",
 ]
 
 [[tool.importlinter.contracts]]
@@ -676,9 +668,6 @@ allow_indirect_imports = true
 # constants, errors, ids) — the natural target to extract into a neutral
 # contract package as untangling proceeds.
 ignore_imports = [
-  "weave.scorers.llm_as_a_judge_scorer -> weave.trace_server.interface.builtin_object_classes.llm_structured_model",
-  "weave.trace.base_objects -> weave.trace_server.interface.builtin_object_classes.builtin_object_registry",
-  "weave.trace.serialization.serialize -> weave.trace_server.interface.builtin_object_classes.builtin_object_registry",
 ]
 
 [[tool.importlinter.contracts]]
@@ -713,9 +702,33 @@ allow_indirect_imports = true
 # These also appear in the trace_server -> client contract above (workers are a
 # subpackage of trace_server); both must clear before either ignore is removed.
 ignore_imports = [
-  "weave.trace_server.workers.evaluate_model_worker.evaluate_model_worker -> weave.evaluation.eval",
-  "weave.trace_server.workers.evaluate_model_worker.evaluate_model_worker -> weave.scorers.llm_as_a_judge_scorer",
-  "weave.trace_server.workers.evaluate_model_worker.evaluate_model_worker -> weave.trace.context.weave_client_context",
-  "weave.trace_server.workers.evaluate_model_worker.evaluate_model_worker -> weave.trace.refs",
-  "weave.trace_server.workers.evaluate_model_worker.evaluate_model_worker -> weave.trace.weave_client",
+]
+
+[[tool.importlinter.contracts]]
+name = "Shared contracts must not import SDK or server implementations"
+type = "forbidden"
+source_modules = ["weave.shared"]
+forbidden_modules = [
+  "weave.agent",
+  "weave.chat",
+  "weave.compat",
+  "weave.conversation",
+  "weave.dataset",
+  "weave.durability",
+  "weave.evaluation",
+  "weave.flow",
+  "weave.initialization",
+  "weave.integrations",
+  "weave.object",
+  "weave.prompt",
+  "weave.scorers",
+  "weave.session",
+  "weave.telemetry",
+  "weave.trace",
+  "weave.trace_server_bindings",
+  "weave.type_handlers",
+  "weave.type_wrappers",
+  "weave.utils",
+  "weave.wandb_interface",
+  "weave.trace_server",
 ]

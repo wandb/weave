@@ -1,0 +1,249 @@
+[
+  {
+    "input": {
+      "llm_model_id": "openai/gpt-4o"
+    },
+    "model_dump": {
+      "name": null,
+      "description": null,
+      "ref": null,
+      "llm_model_id": "openai/gpt-4o",
+      "default_params": {
+        "messages_template": null,
+        "prompt": null,
+        "temperature": null,
+        "top_p": null,
+        "max_tokens": null,
+        "presence_penalty": null,
+        "frequency_penalty": null,
+        "stop": null,
+        "n_times": null,
+        "functions": null,
+        "response_format": null
+      }
+    },
+    "dump": {
+      "_type": "LLMStructuredCompletionModel",
+      "name": null,
+      "description": null,
+      "ref": null,
+      "llm_model_id": "openai/gpt-4o",
+      "default_params": {
+        "_type": "LLMStructuredCompletionModelDefaultParams",
+        "messages_template": null,
+        "prompt": null,
+        "temperature": null,
+        "top_p": null,
+        "max_tokens": null,
+        "presence_penalty": null,
+        "frequency_penalty": null,
+        "stop": null,
+        "n_times": null,
+        "functions": null,
+        "response_format": null,
+        "_class_name": "LLMStructuredCompletionModelDefaultParams",
+        "_bases": [
+          "BaseModel"
+        ]
+      },
+      "_class_name": "LLMStructuredCompletionModel",
+      "_bases": [
+        "Model",
+        "Object",
+        "BaseModel"
+      ]
+    },
+    "digest": "4TAnUAwFWs0lAfcga2UXPywNFJX37qYzZZFjryRlUYk"
+  },
+  {
+    "input": {
+      "llm_model_id": "openai/gpt-4o",
+      "name": "judge",
+      "description": "checks answers",
+      "default_params": {
+        "messages_template": [
+          {
+            "role": "system",
+            "content": "Answer {question}"
+          }
+        ],
+        "temperature": 0.2,
+        "max_tokens": 64,
+        "response_format": "json_object"
+      }
+    },
+    "model_dump": {
+      "name": "judge",
+      "description": "checks answers",
+      "ref": null,
+      "llm_model_id": "openai/gpt-4o",
+      "default_params": {
+        "messages_template": [
+          {
+            "role": "system",
+            "content": "Answer {question}",
+            "name": null,
+            "function_call": null,
+            "tool_call_id": null
+          }
+        ],
+        "prompt": null,
+        "temperature": 0.2,
+        "top_p": null,
+        "max_tokens": 64,
+        "presence_penalty": null,
+        "frequency_penalty": null,
+        "stop": null,
+        "n_times": null,
+        "functions": null,
+        "response_format": "json_object"
+      }
+    },
+    "dump": {
+      "_type": "LLMStructuredCompletionModel",
+      "name": "judge",
+      "description": "checks answers",
+      "ref": null,
+      "llm_model_id": "openai/gpt-4o",
+      "default_params": {
+        "_type": "LLMStructuredCompletionModelDefaultParams",
+        "messages_template": [
+          {
+            "_type": "Message",
+            "role": "system",
+            "content": "Answer {question}",
+            "name": null,
+            "function_call": null,
+            "tool_call_id": null,
+            "_class_name": "Message",
+            "_bases": [
+              "BaseModel"
+            ]
+          }
+        ],
+        "prompt": null,
+        "temperature": 0.2,
+        "top_p": null,
+        "max_tokens": 64,
+        "presence_penalty": null,
+        "frequency_penalty": null,
+        "stop": null,
+        "n_times": null,
+        "functions": null,
+        "response_format": "json_object",
+        "_class_name": "LLMStructuredCompletionModelDefaultParams",
+        "_bases": [
+          "BaseModel"
+        ]
+      },
+      "_class_name": "LLMStructuredCompletionModel",
+      "_bases": [
+        "Model",
+        "Object",
+        "BaseModel"
+      ]
+    },
+    "digest": "79YYm53czAJfvJ9pjW1JMQM2CfA7qWQVilhTjVREpdg"
+  },
+  {
+    "input": {
+      "llm_model_id": "openai/gpt-4o",
+      "ref": {
+        "entity": "team",
+        "project": "project",
+        "name": "model",
+        "_digest": "abc",
+        "_extra": []
+      }
+    },
+    "model_dump": {
+      "name": null,
+      "description": null,
+      "ref": {
+        "entity": "team",
+        "project": "project",
+        "name": "model",
+        "_digest": "abc",
+        "_extra": []
+      },
+      "llm_model_id": "openai/gpt-4o",
+      "default_params": {
+        "messages_template": null,
+        "prompt": null,
+        "temperature": null,
+        "top_p": null,
+        "max_tokens": null,
+        "presence_penalty": null,
+        "frequency_penalty": null,
+        "stop": null,
+        "n_times": null,
+        "functions": null,
+        "response_format": null
+      }
+    },
+    "digest_error": "Object of type ObjectRef is not JSON serializable"
+  },
+  {
+    "input": {
+      "llm_model_id": "openai/gpt-4o",
+      "_type": "LLMStructuredCompletionModel",
+      "_class_name": "LLMStructuredCompletionModel",
+      "_bases": [
+        "Model",
+        "Object",
+        "BaseModel"
+      ]
+    },
+    "model_dump": {
+      "name": null,
+      "description": null,
+      "ref": null,
+      "llm_model_id": "openai/gpt-4o",
+      "default_params": {
+        "messages_template": null,
+        "prompt": null,
+        "temperature": null,
+        "top_p": null,
+        "max_tokens": null,
+        "presence_penalty": null,
+        "frequency_penalty": null,
+        "stop": null,
+        "n_times": null,
+        "functions": null,
+        "response_format": null
+      }
+    },
+    "dump": {
+      "_type": "LLMStructuredCompletionModel",
+      "name": null,
+      "description": null,
+      "ref": null,
+      "llm_model_id": "openai/gpt-4o",
+      "default_params": {
+        "_type": "LLMStructuredCompletionModelDefaultParams",
+        "messages_template": null,
+        "prompt": null,
+        "temperature": null,
+        "top_p": null,
+        "max_tokens": null,
+        "presence_penalty": null,
+        "frequency_penalty": null,
+        "stop": null,
+        "n_times": null,
+        "functions": null,
+        "response_format": null,
+        "_class_name": "LLMStructuredCompletionModelDefaultParams",
+        "_bases": [
+          "BaseModel"
+        ]
+      },
+      "_class_name": "LLMStructuredCompletionModel",
+      "_bases": [
+        "Model",
+        "Object",
+        "BaseModel"
+      ]
+    },
+    "digest": "x4idXCRg4ucYREFqi9WHeQlKIkYNulYznWzZUHzukTY"
+  }
+]

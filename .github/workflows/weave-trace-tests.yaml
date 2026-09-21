@@ -17,6 +17,10 @@ jobs:
   # weave or the core workflow can be reused directly.
   weave-trace-tests:
     name: Weave Trace Tests
+    permissions:
+      contents: read
+      id-token: write
+      pull-requests: read
     needs:
       - check-which-tests-to-run
     if: needs.check-which-tests-to-run.outputs.trace_server_tests == 'true' || github.ref == 'refs/heads/master' || github.event_name == 'workflow_dispatch'
@@ -38,12 +42,31 @@ jobs:
           owner: wandb
           repositories: core
           permission-contents: read
+          permission-pull-requests: read
+
+      - name: Checkout paired-revision resolver
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          path: ci-weave
+          sparse-checkout: |
+            .github/scripts/resolve_core_ref.py
+            .github/scripts/test_resolve_core_ref.py
+          sparse-checkout-cone-mode: false
+          persist-credentials: false
+
+      - name: Resolve paired core revision
+        id: core-ref
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CORE_GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: |
+          python3 ci-weave/.github/scripts/resolve_core_ref.py
 
       - name: Checkout core
         uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
         with:
           repository: wandb/core
-          ref: master
+          ref: ${{ steps.core-ref.outputs.ref }}
           path: ${{ env.CORE_DIR }}
           token: ${{ steps.app-token.outputs.token }}
           persist-credentials: false
@@ -91,6 +114,10 @@ jobs:
       - name: Install dependencies
         working-directory: ${{ env.CORE_DIR }}/services/weave-trace
         run: uv sync --group dev --group test --frozen
+
+      - name: Test paired-revision resolver
+        working-directory: ${{ env.CORE_DIR }}/services/weave-trace
+        run: uv run pytest "$GITHUB_WORKSPACE/ci-weave/.github/scripts/test_resolve_core_ref.py" --noconftest --rootdir="$GITHUB_WORKSPACE/ci-weave" -q
 
       - name: Pip freeze
         working-directory: ${{ env.CORE_DIR }}/services/weave-trace

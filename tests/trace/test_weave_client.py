@@ -28,6 +28,10 @@ from tests.trace_server.conftest_lib.trace_server_external_adapter import (
 )
 from tests.trace_server.helpers import force_optimize
 from weave import Evaluation
+from weave.flow.llm_structured_model import (
+    LLMStructuredCompletionModel,
+    LLMStructuredCompletionModelDefaultParams,
+)
 from weave.integrations.integration_utilities import op_name_from_call
 from weave.prompt.prompt import MessagesPrompt
 from weave.shared.trace_server_interface_util import (
@@ -58,10 +62,6 @@ from weave.trace_server.clickhouse_trace_server_batched import (
 from weave.trace_server.common_interface import SortBy
 from weave.trace_server.constants import MAX_DISPLAY_NAME_LENGTH
 from weave.trace_server.ids import generate_id
-from weave.trace_server.interface.builtin_object_classes.llm_structured_model import (
-    LLMStructuredCompletionModel,
-    LLMStructuredCompletionModelDefaultParams,
-)
 from weave.trace_server.trace_server_interface import (
     FileContentReadReq,
     FileCreateReq,

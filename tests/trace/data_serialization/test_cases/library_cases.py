@@ -2,14 +2,12 @@ import sys
 
 import weave
 from tests.trace.data_serialization.spec import SerializationTestCase
-from weave.scorers import LLMAsAJudgeScorer, RemoteScorer
-from weave.scorers.remote_scorer import OAuthClientCredentialsConfig
-from weave.trace_server.interface.builtin_object_classes.builtin_object_registry import (
+from weave.flow.llm_structured_model import (
     LLMStructuredCompletionModel,
-)
-from weave.trace_server.interface.builtin_object_classes.llm_structured_model import (
     LLMStructuredCompletionModelDefaultParams,
 )
+from weave.scorers import LLMAsAJudgeScorer, RemoteScorer
+from weave.scorers.remote_scorer import OAuthClientCredentialsConfig
 
 
 class MyModel(weave.Model):

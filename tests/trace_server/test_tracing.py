@@ -18,7 +18,7 @@ from opentelemetry.sdk.trace.export.in_memory_span_exporter import (
 )
 from opentelemetry.trace.status import StatusCode
 
-from weave.trace_server import tracing
+from weave.shared import tracing
 from weave.trace_server.tracing import traced, traced_generator
 
 
