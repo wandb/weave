@@ -3,9 +3,9 @@ from collections.abc import Generator
 
 import pytest
 from cerebras.cloud.sdk import AsyncCerebras, Cerebras
+from weave.integrations.cerebras.cerebras_sdk import get_cerebras_patcher
 
 import weave
-from weave.integrations.cerebras.cerebras_sdk import get_cerebras_patcher
 
 model = "gpt-oss-120b"  # Cerebras model
 
