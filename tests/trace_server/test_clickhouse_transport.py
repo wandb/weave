@@ -145,7 +145,7 @@ def test_both_paths_raise_the_same_way(arm, fail_times, error, expected):
 async def test_async_transport_round_trips_against_clickhouse(ch_server) -> None:
     """The parity tests above stub the transport, so nothing there ever reaches a
     real `AsyncClient`. This drives every method on the real thing: `start`
-    (which runs CREATE DATABASE), `command`, `insert`, `query`, `close`.
+    `command`, `insert`, `query`, `close`.
     """
     transport = AsyncClickHouseTransport(ch_server._config)
     table = f"transport_round_trip_{generate_id()[:8]}"
@@ -222,3 +222,30 @@ def test_async_transport_keeps_one_client_per_loop(ch_server) -> None:
     finally:
         loop_a.close()
         loop_b.close()
+
+
+def test_run_migrations_creates_a_fresh_database(ch_server) -> None:
+    """The transport no longer creates the database on connect, so this is the
+    only path that provisions one in-process. It must work against a database
+    that does not exist yet, which means the migrator's client cannot be scoped
+    to it.
+    """
+    fresh_db = f"fresh_{generate_id()[:8]}"
+    cfg = ch_server._config
+    server = ClickHouseTraceServer(
+        host=cfg.host,
+        port=cfg.port,
+        user=cfg.user,
+        password=cfg.password,
+        database=fresh_db,
+        use_async_insert=False,
+    )
+    try:
+        server._run_migrations()
+        rows = ch_server.ch_client.query(
+            "SELECT count() FROM system.databases WHERE name = {db:String}",
+            parameters={"db": fresh_db},
+        ).result_rows
+        assert rows == [(1,)]
+    finally:
+        ch_server.ch_client.command(f"DROP DATABASE IF EXISTS {fresh_db} SYNC")

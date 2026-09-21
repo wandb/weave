@@ -236,17 +236,16 @@ def _ch_session_server(
         ),
     )
 
-    # Drop and recreate from scratch once
+    # Drop and recreate from scratch once. On `default`: the databases we are
+    # about to drop and recreate cannot be the client's own scope.
+    admin = ch_server._transport.mint(database="default")
     on_cluster = _on_cluster_clause()
-    ch_server.ch_client.command(
-        f"DROP DATABASE IF EXISTS {management_db}{on_cluster} SYNC"
-    )
-    ch_server.ch_client.command(f"DROP DATABASE IF EXISTS {unique_db}{on_cluster} SYNC")
-    ch_server._transport._database_ensured = False
+    admin.command(f"DROP DATABASE IF EXISTS {management_db}{on_cluster} SYNC")
+    admin.command(f"DROP DATABASE IF EXISTS {unique_db}{on_cluster} SYNC")
 
     def patched_run_migrations():
         migrator = wf_migrator.get_clickhouse_trace_server_migrator(
-            ch_server._transport.mint(),
+            admin,
             management_db=management_db,
             replicated=wf_env.wf_clickhouse_replicated(),
             replicated_path=wf_env.wf_clickhouse_replicated_path(),
@@ -275,22 +274,16 @@ def _ch_session_server(
 
     # Session cleanup: drop databases
     teardown_on_cluster = _on_cluster_clause()
-    try:
-        ch_server.ch_client.command(
-            f"DROP DATABASE IF EXISTS {management_db}{teardown_on_cluster} SYNC"
-        )
-    except Exception:
-        pass
-    try:
-        ch_server.ch_client.command(
-            f"DROP DATABASE IF EXISTS {unique_db}{teardown_on_cluster} SYNC"
-        )
-    except Exception:
-        pass
-    try:
-        ch_server.ch_client.close()
-    except Exception:
-        pass
+    for db in (management_db, unique_db):
+        try:
+            admin.command(f"DROP DATABASE IF EXISTS {db}{teardown_on_cluster} SYNC")
+        except Exception:
+            pass
+    for client in (ch_server.ch_client, admin):
+        try:
+            client.close()
+        except Exception:
+            pass
 
 
 @pytest.fixture(scope="session", autouse=True)

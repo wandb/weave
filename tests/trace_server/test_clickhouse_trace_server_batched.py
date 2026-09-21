@@ -2297,7 +2297,6 @@ def test_genai_otel_export_llm_policy(
 def test_transport_mint_forwards_send_receive_timeout():
     server = chts.ClickHouseTraceServer(host="test_host")
     with (
-        patch.object(chts.SyncClickHouseTransport, "_ensure_database_once"),
         patch(
             "weave.trace_server.clickhouse.transport.clickhouse_connect.get_client"
         ) as mock_get_client,
@@ -2316,7 +2315,6 @@ def test_transport_mint_forwards_send_receive_timeout():
 def test_transport_mint_omits_send_receive_timeout_by_default():
     server = chts.ClickHouseTraceServer(host="test_host")
     with (
-        patch.object(chts.SyncClickHouseTransport, "_ensure_database_once"),
         patch(
             "weave.trace_server.clickhouse.transport.clickhouse_connect.get_client"
         ) as mock_get_client,
@@ -2324,3 +2322,14 @@ def test_transport_mint_omits_send_receive_timeout_by_default():
         mock_get_client.return_value = MagicMock()
         server._transport.mint()
         assert "send_receive_timeout" not in mock_get_client.call_args.kwargs
+
+
+def test_transport_mint_database_override():
+    """The migrator connects on `default` so it can create the target itself."""
+    server = chts.ClickHouseTraceServer(host="test_host", database="weave_trace_db")
+    with patch(
+        "weave.trace_server.clickhouse.transport.clickhouse_connect.get_client"
+    ) as mock_get_client:
+        mock_get_client.return_value = MagicMock()
+        assert server._transport.mint().database == "weave_trace_db"
+        assert server._transport.mint(database="default").database == "default"

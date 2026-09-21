@@ -105,15 +105,6 @@ class PreparedInsert:
 # --- Transports -------------------------------------------------------------
 
 
-def ensure_database(client: CHClient, database: str) -> None:
-    """Provisioning, not transport: both transports call it once on connect."""
-    client.command(f"CREATE DATABASE IF NOT EXISTS {database}")
-
-
-async def aensure_database(client: AsyncClient, database: str) -> None:
-    await client.command(f"CREATE DATABASE IF NOT EXISTS {database}")
-
-
 class SyncClickHouseTransport:
     """The blocking driver, one client per thread over a shared pool manager.
 
@@ -124,8 +115,6 @@ class SyncClickHouseTransport:
         self._config = config
         self._pool_mgr = pool_mgr
         self._thread_local = threading.local()
-        self._init_lock = threading.Lock()
-        self._database_ensured = False
 
     @property
     def client(self) -> CHClient:
@@ -133,11 +122,15 @@ class SyncClickHouseTransport:
             self._thread_local.client = self.mint()
         return self._thread_local.client
 
-    def mint(self, send_receive_timeout: int | None = None) -> CHClient:
+    def mint(
+        self, send_receive_timeout: int | None = None, database: str | None = None
+    ) -> CHClient:
         """Create a new client on the shared pool manager.
 
         `send_receive_timeout` raises the HTTP read timeout for migration clients,
-        which must outlast replicated-DDL propagation.
+        which must outlast replicated-DDL propagation. `database` overrides the
+        configured one; the migrator connects on `default` so it can create the
+        target itself, the way the standalone migration job does.
         """
         optional_kwargs: dict[str, Any] = {}
         if send_receive_timeout is not None:
@@ -156,19 +149,8 @@ class SyncClickHouseTransport:
             autogenerate_query_id=False,
             **optional_kwargs,
         )
-        self._ensure_database_once(client)
-        client.database = self._config.database
+        client.database = database or self._config.database
         return client
-
-    def _ensure_database_once(self, client: CHClient) -> None:
-        """`mint` runs per thread; the database only has to be created once."""
-        if self._database_ensured:
-            return
-        with self._init_lock:
-            if self._database_ensured:
-                return
-            ensure_database(client, self._config.database)
-            self._database_ensured = True
 
     def query(self, prepared: PreparedQuery) -> QueryResult:
         return self.client.query(
@@ -253,15 +235,6 @@ class AsyncClickHouseTransport:
             connector_limit=ASYNC_CH_CONNECTOR_LIMIT,
             connector_limit_per_host=ASYNC_CH_CONNECTOR_LIMIT_PER_HOST,
         )
-        # The session exists before the database does. Anything that stops us
-        # returning it -- a failed CREATE DATABASE, or cancellation -- has to
-        # close it here, or `start()` retries and leaks another connector each
-        # time. BaseException so CancelledError is covered too.
-        try:
-            await aensure_database(client, self._config.database)
-        except BaseException:
-            await client.close()
-            raise
         client.database = self._config.database
         return client
 

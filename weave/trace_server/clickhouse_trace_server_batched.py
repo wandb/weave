@@ -7613,8 +7613,12 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
     def _run_migrations(self) -> None:
         logger.info("Running migrations")
         migration_timeout = ch_settings.MIGRATION_CLIENT_SEND_RECEIVE_TIMEOUT_SEC
+        # On `default`, like the standalone migration job: the migrator creates
+        # the target database itself, so the client must not be scoped to it.
         migrator = wf_migrator.get_clickhouse_trace_server_migrator(
-            self._transport.mint(send_receive_timeout=migration_timeout),
+            self._transport.mint(
+                send_receive_timeout=migration_timeout, database="default"
+            ),
             replicated=wf_env.wf_clickhouse_replicated(),
             replicated_path=wf_env.wf_clickhouse_replicated_path(),
             replicated_cluster=wf_env.wf_clickhouse_replicated_cluster(),
@@ -7622,7 +7626,9 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             # Mint the heartbeat's client like the primary so it inherits
             # secure/pool/db settings (raw env would drop `secure=`).
             heartbeat_client_factory=partial(
-                self._transport.mint, send_receive_timeout=migration_timeout
+                self._transport.mint,
+                send_receive_timeout=migration_timeout,
+                database="default",
             ),
         )
         migrator.apply_migrations(self._config.database)
