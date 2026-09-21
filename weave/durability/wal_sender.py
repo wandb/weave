@@ -55,8 +55,8 @@ from weave.durability.wal_client_id import WAL_ROOT, compute_client_id
 from weave.durability.wal_consumer import JSONLWALConsumer
 from weave.durability.wal_directory_manager import FileWALDirectoryManager
 from weave.durability.wal_lock import is_writer_alive
+from weave.shared.trace_server import trace_server_interface as tsi
 from weave.telemetry.trace_sentry import log_error
-from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server_bindings.client_interface import TraceServerClientInterface
 from weave.trace_server_bindings.remote_http_trace_server import (
     RemoteHTTPTraceServer,

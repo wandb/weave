@@ -4,6 +4,10 @@ import logging
 from collections.abc import Mapping
 from typing import Any, Literal, TypedDict
 
+from weave.shared.trace_server.trace_server_interface import (
+    FileContentReadReq,
+    TraceServerInterface,
+)
 from weave.trace.context.weave_client_context import (
     get_weave_client,
     require_weave_client,
@@ -23,10 +27,6 @@ from weave.trace.serialization.serializer import (
     is_probably_legacy_inline_load,
 )
 from weave.trace.settings import should_allow_unsafe_custom_obj_decode
-from weave.trace_server.trace_server_interface import (
-    FileContentReadReq,
-    TraceServerInterface,
-)
 
 logger = logging.getLogger(__name__)
 

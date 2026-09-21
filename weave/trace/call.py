@@ -8,6 +8,19 @@ from concurrent.futures import Future
 from typing import TYPE_CHECKING, Any, TypedDict
 
 from weave.evaluation.eval_meta import EVAL_META_KEY
+from weave.shared.trace_server.common_interface import SortBy
+from weave.shared.trace_server.constants import (
+    EVALUATION_RUN_OP_NAME,
+    MAX_DISPLAY_NAME_LENGTH,
+)
+from weave.shared.trace_server.interface.query import Query
+from weave.shared.trace_server.trace_server_interface import (
+    CallSchema,
+    CallsFilter,
+    CallsQueryReq,
+    CallsQueryStatsReq,
+    TraceServerInterface,
+)
 from weave.trace import urls
 from weave.trace.context import weave_client_context
 from weave.trace.feedback import RefFeedbackQuery
@@ -18,16 +31,6 @@ from weave.trace.refs import CallRef, ObjectRef, OpRef
 from weave.trace.serialization.serialize import from_json
 from weave.trace.util import log_once
 from weave.trace.vals import WeaveObject
-from weave.trace_server.common_interface import SortBy
-from weave.trace_server.constants import EVALUATION_RUN_OP_NAME, MAX_DISPLAY_NAME_LENGTH
-from weave.trace_server.interface.query import Query
-from weave.trace_server.trace_server_interface import (
-    CallSchema,
-    CallsFilter,
-    CallsQueryReq,
-    CallsQueryStatsReq,
-    TraceServerInterface,
-)
 from weave.utils.attributes_dict import AttributesDict
 from weave.utils.paginated_iterator import PaginatedIterator
 from weave.utils.project_id import from_project_id

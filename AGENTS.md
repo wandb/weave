@@ -80,7 +80,8 @@ _Important:_ For OpenAI Codex agents (most likely you!), your environment does n
 
 - `weave/` - Core implementation
   - `weave/` - Python package implementation
-  - `weave/trace_server` - Backend server implementation
+  - `weave/trace_server` - Backend server implementation and public compatibility imports
+  - `weave/shared/trace_server` - Portable trace contracts; see `weave/shared/README.md`
 
 ### Azure file storage authentication
 

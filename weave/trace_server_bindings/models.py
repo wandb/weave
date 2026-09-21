@@ -2,7 +2,7 @@ from typing import Annotated, Literal
 
 from pydantic import BaseModel, Field
 
-from weave.trace_server import trace_server_interface as tsi
+from weave.shared.trace_server import trace_server_interface as tsi
 
 
 class StartBatchItem(BaseModel):
