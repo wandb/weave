@@ -8,6 +8,7 @@ the retry and error paths.
 """
 
 import asyncio
+import uuid
 
 import pytest
 from clickhouse_connect.driver.summary import QuerySummary
@@ -230,7 +231,9 @@ def test_run_migrations_creates_a_fresh_database(ch_server) -> None:
     that does not exist yet, which means the migrator's client cannot be scoped
     to it.
     """
-    fresh_db = f"fresh_{generate_id()[:8]}"
+    # uuid4, not generate_id: that one is time-ordered, so two runs in the same
+    # window collide and the second finds this run's row in db_management.
+    fresh_db = f"fresh_{uuid.uuid4().hex[:8]}"
     cfg = ch_server._config
     server = ClickHouseTraceServer(
         host=cfg.host,
@@ -249,3 +252,7 @@ def test_run_migrations_creates_a_fresh_database(ch_server) -> None:
         assert rows == [(1,)]
     finally:
         ch_server.ch_client.command(f"DROP DATABASE IF EXISTS {fresh_db} SYNC")
+        ch_server.ch_client.command(
+            "DELETE FROM db_management.migrations WHERE db_name = {db:String}",
+            parameters={"db": fresh_db},
+        )
