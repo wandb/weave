@@ -1,12 +1,15 @@
 import abc
 import asyncio
-from collections.abc import Awaitable, Callable, Iterable, Iterator
+import contextvars
+import dataclasses
+import inspect
+import threading
+from collections.abc import AsyncIterator, Awaitable, Callable, Iterable
 from typing import Any, TypeVar
 
 from opentelemetry.proto.common.v1.common_pb2 import AnyValue, KeyValue
 
 from weave.trace_server import trace_server_interface as tsi
-from weave.trace_server.async_clickhouse_trace_server import AsyncClickHouseTraceServer
 from weave.trace_server.trace_server_converter import (
     replace_external_weave_ref,
     universal_ext_to_int_ref_converter,
@@ -152,9 +155,24 @@ class IdConverter:
 A = TypeVar("A")
 B = TypeVar("B")
 
+# Rows a blocking stream may run ahead of its consumer by.
+_STREAM_BUFFER_ITEMS = 256
 
-class ExternalTraceServer(tsi.FullTraceServerInterface):
+
+@dataclasses.dataclass
+class _StreamFailed:
+    exc: BaseException
+
+
+class ExternalTraceServer:
     """Used to adapt the internal trace server to the external trace server.
+
+    Every method is a coroutine (or returns an async iterator). The internal
+    server it wraps is converting to async one method family at a time; `_call`
+    awaits the methods that already are coroutines and runs the rest in a
+    thread, so callers on an event loop are never blocked either way. Sync
+    callers wrap this adapter in `sync_facade.SyncTraceServerFacade`.
+
     This is done by converting the project_id, run_id, and user_id to their
     internal representations before calling the internal trace server and
     converting them back to their external representations before returning
@@ -163,15 +181,16 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
     back to their external representations before returning them to the caller.
     """
 
-    _internal_trace_server: tsi.FullTraceServerInterface
+    _internal_trace_server: Any
     _idc: IdConverter
-    _username_resolver: Callable[[str], str | None] | None
+    _username_resolver: Callable[[str], str | Awaitable[str | None] | None] | None
 
     def __init__(
         self,
-        internal_trace_server: tsi.FullTraceServerInterface,
+        internal_trace_server: Any,
         id_converter: IdConverter,
-        username_resolver: Callable[[str], str | None] | None = None,
+        username_resolver: Callable[[str], str | Awaitable[str | None] | None]
+        | None = None,
     ):
         super().__init__()
         self._internal_trace_server = internal_trace_server
@@ -245,54 +264,118 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
                         verify_internal_project_id,
                     )
 
-    def _ref_apply(
-        self,
-        method: Callable[[A], B],
-        req: A,
-        internal_project_id: str,
-        tolerate_external_refs: bool = False,
-    ) -> B:
-        req_conv = universal_ext_to_int_ref_converter(
-            req,
-            self._idc.ext_to_int_project_id,
-            verify_internal_project_id=self._make_project_verifier(internal_project_id),
+    @staticmethod
+    async def _call(method: Callable[..., Any], *args: Any, **kwargs: Any) -> Any:
+        """Await `method` if it is a coroutine function, else run it in a thread.
+
+        The seam of the migration: it goes away once every internal method is
+        a coroutine.
+        """
+        if inspect.iscoroutinefunction(method):
+            return await method(*args, **kwargs)
+        return await asyncio.to_thread(method, *args, **kwargs)
+
+    async def _astream(
+        self, method: Callable[..., Any], *args: Any
+    ) -> AsyncIterator[Any]:
+        """Call a method that returns an iterator and yield from it, off the loop."""
+        res = (
+            await self._call(method, *args)
+            if not inspect.isasyncgenfunction(method)
+            else method(*args)
         )
-        res = method(req_conv)
-        res_conv = universal_int_to_ext_ref_converter(
-            res, self._idc.int_to_ext_project_id, tolerate_external_refs
-        )
-        return res_conv
+        async for item in self._aiter(res):
+            yield item
+
+    @staticmethod
+    async def _aiter(iterable: Any) -> AsyncIterator[Any]:
+        """Yield from an async or a blocking iterable without blocking the loop.
+
+        A blocking iterable is driven to completion by one worker thread that
+        hands items over a bounded queue. One thread for the whole stream, not
+        one hop per item: the generator's span and its contextvars stay on the
+        thread that opened them.
+        """
+        if hasattr(iterable, "__aiter__"):
+            async for item in iterable:
+                yield item
+            return
+
+        loop = asyncio.get_running_loop()
+        queue: asyncio.Queue[Any] = asyncio.Queue(maxsize=_STREAM_BUFFER_ITEMS)
+        consumer_gone = threading.Event()
+        end = object()
+
+        def hand_over(item: Any) -> None:
+            asyncio.run_coroutine_threadsafe(queue.put(item), loop).result()
+
+        def produce() -> None:
+            try:
+                iterator = iter(iterable)
+                try:
+                    for item in iterator:
+                        if consumer_gone.is_set():
+                            return
+                        hand_over(item)
+                finally:
+                    close = getattr(iterator, "close", None)
+                    if close is not None:
+                        close()
+                hand_over(end)
+            except BaseException as exc:
+                if not consumer_gone.is_set():
+                    hand_over(_StreamFailed(exc))
+
+        producer = loop.run_in_executor(None, contextvars.copy_context().run, produce)
+        try:
+            while True:
+                item = await queue.get()
+                if item is end:
+                    return
+                if isinstance(item, _StreamFailed):
+                    raise item.exc
+                yield item
+        finally:
+            consumer_gone.set()
+            while not queue.empty():
+                queue.get_nowait()
+            if producer.done():
+                producer.result()
 
     async def _aref_apply(
         self,
-        method: Callable[[A], Awaitable[B]],
+        method: Callable[[A], Any],
         req: A,
         internal_project_id: str,
-    ) -> B:
+        tolerate_external_refs: bool = False,
+    ) -> Any:
         req_conv = universal_ext_to_int_ref_converter(
             req,
             self._idc.ext_to_int_project_id,
             verify_internal_project_id=self._make_project_verifier(internal_project_id),
         )
-        res = await method(req_conv)
-        res_conv = universal_int_to_ext_ref_converter(
-            res, self._idc.int_to_ext_project_id
+        res = await self._call(method, req_conv)
+        return universal_int_to_ext_ref_converter(
+            res, self._idc.int_to_ext_project_id, tolerate_external_refs
         )
-        return res_conv
 
-    def _stream_ref_apply(
+    async def _astream_ref_apply(
         self,
-        method: Callable[[A], Iterator[B]],
+        method: Callable[[A], Any],
         req: A,
         internal_project_id: str,
-    ) -> Iterator[B]:
+    ) -> AsyncIterator[Any]:
         """Stream results while converting internal refs to external refs."""
         req_conv = universal_ext_to_int_ref_converter(
             req,
             self._idc.ext_to_int_project_id,
             verify_internal_project_id=self._make_project_verifier(internal_project_id),
         )
-        res = method(req_conv)
+        res = (
+            await self._call(method, req_conv)
+            if not inspect.isasyncgenfunction(method)
+            else method(req_conv)
+        )
 
         int_to_ext_project_cache: dict[str, str | None] = {}
 
@@ -304,17 +387,15 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
             return int_to_ext_project_cache[project_id]
 
         try:
-            for item in res:
+            async for item in self._aiter(res):
                 yield universal_int_to_ext_ref_converter(
                     item, cached_int_to_ext_project_id
                 )
         finally:
             int_to_ext_project_cache.clear()
-            if hasattr(res, "close"):
-                res.close()
 
     # Standard API Below:
-    def otel_export(self, req: tsi.OTelExportReq) -> tsi.OTelExportRes:
+    async def otel_export(self, req: tsi.OTelExportReq) -> tsi.OTelExportRes:
         req = req.model_copy(deep=True)
         # Convert project_id at request level
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)
@@ -335,21 +416,23 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
         # descend into `ResourceSpans`. See `_rewrite_processed_spans_refs_inplace`.
         self._rewrite_processed_spans_refs_inplace(req.processed_spans, req.project_id)
 
-        return self._ref_apply(
+        return await self._aref_apply(
             self._internal_trace_server.otel_export, req, req.project_id
         )
 
-    def call_start(self, req: tsi.CallStartReq) -> tsi.CallStartRes:
+    async def call_start(self, req: tsi.CallStartReq) -> tsi.CallStartRes:
         req = req.model_copy(deep=True)
         pid = self._encode_call_start_inplace(req)
-        return self._ref_apply(self._internal_trace_server.call_start, req, pid)
+        return await self._aref_apply(self._internal_trace_server.call_start, req, pid)
 
-    def call_end(self, req: tsi.CallEndReq) -> tsi.CallEndRes:
+    async def call_end(self, req: tsi.CallEndReq) -> tsi.CallEndRes:
         req = req.model_copy(deep=True)
         pid = self._encode_call_end_inplace(req)
-        return self._ref_apply(self._internal_trace_server.call_end, req, pid)
+        return await self._aref_apply(self._internal_trace_server.call_end, req, pid)
 
-    def call_start_batch(self, req: tsi.CallCreateBatchReq) -> tsi.CallCreateBatchRes:
+    async def call_start_batch(
+        self, req: tsi.CallCreateBatchReq
+    ) -> tsi.CallCreateBatchRes:
         """Batch of start/end ops, converting each item's ids ext->int.
 
         Delegates the whole batch to the internal batched writer in one call so
@@ -365,7 +448,9 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
                 pid = self._encode_call_end_inplace(item.req)
             else:
                 raise TypeError(f"Unsupported batch item mode: {type(item)}")
-        return self._ref_apply(self._internal_trace_server.call_start_batch, req, pid)
+        return await self._aref_apply(
+            self._internal_trace_server.call_start_batch, req, pid
+        )
 
     def _encode_call_start_inplace(self, req: tsi.CallStartReq) -> str:
         req.start.project_id = self._idc.ext_to_int_project_id(req.start.project_id)
@@ -379,11 +464,11 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
         req.end.project_id = self._idc.ext_to_int_project_id(req.end.project_id)
         return req.end.project_id
 
-    def call_read(self, req: tsi.CallReadReq) -> tsi.CallReadRes:
+    async def call_read(self, req: tsi.CallReadReq) -> tsi.CallReadRes:
         req = req.model_copy(deep=True)
         original_project_id = req.project_id
         req.project_id = self._idc.ext_to_int_project_id(original_project_id)
-        res = self._ref_apply(
+        res = await self._aref_apply(
             self._internal_trace_server.call_read, req, req.project_id
         )
         if res.call is None:
@@ -408,7 +493,7 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
             int_run_ids.append(self._idc.ext_to_int_run_id(qualified))
         return int_run_ids
 
-    def calls_query(self, req: tsi.CallsQueryReq) -> tsi.CallsQueryRes:
+    async def calls_query(self, req: tsi.CallsQueryReq) -> tsi.CallsQueryRes:
         req = req.model_copy(deep=True)
         original_project_id = req.project_id
         req.project_id = self._idc.ext_to_int_project_id(original_project_id)
@@ -424,7 +509,7 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
                     for user_id in req.filter.wb_user_ids
                 ]
             # TODO: How do we correctly process user_id for the query filters?
-        res = self._ref_apply(
+        res = await self._aref_apply(
             self._internal_trace_server.calls_query, req, req.project_id
         )
         for call in res.calls:
@@ -441,12 +526,16 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
             ):
                 # Resolve the username from the internal ID before we convert
                 # wb_user_id back to its external representation.
-                call.wb_username = self._username_resolver(internal_user_id)
+                call.wb_username = await self._call(
+                    self._username_resolver, internal_user_id
+                )
             if internal_user_id is not None:
                 call.wb_user_id = self._idc.int_to_ext_user_id(internal_user_id)
         return res
 
-    def calls_query_stream(self, req: tsi.CallsQueryReq) -> Iterator[tsi.CallSchema]:
+    async def calls_query_stream(
+        self, req: tsi.CallsQueryReq
+    ) -> AsyncIterator[tsi.CallSchema]:
         req = req.model_copy(deep=True)
         original_project_id = req.project_id
         req.project_id = self._idc.ext_to_int_project_id(original_project_id)
@@ -462,12 +551,12 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
                     for user_id in req.filter.wb_user_ids
                 ]
             # TODO: How do we correctly process user_id for the query filters?
-        res = self._stream_ref_apply(
+        res = self._astream_ref_apply(
             self._internal_trace_server.calls_query_stream,
             req,
             req.project_id,
         )
-        for call in res:
+        async for call in res:
             if call.project_id != req.project_id:
                 raise ValueError("Internal Error - Project Mismatch")
             call.project_id = original_project_id
@@ -481,21 +570,25 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
             ):
                 # Resolve the username from the internal ID before we convert
                 # wb_user_id back to its external representation.
-                call.wb_username = self._username_resolver(internal_user_id)
+                call.wb_username = await self._call(
+                    self._username_resolver, internal_user_id
+                )
             if internal_user_id is not None:
                 call.wb_user_id = self._idc.int_to_ext_user_id(internal_user_id)
             yield call
 
-    def calls_delete(self, req: tsi.CallsDeleteReq) -> tsi.CallsDeleteRes:
+    async def calls_delete(self, req: tsi.CallsDeleteReq) -> tsi.CallsDeleteRes:
         req = req.model_copy(deep=True)
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)
         if req.wb_user_id is not None:
             req.wb_user_id = self._idc.ext_to_int_user_id(req.wb_user_id)
-        return self._ref_apply(
+        return await self._aref_apply(
             self._internal_trace_server.calls_delete, req, req.project_id
         )
 
-    def calls_query_stats(self, req: tsi.CallsQueryStatsReq) -> tsi.CallsQueryStatsRes:
+    async def calls_query_stats(
+        self, req: tsi.CallsQueryStatsReq
+    ) -> tsi.CallsQueryStatsRes:
         req = req.model_copy(deep=True)
         original_project_id = req.project_id
         req.project_id = self._idc.ext_to_int_project_id(original_project_id)
@@ -511,43 +604,45 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
                     for user_id in req.filter.wb_user_ids
                 ]
             # TODO: How do we correctly process user_id for the query filters?
-        return self._ref_apply(
+        return await self._aref_apply(
             self._internal_trace_server.calls_query_stats, req, req.project_id
         )
 
-    def call_update(self, req: tsi.CallUpdateReq) -> tsi.CallUpdateRes:
+    async def call_update(self, req: tsi.CallUpdateReq) -> tsi.CallUpdateRes:
         req = req.model_copy(deep=True)
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)
         if req.wb_user_id is not None:
             req.wb_user_id = self._idc.ext_to_int_user_id(req.wb_user_id)
-        return self._ref_apply(
+        return await self._aref_apply(
             self._internal_trace_server.call_update, req, req.project_id
         )
 
-    def obj_create(self, req: tsi.ObjCreateReq) -> tsi.ObjCreateRes:
+    async def obj_create(self, req: tsi.ObjCreateReq) -> tsi.ObjCreateRes:
         req = req.model_copy(deep=True)
         req.obj.project_id = self._idc.ext_to_int_project_id(req.obj.project_id)
         if req.obj.wb_user_id is not None:
             req.obj.wb_user_id = self._idc.ext_to_int_user_id(req.obj.wb_user_id)
-        return self._ref_apply(
+        return await self._aref_apply(
             self._internal_trace_server.obj_create, req, req.obj.project_id
         )
 
-    def obj_read(self, req: tsi.ObjReadReq) -> tsi.ObjReadRes:
+    async def obj_read(self, req: tsi.ObjReadReq) -> tsi.ObjReadRes:
         req = req.model_copy(deep=True)
         original_project_id = req.project_id
         req.project_id = self._idc.ext_to_int_project_id(original_project_id)
-        res = self._ref_apply(self._internal_trace_server.obj_read, req, req.project_id)
+        res = await self._aref_apply(
+            self._internal_trace_server.obj_read, req, req.project_id
+        )
         if res.obj.project_id != req.project_id:
             raise ValueError("Internal Error - Project Mismatch")
         res.obj.project_id = original_project_id
         return res
 
-    def objs_query(self, req: tsi.ObjQueryReq) -> tsi.ObjQueryRes:
+    async def objs_query(self, req: tsi.ObjQueryReq) -> tsi.ObjQueryRes:
         req = req.model_copy(deep=True)
         original_project_id = req.project_id
         req.project_id = self._idc.ext_to_int_project_id(original_project_id)
-        res = self._ref_apply(
+        res = await self._aref_apply(
             self._internal_trace_server.objs_query, req, req.project_id
         )
         for obj in res.objs:
@@ -556,103 +651,105 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
             obj.project_id = original_project_id
         return res
 
-    def obj_delete(self, req: tsi.ObjDeleteReq) -> tsi.ObjDeleteRes:
+    async def obj_delete(self, req: tsi.ObjDeleteReq) -> tsi.ObjDeleteRes:
         req = req.model_copy(deep=True)
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)
-        return self._ref_apply(
+        return await self._aref_apply(
             self._internal_trace_server.obj_delete, req, req.project_id
         )
 
     # Tag/alias requests contain only plain identifiers (no refs to convert)
-    def obj_add_tags(self, req: tsi.ObjAddTagsReq) -> tsi.ObjAddTagsRes:
+    async def obj_add_tags(self, req: tsi.ObjAddTagsReq) -> tsi.ObjAddTagsRes:
         req = req.model_copy(deep=True)
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)
-        return self._internal_trace_server.obj_add_tags(req)
+        return await self._call(self._internal_trace_server.obj_add_tags, req)
 
-    def obj_remove_tags(self, req: tsi.ObjRemoveTagsReq) -> tsi.ObjRemoveTagsRes:
+    async def obj_remove_tags(self, req: tsi.ObjRemoveTagsReq) -> tsi.ObjRemoveTagsRes:
         req = req.model_copy(deep=True)
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)
-        return self._internal_trace_server.obj_remove_tags(req)
+        return await self._call(self._internal_trace_server.obj_remove_tags, req)
 
-    def obj_set_aliases(self, req: tsi.ObjSetAliasesReq) -> tsi.ObjSetAliasesRes:
+    async def obj_set_aliases(self, req: tsi.ObjSetAliasesReq) -> tsi.ObjSetAliasesRes:
         req = req.model_copy(deep=True)
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)
-        return self._internal_trace_server.obj_set_aliases(req)
+        return await self._call(self._internal_trace_server.obj_set_aliases, req)
 
-    def obj_remove_aliases(
+    async def obj_remove_aliases(
         self, req: tsi.ObjRemoveAliasesReq
     ) -> tsi.ObjRemoveAliasesRes:
         req = req.model_copy(deep=True)
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)
-        return self._internal_trace_server.obj_remove_aliases(req)
+        return await self._call(self._internal_trace_server.obj_remove_aliases, req)
 
-    def tags_list(self, req: tsi.TagsListReq) -> tsi.TagsListRes:
+    async def tags_list(self, req: tsi.TagsListReq) -> tsi.TagsListRes:
         req = req.model_copy(deep=True)
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)
-        return self._internal_trace_server.tags_list(req)
+        return await self._call(self._internal_trace_server.tags_list, req)
 
-    def aliases_list(self, req: tsi.AliasesListReq) -> tsi.AliasesListRes:
+    async def aliases_list(self, req: tsi.AliasesListReq) -> tsi.AliasesListRes:
         req = req.model_copy(deep=True)
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)
-        return self._internal_trace_server.aliases_list(req)
+        return await self._call(self._internal_trace_server.aliases_list, req)
 
-    def table_create(self, req: tsi.TableCreateReq) -> tsi.TableCreateRes:
+    async def table_create(self, req: tsi.TableCreateReq) -> tsi.TableCreateRes:
         req = req.model_copy(deep=True)
         req.table.project_id = self._idc.ext_to_int_project_id(req.table.project_id)
-        return self._ref_apply(
+        return await self._aref_apply(
             self._internal_trace_server.table_create, req, req.table.project_id
         )
 
-    def table_update(self, req: tsi.TableUpdateReq) -> tsi.TableUpdateRes:
+    async def table_update(self, req: tsi.TableUpdateReq) -> tsi.TableUpdateRes:
         req = req.model_copy(deep=True)
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)
-        return self._ref_apply(
+        return await self._aref_apply(
             self._internal_trace_server.table_update, req, req.project_id
         )
 
-    def table_create_from_digests(
+    async def table_create_from_digests(
         self, req: tsi.TableCreateFromDigestsReq
     ) -> tsi.TableCreateFromDigestsRes:
         req = req.model_copy(deep=True)
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)
-        return self._ref_apply(
+        return await self._aref_apply(
             self._internal_trace_server.table_create_from_digests, req, req.project_id
         )
 
-    def table_query(self, req: tsi.TableQueryReq) -> tsi.TableQueryRes:
+    async def table_query(self, req: tsi.TableQueryReq) -> tsi.TableQueryRes:
         req = req.model_copy(deep=True)
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)
-        return self._ref_apply(
+        return await self._aref_apply(
             self._internal_trace_server.table_query, req, req.project_id
         )
 
     def table_query_stream(
         self, req: tsi.TableQueryReq
-    ) -> Iterator[tsi.TableRowSchema]:
+    ) -> AsyncIterator[tsi.TableRowSchema]:
         req = req.model_copy(deep=True)
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)
-        return self._stream_ref_apply(
+        return self._astream_ref_apply(
             self._internal_trace_server.table_query_stream, req, req.project_id
         )
 
     # This is a legacy endpoint, it should be removed once the client is mostly updated
-    def table_query_stats(self, req: tsi.TableQueryStatsReq) -> tsi.TableQueryStatsRes:
+    async def table_query_stats(
+        self, req: tsi.TableQueryStatsReq
+    ) -> tsi.TableQueryStatsRes:
         req = req.model_copy(deep=True)
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)
-        return self._ref_apply(
+        return await self._aref_apply(
             self._internal_trace_server.table_query_stats, req, req.project_id
         )
 
-    def table_query_stats_batch(
+    async def table_query_stats_batch(
         self, req: tsi.TableQueryStatsBatchReq
     ) -> tsi.TableQueryStatsBatchRes:
         req = req.model_copy(deep=True)
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)
-        return self._ref_apply(
+        return await self._aref_apply(
             self._internal_trace_server.table_query_stats_batch, req, req.project_id
         )
 
-    def refs_read_batch(self, req: tsi.RefsReadBatchReq) -> tsi.RefsReadBatchRes:
+    async def refs_read_batch(self, req: tsi.RefsReadBatchReq) -> tsi.RefsReadBatchRes:
         req = req.model_copy(deep=True)
         # refs_read_batch has no single project_id — refs may span projects.
         # External refs are converted normally; any internal refs will be
@@ -664,47 +761,51 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
                 self._idc.int_to_ext_project_id(pid) is not None
             ),
         )
-        res = self._internal_trace_server.refs_read_batch(req_conv)
+        res = await self._call(self._internal_trace_server.refs_read_batch, req_conv)
         return universal_int_to_ext_ref_converter(res, self._idc.int_to_ext_project_id)
 
-    def file_create(self, req: tsi.FileCreateReq) -> tsi.FileCreateRes:
+    async def file_create(self, req: tsi.FileCreateReq) -> tsi.FileCreateRes:
         req = req.model_copy(deep=True)
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)
         # Special case where refs can never be part of the request
-        return self._internal_trace_server.file_create(req)
+        return await self._call(self._internal_trace_server.file_create, req)
 
-    def file_content_read(self, req: tsi.FileContentReadReq) -> tsi.FileContentReadRes:
+    async def file_content_read(
+        self, req: tsi.FileContentReadReq
+    ) -> tsi.FileContentReadRes:
         req = req.model_copy(deep=True)
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)
         # Special case where refs can never be part of the request
-        return self._internal_trace_server.file_content_read(req)
+        return await self._call(self._internal_trace_server.file_content_read, req)
 
-    def files_stats(self, req: tsi.FilesStatsReq) -> tsi.FilesStatsRes:
+    async def files_stats(self, req: tsi.FilesStatsReq) -> tsi.FilesStatsRes:
         req = req.model_copy(deep=True)
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)
-        return self._ref_apply(
+        return await self._aref_apply(
             self._internal_trace_server.files_stats, req, req.project_id
         )
 
-    def export_start(self, req: tsi.ExportStartReq) -> tsi.ExportStartRes:
+    async def export_start(self, req: tsi.ExportStartReq) -> tsi.ExportStartRes:
         req = req.model_copy(deep=True)
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)
         # Artifacts hold ref strings verbatim; no ext<->int ref conversion here.
-        return self._internal_trace_server.export_start(req)
+        return await self._call(self._internal_trace_server.export_start, req)
 
-    def export_status(self, req: tsi.ExportStatusReq) -> tsi.ExportStatusRes:
+    async def export_status(self, req: tsi.ExportStatusReq) -> tsi.ExportStatusRes:
         req = req.model_copy(deep=True)
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)
-        return self._internal_trace_server.export_status(req)
+        return await self._call(self._internal_trace_server.export_status, req)
 
-    def feedback_create(self, req: tsi.FeedbackCreateReq) -> tsi.FeedbackCreateRes:
+    async def feedback_create(
+        self, req: tsi.FeedbackCreateReq
+    ) -> tsi.FeedbackCreateRes:
         req = req.model_copy(deep=True)
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)
         original_user_id = req.wb_user_id
         if original_user_id is None:
             raise ValueError("wb_user_id cannot be None")
         req.wb_user_id = self._idc.ext_to_int_user_id(original_user_id)
-        res = self._ref_apply(
+        res = await self._aref_apply(
             self._internal_trace_server.feedback_create, req, req.project_id
         )
         if res.wb_user_id != req.wb_user_id:
@@ -712,7 +813,7 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
         res.wb_user_id = original_user_id
         return res
 
-    def feedback_create_batch(
+    async def feedback_create_batch(
         self, req: tsi.FeedbackCreateBatchReq
     ) -> tsi.FeedbackCreateBatchRes:
         req = req.model_copy(deep=True)
@@ -727,17 +828,17 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
         # Use the first batch item's project_id for the verifier; all items
         # in the batch have already been converted above.
         pid = req.batch[0].project_id if req.batch else ""
-        res = self._ref_apply(
+        res = await self._aref_apply(
             self._internal_trace_server.feedback_create_batch, req, pid
         )
         return res
 
-    def feedback_query(self, req: tsi.FeedbackQueryReq) -> tsi.FeedbackQueryRes:
+    async def feedback_query(self, req: tsi.FeedbackQueryReq) -> tsi.FeedbackQueryRes:
         req = req.model_copy(deep=True)
         original_project_id = req.project_id
         req.project_id = self._idc.ext_to_int_project_id(original_project_id)
         # TODO: How to handle wb_user_id and wb_run_id in the query filters?
-        res = self._ref_apply(
+        res = await self._aref_apply(
             self._internal_trace_server.feedback_query, req, req.project_id
         )
         for feedback in res.result:
@@ -751,21 +852,23 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
                 )
         return res
 
-    def feedback_purge(self, req: tsi.FeedbackPurgeReq) -> tsi.FeedbackPurgeRes:
+    async def feedback_purge(self, req: tsi.FeedbackPurgeReq) -> tsi.FeedbackPurgeRes:
         req = req.model_copy(deep=True)
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)
-        return self._ref_apply(
+        return await self._aref_apply(
             self._internal_trace_server.feedback_purge, req, req.project_id
         )
 
-    def feedback_replace(self, req: tsi.FeedbackReplaceReq) -> tsi.FeedbackReplaceRes:
+    async def feedback_replace(
+        self, req: tsi.FeedbackReplaceReq
+    ) -> tsi.FeedbackReplaceRes:
         req = req.model_copy(deep=True)
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)
         original_user_id = req.wb_user_id
         if original_user_id is None:
             raise ValueError("wb_user_id cannot be None")
         req.wb_user_id = self._idc.ext_to_int_user_id(original_user_id)
-        res = self._ref_apply(
+        res = await self._aref_apply(
             self._internal_trace_server.feedback_replace, req, req.project_id
         )
         if res.wb_user_id != req.wb_user_id:
@@ -773,51 +876,51 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
         res.wb_user_id = original_user_id
         return res
 
-    def feedback_stats(self, req: tsi.FeedbackStatsReq) -> tsi.FeedbackStatsRes:
+    async def feedback_stats(self, req: tsi.FeedbackStatsReq) -> tsi.FeedbackStatsRes:
         req = req.model_copy(deep=True)
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)
-        return self._ref_apply(
+        return await self._aref_apply(
             self._internal_trace_server.feedback_stats, req, req.project_id
         )
 
-    def feedback_aggregate(
+    async def feedback_aggregate(
         self, req: tsi.FeedbackAggregateReq
     ) -> tsi.FeedbackAggregateRes:
         """Query the feedback table for aggregate scores over time."""
         req = req.model_copy(deep=True)
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)
-        return self._ref_apply(
+        return await self._aref_apply(
             self._internal_trace_server.feedback_aggregate, req, req.project_id
         )
 
-    def feedback_payload_schema(
+    async def feedback_payload_schema(
         self, req: tsi.FeedbackPayloadSchemaReq
     ) -> tsi.FeedbackPayloadSchemaRes:
         req = req.model_copy(deep=True)
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)
-        return self._ref_apply(
+        return await self._aref_apply(
             self._internal_trace_server.feedback_payload_schema, req, req.project_id
         )
 
-    def cost_create(self, req: tsi.CostCreateReq) -> tsi.CostCreateRes:
+    async def cost_create(self, req: tsi.CostCreateReq) -> tsi.CostCreateRes:
         req = req.model_copy(deep=True)
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)
-        return self._ref_apply(
+        return await self._aref_apply(
             self._internal_trace_server.cost_create, req, req.project_id
         )
 
-    def cost_purge(self, req: tsi.CostPurgeReq) -> tsi.CostPurgeRes:
+    async def cost_purge(self, req: tsi.CostPurgeReq) -> tsi.CostPurgeRes:
         req = req.model_copy(deep=True)
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)
-        return self._ref_apply(
+        return await self._aref_apply(
             self._internal_trace_server.cost_purge, req, req.project_id
         )
 
-    def cost_query(self, req: tsi.CostQueryReq) -> tsi.CostQueryRes:
+    async def cost_query(self, req: tsi.CostQueryReq) -> tsi.CostQueryRes:
         req = req.model_copy(deep=True)
         original_project_id = req.project_id
         req.project_id = self._idc.ext_to_int_project_id(original_project_id)
-        res = self._ref_apply(
+        res = await self._aref_apply(
             self._internal_trace_server.cost_query, req, req.project_id
         )
         # Extend this to account for ORG ID when org level costs are implemented
@@ -828,40 +931,24 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
                 cost["pricing_level_id"] = original_project_id
         return res
 
-    def completions_create(
+    async def completions_create(
         self, req: tsi.CompletionsCreateReq
     ) -> tsi.CompletionsCreateRes:
         req = req.model_copy(deep=True)
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)
-        res = self._ref_apply(
-            self._internal_trace_server.completions_create, req, req.project_id
+        # Until the server's completions_create is itself a coroutine, prefer
+        # its native async twin so the LLM call does not hold a thread.
+        method = getattr(
+            self._internal_trace_server,
+            "acompletions_create",
+            self._internal_trace_server.completions_create,
         )
-        return res
-
-    async def acompletions_create(
-        self, req: tsi.CompletionsCreateReq
-    ) -> tsi.CompletionsCreateRes:
-        req = req.model_copy(deep=True)
-        req.project_id = self._idc.ext_to_int_project_id(req.project_id)
-        # The HTTP service hands us the server through its sync facade; the
-        # native async completion path wants the server itself.
-        inner = getattr(
-            self._internal_trace_server, "_inner", self._internal_trace_server
-        )
-        if isinstance(inner, AsyncClickHouseTraceServer):
-            return await self._aref_apply(
-                inner.acompletions_create, req, req.project_id
-            )
-        # Fallback for non-async backends: run the sync path in a thread so the
-        # event loop is still freed while we wait.
-        return await asyncio.to_thread(
-            self._ref_apply, inner.completions_create, req, req.project_id
-        )
+        return await self._aref_apply(method, req, req.project_id)
 
     # Streaming completions - simply proxy through after converting project ID.
     def completions_create_stream(
         self, req: tsi.CompletionsCreateReq
-    ) -> Iterator[dict[str, Any]]:
+    ) -> AsyncIterator[dict[str, Any]]:
         req = req.model_copy(deep=True)
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)
         # Convert any refs in the request (e.g., prompt) to internal format
@@ -872,175 +959,175 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
         )
         # The streamed chunks contain no project-scoped references, so we can
         # forward directly without additional ref conversion.
-        return self._internal_trace_server.completions_create_stream(req)
+        return self._astream(self._internal_trace_server.completions_create_stream, req)
 
-    def image_create(
+    async def image_create(
         self, req: tsi.ImageGenerationCreateReq
     ) -> tsi.ImageGenerationCreateRes:
         req = req.model_copy(deep=True)
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)
-        res = self._ref_apply(
+        res = await self._aref_apply(
             self._internal_trace_server.image_create, req, req.project_id
         )
         return res
 
-    def project_stats(self, req: tsi.ProjectStatsReq) -> tsi.ProjectStatsRes:
+    async def project_stats(self, req: tsi.ProjectStatsReq) -> tsi.ProjectStatsRes:
         req = req.model_copy(deep=True)
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)
-        return self._ref_apply(
+        return await self._aref_apply(
             self._internal_trace_server.project_stats, req, req.project_id
         )
 
-    def project_ttl_settings_read(
+    async def project_ttl_settings_read(
         self, req: tsi.ProjectTTLSettingsReadReq
     ) -> tsi.ProjectTTLSettingsReadRes:
         req = req.model_copy(deep=True)
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)
-        return self._ref_apply(
+        return await self._aref_apply(
             self._internal_trace_server.project_ttl_settings_read, req, req.project_id
         )
 
-    def project_ttl_settings_update(
+    async def project_ttl_settings_update(
         self, req: tsi.ProjectTTLSettingsUpdateReq
     ) -> tsi.ProjectTTLSettingsUpdateRes:
         req = req.model_copy(deep=True)
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)
         if req.wb_user_id is not None:
             req.wb_user_id = self._idc.ext_to_int_user_id(req.wb_user_id)
-        return self._ref_apply(
+        return await self._aref_apply(
             self._internal_trace_server.project_ttl_settings_update, req, req.project_id
         )
 
     def threads_query_stream(
         self, req: tsi.ThreadsQueryReq
-    ) -> Iterator[tsi.ThreadSchema]:
+    ) -> AsyncIterator[tsi.ThreadSchema]:
         req = req.model_copy(deep=True)
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)
-        return self._stream_ref_apply(
+        return self._astream_ref_apply(
             self._internal_trace_server.threads_query_stream, req, req.project_id
         )
 
     # Annotation Queue API
-    def annotation_queue_create(
+    async def annotation_queue_create(
         self, req: tsi.AnnotationQueueCreateReq
     ) -> tsi.AnnotationQueueCreateRes:
         req = req.model_copy(deep=True)
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)
-        return self._ref_apply(
+        return await self._aref_apply(
             self._internal_trace_server.annotation_queue_create, req, req.project_id
         )
 
     def annotation_queues_query_stream(
         self, req: tsi.AnnotationQueuesQueryReq
-    ) -> Iterator[tsi.AnnotationQueueSchema]:
+    ) -> AsyncIterator[tsi.AnnotationQueueSchema]:
         req = req.model_copy(deep=True)
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)
-        return self._stream_ref_apply(
+        return self._astream_ref_apply(
             self._internal_trace_server.annotation_queues_query_stream,
             req,
             req.project_id,
         )
 
-    def annotation_queue_read(
+    async def annotation_queue_read(
         self, req: tsi.AnnotationQueueReadReq
     ) -> tsi.AnnotationQueueReadRes:
         req = req.model_copy(deep=True)
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)
-        return self._ref_apply(
+        return await self._aref_apply(
             self._internal_trace_server.annotation_queue_read, req, req.project_id
         )
 
-    def annotation_queue_update(
+    async def annotation_queue_update(
         self, req: tsi.AnnotationQueueUpdateReq
     ) -> tsi.AnnotationQueueUpdateRes:
         req = req.model_copy(deep=True)
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)
-        return self._ref_apply(
+        return await self._aref_apply(
             self._internal_trace_server.annotation_queue_update, req, req.project_id
         )
 
-    def annotation_queue_delete(
+    async def annotation_queue_delete(
         self, req: tsi.AnnotationQueueDeleteReq
     ) -> tsi.AnnotationQueueDeleteRes:
         req = req.model_copy(deep=True)
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)
-        return self._ref_apply(
+        return await self._aref_apply(
             self._internal_trace_server.annotation_queue_delete, req, req.project_id
         )
 
-    def annotation_queue_add_calls(
+    async def annotation_queue_add_calls(
         self, req: tsi.AnnotationQueueAddCallsReq
     ) -> tsi.AnnotationQueueAddCallsRes:
         req = req.model_copy(deep=True)
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)
-        return self._ref_apply(
+        return await self._aref_apply(
             self._internal_trace_server.annotation_queue_add_calls, req, req.project_id
         )
 
-    def annotation_queue_items_query(
+    async def annotation_queue_items_query(
         self, req: tsi.AnnotationQueueItemsQueryReq
     ) -> tsi.AnnotationQueueItemsQueryRes:
         req = req.model_copy(deep=True)
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)
-        return self._ref_apply(
+        return await self._aref_apply(
             self._internal_trace_server.annotation_queue_items_query,
             req,
             req.project_id,
         )
 
-    def annotation_queues_stats(
+    async def annotation_queues_stats(
         self, req: tsi.AnnotationQueuesStatsReq
     ) -> tsi.AnnotationQueuesStatsRes:
         req = req.model_copy(deep=True)
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)
-        return self._ref_apply(
+        return await self._aref_apply(
             self._internal_trace_server.annotation_queues_stats, req, req.project_id
         )
 
-    def annotator_queue_items_progress_update(
+    async def annotator_queue_items_progress_update(
         self, req: tsi.AnnotatorQueueItemsProgressUpdateReq
     ) -> tsi.AnnotatorQueueItemsProgressUpdateRes:
         req = req.model_copy(deep=True)
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)
         if req.wb_user_id is not None:
             req.wb_user_id = self._idc.ext_to_int_user_id(req.wb_user_id)
-        return self._ref_apply(
+        return await self._aref_apply(
             self._internal_trace_server.annotator_queue_items_progress_update,
             req,
             req.project_id,
         )
 
     # Dataset Sources API
-    def dataset_sources_link(
+    async def dataset_sources_link(
         self, req: tsi.DatasetSourcesLinkReq
     ) -> tsi.DatasetSourcesLinkRes:
         req = req.model_copy(deep=True)
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)
         if req.wb_user_id is not None:
             req.wb_user_id = self._idc.ext_to_int_user_id(req.wb_user_id)
-        return self._ref_apply(
+        return await self._aref_apply(
             self._internal_trace_server.dataset_sources_link, req, req.project_id
         )
 
-    def dataset_sources_link_delete(
+    async def dataset_sources_link_delete(
         self, req: tsi.DatasetSourcesLinkDeleteReq
     ) -> tsi.DatasetSourcesLinkDeleteRes:
         req = req.model_copy(deep=True)
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)
         if req.wb_user_id is not None:
             req.wb_user_id = self._idc.ext_to_int_user_id(req.wb_user_id)
-        return self._ref_apply(
+        return await self._aref_apply(
             self._internal_trace_server.dataset_sources_link_delete, req, req.project_id
         )
 
-    def dataset_sources_query(
+    async def dataset_sources_query(
         self, req: tsi.DatasetSourcesQueryReq
     ) -> tsi.DatasetSourcesQueryRes:
         req = req.model_copy(deep=True)
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)
         if req.wb_user_id is not None:
             req.wb_user_id = self._idc.ext_to_int_user_id(req.wb_user_id)
-        res = self._ref_apply(
+        res = await self._aref_apply(
             self._internal_trace_server.dataset_sources_query, req, req.project_id
         )
         for link in res.links:
@@ -1048,273 +1135,281 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
                 link.added_by = self._idc.int_to_ext_user_id(link.added_by)
         return res
 
-    def source_datasets_query(
+    async def source_datasets_query(
         self, req: tsi.SourceDatasetsQueryReq
     ) -> tsi.SourceDatasetsQueryRes:
         req = req.model_copy(deep=True)
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)
         if req.wb_user_id is not None:
             req.wb_user_id = self._idc.ext_to_int_user_id(req.wb_user_id)
-        return self._ref_apply(
+        return await self._aref_apply(
             self._internal_trace_server.source_datasets_query, req, req.project_id
         )
 
-    def evaluate_model(self, req: tsi.EvaluateModelReq) -> tsi.EvaluateModelRes:
+    async def evaluate_model(self, req: tsi.EvaluateModelReq) -> tsi.EvaluateModelRes:
         req = req.model_copy(deep=True)
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)
         if req.wb_user_id is not None:
             req.wb_user_id = self._idc.ext_to_int_user_id(req.wb_user_id)
-        return self._ref_apply(
+        return await self._aref_apply(
             self._internal_trace_server.evaluate_model, req, req.project_id
         )
 
-    def rescore(self, req: tsi.RescoreReq) -> tsi.RescoreRes:
+    async def rescore(self, req: tsi.RescoreReq) -> tsi.RescoreRes:
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)
         if req.wb_user_id is not None:
             req.wb_user_id = self._idc.ext_to_int_user_id(req.wb_user_id)
-        return self._ref_apply(self._internal_trace_server.rescore, req, req.project_id)
+        return await self._aref_apply(
+            self._internal_trace_server.rescore, req, req.project_id
+        )
 
-    def evaluation_status(
+    async def evaluation_status(
         self, req: tsi.EvaluationStatusReq
     ) -> tsi.EvaluationStatusRes:
         req = req.model_copy(deep=True)
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)
-        return self._ref_apply(
+        return await self._aref_apply(
             self._internal_trace_server.evaluation_status, req, req.project_id
         )
 
-    def calls_score(self, req: tsi.CallsScoreReq) -> tsi.CallsScoreRes:
+    async def calls_score(self, req: tsi.CallsScoreReq) -> tsi.CallsScoreRes:
         req = req.model_copy(deep=True)
         """Translate external IDs to internal IDs before forwarding to the internal server."""
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)
         if req.wb_user_id is not None:
             req.wb_user_id = self._idc.ext_to_int_user_id(req.wb_user_id)
-        return self._ref_apply(
+        return await self._aref_apply(
             self._internal_trace_server.calls_score, req, req.project_id
         )
 
     # === V2 APIs ===
 
-    def call_stats(self, req: tsi.CallStatsReq) -> tsi.CallStatsRes:
+    async def call_stats(self, req: tsi.CallStatsReq) -> tsi.CallStatsRes:
         req = req.model_copy(deep=True)
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)
-        return self._ref_apply(
+        return await self._aref_apply(
             self._internal_trace_server.call_stats, req, req.project_id
         )
 
-    def trace_usage(self, req: tsi.TraceUsageReq) -> tsi.TraceUsageRes:
+    async def trace_usage(self, req: tsi.TraceUsageReq) -> tsi.TraceUsageRes:
         req = req.model_copy(deep=True)
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)
-        return self._ref_apply(
+        return await self._aref_apply(
             self._internal_trace_server.trace_usage, req, req.project_id
         )
 
-    def calls_usage(self, req: tsi.CallsUsageReq) -> tsi.CallsUsageRes:
+    async def calls_usage(self, req: tsi.CallsUsageReq) -> tsi.CallsUsageRes:
         req = req.model_copy(deep=True)
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)
-        return self._ref_apply(
+        return await self._aref_apply(
             self._internal_trace_server.calls_usage, req, req.project_id
         )
 
-    def op_create(self, req: tsi.OpCreateReq) -> tsi.OpCreateRes:
+    async def op_create(self, req: tsi.OpCreateReq) -> tsi.OpCreateRes:
         req = req.model_copy(deep=True)
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)
-        return self._ref_apply(
+        return await self._aref_apply(
             self._internal_trace_server.op_create, req, req.project_id
         )
 
-    def op_read(self, req: tsi.OpReadReq) -> tsi.OpReadRes:
+    async def op_read(self, req: tsi.OpReadReq) -> tsi.OpReadRes:
         req = req.model_copy(deep=True)
         original_project_id = req.project_id
         req.project_id = self._idc.ext_to_int_project_id(original_project_id)
-        return self._ref_apply(self._internal_trace_server.op_read, req, req.project_id)
+        return await self._aref_apply(
+            self._internal_trace_server.op_read, req, req.project_id
+        )
 
-    def op_list(self, req: tsi.OpListReq) -> Iterator[tsi.OpReadRes]:
+    def op_list(self, req: tsi.OpListReq) -> AsyncIterator[tsi.OpReadRes]:
         req = req.model_copy(deep=True)
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)
-        return self._stream_ref_apply(
+        return self._astream_ref_apply(
             self._internal_trace_server.op_list, req, req.project_id
         )
 
-    def op_delete(self, req: tsi.OpDeleteReq) -> tsi.OpDeleteRes:
+    async def op_delete(self, req: tsi.OpDeleteReq) -> tsi.OpDeleteRes:
         req = req.model_copy(deep=True)
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)
-        return self._ref_apply(
+        return await self._aref_apply(
             self._internal_trace_server.op_delete, req, req.project_id
         )
 
-    def dataset_create(self, req: tsi.DatasetCreateReq) -> tsi.DatasetCreateRes:
+    async def dataset_create(self, req: tsi.DatasetCreateReq) -> tsi.DatasetCreateRes:
         req = req.model_copy(deep=True)
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)
-        return self._ref_apply(
+        return await self._aref_apply(
             self._internal_trace_server.dataset_create, req, req.project_id
         )
 
-    def dataset_read(self, req: tsi.DatasetReadReq) -> tsi.DatasetReadRes:
+    async def dataset_read(self, req: tsi.DatasetReadReq) -> tsi.DatasetReadRes:
         req = req.model_copy(deep=True)
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)
-        return self._ref_apply(
+        return await self._aref_apply(
             self._internal_trace_server.dataset_read, req, req.project_id
         )
 
-    def dataset_list(self, req: tsi.DatasetListReq) -> Iterator[tsi.DatasetReadRes]:
+    def dataset_list(
+        self, req: tsi.DatasetListReq
+    ) -> AsyncIterator[tsi.DatasetReadRes]:
         req = req.model_copy(deep=True)
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)
-        return self._stream_ref_apply(
+        return self._astream_ref_apply(
             self._internal_trace_server.dataset_list, req, req.project_id
         )
 
-    def dataset_delete(self, req: tsi.DatasetDeleteReq) -> tsi.DatasetDeleteRes:
+    async def dataset_delete(self, req: tsi.DatasetDeleteReq) -> tsi.DatasetDeleteRes:
         req = req.model_copy(deep=True)
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)
-        return self._ref_apply(
+        return await self._aref_apply(
             self._internal_trace_server.dataset_delete, req, req.project_id
         )
 
-    def custom_runtime_apply(
+    async def custom_runtime_apply(
         self, req: tsi.CustomRuntimeApplyReq
     ) -> tsi.CustomRuntimeApplyRes:
         req = req.model_copy(deep=True)
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)
         if req.wb_user_id is not None:
             req.wb_user_id = self._idc.ext_to_int_user_id(req.wb_user_id)
-        return self._ref_apply(
+        return await self._aref_apply(
             self._internal_trace_server.custom_runtime_apply, req, req.project_id
         )
 
-    def scorer_create(self, req: tsi.ScorerCreateReq) -> tsi.ScorerCreateRes:
+    async def scorer_create(self, req: tsi.ScorerCreateReq) -> tsi.ScorerCreateRes:
         req = req.model_copy(deep=True)
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)
-        return self._ref_apply(
+        return await self._aref_apply(
             self._internal_trace_server.scorer_create, req, req.project_id
         )
 
-    def scorer_read(self, req: tsi.ScorerReadReq) -> tsi.ScorerReadRes:
+    async def scorer_read(self, req: tsi.ScorerReadReq) -> tsi.ScorerReadRes:
         req = req.model_copy(deep=True)
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)
-        return self._ref_apply(
+        return await self._aref_apply(
             self._internal_trace_server.scorer_read, req, req.project_id
         )
 
-    def scorer_list(self, req: tsi.ScorerListReq) -> Iterator[tsi.ScorerReadRes]:
+    def scorer_list(self, req: tsi.ScorerListReq) -> AsyncIterator[tsi.ScorerReadRes]:
         req = req.model_copy(deep=True)
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)
-        return self._stream_ref_apply(
+        return self._astream_ref_apply(
             self._internal_trace_server.scorer_list, req, req.project_id
         )
 
-    def scorer_delete(self, req: tsi.ScorerDeleteReq) -> tsi.ScorerDeleteRes:
+    async def scorer_delete(self, req: tsi.ScorerDeleteReq) -> tsi.ScorerDeleteRes:
         req = req.model_copy(deep=True)
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)
-        return self._ref_apply(
+        return await self._aref_apply(
             self._internal_trace_server.scorer_delete, req, req.project_id
         )
 
-    def evaluation_create(
+    async def evaluation_create(
         self, req: tsi.EvaluationCreateReq
     ) -> tsi.EvaluationCreateRes:
         req = req.model_copy(deep=True)
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)
-        return self._ref_apply(
+        return await self._aref_apply(
             self._internal_trace_server.evaluation_create, req, req.project_id
         )
 
-    def evaluation_read(self, req: tsi.EvaluationReadReq) -> tsi.EvaluationReadRes:
+    async def evaluation_read(
+        self, req: tsi.EvaluationReadReq
+    ) -> tsi.EvaluationReadRes:
         req = req.model_copy(deep=True)
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)
-        return self._ref_apply(
+        return await self._aref_apply(
             self._internal_trace_server.evaluation_read, req, req.project_id
         )
 
     def evaluation_list(
         self, req: tsi.EvaluationListReq
-    ) -> Iterator[tsi.EvaluationReadRes]:
+    ) -> AsyncIterator[tsi.EvaluationReadRes]:
         req = req.model_copy(deep=True)
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)
-        return self._stream_ref_apply(
+        return self._astream_ref_apply(
             self._internal_trace_server.evaluation_list, req, req.project_id
         )
 
-    def evaluation_delete(
+    async def evaluation_delete(
         self, req: tsi.EvaluationDeleteReq
     ) -> tsi.EvaluationDeleteRes:
         req = req.model_copy(deep=True)
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)
-        return self._ref_apply(
+        return await self._aref_apply(
             self._internal_trace_server.evaluation_delete, req, req.project_id
         )
 
     # Model V2 API
 
-    def model_create(self, req: tsi.ModelCreateReq) -> tsi.ModelCreateRes:
+    async def model_create(self, req: tsi.ModelCreateReq) -> tsi.ModelCreateRes:
         req = req.model_copy(deep=True)
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)
-        return self._ref_apply(
+        return await self._aref_apply(
             self._internal_trace_server.model_create, req, req.project_id
         )
 
-    def model_read(self, req: tsi.ModelReadReq) -> tsi.ModelReadRes:
+    async def model_read(self, req: tsi.ModelReadReq) -> tsi.ModelReadRes:
         req = req.model_copy(deep=True)
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)
-        return self._ref_apply(
+        return await self._aref_apply(
             self._internal_trace_server.model_read, req, req.project_id
         )
 
-    def model_list(self, req: tsi.ModelListReq) -> Iterator[tsi.ModelReadRes]:
+    def model_list(self, req: tsi.ModelListReq) -> AsyncIterator[tsi.ModelReadRes]:
         req = req.model_copy(deep=True)
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)
-        return self._stream_ref_apply(
+        return self._astream_ref_apply(
             self._internal_trace_server.model_list, req, req.project_id
         )
 
-    def model_delete(self, req: tsi.ModelDeleteReq) -> tsi.ModelDeleteRes:
+    async def model_delete(self, req: tsi.ModelDeleteReq) -> tsi.ModelDeleteRes:
         req = req.model_copy(deep=True)
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)
-        return self._ref_apply(
+        return await self._aref_apply(
             self._internal_trace_server.model_delete, req, req.project_id
         )
 
-    def evaluation_run_create(
+    async def evaluation_run_create(
         self, req: tsi.EvaluationRunCreateReq
     ) -> tsi.EvaluationRunCreateRes:
         req = req.model_copy(deep=True)
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)
         if req.wb_user_id is not None:
             req.wb_user_id = self._idc.ext_to_int_user_id(req.wb_user_id)
-        return self._ref_apply(
+        return await self._aref_apply(
             self._internal_trace_server.evaluation_run_create, req, req.project_id
         )
 
-    def evaluation_run_read(
+    async def evaluation_run_read(
         self, req: tsi.EvaluationRunReadReq
     ) -> tsi.EvaluationRunReadRes:
         req = req.model_copy(deep=True)
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)
-        return self._ref_apply(
+        return await self._aref_apply(
             self._internal_trace_server.evaluation_run_read, req, req.project_id
         )
 
     def evaluation_run_list(
         self, req: tsi.EvaluationRunListReq
-    ) -> Iterator[tsi.EvaluationRunReadRes]:
+    ) -> AsyncIterator[tsi.EvaluationRunReadRes]:
         req = req.model_copy(deep=True)
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)
-        return self._stream_ref_apply(
+        return self._astream_ref_apply(
             self._internal_trace_server.evaluation_run_list, req, req.project_id
         )
 
-    def evaluation_run_delete(
+    async def evaluation_run_delete(
         self, req: tsi.EvaluationRunDeleteReq
     ) -> tsi.EvaluationRunDeleteRes:
         req = req.model_copy(deep=True)
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)
         if req.wb_user_id is not None:
             req.wb_user_id = self._idc.ext_to_int_user_id(req.wb_user_id)
-        return self._ref_apply(
+        return await self._aref_apply(
             self._internal_trace_server.evaluation_run_delete, req, req.project_id
         )
 
-    def evaluation_run_finish(
+    async def evaluation_run_finish(
         self, req: tsi.EvaluationRunFinishReq
     ) -> tsi.EvaluationRunFinishRes:
         req = req.model_copy(deep=True)
@@ -1322,13 +1417,13 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)
         if req.wb_user_id is not None:
             req.wb_user_id = self._idc.ext_to_int_user_id(req.wb_user_id)
-        return self._ref_apply(
+        return await self._aref_apply(
             self._internal_trace_server.evaluation_run_finish, req, req.project_id
         )
 
     # Prediction V2 API
 
-    def prediction_create(
+    async def prediction_create(
         self, req: tsi.PredictionCreateReq
     ) -> tsi.PredictionCreateRes:
         req = req.model_copy(deep=True)
@@ -1336,29 +1431,31 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)
         if req.wb_user_id is not None:
             req.wb_user_id = self._idc.ext_to_int_user_id(req.wb_user_id)
-        return self._ref_apply(
+        return await self._aref_apply(
             self._internal_trace_server.prediction_create, req, req.project_id
         )
 
-    def prediction_read(self, req: tsi.PredictionReadReq) -> tsi.PredictionReadRes:
+    async def prediction_read(
+        self, req: tsi.PredictionReadReq
+    ) -> tsi.PredictionReadRes:
         req = req.model_copy(deep=True)
         """Read a prediction, converting project_id and model ref."""
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)
-        return self._ref_apply(
+        return await self._aref_apply(
             self._internal_trace_server.prediction_read, req, req.project_id
         )
 
     def prediction_list(
         self, req: tsi.PredictionListReq
-    ) -> Iterator[tsi.PredictionReadRes]:
+    ) -> AsyncIterator[tsi.PredictionReadRes]:
         req = req.model_copy(deep=True)
         """List predictions, converting project_id and model refs."""
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)
-        return self._stream_ref_apply(
+        return self._astream_ref_apply(
             self._internal_trace_server.prediction_list, req, req.project_id
         )
 
-    def prediction_delete(
+    async def prediction_delete(
         self, req: tsi.PredictionDeleteReq
     ) -> tsi.PredictionDeleteRes:
         req = req.model_copy(deep=True)
@@ -1366,11 +1463,11 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)
         if req.wb_user_id is not None:
             req.wb_user_id = self._idc.ext_to_int_user_id(req.wb_user_id)
-        return self._ref_apply(
+        return await self._aref_apply(
             self._internal_trace_server.prediction_delete, req, req.project_id
         )
 
-    def prediction_finish(
+    async def prediction_finish(
         self, req: tsi.PredictionFinishReq
     ) -> tsi.PredictionFinishRes:
         req = req.model_copy(deep=True)
@@ -1378,60 +1475,60 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)
         if req.wb_user_id is not None:
             req.wb_user_id = self._idc.ext_to_int_user_id(req.wb_user_id)
-        return self._ref_apply(
+        return await self._aref_apply(
             self._internal_trace_server.prediction_finish, req, req.project_id
         )
 
     # Score V2 API
 
-    def score_create(self, req: tsi.ScoreCreateReq) -> tsi.ScoreCreateRes:
+    async def score_create(self, req: tsi.ScoreCreateReq) -> tsi.ScoreCreateRes:
         req = req.model_copy(deep=True)
         """Create a score, converting project_id and scorer ref."""
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)
         if req.wb_user_id is not None:
             req.wb_user_id = self._idc.ext_to_int_user_id(req.wb_user_id)
-        return self._ref_apply(
+        return await self._aref_apply(
             self._internal_trace_server.score_create, req, req.project_id
         )
 
-    def score_read(self, req: tsi.ScoreReadReq) -> tsi.ScoreReadRes:
+    async def score_read(self, req: tsi.ScoreReadReq) -> tsi.ScoreReadRes:
         req = req.model_copy(deep=True)
         """Read a score, converting project_id and scorer ref."""
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)
-        return self._ref_apply(
+        return await self._aref_apply(
             self._internal_trace_server.score_read, req, req.project_id
         )
 
-    def score_list(self, req: tsi.ScoreListReq) -> Iterator[tsi.ScoreReadRes]:
+    def score_list(self, req: tsi.ScoreListReq) -> AsyncIterator[tsi.ScoreReadRes]:
         req = req.model_copy(deep=True)
         """List scores, converting project_id and scorer refs."""
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)
-        return self._stream_ref_apply(
+        return self._astream_ref_apply(
             self._internal_trace_server.score_list, req, req.project_id
         )
 
-    def score_delete(self, req: tsi.ScoreDeleteReq) -> tsi.ScoreDeleteRes:
+    async def score_delete(self, req: tsi.ScoreDeleteReq) -> tsi.ScoreDeleteRes:
         req = req.model_copy(deep=True)
         """Delete a score, converting project_id."""
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)
         if req.wb_user_id is not None:
             req.wb_user_id = self._idc.ext_to_int_user_id(req.wb_user_id)
-        return self._ref_apply(
+        return await self._aref_apply(
             self._internal_trace_server.score_delete, req, req.project_id
         )
 
-    def eval_results_query(
+    async def eval_results_query(
         self, req: tsi.EvalResultsQueryReq
     ) -> tsi.EvalResultsQueryRes:
         req = req.model_copy(deep=True)
         """Query grouped evaluation results with project ID conversion."""
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)
-        return self._ref_apply(
+        return await self._aref_apply(
             self._internal_trace_server.eval_results_query, req, req.project_id
         )
 
     # Calls V2 API
-    def calls_complete(
+    async def calls_complete(
         self, req: tsi.CallsUpsertCompleteReq
     ) -> tsi.CallsUpsertCompleteRes:
         req = req.model_copy(deep=True)
@@ -1443,9 +1540,11 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
             if item.wb_user_id is not None:
                 item.wb_user_id = self._idc.ext_to_int_user_id(item.wb_user_id)
         pid = req.batch[0].project_id if req.batch else ""
-        return self._ref_apply(self._internal_trace_server.calls_complete, req, pid)
+        return await self._aref_apply(
+            self._internal_trace_server.calls_complete, req, pid
+        )
 
-    def call_start_v2(self, req: tsi.CallStartV2Req) -> tsi.CallStartV2Res:
+    async def call_start_v2(self, req: tsi.CallStartV2Req) -> tsi.CallStartV2Res:
         req = req.model_copy(deep=True)
         """Start a single call (v2), converting project_id."""
         req.start.project_id = self._idc.ext_to_int_project_id(req.start.project_id)
@@ -1453,19 +1552,19 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
             req.start.wb_run_id = self._idc.ext_to_int_run_id(req.start.wb_run_id)
         if req.start.wb_user_id is not None:
             req.start.wb_user_id = self._idc.ext_to_int_user_id(req.start.wb_user_id)
-        return self._ref_apply(
+        return await self._aref_apply(
             self._internal_trace_server.call_start_v2, req, req.start.project_id
         )
 
-    def call_end_v2(self, req: tsi.CallEndV2Req) -> tsi.CallEndV2Res:
+    async def call_end_v2(self, req: tsi.CallEndV2Req) -> tsi.CallEndV2Res:
         req = req.model_copy(deep=True)
         """End a single call (v2), converting project_id."""
         req.end.project_id = self._idc.ext_to_int_project_id(req.end.project_id)
-        return self._ref_apply(
+        return await self._aref_apply(
             self._internal_trace_server.call_end_v2, req, req.end.project_id
         )
 
-    def genai_otel_export(
+    async def genai_otel_export(
         self,
         req: tsi.agent_types.GenAIOTelExportReq,
         *,
@@ -1482,18 +1581,20 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
         # This path doesn't use `_ref_apply`, so rewrite refs carried in the raw
         # protobuf span attributes here. See `_rewrite_processed_spans_refs_inplace`.
         self._rewrite_processed_spans_refs_inplace(req.processed_spans, req.project_id)
-        res = self._internal_trace_server.genai_otel_export(
-            req, enable_llm_powered_features=enable_llm_powered_features
+        res = await self._call(
+            self._internal_trace_server.genai_otel_export,
+            req,
+            enable_llm_powered_features=enable_llm_powered_features,
         )
 
         return res
 
-    def agent_spans_query(
+    async def agent_spans_query(
         self, req: tsi.agent_types.AgentSpansQueryReq
     ) -> tsi.agent_types.AgentSpansQueryRes:
         original_project_id = req.project_id
         req.project_id = self._idc.ext_to_int_project_id(original_project_id)
-        res = self._ref_apply(
+        res = await self._aref_apply(
             self._internal_trace_server.agent_spans_query,
             req,
             req.project_id,
@@ -1505,35 +1606,35 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
             span.project_id = original_project_id
         return res
 
-    def agent_spans_stats(
+    async def agent_spans_stats(
         self, req: tsi.agent_types.AgentSpanStatsReq
     ) -> tsi.agent_types.AgentSpanStatsRes:
         original_project_id = req.project_id
         req.project_id = self._idc.ext_to_int_project_id(original_project_id)
-        return self._ref_apply(
+        return await self._aref_apply(
             self._internal_trace_server.agent_spans_stats,
             req,
             req.project_id,
             tolerate_external_refs=True,
         )
 
-    def agent_custom_attrs_schema(
+    async def agent_custom_attrs_schema(
         self, req: tsi.agent_types.AgentCustomAttrsSchemaReq
     ) -> tsi.agent_types.AgentCustomAttrsSchemaRes:
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)
-        return self._ref_apply(
+        return await self._aref_apply(
             self._internal_trace_server.agent_custom_attrs_schema,
             req,
             req.project_id,
             tolerate_external_refs=True,
         )
 
-    def agent_agents_query(
+    async def agent_agents_query(
         self, req: tsi.agent_types.AgentsQueryReq
     ) -> tsi.agent_types.AgentsQueryRes:
         original_project_id = req.project_id
         req.project_id = self._idc.ext_to_int_project_id(original_project_id)
-        res = self._ref_apply(
+        res = await self._aref_apply(
             self._internal_trace_server.agent_agents_query,
             req,
             req.project_id,
@@ -1545,12 +1646,12 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
             agent.project_id = original_project_id
         return res
 
-    def agent_versions_query(
+    async def agent_versions_query(
         self, req: tsi.agent_types.AgentVersionsQueryReq
     ) -> tsi.agent_types.AgentVersionsQueryRes:
         original_project_id = req.project_id
         req.project_id = self._idc.ext_to_int_project_id(original_project_id)
-        res = self._ref_apply(
+        res = await self._aref_apply(
             self._internal_trace_server.agent_versions_query,
             req,
             req.project_id,
@@ -1562,51 +1663,53 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
             version.project_id = original_project_id
         return res
 
-    def agent_search(
+    async def agent_search(
         self, req: tsi.agent_types.AgentSearchReq
     ) -> tsi.agent_types.AgentSearchRes:
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)
-        return self._ref_apply(
+        return await self._aref_apply(
             self._internal_trace_server.agent_search,
             req,
             req.project_id,
             tolerate_external_refs=True,
         )
 
-    def agent_traces_chat(
+    async def agent_traces_chat(
         self, req: tsi.agent_types.AgentTraceChatReq
     ) -> tsi.agent_types.AgentTraceChatRes:
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)
-        return self._ref_apply(
+        return await self._aref_apply(
             self._internal_trace_server.agent_traces_chat,
             req,
             req.project_id,
             tolerate_external_refs=True,
         )
 
-    def agent_conversation_chat(
+    async def agent_conversation_chat(
         self, req: tsi.agent_types.AgentConversationChatReq
     ) -> tsi.agent_types.AgentConversationChatRes:
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)
-        return self._ref_apply(
+        return await self._aref_apply(
             self._internal_trace_server.agent_conversation_chat,
             req,
             req.project_id,
             tolerate_external_refs=True,
         )
 
-    def agent_conversation_spans(
+    async def agent_conversation_spans(
         self, req: tsi.agent_types.AgentConversationSpansReq
     ) -> tsi.agent_types.AgentConversationSpansRes:
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)
-        return self._ref_apply(
+        return await self._aref_apply(
             self._internal_trace_server.agent_conversation_spans,
             req,
             req.project_id,
             tolerate_external_refs=True,
         )
 
-    def projects_info(self, req: tsi.ProjectsInfoReq) -> list[tsi.ProjectsInfoRes]:
+    async def projects_info(
+        self, req: tsi.ProjectsInfoReq
+    ) -> list[tsi.ProjectsInfoRes]:
         req = req.model_copy(deep=True)
         """Resolve external project IDs to internal project IDs."""
         return [
