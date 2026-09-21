@@ -1,14 +1,15 @@
-from pydantic import BaseModel
+"""Compatibility exports for weave.shared.builtin_object_classes.leaderboard."""
 
-from weave.trace_server.interface.builtin_object_classes import base_object_def
+from weave.shared.builtin_object_classes.leaderboard import (
+    BaseModel,
+    Leaderboard,
+    LeaderboardColumn,
+    base_object_def,
+)
 
-
-class LeaderboardColumn(BaseModel):
-    evaluation_object_ref: base_object_def.RefStr
-    scorer_name: str
-    summary_metric_path: str
-    should_minimize: bool | None = None
-
-
-class Leaderboard(base_object_def.BaseObject):
-    columns: list[LeaderboardColumn]
+__all__ = [
+    "BaseModel",
+    "Leaderboard",
+    "LeaderboardColumn",
+    "base_object_def",
+]
