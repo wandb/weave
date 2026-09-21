@@ -21,6 +21,7 @@ from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.base64_content_conversion import AUTO_CONVERSION_MIN_SIZE
 from weave.trace_server.clickhouse_trace_server_batched import (
     ClickHouseTraceServer,
+    SyncClickHouseTransport,
     _WriteBatch,
 )
 from weave.trace_server.errors import (
@@ -89,10 +90,7 @@ def test_clickhouse_batching():
     # MagicMock is truthy, so get_project_data_residence() returns BOTH, which is incorrect, mock it
     mock_ch_client.query.return_value.result_rows = []
 
-    # Create a ClickHouseTraceServer instance and patch _mint_client
-    with patch.object(
-        ClickHouseTraceServer, "_mint_client", return_value=mock_ch_client
-    ):
+    with patch.object(SyncClickHouseTransport, "mint", return_value=mock_ch_client):
         trace_server = ClickHouseTraceServer(host="test_host")
 
         # Use properly base64 encoded project_id (entity/project format)
@@ -184,9 +182,7 @@ def test_clickhouse_batching_deduplicates_identical_files():
     mock_ch_client.insert.return_value = MagicMock()
     mock_ch_client.query.return_value.result_rows = []
 
-    with patch.object(
-        ClickHouseTraceServer, "_mint_client", return_value=mock_ch_client
-    ):
+    with patch.object(SyncClickHouseTransport, "mint", return_value=mock_ch_client):
         trace_server = ClickHouseTraceServer(host="test_host")
         project_id = base64.b64encode(b"test_entity/test_project").decode("utf-8")
 
@@ -486,9 +482,7 @@ def test_call_start_batch_invalid_trace_id_returns_400():
     mock_query_result = MagicMock()
     mock_query_result.result_rows = [[0, 1]]  # has_complete=0, has_merged=1
 
-    with patch.object(
-        ClickHouseTraceServer, "_mint_client", return_value=mock_ch_client
-    ):
+    with patch.object(SyncClickHouseTransport, "mint", return_value=mock_ch_client):
         trace_server = ClickHouseTraceServer(host="test_host")
         mock_ch_client.query.return_value = mock_query_result
 
