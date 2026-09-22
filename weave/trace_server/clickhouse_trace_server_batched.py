@@ -4,6 +4,7 @@ import dataclasses
 import datetime
 import json
 import logging
+import re
 import threading
 import time
 from collections import defaultdict
@@ -12,6 +13,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from contextlib import contextmanager
 from functools import partial
 from typing import Any, NamedTuple, TypeVar, cast
+from urllib.parse import urlparse
 from zoneinfo import ZoneInfo
 
 import clickhouse_connect
@@ -8418,6 +8420,75 @@ def _setup_completion_model_info(
 
     # Check for explicit custom provider prefix
     is_explicit_custom = model_name.startswith("custom::")
+
+    if req.inference_route is not None:
+        route = req.inference_route
+        dedicated_environments = (
+            ("dedicated_staging_", "CW_INF_DEDICATED_STAGING_API_KEY_"),
+            ("dedicated_", "CW_INF_DEDICATED_API_KEY_"),
+        )
+        environment = next(
+            (
+                (connection_prefix, secret_prefix)
+                for connection_prefix, secret_prefix in dedicated_environments
+                if route.connection.startswith(connection_prefix)
+            ),
+            None,
+        )
+        if environment is None:
+            raise InvalidRequest("Invalid dedicated inference connection ID")
+        connection_prefix, secret_prefix = environment
+        organization_id = route.connection.removeprefix(connection_prefix)
+        if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_-]*", organization_id):
+            raise InvalidRequest("Invalid dedicated inference organization ID")
+
+        try:
+            parsed_base_url = urlparse(route.base_url)
+            invalid_base_url = (
+                parsed_base_url.scheme != "https"
+                or not parsed_base_url.hostname
+                or not parsed_base_url.hostname.endswith(".gw.cwinference.com")
+                or parsed_base_url.username is not None
+                or parsed_base_url.password is not None
+                or parsed_base_url.port not in {None, 443}
+                or parsed_base_url.path.rstrip("/") != "/v1"
+                or bool(parsed_base_url.params)
+                or bool(parsed_base_url.query)
+                or bool(parsed_base_url.fragment)
+            )
+        except ValueError:
+            invalid_base_url = True
+        if invalid_base_url:
+            raise InvalidRequest("Invalid dedicated inference gateway URL")
+
+        dedicated_secret_name = secret_prefix + organization_id
+        # Resolve the stored credential server-side; the client only identifies
+        # which configured connection to use and never receives the key itself.
+        secret_fetcher = _secret_fetcher_context.get()
+        if not secret_fetcher:
+            raise InvalidRequest(f"No secret fetcher found for {route.connection}")
+        api_key = (
+            secret_fetcher.fetch(dedicated_secret_name)
+            .get("secrets", {})
+            .get(dedicated_secret_name)
+        )
+        if not api_key:
+            raise MissingLLMApiKeyError(
+                f"No API key {dedicated_secret_name} found for {route.connection}",
+                api_key_name=dedicated_secret_name,
+            )
+        base_url = route.base_url.rstrip("/")
+
+        req.inputs.model = "openai/" + model_name
+        return CompletionModelInfo(
+            model_name=model_name,
+            api_key=api_key,
+            provider="custom",
+            base_url=base_url,
+            extra_headers=extra_headers,
+            return_type="openai",
+            vertex_credentials=None,
+        )
 
     is_coreweave = (
         model_info and model_info.get("litellm_provider") == "coreweave"
