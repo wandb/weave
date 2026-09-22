@@ -630,11 +630,11 @@ describe('OpenAI Agents Integration (with WEAVE_USE_OTEL_V2=true)', () => {
     const agent = spans.find(s => s.name === 'invoke_agent test-agent')!;
     const fn = findBySpanId(spans, 'span-fn')!;
 
-    // Child OTel span points back at the agent OTel span via parentSpanId,
+    // Child OTel span points back at the agent OTel span via parentSpanContext,
     // and they share the same traceId.
-    expect(fn.parentSpanId).toBe(agent.spanContext().spanId);
+    expect(fn.parentSpanContext?.spanId).toBe(agent.spanContext().spanId);
     expect(fn.spanContext().traceId).toBe(agent.spanContext().traceId);
-    expect(agent.parentSpanId).toBeUndefined();
+    expect(agent.parentSpanContext?.spanId).toBeUndefined();
   });
 
   test('agent run with tool call emits expected OTel spans', async () => {
@@ -692,7 +692,9 @@ describe('OpenAI Agents Integration (with WEAVE_USE_OTEL_V2=true)', () => {
       'weave.integration.meta.package_name': '@openai/agents',
     });
     // Span is a child of the agent span.
-    expect(executeToolSpan.parentSpanId).toBe(agentSpan!.spanContext().spanId);
+    expect(executeToolSpan.parentSpanContext?.spanId).toBe(
+      agentSpan!.spanContext().spanId
+    );
     expect(executeToolSpan.spanContext().traceId).toBe(
       agentSpan!.spanContext().traceId
     );

@@ -19,12 +19,12 @@
   "scripts": {
     "build": "node scripts/build.mjs",
     "prepare": "npm run build",
-    "test": "jest --silent",
-    "test:coverage": "jest --coverage",
-    "test:watch": "jest --watch",
-    "test:legacy": "jest --selectProjects legacy",
-    "test:modern": "jest --selectProjects modern",
-    "test:hostApps": "jest --selectProjects hostApps --runInBand",
+    "test": "node --experimental-vm-modules ./node_modules/jest/bin/jest.js --silent",
+    "test:coverage": "node --experimental-vm-modules ./node_modules/jest/bin/jest.js --coverage",
+    "test:watch": "node --experimental-vm-modules ./node_modules/jest/bin/jest.js --watch",
+    "test:legacy": "node --experimental-vm-modules ./node_modules/jest/bin/jest.js --selectProjects legacy",
+    "test:modern": "node --experimental-vm-modules ./node_modules/jest/bin/jest.js --selectProjects modern",
+    "test:hostApps": "node --experimental-vm-modules ./node_modules/jest/bin/jest.js --selectProjects hostApps --runInBand",
     "format": "prettier --write \"src/**/*.ts\" \"examples/**/*.ts\"",
     "run": "tsx",
     "prettier-check": "prettier --check \"src/**/*.ts\" \"examples/**/*.ts\"",
@@ -162,11 +162,14 @@
     "ext": "ts,json",
     "exec": "tsx examples/evaluate.ts"
   },
+  "engines": {
+    "node": "^18.19.0 || >=20.6.0"
+  },
   "dependencies": {
     "@opentelemetry/api": "^1.9.1",
-    "@opentelemetry/exporter-trace-otlp-proto": "^0.53.0",
-    "@opentelemetry/resources": "^1.26.0",
-    "@opentelemetry/sdk-trace-base": "^1.26.0",
+    "@opentelemetry/exporter-trace-otlp-proto": "^0.222.0",
+    "@opentelemetry/resources": "^2.11.0",
+    "@opentelemetry/sdk-trace-base": "^2.11.0",
     "cli-progress": "^3.12.0",
     "cross-spawn": "^7.0.5",
     "form-data": "^4.0.4",

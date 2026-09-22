@@ -41,7 +41,9 @@ describe('SubAgent', () => {
     expect(parentTurnSpan).toBeDefined();
     expect(subSpan!.kind).toBe(SpanKind.INTERNAL);
     expect(parentTurnSpan!.kind).toBe(SpanKind.INTERNAL);
-    expect(subSpan!.parentSpanId).toBe(parentTurnSpan!.spanContext().spanId);
+    expect(subSpan!.parentSpanContext?.spanId).toBe(
+      parentTurnSpan!.spanContext().spanId
+    );
 
     expect(spanSnapshot(subSpan!)).toMatchInlineSnapshot(`
       {
@@ -229,8 +231,12 @@ describe('SubAgent', () => {
     expect(chatSpan).toBeDefined();
     expect(toolSpan).toBeDefined();
     // Both children parent to the subagent, not the enclosing Turn.
-    expect(chatSpan!.parentSpanId).toBe(subSpan.spanContext().spanId);
-    expect(toolSpan!.parentSpanId).toBe(subSpan.spanContext().spanId);
+    expect(chatSpan!.parentSpanContext?.spanId).toBe(
+      subSpan.spanContext().spanId
+    );
+    expect(toolSpan!.parentSpanContext?.spanId).toBe(
+      subSpan.spanContext().spanId
+    );
   });
 
   it('nests a child SubAgent (and its descendants) under the parent subagent', () => {
@@ -260,9 +266,15 @@ describe('SubAgent', () => {
     // Full chain: turn -> outer -> inner -> chat. The nested SubAgent parents
     // to the outer subagent (not the Turn), and threads its own context down to the
     // LLM it starts.
-    expect(outerSpan.parentSpanId).toBe(turnSpan.spanContext().spanId);
-    expect(innerSpan.parentSpanId).toBe(outerSpan.spanContext().spanId);
-    expect(chatSpan!.parentSpanId).toBe(innerSpan.spanContext().spanId);
+    expect(outerSpan.parentSpanContext?.spanId).toBe(
+      turnSpan.spanContext().spanId
+    );
+    expect(innerSpan.parentSpanContext?.spanId).toBe(
+      outerSpan.spanContext().spanId
+    );
+    expect(chatSpan!.parentSpanContext?.spanId).toBe(
+      innerSpan.spanContext().spanId
+    );
   });
 
   it('binds children eagerly, not via ambient context: a child created after the SubAgent (and Turn) end still nests under it', () => {
@@ -286,7 +298,11 @@ describe('SubAgent', () => {
     const toolSpan = spans.find(s => s.name === 'execute_tool');
     expect(chatSpan).toBeDefined();
     expect(toolSpan).toBeDefined();
-    expect(chatSpan!.parentSpanId).toBe(subSpan.spanContext().spanId);
-    expect(toolSpan!.parentSpanId).toBe(subSpan.spanContext().spanId);
+    expect(chatSpan!.parentSpanContext?.spanId).toBe(
+      subSpan.spanContext().spanId
+    );
+    expect(toolSpan!.parentSpanContext?.spanId).toBe(
+      subSpan.spanContext().spanId
+    );
   });
 });

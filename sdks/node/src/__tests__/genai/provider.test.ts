@@ -1,10 +1,11 @@
+import {createServer} from 'node:http';
+import type {AddressInfo} from 'node:net';
 import {
   BasicTracerProvider,
   InMemorySpanExporter,
   SimpleSpanProcessor,
 } from '@opentelemetry/sdk-trace-base';
 
-import {EvalLinkSpanProcessor} from '../../evalLinkSpanProcessor';
 import {flushOTel} from '../../genai/flush';
 import {
   getWeaveTracer,
@@ -13,25 +14,10 @@ import {
   shutdownWeaveTracerProvider,
 } from '../../genai/provider';
 import {WEAVE_RESOURCE_ATTR} from '../../genai/weaveResource';
-import {OpLinkSpanProcessor} from '../../opLinkSpanProcessor';
 import {packageVersion} from '../../utils/packageVersion';
+import {CallStack} from '../../weaveClient';
 
 import {installFakeClient, setupGenAITestEnvironment} from './common';
-
-// The eval link writes before the op link because a span at its attribute limit
-// drops the incoming one, so both membership and order are the linkers'
-// contract. No public API lists a provider's processors, so read the SDK's own
-// array — same internals coupling as exporterProjectId below, and the same TODO
-// applies.
-const LINK_PROCESSOR_CLASSES = [EvalLinkSpanProcessor, OpLinkSpanProcessor];
-
-function linkProcessorClasses(provider: BasicTracerProvider): Function[] {
-  const registered: object[] =
-    (provider as any)._registeredSpanProcessors ?? [];
-  return registered
-    .filter(p => LINK_PROCESSOR_CLASSES.some(cls => p instanceof cls))
-    .map(p => p.constructor);
-}
 
 describe('otel/provider', () => {
   setupGenAITestEnvironment();
@@ -53,17 +39,17 @@ describe('otel/provider', () => {
     expect(getWeaveTracerProvider()).toBe(providerA);
   });
 
-  it('sets only the weave SDK resource attributes (no wandb.entity/project)', () => {
-    installFakeClient();
-    getWeaveTracer('weave-genai');
-    const provider = getWeaveTracerProvider();
-    expect(provider).not.toBeNull();
-    // Exact match over our own attributes (ignoring OTel defaults) guards
-    // against `wandb.entity`/`wandb.project` reappearing on the Resource, which
-    // would misroute spans (the server ranks those above the project_id header).
-    const attrs = provider!.resource.attributes;
+  it('exports only weave-owned resource attributes, without routing overrides', async () => {
+    const exporter = new InMemorySpanExporter();
+    installFakeClient({
+      settings: {genai: {spanProcessor: new SimpleSpanProcessor(exporter)}},
+    });
+    getWeaveTracer('weave-genai').startSpan('resource-check').end();
+    await flushOTel();
+
+    const [span] = exporter.getFinishedSpans();
     const weaveOwned = Object.fromEntries(
-      Object.entries(attrs).filter(
+      Object.entries(span.resource.attributes).filter(
         ([k]) => k.startsWith('weave.') || k.startsWith('wandb.')
       )
     );
@@ -73,12 +59,49 @@ describe('otel/provider', () => {
     });
   });
 
-  it('installs the link processors, in order, on a default-settings provider', () => {
-    installFakeClient();
-    getWeaveTracer('weave-genai');
-    expect(linkProcessorClasses(getWeaveTracerProvider()!)).toEqual(
-      LINK_PROCESSOR_CLASSES
-    );
+  it('keeps eval links ahead of op links, including after a project switch', async () => {
+    const originalLimit = process.env.OTEL_SPAN_ATTRIBUTE_COUNT_LIMIT;
+    process.env.OTEL_SPAN_ATTRIBUTE_COUNT_LIMIT = '4';
+    try {
+      for (const projectId of ['ent/A', 'ent/B']) {
+        const exporter = new InMemorySpanExporter();
+        shutdownWeaveTracerProvider();
+        const client = installFakeClient({
+          projectId,
+          settings: {genai: {spanProcessor: new SimpleSpanProcessor(exporter)}},
+        });
+        client.runWithCallStack(
+          new CallStack([
+            {
+              callId: 'eval',
+              traceId: 'trace',
+              childSummary: {},
+              opName: 'Evaluation.evaluate',
+            },
+            {
+              callId: 'predict',
+              traceId: 'trace',
+              childSummary: {},
+              opName: 'Evaluation.predictAndScore',
+            },
+          ]),
+          () => getWeaveTracer('weave-genai').startSpan('linked-span').end()
+        );
+        await flushOTel();
+        expect(exporter.getFinishedSpans()[0].attributes).toEqual({
+          'weave.eval.run_id': 'eval',
+          'weave.eval.predict_and_score_call_id': 'predict',
+          'weave.eval.project_id': projectId,
+          'weave.parent_call.id': 'predict',
+        });
+      }
+    } finally {
+      if (originalLimit === undefined) {
+        delete process.env.OTEL_SPAN_ATTRIBUTE_COUNT_LIMIT;
+      } else {
+        process.env.OTEL_SPAN_ATTRIBUTE_COUNT_LIMIT = originalLimit;
+      }
+    }
   });
 
   it('honors a user-supplied SpanProcessor and routes spans through it', async () => {
@@ -118,25 +141,16 @@ describe('otel/provider', () => {
     // run the same project-switch teardown init() performs, then pull a tracer
     // to (re)build the provider. Keeps these tests exercising the real reset
     // path without standing up the full network-touching init().
-    function reinit(projectId: string): void {
-      installFakeClient({projectId});
+    function reinit(projectId: string, baseURL?: string): void {
+      const client = installFakeClient({projectId});
+      if (baseURL) {
+        client.traceServerApi.baseURL = baseURL;
+      }
       const prior = getWeaveTracerProviderProjectId();
       if (prior !== null && prior !== projectId) {
         shutdownWeaveTracerProvider();
       }
       getWeaveTracer('weave-genai');
-    }
-
-    // TODO(#7512 review): this reaches into OTLP proto exporter internals to
-    // read the `project_id` header a couple of layers deep. It's the concrete
-    // routing target a re-init must follow, but it's coupled to exporter
-    // internals — better replaced by an integration test that asserts the
-    // header on a captured export once we have that harness.
-    function exporterProjectId(provider: BasicTracerProvider): string {
-      const processor = (provider as any)._registeredSpanProcessors?.[0];
-      const exporter = processor?._exporter;
-      const headers = exporter?._transport?._transport?._parameters?.headers;
-      return headers?.project_id;
     }
 
     it('reuses the cached provider when re-init targets the same project', () => {
@@ -174,23 +188,37 @@ describe('otel/provider', () => {
       shutdownSpy.mockRestore();
     });
 
-    it('routes the rebuilt provider to the new project via the project_id header', () => {
-      reinit('ent/A');
-      expect(exporterProjectId(getWeaveTracerProvider()!)).toBe('ent/A');
-
-      reinit('ent/B');
-      expect(exporterProjectId(getWeaveTracerProvider()!)).toBe('ent/B');
-    });
-
-    it('reinstalls the link processors on the rebuilt provider', () => {
-      reinit('ent/A');
-
-      // The linkers are added where the provider is built, so a rebuild has to
-      // pick them up again — registering them once from init() would not.
-      reinit('ent/B');
-      expect(linkProcessorClasses(getWeaveTracerProvider()!)).toEqual(
-        LINK_PROCESSOR_CLASSES
+    it('routes exported spans to the new project after re-init', async () => {
+      const requests: {
+        path: string | undefined;
+        projectId: string | string[] | undefined;
+      }[] = [];
+      const server = createServer((request, response) => {
+        requests.push({
+          path: request.url,
+          projectId: request.headers.project_id,
+        });
+        request.resume();
+        response.end();
+      });
+      await new Promise<void>(resolve =>
+        server.listen(0, '127.0.0.1', resolve)
       );
+      const baseURL = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
+      try {
+        for (const projectId of ['ent/A', 'ent/B']) {
+          reinit(projectId, baseURL);
+          getWeaveTracer('weave-genai').startSpan('exported-span').end();
+          await flushOTel();
+        }
+        expect(requests).toEqual([
+          {path: '/agents/otel/v1/traces', projectId: 'ent/A'},
+          {path: '/agents/otel/v1/traces', projectId: 'ent/B'},
+        ]);
+      } finally {
+        await getWeaveTracerProvider()?.shutdown();
+        await new Promise<void>(resolve => server.close(() => resolve()));
+      }
     });
   });
 });

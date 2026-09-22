@@ -326,13 +326,15 @@ function truncate(value: unknown, max = 90): string {
 function printSpanTree(spans: ReadableSpan[]): void {
   const childrenOf = new Map<string | undefined, ReadableSpan[]>();
   for (const span of spans) {
-    const siblings = childrenOf.get(span.parentSpanId) ?? [];
+    const siblings = childrenOf.get(span.parentSpanContext?.spanId) ?? [];
     siblings.push(span);
-    childrenOf.set(span.parentSpanId, siblings);
+    childrenOf.set(span.parentSpanContext?.spanId, siblings);
   }
   const idsPresent = new Set(spans.map(s => s.spanContext().spanId));
   const roots = spans.filter(
-    s => !s.parentSpanId || !idsPresent.has(s.parentSpanId)
+    s =>
+      !s.parentSpanContext?.spanId ||
+      !idsPresent.has(s.parentSpanContext?.spanId)
   );
 
   console.log(`\n===== CAPTURED SPAN TREE (${spans.length} spans) =====`);
@@ -378,11 +380,13 @@ function checkSpans(
   const tools = byOp('execute_tool');
   const sid = (s: ReadableSpan) => s.spanContext().spanId;
 
-  const root = invoke.find(s => !s.parentSpanId);
+  const root = invoke.find(s => !s.parentSpanContext?.spanId);
   // Agent span(s) for a given agent name (excludes the no-parent run root).
   const agentByName = (name: string) =>
     invoke.filter(
-      s => s.parentSpanId && s.attributes['gen_ai.agent.name'] === name
+      s =>
+        s.parentSpanContext?.spanId &&
+        s.attributes['gen_ai.agent.name'] === name
     );
   const one = (name: string) => agentByName(name)[0];
 
@@ -396,7 +400,7 @@ function checkSpans(
   // Run root + named agent spans.
   check(
     'single run-root invoke_agent',
-    invoke.filter(s => !s.parentSpanId).length === 1
+    invoke.filter(s => !s.parentSpanContext?.spanId).length === 1
   );
   check(
     'root is "invoke_agent research_pipeline"',
@@ -422,35 +426,35 @@ function checkSpans(
   if (root && pipeline) {
     check(
       'research_pipeline nests under run root',
-      pipeline.parentSpanId === sid(root)
+      pipeline.parentSpanContext?.spanId === sid(root)
     );
   }
   if (pipeline) {
     check(
       'planner_agent nests under research_pipeline',
-      one('planner_agent')?.parentSpanId === sid(pipeline)
+      one('planner_agent')?.parentSpanContext?.spanId === sid(pipeline)
     );
     check(
       'recon_team nests under research_pipeline',
-      recon?.parentSpanId === sid(pipeline)
+      recon?.parentSpanContext?.spanId === sid(pipeline)
     );
     check(
       'critique_loop nests under research_pipeline',
-      loop?.parentSpanId === sid(pipeline)
+      loop?.parentSpanContext?.spanId === sid(pipeline)
     );
     check(
       'synthesist_agent nests under research_pipeline',
-      one('synthesist_agent')?.parentSpanId === sid(pipeline)
+      one('synthesist_agent')?.parentSpanContext?.spanId === sid(pipeline)
     );
   }
   if (recon) {
     check(
       'weather_agent nests under recon_team',
-      one('weather_agent')?.parentSpanId === sid(recon)
+      one('weather_agent')?.parentSpanContext?.spanId === sid(recon)
     );
     check(
       'market_agent nests under recon_team',
-      one('market_agent')?.parentSpanId === sid(recon)
+      one('market_agent')?.parentSpanContext?.spanId === sid(recon)
     );
   }
 
@@ -472,12 +476,12 @@ function checkSpans(
   if (criticSpan && loop) {
     check(
       'critic_agent nests under critique_loop',
-      criticSpan.parentSpanId === sid(loop)
+      criticSpan.parentSpanContext?.spanId === sid(loop)
     );
     check(
       'both critic turns nest under critic_agent',
       criticChats.length > 0 &&
-        criticChats.every(c => c.parentSpanId === sid(criticSpan))
+        criticChats.every(c => c.parentSpanContext?.spanId === sid(criticSpan))
     );
   }
 
@@ -509,7 +513,7 @@ function checkSpans(
   if (weatherTool) {
     check(
       'get_weather nests under weather_agent',
-      weatherTool.parentSpanId === sid(one('weather_agent')!)
+      weatherTool.parentSpanContext?.spanId === sid(one('weather_agent')!)
     );
   }
 

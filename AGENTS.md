@@ -373,6 +373,10 @@ nox --no-install -e "tests-3.12(shard='langchain')" -- tests/integrations/langch
 
 ## Typescript Testing Guidelines
 
+The Node SDK uses OpenTelemetry JS 2.x. Use `resourceFromAttributes` to create
+resources and `ReadableSpan.parentSpanContext?.spanId` to inspect parentage.
+Custom span processors and exporters must be compatible with OTel JS 2.x.
+
 The Node SDK (`sdks/node`) is a **pnpm** project — it ships a `pnpm-lock.yaml`
 and pins `"packageManager": "pnpm@10.8.1"` in `package.json`. Do **not** run
 `npm i`: npm's resolver crashes trying to dedupe pnpm's symlink `node_modules`

@@ -29,7 +29,7 @@ const captureExporter = {
       captured.push({
         name: span.name,
         spanId: span.spanContext().spanId,
-        parentSpanId: span.parentSpanId,
+        parentSpanId: span.parentSpanContext?.spanId,
         traceId: span.spanContext().traceId,
         attributes: span.attributes,
         statusCode: span.status.code,

@@ -4,6 +4,9 @@ Weave is a library for tracing and monitoring AI applications.
 
 ## Installation
 
+Requires Node.js 18.19+ (18.x) or 20.6+. OpenTelemetry span processors and
+exporters supplied through `settings.genai.spanProcessor` must support OTel JS 2.x.
+
 You can install Weave via npm:
 
 ```bash

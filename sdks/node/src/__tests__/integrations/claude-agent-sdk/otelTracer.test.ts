@@ -388,7 +388,7 @@ describe('Claude Agent SDK — OTel tracer', () => {
     expect(invoke.attributes[ATTR_GEN_AI_PROVIDER_NAME]).toBeUndefined();
     expect(invoke.attributes[ATTR_GEN_AI_CONVERSATION_ID]).toBe('sess-1');
     expect(invoke.attributes[ATTR_GEN_AI_RESPONSE_MODEL]).toBeUndefined();
-    expect(invoke.parentSpanId).toBeUndefined();
+    expect(invoke.parentSpanContext?.spanId).toBeUndefined();
     // The root carries no token usage of its own — per-model usage rides on
     // child `chat` spans (asserted below) so the trace server costs and rolls
     // it up per model. The SDK's authoritative total cost stays on the root.
@@ -417,7 +417,7 @@ describe('Claude Agent SDK — OTel tracer', () => {
     expect(chat.attributes[ATTR_GEN_AI_RESPONSE_FINISH_REASONS]).toEqual([
       'tool_use',
     ]);
-    expect(chat.parentSpanId).toBe(invoke.spanContext().spanId);
+    expect(chat.parentSpanContext?.spanId).toBe(invoke.spanContext().spanId);
     expect(
       JSON.parse(chat.attributes[ATTR_GEN_AI_OUTPUT_MESSAGES] as string)
     ).toEqual([
@@ -453,7 +453,9 @@ describe('Claude Agent SDK — OTel tracer', () => {
     // total_tokens = inclusive input (13) + output (5).
     expect(usageChat.attributes[ATTR_GEN_AI_USAGE_TOTAL_TOKENS]).toBe(18);
     expect(usageChat.attributes[ATTR_GEN_AI_CONVERSATION_ID]).toBe('sess-1');
-    expect(usageChat.parentSpanId).toBe(invoke.spanContext().spanId);
+    expect(usageChat.parentSpanContext?.spanId).toBe(
+      invoke.spanContext().spanId
+    );
 
     const tool = findSpan(spans, 'execute_tool');
     expect(tool.kind).toBe(SpanKind.INTERNAL);
@@ -463,7 +465,7 @@ describe('Claude Agent SDK — OTel tracer', () => {
       '{"command":"ls"}'
     );
     expect(tool.attributes[ATTR_GEN_AI_TOOL_CALL_RESULT]).toBe('Sunny');
-    expect(tool.parentSpanId).toBe(invoke.spanContext().spanId);
+    expect(tool.parentSpanContext?.spanId).toBe(invoke.spanContext().spanId);
 
     // The whole tree shares one trace.
     const traceId = invoke.spanContext().traceId;
@@ -545,7 +547,7 @@ describe('Claude Agent SDK — OTel tracer', () => {
         span.name === 'chat' &&
         span.attributes[ATTR_GEN_AI_OUTPUT_MESSAGES] !== undefined
     );
-    expect(contentChats.map(span => span.parentSpanId)).toEqual([
+    expect(contentChats.map(span => span.parentSpanContext?.spanId)).toEqual([
       roots[0].spanContext().spanId,
       roots[1].spanContext().spanId,
     ]);
@@ -623,7 +625,7 @@ describe('Claude Agent SDK — OTel tracer', () => {
         span.name === INVOKE &&
         span.attributes[ATTR_GEN_AI_AGENT_NAME] === 'researcher'
     )!;
-    expect(subagent.parentSpanId).toBe(root.spanContext().spanId);
+    expect(subagent.parentSpanContext?.spanId).toBe(root.spanContext().spanId);
     expect(subagent.attributes[ATTR_GEN_AI_AGENT_DESCRIPTION]).toBe(
       'Research the Agent SDK'
     );
@@ -658,7 +660,9 @@ describe('Claude Agent SDK — OTel tracer', () => {
         span.name === 'chat' &&
         span.attributes[ATTR_GEN_AI_REQUEST_MODEL] === 'claude-subagent'
     )!;
-    expect(nestedChat.parentSpanId).toBe(subagent.spanContext().spanId);
+    expect(nestedChat.parentSpanContext?.spanId).toBe(
+      subagent.spanContext().spanId
+    );
     expect(
       JSON.parse(nestedChat.attributes[ATTR_GEN_AI_OUTPUT_MESSAGES] as string)
     ).toEqual([
@@ -682,7 +686,9 @@ describe('Claude Agent SDK — OTel tracer', () => {
         span.name === 'execute_tool' &&
         span.attributes[ATTR_GEN_AI_TOOL_CALL_ID] === 'read-1'
     )!;
-    expect(nestedTool.parentSpanId).toBe(subagent.spanContext().spanId);
+    expect(nestedTool.parentSpanContext?.spanId).toBe(
+      subagent.spanContext().spanId
+    );
     expect(nestedTool.attributes[ATTR_GEN_AI_TOOL_CALL_RESULT]).toBe(
       'forwardSubagentText?: boolean'
     );
@@ -787,7 +793,7 @@ describe('Claude Agent SDK — OTel tracer', () => {
         output: JSON.parse(
           span.attributes[ATTR_GEN_AI_OUTPUT_MESSAGES] as string
         ),
-        parentSpanId: span.parentSpanId,
+        parentSpanId: span.parentSpanContext?.spanId,
       }))
     ).toEqual([
       {
@@ -922,7 +928,7 @@ describe('Claude Agent SDK — OTel tracer', () => {
           .filter(
             child =>
               child.name === 'chat' &&
-              child.parentSpanId === span.spanContext().spanId
+              child.parentSpanContext?.spanId === span.spanContext().spanId
           )
           .map(child =>
             JSON.parse(child.attributes[ATTR_GEN_AI_OUTPUT_MESSAGES] as string)
@@ -1063,7 +1069,7 @@ describe('Claude Agent SDK — OTel tracer', () => {
           outputMessages: JSON.parse(
             span.attributes[ATTR_GEN_AI_OUTPUT_MESSAGES] as string
           ),
-          parentSpanId: span.parentSpanId,
+          parentSpanId: span.parentSpanContext?.spanId,
         }))
     ).toEqual([
       {
@@ -1092,7 +1098,7 @@ describe('Claude Agent SDK — OTel tracer', () => {
           outputMessages: JSON.parse(
             span.attributes[ATTR_GEN_AI_OUTPUT_MESSAGES] as string
           ),
-          parentSpanId: span.parentSpanId,
+          parentSpanId: span.parentSpanContext?.spanId,
         }))
     ).toEqual([
       {
@@ -1309,7 +1315,7 @@ describe('Claude Agent SDK — OTel tracer', () => {
         .filter(span => span.name === 'execute_tool')
         .map(span => ({
           errorType: span.attributes[ATTR_ERROR_TYPE],
-          parentSpanId: span.parentSpanId,
+          parentSpanId: span.parentSpanContext?.spanId,
           result: span.attributes[ATTR_GEN_AI_TOOL_CALL_RESULT],
           statusCode: span.status.code,
           toolCallId: span.attributes[ATTR_GEN_AI_TOOL_CALL_ID],
@@ -1381,7 +1387,9 @@ describe('Claude Agent SDK — OTel tracer', () => {
     expect(
       getExporter()
         .getFinishedSpans()
-        .filter(span => span.name === INVOKE && span.parentSpanId != null)
+        .filter(
+          span => span.name === INVOKE && span.parentSpanContext?.spanId != null
+        )
     ).toEqual([]);
 
     tracer.processMessage(
@@ -1430,7 +1438,7 @@ describe('Claude Agent SDK — OTel tracer', () => {
         )
         .map(span => ({
           errorType: span.attributes[ATTR_ERROR_TYPE],
-          parentSpanId: span.parentSpanId,
+          parentSpanId: span.parentSpanContext?.spanId,
           outputMessages: span.attributes[ATTR_GEN_AI_OUTPUT_MESSAGES],
           statusCode: span.status.code,
         }))
@@ -1478,7 +1486,9 @@ describe('Claude Agent SDK — OTel tracer', () => {
     expect(
       getExporter()
         .getFinishedSpans()
-        .filter(span => span.name === INVOKE && span.parentSpanId != null)
+        .filter(
+          span => span.name === INVOKE && span.parentSpanContext?.spanId != null
+        )
     ).toEqual([]);
 
     tracer.processMessage(
@@ -1713,7 +1723,7 @@ describe('Claude Agent SDK — OTel tracer', () => {
       // result closes it as aborted rather than leaking it.
       errorType: orphan.attributes[ATTR_ERROR_TYPE],
       model: orphan.attributes[ATTR_GEN_AI_REQUEST_MODEL],
-      parentSpanId: orphan.parentSpanId,
+      parentSpanId: orphan.parentSpanContext?.spanId,
       statusCode: orphan.status.code,
     }).toEqual({
       agentDescription: 'Work started before the tracer attached',
@@ -1799,7 +1809,7 @@ describe('Claude Agent SDK — OTel tracer', () => {
       subagents
         .map(span => ({
           name: span.attributes[ATTR_GEN_AI_AGENT_NAME],
-          parentSpanId: span.parentSpanId,
+          parentSpanId: span.parentSpanContext?.spanId,
           statusCode: span.status.code,
           toolName: span.attributes[ATTR_GEN_AI_TOOL_NAME],
         }))
@@ -1869,7 +1879,7 @@ describe('Claude Agent SDK — OTel tracer', () => {
     expect(opus.attributes[ATTR_GEN_AI_USAGE_INPUT_TOKENS]).toBe(100);
     expect(opus.attributes[ATTR_GEN_AI_USAGE_OUTPUT_TOKENS]).toBe(40);
     expect(opus.attributes[ATTR_GEN_AI_USAGE_TOTAL_TOKENS]).toBe(140);
-    expect(opus.parentSpanId).toBe(invoke.spanContext().spanId);
+    expect(opus.parentSpanContext?.spanId).toBe(invoke.spanContext().spanId);
 
     // The internal fast model has no content chat span, only a usage span —
     // sourcing from `modelUsage` is what makes its tokens visible at all.
@@ -1888,7 +1898,7 @@ describe('Claude Agent SDK — OTel tracer', () => {
     ).toBe(3);
     // total_tokens = inclusive input (28) + output (8).
     expect(haiku.attributes[ATTR_GEN_AI_USAGE_TOTAL_TOKENS]).toBe(36);
-    expect(haiku.parentSpanId).toBe(invoke.spanContext().spanId);
+    expect(haiku.parentSpanContext?.spanId).toBe(invoke.spanContext().spanId);
   });
 
   test('uses an options.agent override on the root span', () => {
