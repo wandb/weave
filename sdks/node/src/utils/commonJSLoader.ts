@@ -6,6 +6,7 @@ import instrumentations, {
   type CacheEntry,
   type CJSInstrumentation,
 } from '../integrations/instrumentations';
+import state from '../state';
 import {requirePackageJson} from './npmModuleUtils';
 
 const parse: (filePath: string) => {
@@ -118,6 +119,12 @@ if (typeof module !== 'undefined' && module.exports) {
   reset = () => {
     Module.prototype.require = originalRequire;
   };
+
+  // Snapshot before the swap, unfiltered: the instrumentation registry is
+  // still empty here, because `index.ts` runs `./integrations/hooks`, which
+  // fills it, after this module. `warnIfLoadedBeforeWeave()` filters the
+  // snapshot at init() time instead.
+  state.modulesLoadedBeforeCjsHook = Object.keys(require.cache);
 
   Module.prototype.require = patchedRequire as any;
 } else {

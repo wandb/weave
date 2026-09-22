@@ -1,0 +1,14 @@
+{
+  "name": "cjs-load-order-fixture",
+  "version": "0.0.0",
+  "private": true,
+  "type": "commonjs",
+  "scripts": {
+    "start": "node library-first.cjs",
+    "start-weave-first": "node weave-first.cjs"
+  },
+  "dependencies": {
+    "openai": "file:../../../../../node_modules/openai"
+  },
+  "description": "CJS host app that requires an instrumented library on either side of require('weave'), to check the load-order warning. 'openai' resolves to the copy in the SDK's node_modules and has no dependencies of its own, so it adds nothing to the fixture install."
+}

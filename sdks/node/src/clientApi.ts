@@ -9,6 +9,7 @@ import {defaultHost, encodeProjectId, getUrls, setGlobalDomain} from './urls';
 import {ConcurrencyLimiter} from './utils/concurrencyLimit';
 import {Netrc} from './utils/netrc';
 import {createFetchWithRetry} from './utils/retry';
+import {warnIfLoadedBeforeWeave} from './utils/warnIfLoadedBeforeWeave';
 import {getWandbConfigs} from './wandb/settings';
 import {WandbServerApi} from './wandb/wandbServerApi';
 import {type CallStackEntry, WeaveClient} from './weaveClient';
@@ -142,6 +143,7 @@ export async function init(
     setGlobalClient(client);
     setGlobalDomain(domain);
     registerExitFlush();
+    warnIfLoadedBeforeWeave();
     console.log(
       `View Weave data at https://${domain}/${encodeProjectId(projectId)}/weave`
     );

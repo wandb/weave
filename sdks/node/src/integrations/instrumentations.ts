@@ -79,3 +79,15 @@ export function getESMInstrumentedModules(): string[] {
   const instrumentations = (global as any)[symESMInstrumentations];
   return Array.from(instrumentations.keys());
 }
+
+export function getCJSInstrumentedTargets(): Array<
+  Pick<CJSInstrumentation, 'moduleName' | 'subPath'>
+> {
+  const instrumentations = (global as any)[symCJSInstrumentations];
+  return Array.from(instrumentations.keys() as Iterable<string>, key => {
+    // Keys are `${moduleName}@${subPath}`. The separator is the first `@`
+    // after the leading one a scoped name starts with.
+    const at = key.indexOf('@', key.startsWith('@') ? 1 : 0);
+    return {moduleName: key.slice(0, at), subPath: key.slice(at + 1)};
+  });
+}

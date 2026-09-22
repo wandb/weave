@@ -21,6 +21,14 @@ type State = {
   client: WeaveClient | null;
   domain: string | null;
 
+  /**
+   * `require.cache` keys as they were when the CJS `require` hook was
+   * installed. Everything listed here reached the app unpatched, because the
+   * hook only sees `require` calls made after it. Stays empty under ESM, where
+   * the hook is never installed.
+   */
+  modulesLoadedBeforeCjsHook: string[];
+
   genAi: {
     /**
      * The cached GenAI provider paired with the `projectId` it routes to. Held
@@ -114,6 +122,7 @@ function defaultState(): State {
   return {
     client: null,
     domain: null,
+    modulesLoadedBeforeCjsHook: [],
 
     genAi: {
       provider: null,
