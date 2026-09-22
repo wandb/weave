@@ -535,7 +535,7 @@ describe('Claude Agent SDK — query() patch', () => {
       ).toEqual([{role: 'assistant', content: `done-${suffix}`}]);
 
       const children = spans.filter(
-        span => span.parentSpanId === root.spanContext().spanId
+        span => span.parentSpanContext?.spanId === root.spanContext().spanId
       );
       expect(children).toHaveLength(2);
       expect(
