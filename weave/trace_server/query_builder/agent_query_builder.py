@@ -1166,6 +1166,7 @@ def _grouped_span_membership_where_sql(
                 req.insight_filters,
                 req.started_after,
                 req.started_before,
+                req.insight_filter_scope,
             ),
         )
         if clause is not None

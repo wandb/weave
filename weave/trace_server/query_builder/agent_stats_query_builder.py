@@ -441,6 +441,7 @@ def _spans_source_filter_sql(
         req.insight_filters,
         start,
         end,
+        req.insight_filter_scope,
     )
     if insight_clause is not None:
         where_conditions.append(insight_clause)

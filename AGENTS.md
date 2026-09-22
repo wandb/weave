@@ -504,6 +504,10 @@ deterministic.
 - Agent span list queries omit heavy message, tool-payload, and raw-span fields;
   use an `AgentSpansQueryReq` with `include_details=True` when validating stored
   span details.
+- Agent Insights filters default to conversation scope. Set
+  `insight_filter_scope="turn"` on span query and stats requests to keep only
+  matching traces; failure filters match `affected_trace_ids`, including for
+  stable failure topics.
 - Parallel/background Claude Agent SDK `Agent` calls can emit an
   `async_launched` or `remote_launched` tool result before forwarded child
   messages, then finish via a `task_notification`. Keep one `SubAgent` keyed by

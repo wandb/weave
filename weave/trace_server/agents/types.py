@@ -67,6 +67,15 @@ SearchMessageRole = Literal[
 AgentSpanStatsValueType = Literal["datetime", "number", "boolean", "string"]
 AgentSpanStatsColumnValueType = Literal["datetime", "number", "boolean", "string"]
 AgentSpanStatsCell = datetime.datetime | str | int | float | bool | None
+AgentInsightFilterScope = Annotated[
+    Literal["conversation", "turn"],
+    Field(
+        description=(
+            "Entity matched by all insight filters. Turn-scoped failure filters "
+            "match every turn attributed to the failure."
+        )
+    ),
+]
 # Source: https://github.com/wandb/core/blob/master/services/weave-trace/src/workers/insights/configs/taxonomies/severity.yaml
 AgentFailureSeverity = Literal["info", "major", "minor"]
 AGENT_FAILURE_SEVERITIES = get_args(AgentFailureSeverity)
@@ -398,6 +407,7 @@ class AgentSpanStatsReq(BaseModel):
     # constrained by the stats window; they annotate the conversation.
     signal_filters: AgentSignalFilter | None = None
     insight_filters: list[AgentInsightFilter] = Field(default_factory=list)
+    insight_filter_scope: AgentInsightFilterScope = "conversation"
 
     @model_validator(mode="after")
     def validate_stats_request(self) -> AgentSpanStatsReq:
@@ -824,7 +834,7 @@ class AgentSignalFilter(BaseModel):
 
 
 class AgentInsightFilter(BaseModel):
-    """Conversation filter backed by extracted Insights data in ClickHouse.
+    """Filter criterion backed by extracted Insights data in ClickHouse.
 
     Values within one filter are ORed, while multiple filters are ANDed. Topic
     filters use stable topic IDs that span successful clustering runs.
@@ -851,7 +861,7 @@ class AgentInsightFilter(BaseModel):
     )
     exclude: bool = Field(
         default=False,
-        description="Exclude conversations matching any value in this filter.",
+        description="Exclude entities matching any value in this filter.",
     )
 
     @model_validator(mode="after")
@@ -922,6 +932,7 @@ class AgentSpansQueryReq(BaseModel):
     started_before: datetime.datetime | None = None  # filter started_at < end
     signal_filters: AgentSignalFilter | None = None
     insight_filters: list[AgentInsightFilter] = Field(default_factory=list)
+    insight_filter_scope: AgentInsightFilterScope = "conversation"
 
     @model_validator(mode="after")
     def validate_spans_query_request(self) -> AgentSpansQueryReq:

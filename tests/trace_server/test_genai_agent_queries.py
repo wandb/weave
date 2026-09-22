@@ -4311,3 +4311,243 @@ def test_filter_conversations_by_insights(ch_server):
         )
         == 2
     )
+
+
+@pytest.mark.flaky(reruns=3)
+def test_filter_turns_by_insights(ch_server):
+    project_id = _make_project_id("insight-turn-filter")
+    now = datetime.datetime.now(tz=datetime.timezone.utc)
+    conversation_id = f"conv-{uuid.uuid4().hex[:8]}"
+    spans = [
+        _make_span(
+            project_id,
+            conversation_id=conversation_id,
+            operation_name="invoke_agent",
+            started_at=now + datetime.timedelta(seconds=index),
+        )
+        for index in range(3)
+    ]
+    _insert_spans(ch_server.ch_client, spans)
+
+    intent_ids = [uuid.uuid4() for _ in spans]
+    ch_server.ch_client.insert(
+        "intent_signatures",
+        data=[
+            [
+                project_id,
+                intent_ids[index],
+                category,
+                sentiment,
+                conversation_id,
+                span.trace_id,
+                span.span_id,
+                span.started_at,
+                span.ended_at,
+                now,
+            ]
+            for index, (span, category, sentiment) in enumerate(
+                zip(
+                    spans,
+                    ("information_request", "action_request", "feedback"),
+                    ("frustrated", "neutral", "satisfied"),
+                    strict=True,
+                )
+            )
+        ],
+        column_names=[
+            "project_id",
+            "id",
+            "category",
+            "sentiment",
+            "conversation_id",
+            "trace_id",
+            "span_id",
+            "trace_started_at",
+            "trace_ended_at",
+            "extracted_at",
+        ],
+    )
+
+    failure_id = uuid.uuid4()
+    ch_server.ch_client.insert(
+        "failure_signatures",
+        data=[
+            [
+                project_id,
+                failure_id,
+                "wrong_output",
+                "major",
+                conversation_id,
+                spans[1].trace_id,
+                [spans[0].trace_id, spans[1].trace_id],
+                spans[1].span_id,
+                spans[1].started_at,
+                spans[1].ended_at,
+                now,
+            ]
+        ],
+        column_names=[
+            "project_id",
+            "id",
+            "category",
+            "severity",
+            "conversation_id",
+            "current_trace_id",
+            "affected_trace_ids",
+            "span_id",
+            "trace_started_at",
+            "trace_ended_at",
+            "extracted_at",
+        ],
+    )
+
+    run_id = uuid.uuid4()
+    cluster_id = uuid.uuid4()
+    topic_id = uuid.uuid4()
+    ch_server.ch_client.insert(
+        "signature_cluster_runs",
+        data=[
+            [
+                project_id,
+                run_id,
+                "failure",
+                now - datetime.timedelta(hours=1),
+                now + datetime.timedelta(hours=1),
+                "succeeded",
+                now,
+                now,
+            ]
+        ],
+        column_names=[
+            "project_id",
+            "id",
+            "signature_type",
+            "window_start",
+            "window_end",
+            "status",
+            "started_at",
+            "completed_at",
+        ],
+    )
+    ch_server.ch_client.insert(
+        "signature_clusters",
+        data=[
+            [
+                project_id,
+                run_id,
+                cluster_id,
+                now,
+                "failure",
+                topic_id,
+                "wrong_output",
+                [],
+                "Wrong output",
+            ]
+        ],
+        column_names=[
+            "project_id",
+            "cluster_run_id",
+            "id",
+            "run_window_end",
+            "signature_type",
+            "topic_id",
+            "category",
+            "centroid",
+            "label",
+        ],
+    )
+    ch_server.ch_client.insert(
+        "signature_cluster_assignments",
+        data=[
+            [
+                project_id,
+                run_id,
+                failure_id,
+                cluster_id,
+                "failure",
+                "wrong_output",
+                spans[1].trace_id,
+                spans[1].span_id,
+                conversation_id,
+                spans[1].started_at,
+                spans[1].ended_at,
+            ]
+        ],
+        column_names=[
+            "project_id",
+            "cluster_run_id",
+            "signature_record_id",
+            "cluster_id",
+            "signature_type",
+            "category",
+            "trace_id",
+            "span_id",
+            "conversation_id",
+            "trace_started_at",
+            "trace_ended_at",
+        ],
+    )
+
+    def filtered_trace_ids(*filters: AgentInsightFilter) -> list[str]:
+        response = ch_server.agent_spans_query(
+            AgentSpansQueryReq(
+                project_id=project_id,
+                group_by=[AgentGroupByRef(source="column", key="trace_id")],
+                insight_filters=list(filters),
+                insight_filter_scope="turn",
+                started_after=now - datetime.timedelta(hours=1),
+                started_before=now + datetime.timedelta(hours=1),
+            )
+        )
+        return sorted(group.group_keys["trace_id"] for group in response.groups)
+
+    assert filtered_trace_ids(
+        AgentInsightFilter(
+            field="intent_category",
+            values=["information_request"],
+        )
+    ) == [spans[0].trace_id]
+    assert filtered_trace_ids(
+        AgentInsightFilter(
+            field="failure_category",
+            values=["wrong_output"],
+        )
+    ) == sorted([spans[0].trace_id, spans[1].trace_id])
+    assert filtered_trace_ids(
+        AgentInsightFilter(
+            field="failure_topic_id",
+            values=[str(topic_id)],
+        )
+    ) == sorted([spans[0].trace_id, spans[1].trace_id])
+    assert filtered_trace_ids(
+        AgentInsightFilter(
+            field="failure_severity",
+            values=["major"],
+            exclude=True,
+        )
+    ) == [spans[2].trace_id]
+
+    stats = ch_server.agent_spans_stats(
+        AgentSpanStatsReq(
+            project_id=project_id,
+            start=now - datetime.timedelta(hours=1),
+            end=now + datetime.timedelta(hours=1),
+            granularity=3600,
+            metrics=[
+                AgentSpanStatsMetricSpec(
+                    alias="spans",
+                    value_type="datetime",
+                    value=AgentSpanValueRef(source="field", key="started_at"),
+                    aggregations=["count"],
+                )
+            ],
+            insight_filters=[
+                AgentInsightFilter(
+                    field="failure_category",
+                    values=["wrong_output"],
+                )
+            ],
+            insight_filter_scope="turn",
+        )
+    )
+    assert sum(int(row["count_spans"]) for row in stats.rows) == 2

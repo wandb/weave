@@ -2365,6 +2365,13 @@ def test_signal_filter_round_trip() -> None:
 
 
 def test_insight_filter_validation() -> None:
+    assert AgentSpansQueryReq(project_id="p1").insight_filter_scope == "conversation"
+    assert (
+        AgentSpansQueryReq(
+            project_id="p1", insight_filter_scope="turn"
+        ).insight_filter_scope
+        == "turn"
+    )
     with pytest.raises(ValidationError):
         AgentInsightFilter(
             field="category",
@@ -2473,6 +2480,122 @@ def test_build_topic_insight_filter_clause() -> None:
                     AND status = 'succeeded')
                 AND toString(topic_id) IN {insight_1:Array(String)})
           GROUP BY conversation_id
+        )
+    """
+    assert_sql(
+        expected,
+        {
+            "insight_0": "project-1",
+            "insight_1": ["01994634-c680-7dc3-a40b-0383b5008d70"],
+            "insight_2": start,
+            "insight_3": end,
+        },
+        clause or "",
+        pb.get_params(),
+    )
+
+
+def test_build_turn_insight_filter_clauses() -> None:
+    start = datetime.datetime(2026, 9, 1, tzinfo=datetime.timezone.utc)
+    end = datetime.datetime(2026, 9, 8, tzinfo=datetime.timezone.utc)
+    pb = ParamBuilder("insight")
+    clause = build_insight_filter_clause(
+        pb,
+        "project-1",
+        [
+            AgentInsightFilter(
+                field="intent_category",
+                values=["information_request"],
+            ),
+            AgentInsightFilter(
+                field="failure_severity",
+                values=["major"],
+            ),
+        ],
+        start,
+        end,
+        "turn",
+    )
+
+    expected = """
+        s.trace_id IN (
+          SELECT trace_id FROM intent_signatures
+          WHERE project_id = {insight_0:String}
+            AND trace_id != ''
+            AND trace_started_at >= {insight_2:DateTime64(6)}
+            AND trace_started_at < {insight_3:DateTime64(6)}
+            AND category IN {insight_1:Array(String)}
+          GROUP BY trace_id
+        ) AND s.trace_id IN (
+          SELECT affected_trace_id FROM failure_signatures
+          ARRAY JOIN affected_trace_ids AS affected_trace_id
+          WHERE project_id = {insight_4:String}
+            AND affected_trace_id != ''
+            AND trace_started_at >= {insight_6:DateTime64(6)}
+            AND trace_started_at < {insight_7:DateTime64(6)}
+            AND if(empty(trimBoth(severity)), 'unknown', lower(trimBoth(severity)))
+              IN {insight_5:Array(String)}
+          GROUP BY affected_trace_id
+        )
+    """
+    assert_sql(
+        expected,
+        {
+            "insight_0": "project-1",
+            "insight_1": ["information_request"],
+            "insight_2": start,
+            "insight_3": end,
+            "insight_4": "project-1",
+            "insight_5": ["major"],
+            "insight_6": start,
+            "insight_7": end,
+        },
+        clause or "",
+        pb.get_params(),
+    )
+
+
+def test_build_failure_topic_turn_insight_filter_clause() -> None:
+    start = datetime.datetime(2026, 9, 1, tzinfo=datetime.timezone.utc)
+    end = datetime.datetime(2026, 9, 8, tzinfo=datetime.timezone.utc)
+    pb = ParamBuilder("insight")
+    clause = build_insight_filter_clause(
+        pb,
+        "project-1",
+        [
+            AgentInsightFilter(
+                field="failure_topic_id",
+                values=["01994634-c680-7dc3-a40b-0383b5008d70"],
+            )
+        ],
+        start,
+        end,
+        "turn",
+    )
+
+    expected = """
+        s.trace_id IN (
+          SELECT affected_trace_id FROM failure_signatures
+          ARRAY JOIN affected_trace_ids AS affected_trace_id
+          WHERE project_id = {insight_0:String}
+            AND affected_trace_id != ''
+            AND trace_started_at >= {insight_2:DateTime64(6)}
+            AND trace_started_at < {insight_3:DateTime64(6)}
+            AND id IN (
+              SELECT signature_record_id FROM signature_cluster_assignments
+              WHERE project_id = {insight_0:String}
+                AND signature_type = 'failure'
+                AND (cluster_run_id, cluster_id) IN (
+                  SELECT cluster_run_id, id FROM signature_clusters
+                  WHERE project_id = {insight_0:String}
+                    AND signature_type = 'failure'
+                    AND cluster_run_id IN (
+                      SELECT id FROM signature_cluster_runs
+                      WHERE project_id = {insight_0:String}
+                        AND signature_type = 'failure'
+                        AND status = 'succeeded')
+                    AND toString(topic_id) IN {insight_1:Array(String)}))
+          GROUP BY affected_trace_id
         )
     """
     assert_sql(

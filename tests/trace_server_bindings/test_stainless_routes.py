@@ -479,6 +479,7 @@ def test_v2_method_reaches_its_flat_route(
                         values=["01994634-c680-7dc3-a40b-0383b5008d70"],
                     ),
                 ],
+                insight_filter_scope="turn",
             ),
             "POST",
             "/agents/spans/stats",
@@ -1345,6 +1346,7 @@ def test_create_sends_every_supported_field(
                         values=["01994634-c680-7dc3-a40b-0383b5008d70"],
                     ),
                 ],
+                insight_filter_scope="turn",
             ),
             {
                 "project_id": PROJECT,
@@ -1368,6 +1370,7 @@ def test_create_sends_every_supported_field(
                 "group_filters": [],
                 "include_costs": False,
                 "include_details": False,
+                "insight_filter_scope": "turn",
                 "insight_filters": [
                     {
                         "exclude": False,
@@ -1492,11 +1495,13 @@ def test_agent_spans_stats_sends_insight_filters() -> None:
                 values=["01994634-c680-7dc3-a40b-0383b5008d70"],
             ),
         ],
+        insight_filter_scope="turn",
     )
 
     mock_server.server.agent_spans_stats(req)
 
     assert len(mock_server.requests) == 1
+    assert json.loads(mock_server.requests[0].content)["insight_filter_scope"] == "turn"
     assert json.loads(mock_server.requests[0].content)["insight_filters"] == [
         {
             "exclude": False,
