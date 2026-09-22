@@ -1565,13 +1565,23 @@ class CallsQuery(BaseModel):
         storage_size_join = ""
         config = TableConfig.from_read_table(self.read_table)
         if self.include_storage_size:
+            # Stats primary key is (project_id, id). Without an id predicate
+            # this rollup groups every id in the project, and the outer
+            # `id IN filtered_calls` cannot stop that aggregation.
+            storage_id_predicate = ""
+            if id_subquery_name is not None:
+                storage_id_predicate = f"\n                AND id IN {id_subquery_name}"
+            elif storage_scope_id_cte is not None:
+                storage_id_predicate = (
+                    f"\n                AND id IN {storage_scope_id_cte}"
+                )
             storage_size_join = f"""
             LEFT JOIN (
                 SELECT
                     id,
                     sum({config.storage_size_bytes_sum}) AS storage_size_bytes
                 FROM {config.stats_table_name}
-                WHERE project_id = {param_slot(project_param, "String")}
+                WHERE project_id = {param_slot(project_param, "String")}{storage_id_predicate}
                 GROUP BY id
             ) AS {STORAGE_SIZE_TABLE_NAME}
             ON {table_alias}.id = {STORAGE_SIZE_TABLE_NAME}.id
