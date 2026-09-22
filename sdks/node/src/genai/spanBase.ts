@@ -31,6 +31,20 @@ export interface SpanEndOptions {
 }
 
 /**
+ * Name a span after what it acts on: `chat gpt-4o`, `execute_tool search`,
+ * `invoke_agent research-bot`. This is the shape the Python SDK already
+ * emits, and the one the GenAI semantic conventions suggest.
+ *
+ * A blank or missing target falls back to the bare operation, so an unnamed
+ * agent produces `invoke_agent` rather than `invoke_agent undefined` or a
+ * name with a trailing space.
+ */
+export function spanName(operation: string, target?: string): string {
+  const trimmed = target?.trim() ?? '';
+  return trimmed ? `${operation} ${trimmed}` : operation;
+}
+
+/**
  * Shared base for the four GenAI span wrappers (`Tool`, `LLM`, `SubAgent`,
  * `Turn`). Holds the underlying OTel span plus the `_ended` guard and exposes
  * the common escape-hatch mutators so every span type gets an identical

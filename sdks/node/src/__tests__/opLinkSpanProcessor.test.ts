@@ -110,7 +110,7 @@ describe('OpLinkSpanProcessor', () => {
     const {converse} = await storedCalls();
 
     const spans = exporter.getFinishedSpans();
-    for (const name of ['invoke_agent', 'chat']) {
+    for (const name of ['invoke_agent', 'chat gpt-4o']) {
       const attrs = findSpan(spans, name).attributes;
       expect(attrs[PARENT_CALL_ID_SPAN_ATTR]).toBe(converse.id);
       expect(attrs[PARENT_CALL_TRACE_ID_SPAN_ATTR]).toBe(converse.trace_id);

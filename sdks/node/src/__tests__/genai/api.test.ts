@@ -76,9 +76,9 @@ describe('genai api (top-level functions)', () => {
 
     const spans = getExporter().getFinishedSpans();
     expect(spans).toHaveLength(3);
-    const turnSpan = findSpan(spans, 'invoke_agent');
-    const llmSpan = findSpan(spans, 'chat');
-    const toolSpan = findSpan(spans, 'execute_tool');
+    const turnSpan = findSpan(spans, 'invoke_agent weather-bot');
+    const llmSpan = findSpan(spans, 'chat gpt-4o');
+    const toolSpan = findSpan(spans, 'execute_tool get_weather');
     expect(llmSpan.parentSpanId).toBe(turnSpan.spanContext().spanId);
     expect(toolSpan.parentSpanId).toBe(llmSpan.spanContext().spanId);
     for (const s of spans) {
@@ -126,8 +126,8 @@ describe('genai api (top-level functions)', () => {
     turn.end();
 
     const spans = getExporter().getFinishedSpans();
-    const toolSpan = findSpan(spans, 'execute_tool');
-    const llmSpan = findSpan(spans, 'chat');
+    const toolSpan = findSpan(spans, 'execute_tool get_weather');
+    const llmSpan = findSpan(spans, 'chat gpt-4o');
     expect(toolSpan.parentSpanId).toBe(llmSpan.spanContext().spanId);
   });
 
@@ -138,7 +138,7 @@ describe('genai api (top-level functions)', () => {
     turn.end();
 
     const spans = getExporter().getFinishedSpans();
-    const toolSpan = findSpan(spans, 'execute_tool');
+    const toolSpan = findSpan(spans, 'execute_tool get_weather');
     const turnSpan = findSpan(spans, 'invoke_agent');
     expect(toolSpan.parentSpanId).toBe(turnSpan.spanContext().spanId);
   });
@@ -318,7 +318,7 @@ describe('genai api (top-level functions)', () => {
 
     const spans = getExporter().getFinishedSpans();
     const turnSpan = findSpan(spans, 'invoke_agent');
-    const llmSpan = findSpan(spans, 'chat');
+    const llmSpan = findSpan(spans, 'chat gpt-4o');
     expectSpanTimesToMatch(turnSpan, startedAt, endedAt);
     expectSpanTimesToMatch(llmSpan, startedAt, endedAt);
   });
@@ -342,7 +342,7 @@ describe('genai api (top-level functions)', () => {
     startLLM({model: 'gpt-4o', startTime: startedAt});
     endLLM({endTime: endedAt});
 
-    const llmSpan = findSpan(getExporter().getFinishedSpans(), 'chat');
+    const llmSpan = findSpan(getExporter().getFinishedSpans(), 'chat gpt-4o');
     expectSpanTimesToMatch(llmSpan, startedAt, endedAt);
   });
 
@@ -362,8 +362,8 @@ describe('genai api (top-level functions)', () => {
 
     const spans = getExporter().getFinishedSpans();
     expect(spans.map(s => s.name).sort()).toEqual([
-      'chat',
-      'execute_tool',
+      'chat gpt-4o',
+      'execute_tool get_weather',
       'invoke_agent',
     ]);
     for (const s of spans) {
@@ -404,7 +404,10 @@ describe('genai api (top-level functions)', () => {
     });
     turn.end();
 
-    const toolSpan = findSpan(getExporter().getFinishedSpans(), 'execute_tool');
+    const toolSpan = findSpan(
+      getExporter().getFinishedSpans(),
+      'execute_tool read_file'
+    );
     expect(toolSpan.attributes['weave.integration.name']).toBe('claude-code');
     expect(toolSpan.attributes['tenant.id']).toBe('acme');
   });
@@ -427,7 +430,10 @@ describe('genai api (top-level functions)', () => {
     turn.startTool({name: 'search'}).end();
     turn.end();
 
-    const toolSpan = findSpan(getExporter().getFinishedSpans(), 'execute_tool');
+    const toolSpan = findSpan(
+      getExporter().getFinishedSpans(),
+      'execute_tool search'
+    );
     expect(toolSpan.attributes['weave.integration.name']).toBe('my-harness');
   });
 
@@ -452,11 +458,11 @@ describe('genai api (top-level functions)', () => {
     turn.end();
 
     const spans = getExporter().getFinishedSpans();
-    expect(findSpan(spans, 'chat').attributes['weave.integration.name']).toBe(
-      'weave-claude-code'
-    );
     expect(
-      findSpan(spans, 'execute_tool').attributes['weave.integration.name']
+      findSpan(spans, 'chat claude-opus-4').attributes['weave.integration.name']
+    ).toBe('weave-claude-code');
+    expect(
+      findSpan(spans, 'execute_tool Bash').attributes['weave.integration.name']
     ).toBe('weave-claude-code');
   });
 
@@ -481,16 +487,51 @@ describe('genai api (top-level functions)', () => {
 
     const spans = getExporter().getFinishedSpans();
     // Two invoke_agent spans (turn + subagent); pick the subagent's by its name.
-    const subagentSpan = spans.find(
-      s =>
-        s.name === 'invoke_agent' &&
-        s.attributes['gen_ai.agent.name'] === 'researcher'
-    );
+    const subagentSpan = spans.find(s => s.name === 'invoke_agent researcher');
     expect(subagentSpan?.attributes['weave.integration.name']).toBe(
       'weave-openclaw'
     );
     expect(
-      findSpan(spans, 'execute_tool').attributes['weave.integration.name']
+      findSpan(spans, 'execute_tool search').attributes[
+        'weave.integration.name'
+      ]
     ).toBe('weave-openclaw');
+  });
+
+  test('span names carry the model, tool and agent they act on', () => {
+    const turn = startTurn({agentName: 'research-bot'});
+    const llm = turn.startLLM({model: 'gpt-4o-mini'});
+    llm.startSubagent({name: 'summarizer'}).end();
+    turn.startTool({name: 'wikipedia_search'}).end();
+    llm.end();
+    turn.end();
+
+    expect(
+      getExporter()
+        .getFinishedSpans()
+        .map(s => s.name)
+        .sort()
+    ).toEqual([
+      'chat gpt-4o-mini',
+      'execute_tool wikipedia_search',
+      'invoke_agent research-bot',
+      'invoke_agent summarizer',
+    ]);
+  });
+
+  test('a missing or blank target leaves the bare operation as the span name', () => {
+    const turn = startTurn();
+    const llm = turn.startLLM({model: ''});
+    llm.startSubagent({name: '   '}).end();
+    turn.startTool({name: ''}).end();
+    llm.end();
+    turn.end();
+
+    expect(
+      getExporter()
+        .getFinishedSpans()
+        .map(s => s.name)
+        .sort()
+    ).toEqual(['chat', 'execute_tool', 'invoke_agent', 'invoke_agent']);
   });
 });
