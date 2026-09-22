@@ -542,6 +542,12 @@ export interface SpanQueryParams {
 
   include_details?: boolean;
 
+  /**
+   * Entity matched by all insight filters. Turn-scoped failure filters match every
+   * turn attributed to the failure.
+   */
+  insight_filter_scope?: 'conversation' | 'turn';
+
   insight_filters?: Array<SpanQueryParams.InsightFilter>;
 
   limit?: number;
@@ -750,7 +756,7 @@ export namespace SpanQueryParams {
   }
 
   /**
-   * Conversation filter backed by extracted Insights data in ClickHouse.
+   * Filter criterion backed by extracted Insights data in ClickHouse.
    *
    * Values within one filter are ORed, while multiple filters are ANDed. Topic
    * filters use stable topic IDs that span successful clustering runs.
@@ -772,7 +778,7 @@ export namespace SpanQueryParams {
     values: Array<string>;
 
     /**
-     * Exclude conversations matching any value in this filter.
+     * Exclude entities matching any value in this filter.
      */
     exclude?: boolean;
   }
@@ -944,6 +950,12 @@ export interface SpanStatsParams {
   group_filters?: Array<SpanStatsParams.GroupFilter>;
 
   group_limit?: number;
+
+  /**
+   * Entity matched by all insight filters. Turn-scoped failure filters match every
+   * turn attributed to the failure.
+   */
+  insight_filter_scope?: 'conversation' | 'turn';
 
   insight_filters?: Array<SpanStatsParams.InsightFilter>;
 
@@ -1247,7 +1259,7 @@ export namespace SpanStatsParams {
   }
 
   /**
-   * Conversation filter backed by extracted Insights data in ClickHouse.
+   * Filter criterion backed by extracted Insights data in ClickHouse.
    *
    * Values within one filter are ORed, while multiple filters are ANDed. Topic
    * filters use stable topic IDs that span successful clustering runs.
@@ -1269,7 +1281,7 @@ export namespace SpanStatsParams {
     values: Array<string>;
 
     /**
-     * Exclude conversations matching any value in this filter.
+     * Exclude entities matching any value in this filter.
      */
     exclude?: boolean;
   }

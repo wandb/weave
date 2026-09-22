@@ -66,6 +66,12 @@ class SpanStatsParams(TypedDict, total=False):
 
     group_limit: int
 
+    insight_filter_scope: Literal["conversation", "turn"]
+    """Entity matched by all insight filters.
+
+    Turn-scoped failure filters match every turn attributed to the failure.
+    """
+
     insight_filters: Iterable[InsightFilter]
 
     metrics: Iterable[Metric]
@@ -333,7 +339,7 @@ class GroupFilter(TypedDict, total=False):
 
 
 class InsightFilter(TypedDict, total=False):
-    """Conversation filter backed by extracted Insights data in ClickHouse.
+    """Filter criterion backed by extracted Insights data in ClickHouse.
 
     Values within one filter are ORed, while multiple filters are ANDed. Topic
     filters use stable topic IDs that span successful clustering runs.
@@ -358,7 +364,7 @@ class InsightFilter(TypedDict, total=False):
     """
 
     exclude: bool
-    """Exclude conversations matching any value in this filter."""
+    """Exclude entities matching any value in this filter."""
 
 
 class MetricValue(TypedDict, total=False):

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from typing import Union, Iterable, Optional
 from datetime import datetime
+from typing_extensions import Literal
 
 import httpx
 
@@ -103,6 +104,7 @@ class SpansResource(SyncAPIResource):
         group_filters: Iterable[span_query_params.GroupFilter] | Omit = omit,
         include_costs: bool | Omit = omit,
         include_details: bool | Omit = omit,
+        insight_filter_scope: Literal["conversation", "turn"] | Omit = omit,
         insight_filters: Iterable[span_query_params.InsightFilter] | Omit = omit,
         limit: int | Omit = omit,
         measures: Iterable[span_query_params.Measure] | Omit = omit,
@@ -123,6 +125,9 @@ class SpansResource(SyncAPIResource):
         Query agent spans, either as raw rows or grouped aggregates.
 
         Args:
+          insight_filter_scope: Entity matched by all insight filters. Turn-scoped failure filters match every
+              turn attributed to the failure.
+
           extra_headers: Send extra headers
 
           extra_query: Add additional query parameters to the request
@@ -142,6 +147,7 @@ class SpansResource(SyncAPIResource):
                     "group_filters": group_filters,
                     "include_costs": include_costs,
                     "include_details": include_details,
+                    "insight_filter_scope": insight_filter_scope,
                     "insight_filters": insight_filters,
                     "limit": limit,
                     "measures": measures,
@@ -171,6 +177,7 @@ class SpansResource(SyncAPIResource):
         group_by: Iterable[span_stats_params.GroupBy] | Omit = omit,
         group_filters: Iterable[span_stats_params.GroupFilter] | Omit = omit,
         group_limit: int | Omit = omit,
+        insight_filter_scope: Literal["conversation", "turn"] | Omit = omit,
         insight_filters: Iterable[span_stats_params.InsightFilter] | Omit = omit,
         metrics: Iterable[span_stats_params.Metric] | Omit = omit,
         query: Optional[span_stats_params.Query] | Omit = omit,
@@ -188,6 +195,9 @@ class SpansResource(SyncAPIResource):
 
         Args:
           bucket_by: Bucket stats rows by started_at time intervals.
+
+          insight_filter_scope: Entity matched by all insight filters. Turn-scoped failure filters match every
+              turn attributed to the failure.
 
           extra_headers: Send extra headers
 
@@ -209,6 +219,7 @@ class SpansResource(SyncAPIResource):
                     "group_by": group_by,
                     "group_filters": group_filters,
                     "group_limit": group_limit,
+                    "insight_filter_scope": insight_filter_scope,
                     "insight_filters": insight_filters,
                     "metrics": metrics,
                     "query": query,
@@ -301,6 +312,7 @@ class AsyncSpansResource(AsyncAPIResource):
         group_filters: Iterable[span_query_params.GroupFilter] | Omit = omit,
         include_costs: bool | Omit = omit,
         include_details: bool | Omit = omit,
+        insight_filter_scope: Literal["conversation", "turn"] | Omit = omit,
         insight_filters: Iterable[span_query_params.InsightFilter] | Omit = omit,
         limit: int | Omit = omit,
         measures: Iterable[span_query_params.Measure] | Omit = omit,
@@ -321,6 +333,9 @@ class AsyncSpansResource(AsyncAPIResource):
         Query agent spans, either as raw rows or grouped aggregates.
 
         Args:
+          insight_filter_scope: Entity matched by all insight filters. Turn-scoped failure filters match every
+              turn attributed to the failure.
+
           extra_headers: Send extra headers
 
           extra_query: Add additional query parameters to the request
@@ -340,6 +355,7 @@ class AsyncSpansResource(AsyncAPIResource):
                     "group_filters": group_filters,
                     "include_costs": include_costs,
                     "include_details": include_details,
+                    "insight_filter_scope": insight_filter_scope,
                     "insight_filters": insight_filters,
                     "limit": limit,
                     "measures": measures,
@@ -369,6 +385,7 @@ class AsyncSpansResource(AsyncAPIResource):
         group_by: Iterable[span_stats_params.GroupBy] | Omit = omit,
         group_filters: Iterable[span_stats_params.GroupFilter] | Omit = omit,
         group_limit: int | Omit = omit,
+        insight_filter_scope: Literal["conversation", "turn"] | Omit = omit,
         insight_filters: Iterable[span_stats_params.InsightFilter] | Omit = omit,
         metrics: Iterable[span_stats_params.Metric] | Omit = omit,
         query: Optional[span_stats_params.Query] | Omit = omit,
@@ -386,6 +403,9 @@ class AsyncSpansResource(AsyncAPIResource):
 
         Args:
           bucket_by: Bucket stats rows by started_at time intervals.
+
+          insight_filter_scope: Entity matched by all insight filters. Turn-scoped failure filters match every
+              turn attributed to the failure.
 
           extra_headers: Send extra headers
 
@@ -407,6 +427,7 @@ class AsyncSpansResource(AsyncAPIResource):
                     "group_by": group_by,
                     "group_filters": group_filters,
                     "group_limit": group_limit,
+                    "insight_filter_scope": insight_filter_scope,
                     "insight_filters": insight_filters,
                     "metrics": metrics,
                     "query": query,
