@@ -200,6 +200,8 @@ ID_SHARDED_TABLES: dict[str, str] = {
     # same logical key even though its ORDER BY puts tag before conversation_id.
     "conversation_tags": "project_id, conversation_id, trace_id, tag",
     "conversation_tags_by_tag": "project_id, conversation_id, trace_id, tag",
+    "conversation_tag_assignments": "project_id, conversation_id, trace_id, tag_id",
+    "conversation_tag_assignments_by_tag": "project_id, conversation_id, trace_id, tag_id",
     # Files are chunked: `_file_content_read_once` selects all rows for a
     # (project_id, digest) and checks the count against `n_chunks`. With
     # rand() sharding chunks land on different shards, so any per-shard

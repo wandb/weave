@@ -1033,6 +1033,14 @@ def test_create_distributed_table_sql_id_sharded():
             "conversation_tags_by_tag",
             "sipHash64(project_id, conversation_id, trace_id, tag)",
         ),
+        (
+            "conversation_tag_assignments",
+            "sipHash64(project_id, conversation_id, trace_id, tag_id)",
+        ),
+        (
+            "conversation_tag_assignments_by_tag",
+            "sipHash64(project_id, conversation_id, trace_id, tag_id)",
+        ),
     ],
 )
 def test_create_distributed_table_sql_agent_tables_sharded(table_name, expected_expr):
