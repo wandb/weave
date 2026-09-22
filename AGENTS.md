@@ -406,6 +406,13 @@ deterministic.
   flattened `weave.integration.meta.*` provenance. OTel scalar metadata stays
   typed; non-scalar values are stringified.
 
+### TypeScript Google Gen AI
+
+- Leave an unexpected non-async-iterable `generateContentStream` result
+  unchanged. The generic `op()` wrapper decides at runtime whether to apply its
+  stream reducer; manufacturing an async generator first bypasses that fallback
+  and changes the provider result.
+
 ### TypeScript Anthropic message batches
 
 - A batch result is a discriminated union and only its `succeeded` variant

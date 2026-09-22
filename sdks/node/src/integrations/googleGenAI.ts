@@ -170,6 +170,9 @@ function makeGenerateContentStreamOp(originalGenerateContentStream: any) {
   async function wrapped(...args: any[]) {
     const [params] = args;
     const stream = await originalGenerateContentStream(...args);
+    if (typeof stream?.[Symbol.asyncIterator] !== 'function') {
+      return stream;
+    }
 
     async function* taggedStream() {
       for await (const chunk of stream) {

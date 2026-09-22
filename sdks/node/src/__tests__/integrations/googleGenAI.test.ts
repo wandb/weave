@@ -159,4 +159,23 @@ describe('Google GenAI Integration', () => {
       },
     });
   });
+
+  test('preserves an unexpected non-async-iterable generateContentStream result', async () => {
+    const {mockModule, mockGenerateContentStream} = createMockGoogleGenAI();
+    mockGenerateContentStream.mockResolvedValue('provider-result');
+    const patchedGoogleGenAI = commonPatchGoogleGenAI(mockModule);
+    const client = new patchedGoogleGenAI.GoogleGenAI();
+
+    const result = await client.models.generateContentStream({
+      model: 'gemini-2.5-flash',
+      contents: 'Hello Gemini stream',
+    });
+
+    expect(result).toBe('provider-result');
+    expect(mockGenerateContentStream).toHaveBeenCalledTimes(1);
+
+    const calls = await inMemoryTraceServer.getCalls(testProjectName, 100);
+    expect(calls).toHaveLength(1);
+    expect(calls[0].output).toBe('provider-result');
+  });
 });
