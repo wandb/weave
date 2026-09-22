@@ -4134,7 +4134,9 @@ def test_filter_conversations_by_insights(ch_server):
     )
     old_cluster_id = uuid.uuid4()
     latest_cluster_id = uuid.uuid4()
+    moved_cluster_id = uuid.uuid4()
     topic_id = uuid.uuid4()
+    moved_topic_id = uuid.uuid4()
     ch_server.ch_client.insert(
         "signature_clusters",
         data=[
@@ -4144,14 +4146,21 @@ def test_filter_conversations_by_insights(ch_server):
                 cluster_id,
                 now - datetime.timedelta(days=offset),
                 "intent",
-                topic_id,
+                cluster_topic_id,
                 category,
                 [],
                 "Information requests",
             ]
-            for run_id, cluster_id, category, offset in (
-                (old_run_id, old_cluster_id, "action_request", 1),
-                (latest_run_id, latest_cluster_id, "information_request", 0),
+            for run_id, cluster_id, cluster_topic_id, category, offset in (
+                (old_run_id, old_cluster_id, topic_id, "action_request", 1),
+                (
+                    latest_run_id,
+                    latest_cluster_id,
+                    topic_id,
+                    "information_request",
+                    0,
+                ),
+                (latest_run_id, moved_cluster_id, moved_topic_id, "action_request", 0),
             )
         ],
         column_names=[
@@ -4182,16 +4191,18 @@ def test_filter_conversations_by_insights(ch_server):
                 span.started_at,
                 span.ended_at,
             ]
-            for index, (run_id, cluster_id, span, category) in enumerate(
+            for index, (run_id, cluster_id, span, category) in (
+                (1, (old_run_id, old_cluster_id, spans[1], "action_request")),
                 (
-                    (old_run_id, old_cluster_id, spans[1], "action_request"),
+                    0,
                     (
                         latest_run_id,
                         latest_cluster_id,
                         spans[0],
                         "information_request",
                     ),
-                )
+                ),
+                (1, (latest_run_id, moved_cluster_id, spans[1], "action_request")),
             )
         ],
         column_names=[
@@ -4259,12 +4270,19 @@ def test_filter_conversations_by_insights(ch_server):
             values=["minor"],
         )
     ) == [spans[1].conversation_id]
+    # spans[1] left topic_id in the latest run, so only its newest topic matches.
     assert filtered_ids(
         AgentInsightFilter(
             field="intent_topic_id",
             values=[str(topic_id)],
         )
-    ) == sorted([spans[0].conversation_id, spans[1].conversation_id])
+    ) == [spans[0].conversation_id]
+    assert filtered_ids(
+        AgentInsightFilter(
+            field="intent_topic_id",
+            values=[str(moved_topic_id)],
+        )
+    ) == [spans[1].conversation_id]
     assert (
         filtered_ids(
             AgentInsightFilter(
@@ -4299,7 +4317,7 @@ def test_filter_conversations_by_insights(ch_server):
                 values=[str(topic_id)],
             )
         )
-        == 2
+        == 1
     )
     assert (
         filtered_stats_count(

@@ -2456,22 +2456,27 @@ def test_build_topic_insight_filter_clause() -> None:
 
     expected = """
         s.conversation_id NOT IN (
-          SELECT conversation_id FROM signature_cluster_assignments
-          WHERE project_id = {insight_0:String}
-            AND conversation_id != ''
-            AND trace_started_at >= {insight_2:DateTime64(6)}
-            AND trace_started_at < {insight_3:DateTime64(6)}
-            AND signature_type = 'failure'
-            AND (cluster_run_id, cluster_id) IN (
-              SELECT cluster_run_id, id FROM signature_clusters
-              WHERE project_id = {insight_0:String}
-                AND signature_type = 'failure'
-                AND cluster_run_id IN (
-                  SELECT id FROM signature_cluster_runs
-                  WHERE project_id = {insight_0:String}
-                    AND signature_type = 'failure'
-                    AND status = 'succeeded')
-                AND toString(topic_id) IN {insight_1:Array(String)})
+          SELECT conversation_id FROM (
+            SELECT any(assignments.conversation_id) AS conversation_id,
+              argMax(clusters.topic_id, tuple(runs.window_end, runs.completed_at, assignments.cluster_run_id)) AS topic_id
+            FROM signature_cluster_assignments AS assignments
+            INNER JOIN signature_clusters AS clusters
+              ON assignments.cluster_run_id = clusters.cluster_run_id
+              AND assignments.cluster_id = clusters.id
+            INNER JOIN signature_cluster_runs AS runs
+              ON assignments.cluster_run_id = runs.id
+            WHERE assignments.project_id = {insight_0:String}
+              AND assignments.conversation_id != ''
+              AND assignments.trace_started_at >= {insight_2:DateTime64(6)}
+              AND assignments.trace_started_at < {insight_3:DateTime64(6)}
+              AND assignments.signature_type = 'failure'
+              AND clusters.project_id = {insight_0:String}
+              AND clusters.signature_type = 'failure'
+              AND runs.project_id = {insight_0:String}
+              AND runs.signature_type = 'failure'
+              AND runs.status = 'succeeded'
+            GROUP BY assignments.signature_record_id)
+          WHERE toString(topic_id) IN {insight_1:Array(String)}
           GROUP BY conversation_id
         )
     """
