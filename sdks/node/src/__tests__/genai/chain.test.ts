@@ -26,9 +26,9 @@ describe('end-to-end chain', () => {
 
     const spans = getExporter().getFinishedSpans();
     expect(spans).toHaveLength(3);
-    const turnSpan = findSpan(spans, 'invoke_agent');
-    const llmSpan = findSpan(spans, 'chat');
-    const toolSpan = findSpan(spans, 'execute_tool');
+    const turnSpan = findSpan(spans, 'invoke_agent weather-bot');
+    const llmSpan = findSpan(spans, 'chat gpt-4o');
+    const toolSpan = findSpan(spans, 'execute_tool get_weather');
 
     // All three share the same trace id.
     const traceId = turnSpan.spanContext().traceId;

@@ -23,7 +23,7 @@ describe('LLM (via Turn.startLLM)', () => {
   setupGenAITestEnvironment();
   const getExporter = setupExporterPerTest();
 
-  it("emits a 'chat' span as a child of the turn's invoke_agent span", () => {
+  it("emits a 'chat <model>' span as a child of the turn's invoke_agent span", () => {
     const turn = Turn.create({agentName: 'a', conversationId: 'conv-1'});
     const llm = turn.startLLM({
       model: 'gpt-4o',
@@ -34,8 +34,8 @@ describe('LLM (via Turn.startLLM)', () => {
     turn.end();
 
     const spans = getExporter().getFinishedSpans();
-    const llmSpan = findSpan(spans, 'chat');
-    const turnSpan = findSpan(spans, 'invoke_agent');
+    const llmSpan = findSpan(spans, 'chat gpt-4o');
+    const turnSpan = findSpan(spans, 'invoke_agent a');
 
     expect(llmSpan.kind).toBe(SpanKind.CLIENT);
     expect(llmSpan.parentSpanId).toBe(turnSpan.spanContext().spanId);
@@ -71,7 +71,7 @@ describe('LLM (via Turn.startLLM)', () => {
     llm.end();
     turn.end();
 
-    const llmSpan = findSpan(getExporter().getFinishedSpans(), 'chat');
+    const llmSpan = findSpan(getExporter().getFinishedSpans(), 'chat gpt-4o');
     expect(
       JSON.parse(llmSpan.attributes[ATTR_GEN_AI_INPUT_MESSAGES] as string)
     ).toEqual([{role: 'user', content: 'hi'}]);
@@ -97,7 +97,7 @@ describe('LLM (via Turn.startLLM)', () => {
     llm.end();
     turn.end();
 
-    const llmSpan = findSpan(getExporter().getFinishedSpans(), 'chat');
+    const llmSpan = findSpan(getExporter().getFinishedSpans(), 'chat gpt-4o');
     expect(llmSpan.attributes[ATTR_GEN_AI_INPUT_MESSAGES]).toBeUndefined();
     expect(llmSpan.attributes[ATTR_GEN_AI_OUTPUT_MESSAGES]).toBeUndefined();
     expect(llmSpan.attributes[ATTR_GEN_AI_USAGE_INPUT_TOKENS]).toBeUndefined();
@@ -115,7 +115,7 @@ describe('LLM (via Turn.startLLM)', () => {
       llm.end();
       turn.end();
 
-      const llmSpan = findSpan(getExporter().getFinishedSpans(), 'chat');
+      const llmSpan = findSpan(getExporter().getFinishedSpans(), 'chat gpt-4o');
       expect(
         JSON.parse(llmSpan.attributes[ATTR_GEN_AI_OUTPUT_MESSAGES] as string)
       ).toEqual([{role: 'assistant', content: 'Hello!'}]);
@@ -128,7 +128,7 @@ describe('LLM (via Turn.startLLM)', () => {
       llm.end();
       turn.end();
 
-      const llmSpan = findSpan(getExporter().getFinishedSpans(), 'chat');
+      const llmSpan = findSpan(getExporter().getFinishedSpans(), 'chat gpt-4o');
       const messages = JSON.parse(
         llmSpan.attributes[ATTR_GEN_AI_OUTPUT_MESSAGES] as string
       );
@@ -156,7 +156,7 @@ describe('LLM (via Turn.startLLM)', () => {
       llm.end();
       turn.end();
 
-      const llmSpan = findSpan(getExporter().getFinishedSpans(), 'chat');
+      const llmSpan = findSpan(getExporter().getFinishedSpans(), 'chat gpt-4o');
       const messages = JSON.parse(
         llmSpan.attributes[ATTR_GEN_AI_OUTPUT_MESSAGES] as string
       );
@@ -181,7 +181,7 @@ describe('LLM (via Turn.startLLM)', () => {
       llm.end();
       turn.end();
 
-      const llmSpan = findSpan(getExporter().getFinishedSpans(), 'chat');
+      const llmSpan = findSpan(getExporter().getFinishedSpans(), 'chat gpt-4o');
       const messages = JSON.parse(
         llmSpan.attributes[ATTR_GEN_AI_INPUT_MESSAGES] as string
       );
@@ -205,7 +205,7 @@ describe('LLM (via Turn.startLLM)', () => {
       llm.end();
       turn.end();
 
-      const llmSpan = findSpan(getExporter().getFinishedSpans(), 'chat');
+      const llmSpan = findSpan(getExporter().getFinishedSpans(), 'chat gpt-4o');
       const messages = JSON.parse(
         llmSpan.attributes[ATTR_GEN_AI_INPUT_MESSAGES] as string
       );
@@ -225,7 +225,7 @@ describe('LLM (via Turn.startLLM)', () => {
       llm.end();
       turn.end();
 
-      const llmSpan = findSpan(getExporter().getFinishedSpans(), 'chat');
+      const llmSpan = findSpan(getExporter().getFinishedSpans(), 'chat gpt-4o');
       const messages = JSON.parse(
         llmSpan.attributes[ATTR_GEN_AI_INPUT_MESSAGES] as string
       );
@@ -246,7 +246,7 @@ describe('LLM (via Turn.startLLM)', () => {
       llm.end();
       turn.end();
 
-      const llmSpan = findSpan(getExporter().getFinishedSpans(), 'chat');
+      const llmSpan = findSpan(getExporter().getFinishedSpans(), 'chat gpt-4o');
       const messages = JSON.parse(
         llmSpan.attributes[ATTR_GEN_AI_INPUT_MESSAGES] as string
       );
@@ -281,7 +281,7 @@ describe('LLM (via Turn.startLLM)', () => {
       llm.end();
       turn.end();
 
-      const llmSpan = findSpan(getExporter().getFinishedSpans(), 'chat');
+      const llmSpan = findSpan(getExporter().getFinishedSpans(), 'chat gpt-4o');
       expect(spanSnapshot(llmSpan)).toMatchInlineSnapshot(`
         {
           "attributes": {
@@ -325,7 +325,7 @@ describe('LLM (via Turn.startLLM)', () => {
       llm.end({endTime: endedAt});
       turn.end();
 
-      const llmSpan = findSpan(getExporter().getFinishedSpans(), 'chat');
+      const llmSpan = findSpan(getExporter().getFinishedSpans(), 'chat gpt-4o');
       expectSpanTimesToMatch(llmSpan, startedAt, endedAt);
     });
 
@@ -341,7 +341,7 @@ describe('LLM (via Turn.startLLM)', () => {
       llm.setAttributes({'after.end': 'x'});
       turn.end();
 
-      const llmSpan = findSpan(getExporter().getFinishedSpans(), 'chat');
+      const llmSpan = findSpan(getExporter().getFinishedSpans(), 'chat gpt-4o');
       expect(llmSpan.attributes['gen_ai.response.id']).toBe('resp-abc');
       expect(llmSpan.attributes['gen_ai.output.type']).toBe('text');
       expect(llmSpan.attributes['after.end']).toBeUndefined();
@@ -360,7 +360,7 @@ describe('LLM (via Turn.startLLM)', () => {
       llm.addEvent('after.end');
       turn.end();
 
-      const llmSpan = findSpan(getExporter().getFinishedSpans(), 'chat');
+      const llmSpan = findSpan(getExporter().getFinishedSpans(), 'chat gpt-4o');
       expect(llmSpan.events).toHaveLength(1);
       expect(llmSpan.events[0].name).toBe('gen_ai.content.completion');
       expect(warnSpy).toHaveBeenCalledWith(

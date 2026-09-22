@@ -26,17 +26,8 @@ describe('SubAgent', () => {
     turn.end();
 
     const spans = getExporter().getFinishedSpans();
-    // Two spans, both named 'invoke_agent'. Differentiate by agent name.
-    const subSpan = spans.find(
-      s =>
-        s.name === 'invoke_agent' &&
-        s.attributes[ATTR_GEN_AI_AGENT_NAME] === 'child-bot'
-    );
-    const parentTurnSpan = spans.find(
-      s =>
-        s.name === 'invoke_agent' &&
-        s.attributes[ATTR_GEN_AI_AGENT_NAME] === 'parent'
-    );
+    const subSpan = spans.find(s => s.name === 'invoke_agent child-bot');
+    const parentTurnSpan = spans.find(s => s.name === 'invoke_agent parent');
     expect(subSpan).toBeDefined();
     expect(parentTurnSpan).toBeDefined();
     expect(subSpan!.kind).toBe(SpanKind.INTERNAL);
@@ -60,7 +51,7 @@ describe('SubAgent', () => {
   const findSub = (spans: ReadableSpan[]) => {
     const found = spans.find(
       s =>
-        s.name === 'invoke_agent' &&
+        s.name === 'invoke_agent researcher' &&
         s.attributes[ATTR_GEN_AI_AGENT_NAME] === 'researcher'
     );
     if (!found) throw new Error('no researcher invoke_agent span found');
@@ -224,8 +215,8 @@ describe('SubAgent', () => {
 
     const spans = getExporter().getFinishedSpans();
     const subSpan = findSub(spans);
-    const chatSpan = spans.find(s => s.name === 'chat');
-    const toolSpan = spans.find(s => s.name === 'execute_tool');
+    const chatSpan = spans.find(s => s.name === 'chat gpt-4o');
+    const toolSpan = spans.find(s => s.name === 'execute_tool search');
     expect(chatSpan).toBeDefined();
     expect(toolSpan).toBeDefined();
     // Both children parent to the subagent, not the enclosing Turn.
@@ -246,7 +237,7 @@ describe('SubAgent', () => {
     const bySubName = (name: string) => {
       const found = spans.find(
         s =>
-          s.name === 'invoke_agent' &&
+          s.name === `invoke_agent ${name}` &&
           s.attributes[ATTR_GEN_AI_AGENT_NAME] === name
       );
       if (!found) throw new Error(`no invoke_agent span for ${name}`);
@@ -255,7 +246,7 @@ describe('SubAgent', () => {
     const turnSpan = bySubName('parent');
     const outerSpan = bySubName('outer');
     const innerSpan = bySubName('inner');
-    const chatSpan = spans.find(s => s.name === 'chat');
+    const chatSpan = spans.find(s => s.name === 'chat gpt-4o');
     expect(chatSpan).toBeDefined();
     // Full chain: turn -> outer -> inner -> chat. The nested SubAgent parents
     // to the outer subagent (not the Turn), and threads its own context down to the
@@ -282,8 +273,8 @@ describe('SubAgent', () => {
 
     const spans = getExporter().getFinishedSpans();
     const subSpan = findSub(spans);
-    const chatSpan = spans.find(s => s.name === 'chat');
-    const toolSpan = spans.find(s => s.name === 'execute_tool');
+    const chatSpan = spans.find(s => s.name === 'chat gpt-4o');
+    const toolSpan = spans.find(s => s.name === 'execute_tool search');
     expect(chatSpan).toBeDefined();
     expect(toolSpan).toBeDefined();
     expect(chatSpan!.parentSpanId).toBe(subSpan.spanContext().spanId);
