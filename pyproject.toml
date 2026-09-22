@@ -425,6 +425,7 @@ fasion = "fasion" # Wandb lore
 alog_score = "alog_score"
 BoxedNDArray = "BoxedNDArray"
 AKS = "AKS" # Azure Kubernetes Service, in AGENTS.md
+ANDed = "ANDed" # logical AND, past tense; typos splits this into AND + Ded
 
 [tool.fixit]
 enable = [".rules.op_deco", ".rules.legacy_methods"]
