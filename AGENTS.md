@@ -630,6 +630,13 @@ deterministic.
   ```
 - Some integrations (like instructor) may need to patch multiple libraries
 
+### Google GenAI stream aggregation
+
+- Text and thought deltas may be combined only within the current contiguous
+  text/thought segment. Treat every non-text `Part` (including function calls,
+  function responses, and media) as a boundary so aggregation preserves the
+  provider's part order.
+
 ### Wrapping `fn` to change what an SDK receives
 
 - An `on_input_handler` shapes only what gets recorded. To change the arguments

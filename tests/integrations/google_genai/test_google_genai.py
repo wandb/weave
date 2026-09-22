@@ -6,7 +6,19 @@ from unittest.mock import Mock
 
 import pytest
 from google import genai
-from google.genai.types import GenerateContentConfig, GenerateImagesConfig
+from google.genai.types import (
+    Candidate,
+    CodeExecutionResult,
+    Content,
+    ExecutableCode,
+    GenerateContentConfig,
+    GenerateContentResponse,
+    GenerateContentResponseUsageMetadata,
+    GenerateImagesConfig,
+    Language,
+    Outcome,
+    Part,
+)
 from pydantic import BaseModel
 
 import weave
@@ -790,6 +802,80 @@ def test_accumulator_preserves_non_text_parts():
     # Non-text part should be appended to the accumulated parts
     assert value_part in result.candidates[0].content.parts
     assert result is acc
+
+
+def test_accumulator_preserves_part_order_across_code_execution():
+    """Text emitted after code execution remains after the structured parts."""
+    initial_response = GenerateContentResponse(
+        candidates=[
+            Candidate(
+                content=Content(
+                    role="model",
+                    parts=[
+                        Part(text="I'll calculate that."),
+                        Part(
+                            executable_code=ExecutableCode(
+                                language=Language.PYTHON,
+                                code="print(sum(range(1, 5)))",
+                            )
+                        ),
+                    ],
+                )
+            )
+        ],
+        usage_metadata=GenerateContentResponseUsageMetadata(),
+    )
+    execution_result = GenerateContentResponse(
+        candidates=[
+            Candidate(
+                content=Content(
+                    role="model",
+                    parts=[
+                        Part(
+                            code_execution_result=CodeExecutionResult(
+                                outcome=Outcome.OUTCOME_OK,
+                                output="10",
+                            )
+                        )
+                    ],
+                )
+            )
+        ],
+        usage_metadata=GenerateContentResponseUsageMetadata(),
+    )
+    final_response = GenerateContentResponse(
+        candidates=[
+            Candidate(
+                content=Content(
+                    role="model",
+                    parts=[Part(text=" The result is 10.")],
+                )
+            )
+        ],
+        usage_metadata=GenerateContentResponseUsageMetadata(),
+    )
+
+    result = google_genai_gemini_accumulator(None, initial_response)
+    result = google_genai_gemini_accumulator(result, execution_result)
+    result = google_genai_gemini_accumulator(result, final_response)
+
+    parts = result.candidates[0].content.parts
+    assert [part.text for part in parts] == [
+        "I'll calculate that.",
+        None,
+        None,
+        " The result is 10.",
+    ]
+    assert parts[1].executable_code.model_dump(mode="json", exclude_none=True) == {
+        "code": "print(sum(range(1, 5)))",
+        "language": "PYTHON",
+    }
+    assert parts[2].code_execution_result.model_dump(
+        mode="json", exclude_none=True
+    ) == {
+        "outcome": "OUTCOME_OK",
+        "output": "10",
+    }
 
 
 # ── _traverse_and_replace_blobs unit tests ────────────────────────────────────
