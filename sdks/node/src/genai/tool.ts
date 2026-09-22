@@ -2,7 +2,12 @@ import {type Attributes, type Span, SpanKind} from '@opentelemetry/api';
 
 import type {ChildSpanContext} from './common';
 import {getWeaveTracer} from './provider';
-import {SpanBase, type SpanEndOptions, type SpanInitBase} from './spanBase';
+import {
+  SpanBase,
+  type SpanEndOptions,
+  type SpanInitBase,
+  spanName,
+} from './spanBase';
 import {
   ATTR_GEN_AI_CONVERSATION_ID,
   ATTR_GEN_AI_OPERATION_NAME,
@@ -41,9 +46,10 @@ function serializeToolValue(value: JsonValue | undefined): string | undefined {
 }
 
 /**
- * A tool invocation. Emits an `execute_tool` span carrying the tool name,
- * the arguments, the tool-call id, and the result. String arguments and
- * results are recorded as-is; other JSON values are serialized.
+ * A tool invocation. Emits an `execute_tool <name>` span (`execute_tool` when
+ * the name is blank) carrying the tool name, the arguments, the tool-call id,
+ * and the result. String arguments and results are recorded as-is; other JSON
+ * values are serialized.
  *
  * Created by `weave.startTool()` (or `turn.startTool()`, or
  * `llm.startTool()`) and terminated with `end()`, which accepts the result and
@@ -94,7 +100,7 @@ export class Tool extends SpanBase {
       attributes[ATTR_GEN_AI_CONVERSATION_ID] = opts.conversationId;
     }
     const span = tracer.startSpan(
-      'execute_tool',
+      spanName('execute_tool', opts.name),
       {kind: SpanKind.INTERNAL, attributes, startTime: opts.startTime},
       opts.parentContext
     );
