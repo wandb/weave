@@ -4114,7 +4114,8 @@ def test_filter_conversations_by_insights(ch_server):
                 run_id,
                 "intent",
                 now - datetime.timedelta(days=offset + 1),
-                now - datetime.timedelta(days=offset),
+                # Windows reach an hour past the spans so the latest run covers them.
+                now - datetime.timedelta(days=offset, hours=-1),
                 "succeeded",
                 now - datetime.timedelta(days=offset + 1),
                 now - datetime.timedelta(days=offset),

@@ -9,9 +9,17 @@ from weave.trace_server.orm import ParamBuilder
 
 TOPIC_FIELDS = {"intent_topic_id", "failure_topic_id"}
 INTENT_SIGNATURE_FIELDS = {"intent_category", "intent_sentiment"}
-# Overlapping clustering runs each assign a turn; the newest run's topic wins.
-NEWEST_RUN_ORDER = (
-    "tuple(runs.window_end, runs.completed_at, assignments.cluster_run_id)"
+# Runs that predate topic reconciliation left topic_id at the UUID default.
+NIL_TOPIC_ID = "toUUID('00000000-0000-0000-0000-000000000000')"
+# Successful runs sorted oldest to newest by window end, completion time, then id.
+NEWEST_RUNS_ARRAY = (
+    "arraySort(run -> tuple(run.2, run.3, run.4), "
+    "groupArray(tuple(window_start, window_end, completed_at, id)))"
+)
+# The newest run whose window covers the turn decides the turn's topic.
+COVERING_RUN_ID = (
+    "tupleElement(arrayLast(run -> run.1 <= trace_started_at "
+    "AND trace_started_at < run.2, newest_runs), 4)"
 )
 
 
@@ -25,7 +33,7 @@ def build_insight_filter_clause(
     """Match conversations carrying every requested Insights filter.
 
     The request's span window also bounds matching Insights turns. Stable topic
-    IDs are resolved per turn to the newest successful clustering run's topic.
+    IDs are resolved per turn through the newest successful run covering it.
     """
     if not insight_filters:
         return None
@@ -54,13 +62,11 @@ def _single_insight_filter_clause(
     pid_slot = pb.add(project_id, param_type="String")
     values_slot = pb.add(insight_filter.values, param_type="Array(String)")
     operator = "NOT IN" if insight_filter.exclude else "IN"
+    conditions = _turn_conditions(pb, pid_slot, started_after, started_before)
 
     if insight_filter.field in TOPIC_FIELDS:
         signature_type = (
             "intent" if insight_filter.field == "intent_topic_id" else "failure"
-        )
-        conditions = _turn_conditions(
-            pb, pid_slot, started_after, started_before, table="assignments"
         )
         subquery = _topic_conversations_subquery(
             pid_slot, values_slot, signature_type, conditions
@@ -68,7 +74,6 @@ def _single_insight_filter_clause(
 
         return f"s.conversation_id {operator} ({subquery})"
 
-    conditions = _turn_conditions(pb, pid_slot, started_after, started_before)
     if insight_filter.field in INTENT_SIGNATURE_FIELDS:
         table = "intent_signatures"
     else:
@@ -95,21 +100,16 @@ def _turn_conditions(
     pid_slot: str,
     started_after: datetime.datetime | None,
     started_before: datetime.datetime | None,
-    table: str | None = None,
 ) -> list[str]:
     """Scope Insights turns to the project and the request's span window."""
-    prefix = f"{table}." if table else ""
-    conditions = [
-        f"{prefix}project_id = {pid_slot}",
-        f"{prefix}conversation_id != ''",
-    ]
+    conditions = [f"project_id = {pid_slot}", "conversation_id != ''"]
 
     if started_after is not None:
         after_slot = pb.add(started_after, param_type="DateTime64(6)")
-        conditions.append(f"{prefix}trace_started_at >= {after_slot}")
+        conditions.append(f"trace_started_at >= {after_slot}")
     if started_before is not None:
         before_slot = pb.add(started_before, param_type="DateTime64(6)")
-        conditions.append(f"{prefix}trace_started_at < {before_slot}")
+        conditions.append(f"trace_started_at < {before_slot}")
 
     return conditions
 
@@ -120,29 +120,34 @@ def _topic_conversations_subquery(
     signature_type: str,
     conditions: list[str],
 ) -> str:
-    """Conversations with a turn whose newest-run topic is one of the requested topics."""
+    """Conversations with a turn its newest covering run files under a requested topic.
+
+    Only the assignment rows of matching clusters are read, pruned through the
+    (project_id, cluster_run_id) sort key. A turn the newest covering run left
+    unclustered has no matching row and so matches no topic.
+    """
+    run_source = (
+        f"FROM signature_cluster_runs WHERE project_id = {pid_slot} "
+        f"AND signature_type = '{signature_type}' AND status = 'succeeded'"
+    )
+    succeeded_run_ids = f"SELECT id {run_source}"
+    succeeded_runs = f"SELECT window_start, window_end, completed_at, id {run_source}"
+    matching_clusters = (
+        "SELECT cluster_run_id, id FROM signature_clusters "
+        f"WHERE project_id = {pid_slot} AND signature_type = '{signature_type}' "
+        f"AND cluster_run_id IN ({succeeded_run_ids}) "
+        f"AND topic_id != {NIL_TOPIC_ID} "
+        f"AND toString(topic_id) IN {values_slot}"
+    )
     conditions = [
         *conditions,
-        f"assignments.signature_type = '{signature_type}'",
-        f"clusters.project_id = {pid_slot}",
-        f"clusters.signature_type = '{signature_type}'",
-        f"runs.project_id = {pid_slot}",
-        f"runs.signature_type = '{signature_type}'",
-        "runs.status = 'succeeded'",
+        f"signature_type = '{signature_type}'",
+        f"(cluster_run_id, cluster_id) IN ({matching_clusters})",
+        f"cluster_run_id = {COVERING_RUN_ID}",
     ]
 
     return (
-        "SELECT conversation_id FROM ("
-        "SELECT any(assignments.conversation_id) AS conversation_id, "
-        f"argMax(clusters.topic_id, {NEWEST_RUN_ORDER}) AS topic_id "
-        "FROM signature_cluster_assignments AS assignments "
-        "INNER JOIN signature_clusters AS clusters "
-        "ON assignments.cluster_run_id = clusters.cluster_run_id "
-        "AND assignments.cluster_id = clusters.id "
-        "INNER JOIN signature_cluster_runs AS runs "
-        "ON assignments.cluster_run_id = runs.id "
-        f"WHERE {' AND '.join(conditions)} "
-        "GROUP BY assignments.signature_record_id) "
-        f"WHERE toString(topic_id) IN {values_slot} "
-        "GROUP BY conversation_id"
+        f"WITH (SELECT {NEWEST_RUNS_ARRAY} FROM ({succeeded_runs})) AS newest_runs "
+        "SELECT conversation_id FROM signature_cluster_assignments "
+        f"WHERE {' AND '.join(conditions)} GROUP BY conversation_id"
     )
