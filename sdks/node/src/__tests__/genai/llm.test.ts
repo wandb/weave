@@ -8,6 +8,7 @@ import {
   ATTR_GEN_AI_USAGE_INPUT_TOKENS,
   ATTR_GEN_AI_USAGE_OUTPUT_TOKENS,
   ATTR_GEN_AI_USAGE_REASONING_OUTPUT_TOKENS,
+  ATTR_GEN_AI_USAGE_TOTAL_TOKENS,
 } from '../../genai/semconv';
 import {Turn} from '../../genai/turn';
 
@@ -64,6 +65,7 @@ describe('LLM (via Turn.startLLM)', () => {
     llm.usage = {
       inputTokens: 10,
       outputTokens: 5,
+      totalTokens: 17,
       reasoningTokens: 2,
       cacheReadInputTokens: 1,
       cacheCreationInputTokens: 3,
@@ -80,6 +82,7 @@ describe('LLM (via Turn.startLLM)', () => {
     ).toEqual([{role: 'assistant', content: 'hello'}]);
     expect(llmSpan.attributes[ATTR_GEN_AI_USAGE_INPUT_TOKENS]).toBe(10);
     expect(llmSpan.attributes[ATTR_GEN_AI_USAGE_OUTPUT_TOKENS]).toBe(5);
+    expect(llmSpan.attributes[ATTR_GEN_AI_USAGE_TOTAL_TOKENS]).toBe(17);
     expect(llmSpan.attributes[ATTR_GEN_AI_USAGE_REASONING_OUTPUT_TOKENS]).toBe(
       2
     );
@@ -101,6 +104,7 @@ describe('LLM (via Turn.startLLM)', () => {
     expect(llmSpan.attributes[ATTR_GEN_AI_INPUT_MESSAGES]).toBeUndefined();
     expect(llmSpan.attributes[ATTR_GEN_AI_OUTPUT_MESSAGES]).toBeUndefined();
     expect(llmSpan.attributes[ATTR_GEN_AI_USAGE_INPUT_TOKENS]).toBeUndefined();
+    expect(llmSpan.attributes[ATTR_GEN_AI_USAGE_TOTAL_TOKENS]).toBeUndefined();
   });
 
   // ---------------------------------------------------------------------------

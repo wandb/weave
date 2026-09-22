@@ -484,6 +484,9 @@ deterministic.
   `Tool` and `SubAgent` do not use ambient state.
 - Keep response models on child `chat` spans; use `setAttributes()` for fields
   without typed `record()` methods.
+- TypeScript `Usage.totalTokens` and Python `Usage.total_tokens` preserve an
+  explicit provider-reported total as the Weave extension
+  `gen_ai.usage.total_tokens`; do not derive it from the component counts.
 - Every TypeScript GenAI span handle supports
   `recordError(error)` to mark a failure without ending the span; terminal
   failures can use `end({error})`. The SDK derives `error.type` from

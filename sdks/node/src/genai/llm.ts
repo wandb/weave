@@ -27,6 +27,7 @@ import {
   ATTR_GEN_AI_USAGE_INPUT_TOKENS,
   ATTR_GEN_AI_USAGE_OUTPUT_TOKENS,
   ATTR_GEN_AI_USAGE_REASONING_OUTPUT_TOKENS,
+  ATTR_GEN_AI_USAGE_TOTAL_TOKENS,
   WEAVE_GENAI_TRACER_NAME,
 } from './semconv';
 import {SubAgent, type SubAgentInit} from './subagent';
@@ -343,6 +344,9 @@ export class LLM extends SpanBase {
     }
     if (u.outputTokens !== undefined) {
       this.span.setAttribute(ATTR_GEN_AI_USAGE_OUTPUT_TOKENS, u.outputTokens);
+    }
+    if (u.totalTokens !== undefined) {
+      this.span.setAttribute(ATTR_GEN_AI_USAGE_TOTAL_TOKENS, u.totalTokens);
     }
     if (u.reasoningTokens !== undefined) {
       this.span.setAttribute(
