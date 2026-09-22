@@ -1214,6 +1214,9 @@ class AgentChatMessage(AgentResponseModel):
     agent_name: str | None = None
     agent_version: str | None = None
     status_code: StatusCodeLiteral | None = None
+    # Set together from the span's own fields when `status_code` is `ERROR`.
+    error_type: str | None = None
+    status_message: str | None = None
     started_at: datetime.datetime | None = None
 
     user_message: AgentChatUserMessage | None = None
