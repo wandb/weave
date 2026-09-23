@@ -557,8 +557,8 @@ class ChatTraversal:
             return True
         self.messages.append(msg)
         assistant = msg.assistant_message
-        emitted_text = bool(assistant and assistant.text)
-        return emitted_text or subtree_emitted_assistant
+        emitted_output = bool(assistant and (assistant.text or assistant.content_refs))
+        return emitted_output or subtree_emitted_assistant
 
     def _emit_system_instructions(
         self, span: AgentSpanSchema, agent_name: str | None
@@ -1368,18 +1368,24 @@ def _emit_assistant_message(
     usage is summed across the subtree so the emitted message reflects the
     whole agent turn.
 
-    A span that produced reasoning but no assistant text (e.g. an LLM step that
-    only emitted a tool call) still yields a message carrying that reasoning, so
-    thinking interleaved between tool calls is surfaced rather than dropped. An
-    errored span also yields a message without content so its failure remains
-    visible in the conversation projection. Successful empty spans are omitted.
+    A span that produced media or reasoning but no assistant text still yields a
+    message carrying that output, so image-only responses and thinking
+    interleaved between tool calls are surfaced rather than dropped. An errored
+    span also yields a message without content so its failure remains visible in
+    the conversation projection. Successful empty spans are omitted.
     """
     text = (
         _extract_non_user_output_text(span.output_messages)
         if span.output_messages
         else ""
     )
-    if not text and not span.reasoning_content and span.status_code != "ERROR":
+    content_refs = _message_content_refs(span, span.output_messages)
+    if (
+        not text
+        and not content_refs
+        and not span.reasoning_content
+        and span.status_code != "ERROR"
+    ):
         return None
 
     if aggregate_node:
@@ -1416,6 +1422,6 @@ def _emit_assistant_message(
             total_cost_usd=totals.total_cost_usd,
             duration_ms=_compute_duration_ms(span.started_at, span.ended_at),
             status=span.status_code,
-            content_refs=_message_content_refs(span, span.output_messages),
+            content_refs=content_refs,
         ),
     )
