@@ -169,6 +169,8 @@ export namespace AgentTraceChatRes {
      */
     context_compacted: Message.ContextCompacted | null;
 
+    error_type: string | null;
+
     feedback: Array<Message.Feedback> | null;
 
     span_id: string | null;
@@ -176,6 +178,8 @@ export namespace AgentTraceChatRes {
     started_at: string | null;
 
     status_code: 'UNSET' | 'OK' | 'ERROR' | null;
+
+    status_message: string | null;
 
     /**
      * Payload for a tool call timeline event.
