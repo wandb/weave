@@ -2203,22 +2203,23 @@ class TestLLMRecord:
         llm = LLM()
         assert llm.record(response_id="x") is llm
 
+    @pytest.mark.parametrize("total_tokens", [0, 5])
     def test_recorded_fields_emitted_on_span(
-        self, otel_spans: InMemorySpanExporter
+        self, otel_spans: InMemorySpanExporter, total_tokens: int
     ) -> None:
         """End-to-end: record() values flow through to the OTel attrs."""
         attrs = _emit_llm_with(
             otel_spans,
             input_messages=[Message.user("hi")],
             output_messages=[Message.assistant("hello")],
-            usage=Usage(input_tokens=3, output_tokens=2, total_tokens=5),
+            usage=Usage(input_tokens=3, output_tokens=2, total_tokens=total_tokens),
             reasoning="thinking...",
             response_id="r1",
             finish_reasons=["stop"],
         )
         assert attrs["gen_ai.usage.input_tokens"] == 3
         assert attrs["gen_ai.usage.output_tokens"] == 2
-        assert attrs["gen_ai.usage.total_tokens"] == 5
+        assert attrs["gen_ai.usage.total_tokens"] == total_tokens
         assert attrs["gen_ai.response.id"] == "r1"
         assert attrs["gen_ai.response.finish_reasons"] == ("stop",)
         # Reasoning is folded into output messages as a ReasoningPart

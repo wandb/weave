@@ -288,7 +288,7 @@ def llm_attributes(
             attrs["gen_ai.usage.input_tokens"] = usage.input_tokens
         if usage.output_tokens:
             attrs["gen_ai.usage.output_tokens"] = usage.output_tokens
-        if usage.total_tokens:
+        if usage.total_tokens is not None:
             attrs["gen_ai.usage.total_tokens"] = usage.total_tokens
         if usage.reasoning_tokens:
             attrs["gen_ai.usage.reasoning_tokens"] = usage.reasoning_tokens

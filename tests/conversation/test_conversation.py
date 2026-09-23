@@ -79,7 +79,7 @@ class TestUsage:
         u = Usage()
         assert u.input_tokens == 0
         assert u.output_tokens == 0
-        assert u.total_tokens == 0
+        assert u.total_tokens is None
         assert u.reasoning_tokens == 0
 
     def test_set_fields(self) -> None:

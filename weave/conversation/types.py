@@ -228,11 +228,12 @@ class Usage(BaseModel):
     """Token usage for an LLM call.
 
     ``total_tokens`` is provider-reported and is not derived from other fields.
+    ``None`` means not reported; an explicit zero is preserved.
     """
 
     input_tokens: int = 0
     output_tokens: int = 0
-    total_tokens: int = 0
+    total_tokens: int | None = None
     reasoning_tokens: int = 0
     cache_creation_input_tokens: int = 0
     cache_read_input_tokens: int = 0
