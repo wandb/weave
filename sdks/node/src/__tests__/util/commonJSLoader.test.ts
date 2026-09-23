@@ -91,6 +91,13 @@ describe('snapshotRequireCache', () => {
     });
   });
 
+  test('takes one when an older SDK created the shared state without the field', () => {
+    state.modulesLoadedBeforeCjsHook = undefined as unknown as null;
+    const openai = pkg('openai', 'index.js');
+    snapshotRequireCache(cacheOf({[openai]: []}), ownLoader);
+    expect(state.modulesLoadedBeforeCjsHook).toEqual([openai]);
+  });
+
   test('keeps the snapshot an earlier copy took', () => {
     state.modulesLoadedBeforeCjsHook = ['taken earlier'];
     snapshotRequireCache(cacheOf({[pkg('openai', 'index.js')]: []}), ownLoader);
