@@ -81,6 +81,9 @@ AgentIntentSentiment = Literal[
 AGENT_INTENT_SENTIMENTS = get_args(AgentIntentSentiment)
 # Insight filter fields whose values are stable topic ids rather than taxonomy names.
 TOPIC_INSIGHT_FIELDS = frozenset({"intent_topic_id", "failure_topic_id"})
+# Insight filter fields read from intent_signatures; every other field reads failures.
+INTENT_SIGNATURE_FIELDS = frozenset({"intent_category", "intent_sentiment"})
+AgentSignatureType = Literal["intent", "failure"]
 AgentSpanStatsAggregation = Literal[
     "sum",
     "avg",

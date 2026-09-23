@@ -2457,15 +2457,11 @@ def test_build_topic_insight_filter_clause() -> None:
     expected = """
         s.conversation_id NOT IN (
           WITH succeeded_runs AS (
-            SELECT window_start, window_end, completed_at, id
-            FROM (
-              SELECT window_start, window_end, completed_at, id, status FROM signature_cluster_runs
-              WHERE project_id = {insight_0:String} AND signature_type = 'failure'
-              ORDER BY inserted_at DESC
-              LIMIT 1 BY project_id, signature_type, window_end, id)
-            WHERE status = 'succeeded'),
+            SELECT window_start, window_end, inserted_at, id FROM signature_cluster_runs
+            WHERE project_id = {insight_0:String} AND signature_type = 'failure'
+              AND status = 'succeeded'),
           (
-            SELECT arraySort(run -> tuple(run.2, run.3, run.4), groupArray(tuple(window_start, window_end, completed_at, id)))
+            SELECT arraySort(run -> tuple(run.2, run.3, run.4), groupArray(tuple(window_start, window_end, inserted_at, id)))
             FROM succeeded_runs
           ) AS succeeded_runs_by_recency
           SELECT conversation_id FROM signature_cluster_assignments
