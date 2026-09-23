@@ -49,7 +49,6 @@ export type MessagePart =
 export interface Usage {
   inputTokens?: number;
   outputTokens?: number;
-  /** Provider-reported total token count. Not derived from other fields. */
   totalTokens?: number;
   reasoningTokens?: number;
   cacheCreationInputTokens?: number;
