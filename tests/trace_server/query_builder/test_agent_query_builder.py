@@ -2561,6 +2561,28 @@ def test_build_turn_insight_filter_clauses() -> None:
     )
 
 
+def test_build_intent_topic_turn_insight_filter_clause() -> None:
+    pb = ParamBuilder("insight")
+    clause = build_insight_filter_clause(
+        pb,
+        "project-1",
+        [
+            AgentInsightFilter(
+                field="intent_topic_id",
+                values=["01994634-c680-7dc3-a40b-0383b5008d70"],
+            )
+        ],
+        None,
+        None,
+        "turn",
+    )
+
+    assert clause is not None
+    assert clause.startswith("s.trace_id IN (")
+    assert "SELECT trace_id FROM signature_cluster_assignments" in clause
+    assert "failure_signatures" not in clause
+
+
 def test_build_failure_topic_turn_insight_filter_clause() -> None:
     start = datetime.datetime(2026, 9, 1, tzinfo=datetime.timezone.utc)
     end = datetime.datetime(2026, 9, 8, tzinfo=datetime.timezone.utc)

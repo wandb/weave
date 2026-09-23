@@ -83,31 +83,13 @@ def _single_insight_filter_clause(
         signature_type: AgentSignatureType = (
             "intent" if insight_filter.field == "intent_topic_id" else "failure"
         )
-        if scope == "turn" and signature_type == "failure":
-            signature_ids = _topic_assignments_subquery(
-                pid_slot,
-                values_slot,
-                signature_type,
-                conditions,
-                "signature_record_id",
-            )
-            failure_conditions = [*conditions]
-            failure_conditions[1] = "affected_trace_id != ''"
-            failure_conditions.append(f"id IN ({signature_ids})")
-            subquery = (
-                "SELECT affected_trace_id FROM failure_signatures "
-                "ARRAY JOIN affected_trace_ids AS affected_trace_id "
-                f"WHERE {' AND '.join(failure_conditions)} "
-                "GROUP BY affected_trace_id"
-            )
-        else:
-            subquery = _topic_assignments_subquery(
-                pid_slot,
-                values_slot,
-                signature_type,
-                conditions,
-                signature_entity_column,
-            )
+        subquery = _topic_entities_subquery(
+            pid_slot,
+            values_slot,
+            signature_type,
+            scope,
+            conditions,
+        )
         return f"{span_entity_column} {operator} ({subquery})"
 
     if insight_filter.field in INTENT_SIGNATURE_FIELDS:
@@ -196,4 +178,44 @@ def _topic_assignments_subquery(
         "AS succeeded_runs_by_recency "
         f"SELECT {result_column} FROM signature_cluster_assignments "
         f"WHERE {' AND '.join(assignment_conditions)} GROUP BY {result_column}"
+    )
+
+
+def _topic_entities_subquery(
+    pid_slot: str,
+    values_slot: str,
+    signature_type: AgentSignatureType,
+    scope: AgentInsightFilterScope,
+    conditions: list[str],
+) -> str:
+    if scope == "conversation":
+        result_column = "conversation_id"
+    elif signature_type == "intent":
+        result_column = "trace_id"
+    else:
+        # Failure assignments point at the current trace, while the failure itself
+        # can apply to several turns. Resolve the topic before expanding the failure.
+        signature_ids = _topic_assignments_subquery(
+            pid_slot,
+            values_slot,
+            signature_type,
+            conditions,
+            "signature_record_id",
+        )
+        failure_conditions = [*conditions]
+        failure_conditions[1] = "affected_trace_id != ''"
+        failure_conditions.append(f"id IN ({signature_ids})")
+        return (
+            "SELECT affected_trace_id FROM failure_signatures "
+            "ARRAY JOIN affected_trace_ids AS affected_trace_id "
+            f"WHERE {' AND '.join(failure_conditions)} "
+            "GROUP BY affected_trace_id"
+        )
+
+    return _topic_assignments_subquery(
+        pid_slot,
+        values_slot,
+        signature_type,
+        conditions,
+        result_column,
     )
