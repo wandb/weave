@@ -34,8 +34,8 @@ export interface CJSInstrumentation {
   version: string;
   hook: HookFn;
   /**
-   * The hook patches prototypes or registers globally, so it also fixes
-   * references the app took before it ran. The loader then stops the
+   * The hook patches prototypes, so it also reaches references the app took
+   * from this copy of the module before it ran. The loader then stops the
    * load-order warning for the file it patched.
    */
   reachesEarlierReferences?: boolean;
@@ -118,10 +118,11 @@ const loadOrderWarningSuppressed = globalSingleton(
  * Stop `init()` from warning that these modules were loaded before `weave`.
  *
  * Call it when tracing no longer depends on require order: the app registered
- * the integration itself (`wrapOpenAI()`), or a patch reaches every existing
- * reference (a prototype patch, a global trace processor). A hook that only
- * swaps exports must not call it, because a reference taken before the swap
- * stays unpatched.
+ * the integration itself (`wrapOpenAI()`), or a registration reaches every copy
+ * of the module (the global agents trace processor). A hook that only swaps
+ * exports must not call it, because a reference taken before the swap stays
+ * unpatched. A prototype patch reaches one copy only; its registration sets
+ * `reachesEarlierReferences` instead.
  */
 export function suppressLoadOrderWarning(...moduleNames: string[]): void {
   for (const moduleName of moduleNames) {
@@ -139,9 +140,10 @@ const patchedEarlyFiles = globalSingleton(
 );
 
 /**
- * Stop the warning for one copy of a module: the loader applied a hook marked
- * `reachesEarlierReferences` to this exact file. Other copies of the same
- * package, such as one nested under another dependency, still warn.
+ * Stop the warning for one copy of a module: the loader patched this exact
+ * file, and a compatible registration for it sets `reachesEarlierReferences`.
+ * Other copies of the same package, such as one nested under another
+ * dependency, still warn.
  */
 export function suppressLoadOrderWarningForFile(file: string): void {
   patchedEarlyFiles.add(file);

@@ -29,6 +29,53 @@ function packageNameOf(file: string): string {
   return parse(file)?.name ?? nearestPackageName(path.dirname(file));
 }
 
+/**
+ * Whether the hook for this file also reached references the app took before
+ * it ran. Any compatible entry counts: an older weave copy may have registered
+ * the same target first, without the flag, and its hook patches the same
+ * prototypes.
+ */
+export function reachesEarlierReferences(
+  candidates:
+    | ReadonlyArray<
+        Pick<CJSInstrumentation, 'version' | 'reachesEarlierReferences'>
+      >
+    | undefined,
+  version: string
+): boolean {
+  return (candidates ?? []).some(
+    candidate =>
+      candidate.reachesEarlierReferences === true &&
+      semifies(version, candidate.version)
+  );
+}
+
+/**
+ * Record what the app had loaded before this copy's hook, and which packages
+ * had required each of those files, for `warnIfLoadedBeforeWeave()`.
+ */
+export function snapshotRequireCache(
+  cache: NodeJS.Dict<NodeModule>,
+  ownLoader: string
+): void {
+  const files = Object.keys(cache);
+  if (
+    !shouldSnapshotRequireCache(
+      state.modulesLoadedBeforeCjsHook,
+      files,
+      ownLoader,
+      packageNameOf
+    )
+  ) {
+    return;
+  }
+  state.modulesLoadedBeforeCjsHook = files;
+  state.requirerPackagesBeforeCjsHook = requirerPackagesOf(
+    cache,
+    packageNameOf
+  );
+}
+
 const patching = Object.create(null);
 
 const cachedModules = new Map<string, CacheEntry>();
@@ -40,7 +87,6 @@ if (typeof module !== 'undefined' && module.exports) {
   const Module = require('module');
   const originalRequire = Module.prototype.require;
 
-  // Other weave copies recognize this hook by its name; keep it.
   function patchedRequire(this: any, request: any) {
     let filename;
     try {
@@ -86,10 +132,7 @@ if (typeof module !== 'undefined' && module.exports) {
       const originalExports = originalRequire.apply(this, arguments as any);
 
       let instrumentation:
-        | Pick<
-            CJSInstrumentation,
-            'version' | 'hook' | 'reachesEarlierReferences'
-          >
+        | Pick<CJSInstrumentation, 'version' | 'hook'>
         | undefined;
 
       let packageJson: any;
@@ -127,7 +170,12 @@ if (typeof module !== 'undefined' && module.exports) {
 
       cachedModules.set(filename, cacheEntry);
       delete patching[filename];
-      if (instrumentation.reachesEarlierReferences) {
+      if (
+        reachesEarlierReferences(
+          instrumentations.get(instrumentationLookupKey),
+          version
+        )
+      ) {
         suppressLoadOrderWarningForFile(filename);
       }
     }
@@ -142,18 +190,7 @@ if (typeof module !== 'undefined' && module.exports) {
   // still empty here, because `index.ts` runs `./integrations/hooks`, which
   // fills it, after this module. `warnIfLoadedBeforeWeave()` filters the
   // snapshot at init() time instead.
-  if (
-    shouldSnapshotRequireCache(
-      state.modulesLoadedBeforeCjsHook,
-      originalRequire
-    )
-  ) {
-    state.modulesLoadedBeforeCjsHook = Object.keys(require.cache);
-    state.requirerPackagesBeforeCjsHook = requirerPackagesOf(
-      require.cache,
-      packageNameOf
-    );
-  }
+  snapshotRequireCache(require.cache, __filename);
 
   Module.prototype.require = patchedRequire as any;
 } else {

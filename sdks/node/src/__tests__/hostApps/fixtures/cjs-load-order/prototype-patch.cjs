@@ -2,6 +2,9 @@
 // --require-again it is required again after weave: the hook then patches the
 // prototypes, which reaches the client created first, and init() should stay
 // quiet. Without it, the client stays unpatched and init() should warn.
+// --older-copy-first stands in for an older weave copy that registered the same
+// target first, without the reachesEarlierReferences flag; its hook runs
+// instead and patches the same prototype, so init() should stay quiet too.
 
 const fs = require('fs');
 const path = require('path');
@@ -28,6 +31,20 @@ Anthropic.Messages = Messages;
 module.exports = {Anthropic};
 `
 );
+
+if (process.argv.includes('--older-copy-first')) {
+  const key = Symbol.for('_weave_cjs_instrumentations');
+  global[key] = global[key] || new Map();
+  global[key].set('@anthropic-ai/sdk@index.js', [
+    {
+      version: '>= 0.0.0',
+      hook: exports => {
+        exports.Anthropic.Messages.prototype.create = function create() {};
+        return exports;
+      },
+    },
+  ]);
+}
 
 const {Anthropic} = require('@anthropic-ai/sdk');
 const client = new Anthropic();

@@ -55,17 +55,31 @@ export function warnIfLoadedBeforeWeave(): void {
   }
 }
 
+// Every weave version with a CommonJS hook installs it from this file.
+const WEAVE_LOADER = path.join('dist', 'utils', 'commonJSLoader.js');
+
 /**
  * Whether a copy of the SDK that is installing its CJS hook should take the
  * load-order snapshot: not if a copy already did, and not if another weave
- * copy's hook is the active require, because that hook saw every later load.
+ * copy's loader is cached, because that copy's hook saw every later load. The
+ * active require's function name proves nothing: other tools reuse the name.
  * An older SDK may have created the shared state without the field.
  */
 export function shouldSnapshotRequireCache(
   snapshot: string[] | null | undefined,
-  activeRequire: {name: string}
+  cachedFiles: string[],
+  ownLoader: string,
+  packageNameOf: (file: string) => string
 ): boolean {
-  return snapshot == null && activeRequire.name !== 'patchedRequire';
+  return (
+    snapshot == null &&
+    !cachedFiles.some(
+      file =>
+        file !== ownLoader &&
+        file.endsWith(path.sep + WEAVE_LOADER) &&
+        packageNameOf(file) === 'weave'
+    )
+  );
 }
 
 /**

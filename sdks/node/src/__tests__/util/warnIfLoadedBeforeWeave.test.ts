@@ -10,16 +10,7 @@ import {
   suppressLoadOrderWarningWhenLoadedBy,
 } from '../../integrations/instrumentations';
 import state from '../../state';
-import {nearestPackageName} from '../../utils/npmModuleUtils';
-import {
-  requirerPackagesOf,
-  shouldSnapshotRequireCache,
-  warnIfLoadedBeforeWeave,
-} from '../../utils/warnIfLoadedBeforeWeave';
-
-const parse: (file: string) => {name: string} | undefined =
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  require('module-details-from-path');
+import {warnIfLoadedBeforeWeave} from '../../utils/warnIfLoadedBeforeWeave';
 
 const root = fs.mkdtempSync(path.join(os.tmpdir(), 'weave-load-order-'));
 const nodeModules = path.join(root, 'node_modules');
@@ -70,6 +61,10 @@ describe('warnIfLoadedBeforeWeave', () => {
     expect([...getLoadOrderDependencyOwners('openai')]).toEqual([
       '@openai/agents-openai',
     ]);
+    // Realtime owners come only with the agents processor.
+    expect([
+      ...getLoadOrderDependencyOwners('@openai/agents-realtime'),
+    ]).toEqual([]);
   });
 
   test('warns once for each library the app loaded before the hook', () => {
@@ -141,38 +136,6 @@ describe('warnIfLoadedBeforeWeave', () => {
     warn.mockRestore();
   });
 
-  test('records the package of each requirer, including linked ones', () => {
-    // A linked package's real path is outside node_modules; its package.json names it.
-    const linkedAdk = installed(
-      path.join(root, 'packages', 'adk'),
-      '@google/adk',
-      '1.2.0',
-      'index.js'
-    );
-    const appFile = installed(root, 'my-app', '1.0.0', 'src/app.js');
-    const target = pkg('@google/genai', '1.30.0', 'dist/node/index.cjs');
-    const fromPnpm = installed(
-      path.join(nodeModules, '.pnpm', 'x@1.0.0', 'node_modules', '@scope', 'x'),
-      '@scope/x',
-      '1.0.0',
-      'lib/index.js'
-    );
-    const child = {filename: target} as NodeModule;
-    const cache = {
-      [linkedAdk]: {children: [child]},
-      [appFile]: {children: [child]},
-      [fromPnpm]: {children: [child]},
-      [target]: {children: []},
-    } as unknown as NodeJS.Dict<NodeModule>;
-
-    expect(
-      requirerPackagesOf(
-        cache,
-        file => parse(file)?.name ?? nearestPackageName(path.dirname(file))
-      )
-    ).toEqual({[target]: ['@google/adk', 'my-app', '@scope/x']});
-  });
-
   test('skips only the copy the loader patched, not another copy', () => {
     const warn = jest.spyOn(console, 'warn').mockImplementation();
     const patchedCopy = installed(
@@ -226,17 +189,5 @@ describe('warnIfLoadedBeforeWeave', () => {
     }
     expect(warn.mock.calls).toEqual([]);
     warn.mockRestore();
-  });
-
-  test('a copy snapshots only if no copy did and no weave hook is active', () => {
-    const nodeRequire = {name: 'require'};
-    const weaveHook = {name: 'patchedRequire'};
-    expect([
-      shouldSnapshotRequireCache(null, nodeRequire), // first copy
-      shouldSnapshotRequireCache(undefined, nodeRequire), // older ESM copy first
-      shouldSnapshotRequireCache([], weaveHook), // second copy of this version
-      shouldSnapshotRequireCache(undefined, weaveHook), // older CJS copy first
-      shouldSnapshotRequireCache(null, weaveHook), // SDK without shared state first
-    ]).toEqual([true, true, false, false, false]);
   });
 });

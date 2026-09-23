@@ -11,7 +11,8 @@
     "start-wrap-after-init": "node wrap-after-init.cjs",
     "start-forced-exit": "node forced-exit.cjs",
     "start-prototype-patch": "node prototype-patch.cjs",
-    "start-prototype-patch-again": "node prototype-patch.cjs --require-again"
+    "start-prototype-patch-again": "node prototype-patch.cjs --require-again",
+    "start-prototype-patch-older-copy": "node prototype-patch.cjs --require-again --older-copy-first"
   },
   "dependencies": {
     "openai": "file:../../../../../node_modules/openai"

@@ -15,6 +15,8 @@ describe('hostApps — cjs-load-order', () => {
     expect(result.stderr).toContain(
       "Weave: 'openai' was loaded before 'weave'"
     );
+    // The init() timer and the exit listener both check; one print.
+    expect(result.stderr.match(/was loaded before/g)).toHaveLength(1);
   }, 60_000);
 
   test('init() stays quiet when weave was required first', async () => {
@@ -62,5 +64,11 @@ describe('hostApps — cjs-load-order', () => {
     const again = await launch('start-prototype-patch-again');
     expect(again.stdout).toContain('patched: true');
     expect(again.stderr).not.toContain('was loaded before');
+  }, 60_000);
+
+  test('a prototype patch counts even when an older copy registered its hook first', async () => {
+    const result = await launch('start-prototype-patch-older-copy');
+    expect(result.stdout).toContain('patched: true');
+    expect(result.stderr).not.toContain('was loaded before');
   }, 60_000);
 });
