@@ -22,12 +22,13 @@ type State = {
   domain: string | null;
 
   /**
-   * `require.cache` keys as they were when the CJS `require` hook was
+   * `require.cache` keys as they were when the first CJS `require` hook was
    * installed. Everything listed here reached the app unpatched, because the
-   * hook only sees `require` calls made after it. Stays empty under ESM, where
-   * the hook is never installed.
+   * hook only sees `require` calls made after it. A later copy of the SDK keeps
+   * this list, since what loaded in between went through the first hook. Stays
+   * null under ESM, where the hook is never installed.
    */
-  modulesLoadedBeforeCjsHook: string[];
+  modulesLoadedBeforeCjsHook: string[] | null;
 
   genAi: {
     /**
@@ -122,7 +123,7 @@ function defaultState(): State {
   return {
     client: null,
     domain: null,
-    modulesLoadedBeforeCjsHook: [],
+    modulesLoadedBeforeCjsHook: null,
 
     genAi: {
       provider: null,

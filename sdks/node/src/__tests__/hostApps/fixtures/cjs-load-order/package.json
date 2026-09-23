@@ -5,7 +5,8 @@
   "type": "commonjs",
   "scripts": {
     "start": "node library-first.cjs",
-    "start-weave-first": "node weave-first.cjs"
+    "start-weave-first": "node weave-first.cjs",
+    "start-weave-twice": "node weave-twice.cjs"
   },
   "dependencies": {
     "openai": "file:../../../../../node_modules/openai"

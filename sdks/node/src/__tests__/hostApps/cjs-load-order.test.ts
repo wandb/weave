@@ -22,4 +22,11 @@ describe('hostApps — cjs-load-order', () => {
     expect(result.exitCode).toBe(0);
     expect(result.stderr).not.toContain('was loaded before');
   }, 60_000);
+
+  test('init() stays quiet when a second copy of weave loads after the library', async () => {
+    const result = await launch('start-weave-twice');
+    expect(result.exitCode).toBe(0);
+    expect(result.stdout).toContain('create: wrappedWithAgents');
+    expect(result.stderr).not.toContain('was loaded before');
+  }, 60_000);
 });

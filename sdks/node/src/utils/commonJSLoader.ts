@@ -123,8 +123,9 @@ if (typeof module !== 'undefined' && module.exports) {
   // Snapshot before the swap, unfiltered: the instrumentation registry is
   // still empty here, because `index.ts` runs `./integrations/hooks`, which
   // fills it, after this module. `warnIfLoadedBeforeWeave()` filters the
-  // snapshot at init() time instead.
-  state.modulesLoadedBeforeCjsHook = Object.keys(require.cache);
+  // snapshot at init() time instead. A second copy of the SDK keeps the first
+  // copy's snapshot.
+  state.modulesLoadedBeforeCjsHook ??= Object.keys(require.cache);
 
   Module.prototype.require = patchedRequire as any;
 } else {
