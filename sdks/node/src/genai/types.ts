@@ -49,6 +49,7 @@ export type MessagePart =
 export interface Usage {
   inputTokens?: number;
   outputTokens?: number;
+  totalTokens?: number;
   reasoningTokens?: number;
   cacheCreationInputTokens?: number;
   cacheReadInputTokens?: number;
