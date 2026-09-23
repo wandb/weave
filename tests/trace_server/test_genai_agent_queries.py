@@ -30,6 +30,7 @@ from weave.trace_server.agents.types import (
     AgentConversationSpansReq,
     AgentCustomAttrsSchemaReq,
     AgentGroupByRef,
+    AgentInsightFilter,
     AgentSearchReq,
     AgentSignalFilter,
     AgentSortBy,
@@ -4011,3 +4012,349 @@ def test_filter_conversations_by_signal(ch_server):
         )
     )
     assert filtered_ids(AgentSignalFilter(tags=["flagged"])) == []
+
+
+@pytest.mark.flaky(reruns=3)
+def test_filter_conversations_by_insights(ch_server):
+    project_id = _make_project_id("insight-filter")
+    now = datetime.datetime.now(tz=datetime.timezone.utc)
+    # spans[3] starts inside the older run's window only.
+    span_starts = [now + datetime.timedelta(seconds=index) for index in range(3)]
+    span_starts.append(now - datetime.timedelta(days=1, hours=12))
+    spans = [
+        _make_span(
+            project_id,
+            conversation_id=f"conv-{suffix}-{uuid.uuid4().hex[:8]}",
+            operation_name="invoke_agent",
+            started_at=started_at,
+        )
+        for suffix, started_at in zip("abcd", span_starts, strict=True)
+    ]
+    _insert_spans(ch_server.ch_client, spans)
+    intent_ids = [uuid.uuid4() for _ in spans]
+    ch_server.ch_client.insert(
+        "intent_signatures",
+        data=[
+            [
+                project_id,
+                intent_ids[index],
+                category,
+                sentiment,
+                span.conversation_id,
+                span.trace_id,
+                span.span_id,
+                span.started_at,
+                span.ended_at,
+                now,
+            ]
+            for index, (span, category, sentiment) in enumerate(
+                zip(
+                    spans[:2],
+                    ("information_request", "action_request"),
+                    ("frustrated", "satisfied"),
+                    strict=True,
+                )
+            )
+        ],
+        column_names=[
+            "project_id",
+            "id",
+            "category",
+            "sentiment",
+            "conversation_id",
+            "trace_id",
+            "span_id",
+            "trace_started_at",
+            "trace_ended_at",
+            "extracted_at",
+        ],
+    )
+    ch_server.ch_client.insert(
+        "failure_signatures",
+        data=[
+            [
+                project_id,
+                uuid.uuid4(),
+                category,
+                severity,
+                span.conversation_id,
+                span.trace_id,
+                [span.trace_id],
+                span.span_id,
+                span.started_at,
+                span.ended_at,
+                now,
+            ]
+            for span, category, severity in zip(
+                spans[:2],
+                ("wrong_output", "tool_failure"),
+                ("major", "minor"),
+                strict=True,
+            )
+        ],
+        column_names=[
+            "project_id",
+            "id",
+            "category",
+            "severity",
+            "conversation_id",
+            "current_trace_id",
+            "affected_trace_ids",
+            "span_id",
+            "trace_started_at",
+            "trace_ended_at",
+            "extracted_at",
+        ],
+    )
+
+    old_run_id = uuid.uuid4()
+    latest_run_id = uuid.uuid4()
+    ch_server.ch_client.insert(
+        "signature_cluster_runs",
+        data=[
+            [
+                project_id,
+                run_id,
+                "intent",
+                now - datetime.timedelta(days=offset + 1),
+                # Windows reach an hour past the spans so the latest run covers them.
+                now - datetime.timedelta(days=offset) + datetime.timedelta(hours=1),
+                "succeeded",
+                now - datetime.timedelta(days=offset + 1),
+                now - datetime.timedelta(days=offset),
+            ]
+            for run_id, offset in ((old_run_id, 1), (latest_run_id, 0))
+        ],
+        column_names=[
+            "project_id",
+            "id",
+            "signature_type",
+            "window_start",
+            "window_end",
+            "status",
+            "started_at",
+            "completed_at",
+        ],
+    )
+    old_cluster_id = uuid.uuid4()
+    latest_cluster_id = uuid.uuid4()
+    moved_cluster_id = uuid.uuid4()
+    nil_cluster_id = uuid.uuid4()
+    topic_id = uuid.uuid4()
+    moved_topic_id = uuid.uuid4()
+    nil_topic_id = uuid.UUID(int=0)
+    ch_server.ch_client.insert(
+        "signature_clusters",
+        data=[
+            [
+                project_id,
+                run_id,
+                cluster_id,
+                now - datetime.timedelta(days=offset),
+                "intent",
+                cluster_topic_id,
+                category,
+                [],
+                "Information requests",
+            ]
+            for run_id, cluster_id, cluster_topic_id, category, offset in (
+                (old_run_id, old_cluster_id, topic_id, "action_request", 1),
+                (
+                    latest_run_id,
+                    latest_cluster_id,
+                    topic_id,
+                    "information_request",
+                    0,
+                ),
+                (latest_run_id, moved_cluster_id, moved_topic_id, "action_request", 0),
+                (latest_run_id, nil_cluster_id, nil_topic_id, "action_request", 0),
+            )
+        ],
+        column_names=[
+            "project_id",
+            "cluster_run_id",
+            "id",
+            "run_window_end",
+            "signature_type",
+            "topic_id",
+            "category",
+            "centroid",
+            "label",
+        ],
+    )
+    ch_server.ch_client.insert(
+        "signature_cluster_assignments",
+        data=[
+            [
+                project_id,
+                run_id,
+                intent_ids[index],
+                cluster_id,
+                "intent",
+                category,
+                span.trace_id,
+                span.span_id,
+                span.conversation_id,
+                span.started_at,
+                span.ended_at,
+            ]
+            for index, (run_id, cluster_id, span, category) in (
+                (1, (old_run_id, old_cluster_id, spans[1], "action_request")),
+                (
+                    0,
+                    (
+                        latest_run_id,
+                        latest_cluster_id,
+                        spans[0],
+                        "information_request",
+                    ),
+                ),
+                (1, (latest_run_id, moved_cluster_id, spans[1], "action_request")),
+                (2, (latest_run_id, nil_cluster_id, spans[2], "action_request")),
+                (3, (old_run_id, old_cluster_id, spans[3], "action_request")),
+            )
+        ],
+        column_names=[
+            "project_id",
+            "cluster_run_id",
+            "signature_record_id",
+            "cluster_id",
+            "signature_type",
+            "category",
+            "trace_id",
+            "span_id",
+            "conversation_id",
+            "trace_started_at",
+            "trace_ended_at",
+        ],
+    )
+
+    def filtered_ids(
+        *filters: AgentInsightFilter,
+        started_after: datetime.datetime = now - datetime.timedelta(hours=1),
+    ) -> list[str]:
+        response = ch_server.agent_spans_query(
+            AgentSpansQueryReq(
+                project_id=project_id,
+                group_by=[AgentGroupByRef(source="column", key="conversation_id")],
+                insight_filters=list(filters),
+                started_after=started_after,
+                started_before=now + datetime.timedelta(hours=1),
+            )
+        )
+        return sorted(group.group_keys["conversation_id"] for group in response.groups)
+
+    def filtered_stats_count(*filters: AgentInsightFilter) -> int:
+        response = ch_server.agent_spans_stats(
+            AgentSpanStatsReq(
+                project_id=project_id,
+                start=now - datetime.timedelta(hours=1),
+                end=now + datetime.timedelta(hours=1),
+                granularity=3600,
+                metrics=[
+                    AgentSpanStatsMetricSpec(
+                        alias="spans",
+                        value_type="datetime",
+                        value=AgentSpanValueRef(source="field", key="started_at"),
+                        aggregations=["count"],
+                    )
+                ],
+                insight_filters=list(filters),
+            )
+        )
+        return sum(int(row["count_spans"]) for row in response.rows)
+
+    assert filtered_ids(
+        AgentInsightFilter(
+            field="intent_category",
+            values=["information_request"],
+        )
+    ) == [spans[0].conversation_id]
+    assert filtered_ids(
+        AgentInsightFilter(
+            field="intent_sentiment",
+            values=["frustrated"],
+        )
+    ) == [spans[0].conversation_id]
+    assert filtered_ids(
+        AgentInsightFilter(
+            field="failure_severity",
+            values=["minor"],
+        )
+    ) == [spans[1].conversation_id]
+    # spans[1] left topic_id in the latest run, so only its newest topic matches.
+    assert filtered_ids(
+        AgentInsightFilter(
+            field="intent_topic_id",
+            values=[str(topic_id)],
+        )
+    ) == [spans[0].conversation_id]
+    assert filtered_ids(
+        AgentInsightFilter(
+            field="intent_topic_id",
+            values=[str(moved_topic_id)],
+        )
+    ) == [spans[1].conversation_id]
+    # Only the older run covers spans[3], so that run's topic still applies to it.
+    assert filtered_ids(
+        AgentInsightFilter(
+            field="intent_topic_id",
+            values=[str(topic_id)],
+        ),
+        started_after=now - datetime.timedelta(days=2),
+    ) == sorted([spans[0].conversation_id, spans[3].conversation_id])
+    assert (
+        filtered_ids(
+            AgentInsightFilter(
+                field="intent_topic_id",
+                values=[str(nil_topic_id)],
+            )
+        )
+        == []
+    )
+    assert (
+        filtered_ids(
+            AgentInsightFilter(
+                field="failure_topic_id",
+                values=[str(uuid.uuid4())],
+            )
+        )
+        == []
+    )
+    assert (
+        filtered_stats_count(
+            AgentInsightFilter(
+                field="intent_sentiment",
+                values=["frustrated"],
+            )
+        )
+        == 1
+    )
+    assert (
+        filtered_stats_count(
+            AgentInsightFilter(
+                field="failure_severity",
+                values=["minor"],
+            )
+        )
+        == 1
+    )
+    assert (
+        filtered_stats_count(
+            AgentInsightFilter(
+                field="intent_topic_id",
+                values=[str(topic_id)],
+            )
+        )
+        == 1
+    )
+    assert (
+        filtered_stats_count(
+            AgentInsightFilter(
+                field="intent_category",
+                values=["information_request"],
+                exclude=True,
+            )
+        )
+        == 2
+    )

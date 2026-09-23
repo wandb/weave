@@ -1226,6 +1226,8 @@ def test_contentless_error_span_emits_assistant_message() -> None:
             parent_span_id="agent",
             operation_name="chat",
             status_code="ERROR",
+            error_type="openai.RateLimitError",
+            status_message="Error code: 429 - rate_limit_exceeded",
         ),
     ]
 
@@ -1239,6 +1241,8 @@ def test_contentless_error_span_emits_assistant_message() -> None:
     error_message = messages[-1]
     assert error_message.span_id == "llm-error"
     assert error_message.status_code == "ERROR"
+    assert error_message.error_type == "openai.RateLimitError"
+    assert error_message.status_message == "Error code: 429 - rate_limit_exceeded"
     assert _assistant_payload(error_message).text == ""
     assert _assistant_payload(error_message).status == "ERROR"
 

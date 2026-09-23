@@ -916,6 +916,30 @@ class TestOTelSpanEmission:
         assert attrs["gen_ai.conversation.id"] == "convo-1"
         assert attrs["gen_ai.conversation.name"] == "Weather Chat"
 
+    def test_blank_targets_leave_the_bare_operation_as_the_span_name(
+        self, otel_spans: InMemorySpanExporter
+    ) -> None:
+        with Conversation(conversation_id="convo-blank") as conversation:
+            with conversation.start_turn() as turn:
+                with turn.start_llm(model=""):
+                    pass
+                with turn.start_tool(name=""):
+                    pass
+                with turn.start_subagent(name="   "):
+                    pass
+        streaming = sorted(span.name for span in otel_spans.get_finished_spans())
+        otel_spans.clear()
+
+        log_turn(
+            conversation_id="batch",
+            spans=[LLM(), Tool(), SubAgent(name="   ")],
+        )
+        batch = sorted(span.name for span in otel_spans.get_finished_spans())
+
+        expected = ["chat", "execute_tool", "invoke_agent", "invoke_agent"]
+        assert streaming == expected
+        assert batch == expected
+
     def test_turn_system_instructions_emitted_on_span(
         self, otel_spans: InMemorySpanExporter
     ) -> None:

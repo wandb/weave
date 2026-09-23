@@ -11,7 +11,8 @@ in the serialization JSON Schema. Request models stay on BaseModel.
 from __future__ import annotations
 
 import datetime
-from typing import TYPE_CHECKING, Annotated, Any, Literal
+from typing import TYPE_CHECKING, Annotated, Any, Literal, get_args
+from uuid import UUID
 
 from pydantic import (
     AwareDatetime,
@@ -67,6 +68,23 @@ SearchMessageRole = Literal[
 AgentSpanStatsValueType = Literal["datetime", "number", "boolean", "string"]
 AgentSpanStatsColumnValueType = Literal["datetime", "number", "boolean", "string"]
 AgentSpanStatsCell = datetime.datetime | str | int | float | bool | None
+# Source: https://github.com/wandb/core/blob/master/services/weave-trace/src/workers/insights/configs/taxonomies/severity.yaml
+AgentFailureSeverity = Literal["info", "major", "minor"]
+AGENT_FAILURE_SEVERITIES = get_args(AgentFailureSeverity)
+# Source: https://github.com/wandb/core/blob/master/services/weave-trace/src/workers/insights/configs/taxonomies/sentiment.yaml
+AgentIntentSentiment = Literal[
+    "frustrated",
+    "dissatisfied",
+    "neutral",
+    "satisfied",
+    "delighted",
+]
+AGENT_INTENT_SENTIMENTS = get_args(AgentIntentSentiment)
+# Insight filter fields whose values are stable topic ids rather than taxonomy names.
+TOPIC_INSIGHT_FIELDS = frozenset({"intent_topic_id", "failure_topic_id"})
+# Insight filter fields read from intent_signatures; every other field reads failures.
+INTENT_SIGNATURE_FIELDS = frozenset({"intent_category", "intent_sentiment"})
+AgentSignatureType = Literal["intent", "failure"]
 AgentSpanStatsAggregation = Literal[
     "sum",
     "avg",
@@ -385,6 +403,7 @@ class AgentSpanStatsReq(BaseModel):
     # requested signal tags/ratings. Signal timestamps are intentionally not
     # constrained by the stats window; they annotate the conversation.
     signal_filters: AgentSignalFilter | None = None
+    insight_filters: list[AgentInsightFilter] = Field(default_factory=list)
 
     @model_validator(mode="after")
     def validate_stats_request(self) -> AgentSpanStatsReq:
@@ -415,6 +434,7 @@ class AgentSpanStatsReq(BaseModel):
         apply_max_range_days = (
             bool(self.group_by)
             or bool(self.group_filters)
+            or bool(self.insight_filters)
             or numeric_bucket is not None
         )
         max_range = datetime.timedelta(days=MAX_AGENT_STATS_RANGE_DAYS)
@@ -809,6 +829,67 @@ class AgentSignalFilter(BaseModel):
         return not self.tags and not self.ratings
 
 
+class AgentInsightFilter(BaseModel):
+    """Conversation filter backed by extracted Insights data in ClickHouse.
+
+    Values within one filter are ORed, while multiple filters are ANDed. Topic
+    filters use stable topic IDs that span successful clustering runs.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    field: Literal[
+        "intent_category",
+        "intent_sentiment",
+        "failure_category",
+        "failure_severity",
+        "intent_topic_id",
+        "failure_topic_id",
+    ]
+    values: list[str] = Field(
+        min_length=1,
+        max_length=1000,
+        description=(
+            "Values to match. intent_sentiment accepts only "
+            f"{', '.join(AGENT_INTENT_SENTIMENTS)}; failure_severity "
+            "accepts only info, major, or minor."
+        ),
+    )
+    exclude: bool = Field(
+        default=False,
+        description="Exclude conversations matching any value in this filter.",
+    )
+
+    @model_validator(mode="after")
+    def validate_values(self) -> AgentInsightFilter:
+        if self.field == "intent_sentiment":
+            invalid = sorted(set(self.values) - set(AGENT_INTENT_SENTIMENTS))
+            if invalid:
+                allowed = ", ".join(AGENT_INTENT_SENTIMENTS)
+                raise ValueError(
+                    f"intent_sentiment values must be one of: {allowed}; got: "
+                    f"{', '.join(invalid)}"
+                )
+        if self.field == "failure_severity":
+            invalid = sorted(set(self.values) - set(AGENT_FAILURE_SEVERITIES))
+            if invalid:
+                allowed = ", ".join(AGENT_FAILURE_SEVERITIES)
+                raise ValueError(
+                    f"failure_severity values must be one of: {allowed}; got: "
+                    f"{', '.join(invalid)}"
+                )
+        is_topic_filter = self.field in TOPIC_INSIGHT_FIELDS
+        if is_topic_filter:
+            normalized_topic_ids = []
+            for value in self.values:
+                try:
+                    normalized_topic_ids.append(str(UUID(value)))
+                except ValueError as exc:
+                    raise ValueError(f"invalid topic ID: {value}") from exc
+            self.values = normalized_topic_ids
+        return self
+
+
 class AgentSpansQueryReq(BaseModel):
     """Request to query agent spans for a project.
 
@@ -846,6 +927,7 @@ class AgentSpansQueryReq(BaseModel):
     started_after: datetime.datetime | None = None  # filter started_at >= start
     started_before: datetime.datetime | None = None  # filter started_at < end
     signal_filters: AgentSignalFilter | None = None
+    insight_filters: list[AgentInsightFilter] = Field(default_factory=list)
 
     @model_validator(mode="after")
     def validate_spans_query_request(self) -> AgentSpansQueryReq:
@@ -863,6 +945,8 @@ class AgentSpansQueryReq(BaseModel):
             and not self.group_by
         ):
             raise ValueError("signal_filters require group_by")
+        if self.insight_filters and not self.group_by:
+            raise ValueError("insight_filters require group_by")
         if self.group_distributions and len(self.group_by or []) != 1:
             raise ValueError("group_distributions currently support one group_by ref")
         if self.group_by and self.custom_attr_columns:
@@ -1138,6 +1222,9 @@ class AgentChatMessage(AgentResponseModel):
     agent_name: str | None = None
     agent_version: str | None = None
     status_code: StatusCodeLiteral | None = None
+    # Set together from the span's own fields when `status_code` is `ERROR`.
+    error_type: str | None = None
+    status_message: str | None = None
     started_at: datetime.datetime | None = None
 
     user_message: AgentChatUserMessage | None = None

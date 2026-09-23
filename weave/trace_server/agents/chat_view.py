@@ -417,6 +417,8 @@ class ChatTraversal:
                 agent_name=agent_start_label,
                 agent_version=span.agent_version,
                 status_code=span.status_code,
+                error_type=span.error_type,
+                status_message=span.status_message,
                 started_at=span.started_at,
                 agent_start=AgentChatAgentStart(
                     model=span.request_model,
@@ -443,6 +445,8 @@ class ChatTraversal:
                     agent_name=subtree_agent,
                     agent_version=span.agent_version,
                     status_code=span.status_code,
+                    error_type=span.error_type,
+                    status_message=span.status_message,
                     started_at=span.started_at,
                     context_compacted=AgentChatContextCompacted(
                         compaction_summary=span.compaction_summary,
@@ -471,6 +475,8 @@ class ChatTraversal:
                             agent_name=subtree_agent,
                             agent_version=span.agent_version,
                             status_code=span.status_code,
+                            error_type=span.error_type,
+                            status_message=span.status_message,
                             started_at=span.started_at,
                             tool_call=AgentChatToolCall(
                                 tool_name=f"Start {subtree_agent or 'subagent'}",
@@ -505,6 +511,8 @@ class ChatTraversal:
                 agent_name=agent_name,
                 agent_version=span.agent_version,
                 status_code=span.status_code,
+                error_type=span.error_type,
+                status_message=span.status_message,
                 started_at=span.started_at,
                 tool_call=AgentChatToolCall(
                     tool_name=tool_name,
@@ -598,6 +606,8 @@ class ChatTraversal:
                 agent_name=agent_name,
                 agent_version=span.agent_version,
                 status_code=span.status_code,
+                error_type=span.error_type,
+                status_message=span.status_message,
                 started_at=span.started_at,
                 agent_start=AgentChatAgentStart(
                     model=span.request_model,
@@ -647,6 +657,8 @@ class ChatTraversal:
                         agent_name=agent_name,
                         agent_version=span.agent_version,
                         status_code=span.status_code,
+                        error_type=span.error_type,
+                        status_message=span.status_message,
                         started_at=span.started_at,
                         tool_call=AgentChatToolCall(
                             tool_name="Task notification",
@@ -1250,6 +1262,8 @@ def _find_task_notification(
                 agent_name=_own_agent_label(span),
                 agent_version=span.agent_version,
                 status_code=span.status_code,
+                error_type=span.error_type,
+                status_message=span.status_message,
                 started_at=span.started_at,
                 tool_call=AgentChatToolCall(
                     tool_name="Task notification",
@@ -1387,6 +1401,8 @@ def _emit_assistant_message(
         agent_name=agent_name,
         agent_version=span.agent_version,
         status_code=span.status_code,
+        error_type=span.error_type,
+        status_message=span.status_message,
         started_at=span.started_at,
         assistant_message=AgentChatAssistantMessage(
             model=span.response_model or span.request_model,

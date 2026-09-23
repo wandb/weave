@@ -28,6 +28,7 @@ __all__ = [
     "GroupFilterMeasureFilterExprLteOperation",
     "GroupFilterMeasureValue",
     "GroupFilterGroupBy",
+    "InsightFilter",
     "Measure",
     "MeasureFilter",
     "MeasureFilterExpr",
@@ -58,6 +59,8 @@ class SpanQueryParams(TypedDict, total=False):
     include_costs: bool
 
     include_details: bool
+
+    insight_filters: Iterable[InsightFilter]
 
     limit: int
 
@@ -230,6 +233,35 @@ class GroupFilter(TypedDict, total=False):
     max: Annotated[Union[float, Union[str, datetime], None], PropertyInfo(format="iso8601")]
 
     min: Annotated[Union[float, Union[str, datetime], None], PropertyInfo(format="iso8601")]
+
+
+class InsightFilter(TypedDict, total=False):
+    """Conversation filter backed by extracted Insights data in ClickHouse.
+
+    Values within one filter are ORed, while multiple filters are ANDed. Topic
+    filters use stable topic IDs that span successful clustering runs.
+    """
+
+    field: Required[
+        Literal[
+            "intent_category",
+            "intent_sentiment",
+            "failure_category",
+            "failure_severity",
+            "intent_topic_id",
+            "failure_topic_id",
+        ]
+    ]
+
+    values: Required[SequenceNotStr[str]]
+    """Values to match.
+
+    intent_sentiment accepts only frustrated, dissatisfied, neutral, satisfied,
+    delighted; failure_severity accepts only info, major, or minor.
+    """
+
+    exclude: bool
+    """Exclude conversations matching any value in this filter."""
 
 
 class MeasureFilterExprLtOperation(TypedDict, total=False):

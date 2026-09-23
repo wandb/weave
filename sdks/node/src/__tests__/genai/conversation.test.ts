@@ -26,7 +26,7 @@ describe('Conversation', () => {
 
     const spans = getExporter().getFinishedSpans();
     expect(spans).toHaveLength(1); // only the turn span
-    expect(spans[0].name).toBe('invoke_agent');
+    expect(spans[0].name).toBe('invoke_agent weather-bot');
     expect(spans[0].attributes[ATTR_GEN_AI_CONVERSATION_ID]).toBe('c-1');
     expect(spans[0].attributes[ATTR_GEN_AI_AGENT_NAME]).toBe('weather-bot');
   });
@@ -82,7 +82,10 @@ describe('Conversation', () => {
     turn.end();
     conversation.end();
 
-    const span = findSpan(getExporter().getFinishedSpans(), 'invoke_agent');
+    const span = findSpan(
+      getExporter().getFinishedSpans(),
+      'invoke_agent weather-bot'
+    );
     expect(spanSnapshot(span)).toMatchInlineSnapshot(`
       {
         "attributes": {
@@ -115,7 +118,10 @@ describe('Conversation', () => {
     turn.end();
     conversation.end();
 
-    const span = findSpan(getExporter().getFinishedSpans(), 'invoke_agent');
+    const span = findSpan(
+      getExporter().getFinishedSpans(),
+      'invoke_agent dispatcher'
+    );
     expect(spanSnapshot(span)).toMatchInlineSnapshot(`
       {
         "attributes": {

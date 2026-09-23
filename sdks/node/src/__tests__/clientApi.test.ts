@@ -76,6 +76,18 @@ describe('Client API', () => {
       expect(gottenClient.projectId).toBe('custom-entity/test-project');
     });
 
+    test('percent-encodes the project name in the printed link', async () => {
+      const consoleLogSpy = jest.spyOn(console, 'log').mockImplementation();
+
+      await init('custom-entity/my project');
+
+      expect(consoleLogSpy).toHaveBeenCalledWith(
+        'View Weave data at https://api.wandb.ai/custom-entity/my%20project/weave'
+      );
+
+      consoleLogSpy.mockRestore();
+    });
+
     test('sends the client-capability header on the ingest client', async () => {
       await init('test-project');
 

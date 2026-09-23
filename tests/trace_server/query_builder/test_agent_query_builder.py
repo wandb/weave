@@ -15,9 +15,11 @@ from pydantic import ValidationError
 
 from weave.trace_server.agents.span_costs import cost_augmented_source_sql
 from weave.trace_server.agents.types import (
+    AGENT_INTENT_SENTIMENTS,
     AgentConversationChatReq,
     AgentCustomAttrsSchemaReq,
     AgentGroupByRef,
+    AgentInsightFilter,
     AgentSearchReq,
     AgentSignalFilter,
     AgentSortBy,
@@ -34,6 +36,9 @@ from weave.trace_server.agents.types import (
 from weave.trace_server.interface import query as tsi_query
 from weave.trace_server.interface.query import Query
 from weave.trace_server.orm import ParamBuilder
+from weave.trace_server.query_builder.agent_insight_filters import (
+    build_insight_filter_clause,
+)
 from weave.trace_server.query_builder.agent_query_builder import (
     CHAT_VIEW_COLS,
     QUALIFIED_CHAT_VIEW_COLS,
@@ -53,6 +58,7 @@ from weave.trace_server.query_builder.agent_query_builder import (
     make_custom_attrs_schema_query,
     make_message_search_query,
     make_span_group_categorical_distributions_query,
+    make_span_group_distribution_counts_query,
     make_span_group_numeric_distributions_query,
     make_spans_count_query,
     make_spans_list_query,
@@ -867,6 +873,44 @@ class TestMakeGroupedSpansCountQuery:
         }
         assert_sql(expected, expected_params, query, pb.get_params())
 
+    def test_group_by_conversation_id_with_insight_filter(self) -> None:
+        pb = ParamBuilder("genai")
+        query = make_spans_count_query(
+            pb,
+            AgentSpansQueryReq(
+                project_id="p1",
+                group_by=[AgentGroupByRef(source="column", key="conversation_id")],
+                insight_filters=[
+                    AgentInsightFilter(
+                        field="intent_category",
+                        values=["information_request"],
+                    )
+                ],
+            ),
+        )
+        src = _AttrSrc(3)
+        expected = f"""
+            SELECT count() FROM (
+                SELECT s.conversation_id FROM {src.sql} s
+                WHERE s.project_id = {{genai_0:String}}
+                  AND s.conversation_id IN (
+                    SELECT conversation_id FROM intent_signatures
+                    WHERE project_id = {{genai_1:String}}
+                      AND conversation_id != ''
+                      AND category IN {{genai_2:Array(String)}}
+                    GROUP BY conversation_id
+                  )
+                GROUP BY s.conversation_id
+            )
+        """
+        expected_params = {
+            "genai_0": "p1",
+            "genai_1": "p1",
+            "genai_2": ["information_request"],
+            **src.params,
+        }
+        assert_sql(expected, expected_params, query, pb.get_params())
+
 
 # ============================================================================
 # make_spans_list_query (grouped)
@@ -1322,6 +1366,50 @@ class TestMakeGroupedSpansListQuery:
         }
         assert_sql(expected, expected_params, query, pb.get_params())
 
+    def test_grouped_query_with_failure_severity_filter(self) -> None:
+        pb = ParamBuilder("genai")
+        query = make_spans_list_query(
+            pb,
+            AgentSpansQueryReq(
+                project_id="p1",
+                group_by=[AgentGroupByRef(source="column", key="conversation_id")],
+                insight_filters=[
+                    AgentInsightFilter(
+                        field="failure_severity",
+                        values=["major", "minor"],
+                    )
+                ],
+            ),
+        )
+
+        src = _AttrSrc(5)
+        expected = f"""
+            SELECT s.conversation_id AS conversation_id,
+                   {_GROUPED_AGG_TAIL}
+            FROM {src.sql} s
+            WHERE s.project_id = {{genai_0:String}}
+              AND s.conversation_id IN (
+                SELECT conversation_id FROM failure_signatures
+                WHERE project_id = {{genai_3:String}}
+                  AND conversation_id != ''
+                  AND if(empty(trimBoth(severity)), 'unknown', lower(trimBoth(severity)))
+                      IN {{genai_4:Array(String)}}
+                GROUP BY conversation_id
+              )
+            GROUP BY conversation_id
+            ORDER BY last_seen DESC
+            LIMIT {{genai_1:UInt64}} OFFSET {{genai_2:UInt64}}
+        """
+        expected_params = {
+            "genai_0": "p1",
+            "genai_1": 100,
+            "genai_2": 0,
+            "genai_3": "p1",
+            "genai_4": ["major", "minor"],
+            **src.params,
+        }
+        assert_sql(expected, expected_params, query, pb.get_params())
+
 
 # ============================================================================
 # make_span_group_*_distribution_query
@@ -1329,6 +1417,44 @@ class TestMakeGroupedSpansListQuery:
 
 
 class TestMakeSpanGroupDistributionQueries:
+    def test_distribution_queries_apply_insight_filters(self) -> None:
+        req = AgentSpansQueryReq(
+            project_id="p1",
+            group_by=[AgentGroupByRef(source="column", key="conversation_id")],
+            insight_filters=[
+                AgentInsightFilter(
+                    field="failure_severity",
+                    values=["major"],
+                )
+            ],
+        )
+        numeric_spec = AgentSpanGroupDistributionSpec(
+            alias="score_distribution",
+            value=AgentSpanValueRef(source="custom_attrs_float", key="score"),
+        )
+        categorical_spec = AgentSpanGroupDistributionSpec(
+            alias="env_distribution",
+            value=AgentSpanValueRef(source="custom_attrs_string", key="env"),
+        )
+
+        queries_and_params = []
+        for build_query in (
+            lambda pb: make_span_group_distribution_counts_query(pb, req, ["conv-a"]),
+            lambda pb: make_span_group_numeric_distributions_query(
+                pb, req, ["conv-a"], [numeric_spec]
+            ),
+            lambda pb: make_span_group_categorical_distributions_query(
+                pb, req, ["conv-a"], [categorical_spec]
+            ),
+        ):
+            pb = ParamBuilder("genai")
+            queries_and_params.append((build_query(pb), pb.get_params()))
+
+        for query, params in queries_and_params:
+            assert "s.conversation_id IN (" in query
+            assert "FROM failure_signatures" in query
+            assert ["major"] in params.values()
+
     def test_numeric_distributions_query_batches_specs(self) -> None:
         pb = ParamBuilder("genai")
         query = make_span_group_numeric_distributions_query(
@@ -2236,6 +2362,136 @@ def test_signal_filter_round_trip() -> None:
     assert req.signal_filters.ratings[0].op == "gte"
     assert AgentSignalFilter().is_empty() is True
     assert req.signal_filters.is_empty() is False
+
+
+def test_insight_filter_validation() -> None:
+    with pytest.raises(ValidationError):
+        AgentInsightFilter(
+            field="category",
+            values=["major"],
+        )
+    with pytest.raises(ValidationError):
+        AgentInsightFilter(
+            field="intent_category",
+            values=[],
+        )
+    with pytest.raises(ValidationError):
+        AgentInsightFilter(
+            field="intent_topic_id",
+            values=[str(index) for index in range(1001)],
+        )
+    with pytest.raises(ValidationError, match="Extra inputs are not permitted"):
+        AgentInsightFilter(
+            field="failure_severity",
+            values=["major"],
+            signature_type="failure",
+        )
+    for severity in ("info", "major", "minor"):
+        insight_filter = AgentInsightFilter(
+            field="failure_severity",
+            values=[severity],
+        )
+        assert insight_filter.values == [severity]
+    with pytest.raises(
+        ValidationError,
+        match=(
+            "failure_severity values must be one of: info, major, minor; got: unknown"
+        ),
+    ):
+        AgentInsightFilter(
+            field="failure_severity",
+            values=["unknown"],
+        )
+    for sentiment in AGENT_INTENT_SENTIMENTS:
+        insight_filter = AgentInsightFilter(
+            field="intent_sentiment",
+            values=[sentiment],
+        )
+        assert insight_filter.values == [sentiment]
+    with pytest.raises(
+        ValidationError,
+        match=(
+            "intent_sentiment values must be one of: "
+            f"{', '.join(AGENT_INTENT_SENTIMENTS)}; got: positive"
+        ),
+    ):
+        AgentInsightFilter(
+            field="intent_sentiment",
+            values=["positive"],
+        )
+    with pytest.raises(ValidationError, match="invalid topic ID: not-a-uuid"):
+        AgentInsightFilter(
+            field="intent_topic_id",
+            values=["not-a-uuid"],
+        )
+    with pytest.raises(ValidationError, match="insight_filters require group_by"):
+        AgentSpansQueryReq(
+            project_id="p1",
+            insight_filters=[
+                AgentInsightFilter(
+                    field="intent_category",
+                    values=["information_request"],
+                )
+            ],
+        )
+
+
+def test_build_topic_insight_filter_clause() -> None:
+    start = datetime.datetime(2026, 9, 1, tzinfo=datetime.timezone.utc)
+    end = datetime.datetime(2026, 9, 8, tzinfo=datetime.timezone.utc)
+    pb = ParamBuilder("insight")
+    clause = build_insight_filter_clause(
+        pb,
+        "project-1",
+        [
+            AgentInsightFilter(
+                field="failure_topic_id",
+                values=["01994634-c680-7dc3-a40b-0383b5008d70"],
+                exclude=True,
+            )
+        ],
+        start,
+        end,
+    )
+
+    expected = """
+        s.conversation_id NOT IN (
+          WITH succeeded_runs AS (
+            SELECT window_start, window_end, inserted_at, id FROM signature_cluster_runs
+            WHERE project_id = {insight_0:String} AND signature_type = 'failure'
+              AND status = 'succeeded'),
+          (
+            SELECT arraySort(run -> tuple(run.2, run.3, run.4), groupArray(tuple(window_start, window_end, inserted_at, id)))
+            FROM succeeded_runs
+          ) AS succeeded_runs_by_recency
+          SELECT conversation_id FROM signature_cluster_assignments
+          WHERE project_id = {insight_0:String}
+            AND conversation_id != ''
+            AND trace_started_at >= {insight_2:DateTime64(6)}
+            AND trace_started_at < {insight_3:DateTime64(6)}
+            AND signature_type = 'failure'
+            AND (cluster_run_id, cluster_id) IN (
+              SELECT cluster_run_id, id FROM signature_clusters
+              WHERE project_id = {insight_0:String}
+                AND signature_type = 'failure'
+                AND cluster_run_id IN (SELECT id FROM succeeded_runs)
+                AND topic_id != toUUID('00000000-0000-0000-0000-000000000000')
+                AND toString(topic_id) IN {insight_1:Array(String)})
+            AND cluster_run_id = tupleElement(arrayLast(run -> run.1 <= trace_started_at AND trace_started_at < run.2, succeeded_runs_by_recency), 4)
+          GROUP BY conversation_id
+        )
+    """
+    assert_sql(
+        expected,
+        {
+            "insight_0": "project-1",
+            "insight_1": ["01994634-c680-7dc3-a40b-0383b5008d70"],
+            "insight_2": start,
+            "insight_3": end,
+        },
+        clause or "",
+        pb.get_params(),
+    )
 
 
 def test_build_signal_filter_clause() -> None:

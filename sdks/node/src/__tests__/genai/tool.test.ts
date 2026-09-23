@@ -35,7 +35,7 @@ describe('Tool', () => {
     turn.end();
 
     const spans = getExporter().getFinishedSpans();
-    const toolSpan = findSpan(spans, 'execute_tool');
+    const toolSpan = findSpan(spans, 'execute_tool get_weather');
     const turnSpan = findSpan(spans, 'invoke_agent');
 
     expect(toolSpan.kind).toBe(SpanKind.INTERNAL);
@@ -61,8 +61,8 @@ describe('Tool', () => {
     turn.end();
 
     const spans = getExporter().getFinishedSpans();
-    const toolSpan = findSpan(spans, 'execute_tool');
-    const llmSpan = findSpan(spans, 'chat');
+    const toolSpan = findSpan(spans, 'execute_tool get_weather');
+    const llmSpan = findSpan(spans, 'chat gpt-4o');
     expect(toolSpan.parentSpanId).toBe(llmSpan.spanContext().spanId);
   });
 
@@ -76,7 +76,10 @@ describe('Tool', () => {
     tool.end({result: {temperature: 99}});
     turn.end();
 
-    const toolSpan = findSpan(getExporter().getFinishedSpans(), 'execute_tool');
+    const toolSpan = findSpan(
+      getExporter().getFinishedSpans(),
+      'execute_tool get_weather'
+    );
     expect(toolSpan.attributes[ATTR_GEN_AI_TOOL_CALL_ARGUMENTS]).toBe(
       '{"city":"Tokyo","units":["celsius","fahrenheit"]}'
     );
@@ -94,7 +97,10 @@ describe('Tool', () => {
     });
     turn.end();
 
-    const toolSpan = findSpan(getExporter().getFinishedSpans(), 'execute_tool');
+    const toolSpan = findSpan(
+      getExporter().getFinishedSpans(),
+      'execute_tool get_weather'
+    );
     expect(toolSpan.attributes[ATTR_GEN_AI_TOOL_CALL_RESULT]).toBe(
       '{"message":"weather service unavailable"}'
     );
@@ -113,7 +119,10 @@ describe('Tool', () => {
     tool.end({result: cyclic});
     turn.end();
 
-    const toolSpan = findSpan(getExporter().getFinishedSpans(), 'execute_tool');
+    const toolSpan = findSpan(
+      getExporter().getFinishedSpans(),
+      'execute_tool cyclic_value'
+    );
     expect(toolSpan.attributes[ATTR_GEN_AI_TOOL_CALL_ARGUMENTS]).toBe(
       '[unserializable]'
     );
@@ -134,7 +143,10 @@ describe('Tool', () => {
     tool.setAttributes({'after.end': 'x'});
     turn.end();
 
-    const toolSpan = findSpan(getExporter().getFinishedSpans(), 'execute_tool');
+    const toolSpan = findSpan(
+      getExporter().getFinishedSpans(),
+      'execute_tool get_weather'
+    );
     expect(toolSpan.attributes['weave.display_name']).toBe(
       'get_weather: Tokyo'
     );
@@ -157,7 +169,10 @@ describe('Tool', () => {
     tool.addEvent('after.end');
     turn.end();
 
-    const toolSpan = findSpan(getExporter().getFinishedSpans(), 'execute_tool');
+    const toolSpan = findSpan(
+      getExporter().getFinishedSpans(),
+      'execute_tool get_weather'
+    );
     expect(toolSpan.events).toHaveLength(1);
     expect(toolSpan.events[0].name).toBe('weave.permission_request');
     expect(
@@ -177,7 +192,10 @@ describe('Tool', () => {
     tool.end({endTime: endedAt});
     turn.end();
 
-    const toolSpan = findSpan(getExporter().getFinishedSpans(), 'execute_tool');
+    const toolSpan = findSpan(
+      getExporter().getFinishedSpans(),
+      'execute_tool get_weather'
+    );
     expectSpanTimesToMatch(toolSpan, startedAt, endedAt);
   });
 });
