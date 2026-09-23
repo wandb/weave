@@ -262,7 +262,12 @@ class TestLLMAttributes:
             response_id="resp-abc",
             finish_reasons=["stop"],
             system_instructions=["Be helpful", "Be concise"],
-            usage=Usage(input_tokens=100, output_tokens=50, reasoning_tokens=20),
+            usage=Usage(
+                input_tokens=100,
+                output_tokens=50,
+                total_tokens=170,
+                reasoning_tokens=20,
+            ),
             input_messages=[Message(role="user", content="Hello")],
             output_messages=[Message(role="assistant", content="Hi!")],
         )
@@ -274,6 +279,7 @@ class TestLLMAttributes:
         assert attrs["gen_ai.response.finish_reasons"] == ["stop"]
         assert attrs["gen_ai.usage.input_tokens"] == 100
         assert attrs["gen_ai.usage.output_tokens"] == 50
+        assert attrs["gen_ai.usage.total_tokens"] == 170
         assert attrs["gen_ai.usage.reasoning_tokens"] == 20
         # system_instructions: array of TextParts per semconv
         assert json.loads(attrs["gen_ai.system_instructions"]) == [
@@ -318,12 +324,14 @@ class TestLLMAttributes:
         attrs = llm_attributes(model="gpt-4o", usage=Usage())
         assert "gen_ai.usage.input_tokens" not in attrs
         assert "gen_ai.usage.output_tokens" not in attrs
+        assert "gen_ai.usage.total_tokens" not in attrs
         assert "gen_ai.usage.reasoning_tokens" not in attrs
 
     def test_none_usage_omitted(self) -> None:
         attrs = llm_attributes(model="gpt-4o", usage=None)
         assert "gen_ai.usage.input_tokens" not in attrs
         assert "gen_ai.usage.output_tokens" not in attrs
+        assert "gen_ai.usage.total_tokens" not in attrs
         assert "gen_ai.usage.reasoning_tokens" not in attrs
 
     def test_partial_usage_only_includes_nonzero(self) -> None:
@@ -333,6 +341,7 @@ class TestLLMAttributes:
         )
         assert attrs["gen_ai.usage.input_tokens"] == 100
         assert "gen_ai.usage.output_tokens" not in attrs
+        assert "gen_ai.usage.total_tokens" not in attrs
         assert "gen_ai.usage.reasoning_tokens" not in attrs
 
     def test_empty_system_instructions_omitted(self) -> None:
@@ -2218,21 +2227,23 @@ class TestLLMRecord:
         llm = LLM()
         assert llm.record(response_id="x") is llm
 
+    @pytest.mark.parametrize("total_tokens", [0, 5])
     def test_recorded_fields_emitted_on_span(
-        self, otel_spans: InMemorySpanExporter
+        self, otel_spans: InMemorySpanExporter, total_tokens: int
     ) -> None:
         """End-to-end: record() values flow through to the OTel attrs."""
         attrs = _emit_llm_with(
             otel_spans,
             input_messages=[Message.user("hi")],
             output_messages=[Message.assistant("hello")],
-            usage=Usage(input_tokens=3, output_tokens=2),
+            usage=Usage(input_tokens=3, output_tokens=2, total_tokens=total_tokens),
             reasoning="thinking...",
             response_id="r1",
             finish_reasons=["stop"],
         )
         assert attrs["gen_ai.usage.input_tokens"] == 3
         assert attrs["gen_ai.usage.output_tokens"] == 2
+        assert attrs["gen_ai.usage.total_tokens"] == total_tokens
         assert attrs["gen_ai.response.id"] == "r1"
         assert attrs["gen_ai.response.finish_reasons"] == ("stop",)
         # Reasoning is folded into output messages as a ReasoningPart
