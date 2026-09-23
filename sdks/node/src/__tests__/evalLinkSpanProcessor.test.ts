@@ -120,7 +120,7 @@ describe('EvalLinkSpanProcessor - declarative Evaluation', () => {
 
     const spans = exporter.getFinishedSpans();
     const rootSpan = findSpan(spans, 'invoke_agent');
-    const childSpan = findSpan(spans, 'chat');
+    const childSpan = findSpan(spans, 'chat gpt-4o');
 
     // Eval results match a span on the pair, so assert it, not either half.
     expect(rootSpan.attributes[EVAL_RUN_ID_SPAN_ATTR]).toBe(evaluateCall.id);
