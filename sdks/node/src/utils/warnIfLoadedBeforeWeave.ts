@@ -5,6 +5,7 @@ import {
   getCJSInstrumentedTargets,
   getLoadOrderDependencyOwners,
   isLoadOrderWarningSuppressed,
+  isLoadOrderWarningSuppressedForFile,
 } from '../integrations/instrumentations';
 import state from '../state';
 import {requirePackageJson} from './npmModuleUtils';
@@ -38,6 +39,7 @@ export function warnIfLoadedBeforeWeave(): void {
     const unpatched = loadedBeforeHook.filter(
       file =>
         file.endsWith(patched) &&
+        !isLoadOrderWarningSuppressedForFile(file) &&
         !loadedOnlyBy(file, owners) &&
         isPatchableVersion(file.slice(0, -(entry.length + 1)), versions)
     );
@@ -51,6 +53,37 @@ export function warnIfLoadedBeforeWeave(): void {
         `Ignore this if you register the integration explicitly.`
     );
   }
+}
+
+/**
+ * Whether a copy of the SDK that is installing its CJS hook should take the
+ * load-order snapshot: not if a copy already did, and not if another weave
+ * copy's hook is the active require, because that hook saw every later load.
+ * An older SDK may have created the shared state without the field.
+ */
+export function shouldSnapshotRequireCache(
+  snapshot: string[] | null | undefined,
+  activeRequire: {name: string}
+): boolean {
+  return snapshot == null && activeRequire.name !== 'patchedRequire';
+}
+
+/**
+ * For each file in `cache`, the package of every file that had required it so
+ * far. The loader stores this next to its snapshot; see
+ * `state.requirerPackagesBeforeCjsHook`.
+ */
+export function requirerPackagesOf(
+  cache: NodeJS.Dict<NodeModule>,
+  packageNameOf: (file: string) => string
+): Record<string, string[]> {
+  const requirers: Record<string, string[]> = {};
+  for (const [file, cached] of Object.entries(cache)) {
+    for (const child of cached?.children ?? []) {
+      (requirers[child.filename] ??= []).push(packageNameOf(file));
+    }
+  }
+  return requirers;
 }
 
 // True when only `owners` had required `file` before the hook, i.e. another

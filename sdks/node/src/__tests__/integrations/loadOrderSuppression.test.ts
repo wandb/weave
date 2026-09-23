@@ -10,6 +10,7 @@ import {
 } from '../../integrations/googleAdk';
 import {
   commonPatchGoogleGenAI,
+  instrumentGoogleGenAI,
   wrapGoogleGenAI,
 } from '../../integrations/googleGenAI';
 import instrumentations, {
@@ -97,6 +98,9 @@ beforeAll(() => {
   instrumentOpenAI();
   instrumentAnthropic();
   instrumentClaudeAgentSdk();
+  instrumentGoogleADK();
+  instrumentGoogleGenAI();
+  instrumentOpenAIAgent();
   instrumentOpenAIRealtimeAgent();
 });
 
@@ -177,11 +181,12 @@ describe('load-order warning suppression', () => {
         owners: {'@openai/agents-realtime': ['@openai/agents']},
       },
     ],
-    // Patches that reach every existing reference.
+    // Prototype patches: the loader suppresses the one file it patched, by the
+    // registration flag checked below, so the hooks themselves record nothing.
     [
       'ADK require hook',
       () => commonPatchGoogleADK({Runner: FakeRunner} as any),
-      {suppressed: ['@google/adk'], owners: {}},
+      NONE,
     ],
     [
       'Anthropic require hook',
@@ -189,7 +194,7 @@ describe('load-order warning suppression', () => {
         cjsHook('@anthropic-ai/sdk@index.js')({
           Anthropic: {Messages: FakeMessages},
         }),
-      {suppressed: ['@anthropic-ai/sdk'], owners: {}},
+      NONE,
     ],
     // Hooked modules that another integration loads for its own use.
     [
@@ -206,4 +211,17 @@ describe('load-order warning suppression', () => {
     await run();
     expect(suppression()).toEqual(expected);
   });
+});
+
+test('only the hooks whose patch reaches earlier references are flagged', () => {
+  const flagged = [...instrumentations]
+    .filter(([, candidates]: [string, any[]]) =>
+      candidates.some(candidate => candidate.reachesEarlierReferences)
+    )
+    .map(([key]: [string, any[]]) => key)
+    .sort();
+  expect(flagged).toEqual([
+    '@anthropic-ai/sdk@index.js',
+    '@google/adk@dist/cjs/index.js',
+  ]);
 });

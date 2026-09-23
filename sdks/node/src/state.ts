@@ -31,10 +31,11 @@ type State = {
   modulesLoadedBeforeCjsHook: string[] | null;
 
   /**
-   * For each file in `modulesLoadedBeforeCjsHook`, the packages whose files had
-   * required it by then; `''` stands for a file outside `node_modules`, such as
-   * the app's own code. Tells a library the app imported apart from one another
-   * package loaded for its own use. Taken together with the snapshot.
+   * For each file in `modulesLoadedBeforeCjsHook`, the package of every file
+   * that had required it by then: the name from its `node_modules` path, or from
+   * the nearest `package.json` for a linked package or the app's own code (`''`
+   * if none). Tells a library the app imported apart from one another package
+   * loaded for its own use. Taken together with the snapshot.
    */
   requirerPackagesBeforeCjsHook: Record<string, string[]> | null;
 

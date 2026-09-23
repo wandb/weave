@@ -5,9 +5,14 @@ import semifies from 'semifies';
 import instrumentations, {
   type CacheEntry,
   type CJSInstrumentation,
+  suppressLoadOrderWarningForFile,
 } from '../integrations/instrumentations';
 import state from '../state';
-import {requirePackageJson} from './npmModuleUtils';
+import {nearestPackageName, requirePackageJson} from './npmModuleUtils';
+import {
+  requirerPackagesOf,
+  shouldSnapshotRequireCache,
+} from './warnIfLoadedBeforeWeave';
 
 const parse: (filePath: string) => {
   name: string;
@@ -18,16 +23,10 @@ const parse: (filePath: string) => {
 
 export let reset = () => {};
 
-function requirerPackagesOf(
-  cache: NodeJS.Dict<NodeModule>
-): Record<string, string[]> {
-  const requirers: Record<string, string[]> = {};
-  for (const [file, cached] of Object.entries(cache)) {
-    for (const child of cached?.children ?? []) {
-      (requirers[child.filename] ??= []).push(parse(file)?.name ?? '');
-    }
-  }
-  return requirers;
+// The package a file belongs to: from its `node_modules` path, or from the
+// nearest package.json for a linked package or the app's own code.
+function packageNameOf(file: string): string {
+  return parse(file)?.name ?? nearestPackageName(path.dirname(file));
 }
 
 const patching = Object.create(null);
@@ -41,6 +40,7 @@ if (typeof module !== 'undefined' && module.exports) {
   const Module = require('module');
   const originalRequire = Module.prototype.require;
 
+  // Other weave copies recognize this hook by its name; keep it.
   function patchedRequire(this: any, request: any) {
     let filename;
     try {
@@ -86,7 +86,10 @@ if (typeof module !== 'undefined' && module.exports) {
       const originalExports = originalRequire.apply(this, arguments as any);
 
       let instrumentation:
-        | Pick<CJSInstrumentation, 'version' | 'hook'>
+        | Pick<
+            CJSInstrumentation,
+            'version' | 'hook' | 'reachesEarlierReferences'
+          >
         | undefined;
 
       let packageJson: any;
@@ -124,6 +127,9 @@ if (typeof module !== 'undefined' && module.exports) {
 
       cachedModules.set(filename, cacheEntry);
       delete patching[filename];
+      if (instrumentation.reachesEarlierReferences) {
+        suppressLoadOrderWarningForFile(filename);
+      }
     }
     return cachedModules.get(filename)!.patchedExports;
   }
@@ -135,12 +141,18 @@ if (typeof module !== 'undefined' && module.exports) {
   // Snapshot before the swap, unfiltered: the instrumentation registry is
   // still empty here, because `index.ts` runs `./integrations/hooks`, which
   // fills it, after this module. `warnIfLoadedBeforeWeave()` filters the
-  // snapshot at init() time instead. Only `null` means no copy has snapshotted
-  // yet. A second copy of this SDK finds an array, and an older SDK that created
-  // the shared state leaves the field undefined; its hook saw the later loads.
-  if (state.modulesLoadedBeforeCjsHook === null) {
+  // snapshot at init() time instead.
+  if (
+    shouldSnapshotRequireCache(
+      state.modulesLoadedBeforeCjsHook,
+      originalRequire
+    )
+  ) {
     state.modulesLoadedBeforeCjsHook = Object.keys(require.cache);
-    state.requirerPackagesBeforeCjsHook = requirerPackagesOf(require.cache);
+    state.requirerPackagesBeforeCjsHook = requirerPackagesOf(
+      require.cache,
+      packageNameOf
+    );
   }
 
   Module.prototype.require = patchedRequire as any;

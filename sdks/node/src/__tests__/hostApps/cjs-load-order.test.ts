@@ -43,4 +43,24 @@ describe('hostApps — cjs-load-order', () => {
     expect(result.stdout).toContain('create: wrappedWithAgents');
     expect(result.stderr).not.toContain('was loaded before');
   }, 60_000);
+
+  test('the exit listener warns when the app exits right after init()', async () => {
+    const result = await launch('start-forced-exit');
+    expect(result.exitCode).toBe(0);
+    expect(result.stderr).toContain(
+      "Weave: 'openai' was loaded before 'weave'"
+    );
+  }, 60_000);
+
+  test('a prototype-patched library warns until it is required again', async () => {
+    const once = await launch('start-prototype-patch');
+    expect(once.stdout).toContain('patched: false');
+    expect(once.stderr).toContain(
+      "Weave: '@anthropic-ai/sdk' was loaded before 'weave'"
+    );
+
+    const again = await launch('start-prototype-patch-again');
+    expect(again.stdout).toContain('patched: true');
+    expect(again.stderr).not.toContain('was loaded before');
+  }, 60_000);
 });

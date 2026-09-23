@@ -33,6 +33,12 @@ export interface CJSInstrumentation {
   subPath: string;
   version: string;
   hook: HookFn;
+  /**
+   * The hook patches prototypes or registers globally, so it also fixes
+   * references the app took before it ran. The loader then stops the
+   * load-order warning for the file it patched.
+   */
+  reachesEarlierReferences?: boolean;
 }
 
 export interface ESMInstrumentation {
@@ -46,6 +52,7 @@ export function addCJSInstrumentation({
   subPath,
   version,
   hook,
+  reachesEarlierReferences,
 }: CJSInstrumentation) {
   const instrumentations = (global as any)[symCJSInstrumentations];
 
@@ -58,6 +65,7 @@ export function addCJSInstrumentation({
   instrumentations.get(instrumentationLookupKey)!.push({
     version,
     hook,
+    reachesEarlierReferences,
   });
 }
 
@@ -123,6 +131,24 @@ export function suppressLoadOrderWarning(...moduleNames: string[]): void {
 
 export function isLoadOrderWarningSuppressed(moduleName: string): boolean {
   return loadOrderWarningSuppressed.has(moduleName);
+}
+
+const patchedEarlyFiles = globalSingleton(
+  '_weave_load_order_patched_files',
+  () => new Set<string>()
+);
+
+/**
+ * Stop the warning for one copy of a module: the loader applied a hook marked
+ * `reachesEarlierReferences` to this exact file. Other copies of the same
+ * package, such as one nested under another dependency, still warn.
+ */
+export function suppressLoadOrderWarningForFile(file: string): void {
+  patchedEarlyFiles.add(file);
+}
+
+export function isLoadOrderWarningSuppressedForFile(file: string): boolean {
+  return patchedEarlyFiles.has(file);
 }
 
 const dependencyOwners = globalSingleton(

@@ -1417,10 +1417,6 @@ export function commonPatchGoogleADK(exports: typeof GoogleADK) {
   try {
     if (exports?.Runner) {
       patchRunnerClass(exports.Runner);
-      // The patch is on Runner.prototype, so it reaches runners created before it.
-      if ((exports.Runner.prototype as any)?.[weaveAdkRunnerPatched]) {
-        suppressLoadOrderWarning('@google/adk');
-      }
     }
   } catch (error) {
     warnOnce(
@@ -1440,6 +1436,8 @@ export function instrumentGoogleADK() {
     subPath: ADK_CJS_SUBPATH,
     version: ADK_VERSION_RANGE,
     hook: commonPatchGoogleADK,
+    // The patch is on Runner.prototype, so it reaches runners created before it.
+    reachesEarlierReferences: true,
   });
   addESMInstrumentation({
     moduleName: '@google/adk',

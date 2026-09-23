@@ -8,7 +8,10 @@
     "start-weave-first": "node weave-first.cjs",
     "start-weave-twice": "node weave-twice.cjs",
     "start-wrap-before-init": "node wrap-before-init.cjs",
-    "start-wrap-after-init": "node wrap-after-init.cjs"
+    "start-wrap-after-init": "node wrap-after-init.cjs",
+    "start-forced-exit": "node forced-exit.cjs",
+    "start-prototype-patch": "node prototype-patch.cjs",
+    "start-prototype-patch-again": "node prototype-patch.cjs --require-again"
   },
   "dependencies": {
     "openai": "file:../../../../../node_modules/openai"

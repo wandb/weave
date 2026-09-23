@@ -4,11 +4,22 @@ import path from 'path';
 
 import '../../integrations/hooks';
 import {
+  getLoadOrderDependencyOwners,
   suppressLoadOrderWarning,
+  suppressLoadOrderWarningForFile,
   suppressLoadOrderWarningWhenLoadedBy,
 } from '../../integrations/instrumentations';
 import state from '../../state';
-import {warnIfLoadedBeforeWeave} from '../../utils/warnIfLoadedBeforeWeave';
+import {nearestPackageName} from '../../utils/npmModuleUtils';
+import {
+  requirerPackagesOf,
+  shouldSnapshotRequireCache,
+  warnIfLoadedBeforeWeave,
+} from '../../utils/warnIfLoadedBeforeWeave';
+
+const parse: (file: string) => {name: string} | undefined =
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  require('module-details-from-path');
 
 const root = fs.mkdtempSync(path.join(os.tmpdir(), 'weave-load-order-'));
 const nodeModules = path.join(root, 'node_modules');
@@ -52,6 +63,15 @@ function warning(moduleName: string): string {
 afterAll(() => fs.rmSync(root, {recursive: true, force: true}));
 
 describe('warnIfLoadedBeforeWeave', () => {
+  test('loading weave declares the packages that load hooked modules themselves', () => {
+    expect([...getLoadOrderDependencyOwners('@google/genai')]).toEqual([
+      '@google/adk',
+    ]);
+    expect([...getLoadOrderDependencyOwners('openai')]).toEqual([
+      '@openai/agents-openai',
+    ]);
+  });
+
   test('warns once for each library the app loaded before the hook', () => {
     const warn = jest.spyOn(console, 'warn').mockImplementation();
     const openai = pkg('openai', '5.0.0', 'index.js');
@@ -119,5 +139,104 @@ describe('warnIfLoadedBeforeWeave', () => {
 
     expect(warn.mock.calls).toEqual([[warning('@anthropic-ai/sdk')]]);
     warn.mockRestore();
+  });
+
+  test('records the package of each requirer, including linked ones', () => {
+    // A linked package's real path is outside node_modules; its package.json names it.
+    const linkedAdk = installed(
+      path.join(root, 'packages', 'adk'),
+      '@google/adk',
+      '1.2.0',
+      'index.js'
+    );
+    const appFile = installed(root, 'my-app', '1.0.0', 'src/app.js');
+    const target = pkg('@google/genai', '1.30.0', 'dist/node/index.cjs');
+    const fromPnpm = installed(
+      path.join(nodeModules, '.pnpm', 'x@1.0.0', 'node_modules', '@scope', 'x'),
+      '@scope/x',
+      '1.0.0',
+      'lib/index.js'
+    );
+    const child = {filename: target} as NodeModule;
+    const cache = {
+      [linkedAdk]: {children: [child]},
+      [appFile]: {children: [child]},
+      [fromPnpm]: {children: [child]},
+      [target]: {children: []},
+    } as unknown as NodeJS.Dict<NodeModule>;
+
+    expect(
+      requirerPackagesOf(
+        cache,
+        file => parse(file)?.name ?? nearestPackageName(path.dirname(file))
+      )
+    ).toEqual({[target]: ['@google/adk', 'my-app', '@scope/x']});
+  });
+
+  test('skips only the copy the loader patched, not another copy', () => {
+    const warn = jest.spyOn(console, 'warn').mockImplementation();
+    const patchedCopy = installed(
+      path.join(nodeModules, 'dep', 'node_modules', '@openai', 'agents'),
+      '@openai/agents',
+      '0.12.0',
+      'dist/index.js'
+    );
+    const appCopy = pkg('@openai/agents', '0.12.0', 'dist/index.js');
+    suppressLoadOrderWarningForFile(patchedCopy);
+    state.requirerPackagesBeforeCjsHook = {};
+
+    state.modulesLoadedBeforeCjsHook = [patchedCopy];
+    warnIfLoadedBeforeWeave();
+    expect(warn.mock.calls).toEqual([]);
+
+    state.modulesLoadedBeforeCjsHook = [patchedCopy, appCopy];
+    warnIfLoadedBeforeWeave();
+    expect(warn.mock.calls).toEqual([[warning('@openai/agents')]]);
+    warn.mockRestore();
+  });
+
+  test('keeps the warning when the package version cannot be read', () => {
+    const warn = jest.spyOn(console, 'warn').mockImplementation();
+    const noPackageJson = path.join(
+      root,
+      'bare',
+      'node_modules',
+      '@anthropic-ai',
+      'claude-agent-sdk',
+      'sdk.mjs'
+    );
+    fs.mkdirSync(path.dirname(noPackageJson), {recursive: true});
+    fs.writeFileSync(noPackageJson, '');
+    state.modulesLoadedBeforeCjsHook = [noPackageJson];
+    state.requirerPackagesBeforeCjsHook = {};
+
+    warnIfLoadedBeforeWeave();
+
+    expect(warn.mock.calls).toEqual([
+      [warning('@anthropic-ai/claude-agent-sdk')],
+    ]);
+    warn.mockRestore();
+  });
+
+  test('stays quiet without a snapshot', () => {
+    const warn = jest.spyOn(console, 'warn').mockImplementation();
+    for (const snapshot of [null, undefined]) {
+      state.modulesLoadedBeforeCjsHook = snapshot as unknown as null;
+      warnIfLoadedBeforeWeave();
+    }
+    expect(warn.mock.calls).toEqual([]);
+    warn.mockRestore();
+  });
+
+  test('a copy snapshots only if no copy did and no weave hook is active', () => {
+    const nodeRequire = {name: 'require'};
+    const weaveHook = {name: 'patchedRequire'};
+    expect([
+      shouldSnapshotRequireCache(null, nodeRequire), // first copy
+      shouldSnapshotRequireCache(undefined, nodeRequire), // older ESM copy first
+      shouldSnapshotRequireCache([], weaveHook), // second copy of this version
+      shouldSnapshotRequireCache(undefined, weaveHook), // older CJS copy first
+      shouldSnapshotRequireCache(null, weaveHook), // SDK without shared state first
+    ]).toEqual([true, true, false, false, false]);
   });
 });
