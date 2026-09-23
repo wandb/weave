@@ -8,6 +8,8 @@ import {
   wrapGoogleGenAI,
 } from '../../integrations/googleGenAI';
 import {instrumentOpenAI, wrapOpenAI} from '../../integrations/openai';
+import {createOpenAIAgentsTracingProcessor} from '../../integrations/openai.agent';
+import {patchRealtimeSession} from '../../integrations/openai.realtime.agent';
 
 class FakeOpenAI {
   chat = {completions: {create: () => undefined}};
@@ -26,10 +28,12 @@ const EXPLICIT_MODULES = [
   '@google/genai',
   '@anthropic-ai/claude-agent-sdk',
   '@google/adk',
+  '@openai/agents',
+  '@openai/agents-realtime',
 ];
 
 describe('explicit registration', () => {
-  test('only the explicit APIs count, not the require hook', () => {
+  test('only the explicit APIs count, not the require hook', async () => {
     instrumentOpenAI();
     const [{hook}] = instrumentations.get('openai@index.js');
     const hookedOpenAI = hook({OpenAI: FakeOpenAI}, 'openai', '');
@@ -42,6 +46,8 @@ describe('explicit registration', () => {
     wrapGoogleGenAI(new FakeGoogleGenAI() as any);
     wrapClaudeAgentSdk({query: () => undefined});
     new WeaveAdkPlugin();
+    createOpenAIAgentsTracingProcessor();
+    await patchRealtimeSession();
     expect(EXPLICIT_MODULES.filter(isRegisteredExplicitly)).toEqual(
       EXPLICIT_MODULES
     );

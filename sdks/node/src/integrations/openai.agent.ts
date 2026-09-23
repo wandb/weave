@@ -12,7 +12,11 @@
  */
 
 import type OpenAIAgents from '@openai/agents';
-import {addCJSInstrumentation, addESMInstrumentation} from './instrumentations';
+import {
+  addCJSInstrumentation,
+  addESMInstrumentation,
+  markRegisteredExplicitly,
+} from './instrumentations';
 import type {TracingProcessor} from '@openai/agents';
 import {getGlobalClient} from '../clientApi';
 import {defaultSettings} from '../settings';
@@ -100,6 +104,9 @@ export function getCurrentSpan(): OpenAIAgents.Span<any> | null {
  * ```
  */
 export function createOpenAIAgentsTracingProcessor(): TracingProcessor {
+  // The require hook creates one too, but it registers the processor globally,
+  // which reaches every reference to the agents module.
+  markRegisteredExplicitly('@openai/agents');
   const settings = getGlobalClient()?.settings ?? defaultSettings();
   if (settings.useOTelV2) {
     return new WeaveOtelTracingProcessor();

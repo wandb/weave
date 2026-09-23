@@ -31,7 +31,11 @@
 import {getGlobalClient} from '../clientApi';
 import {uuidv7} from 'uuidv7';
 import type {RealtimeSession} from '@openai/agents-realtime';
-import {addCJSInstrumentation, addESMInstrumentation} from './instrumentations';
+import {
+  addCJSInstrumentation,
+  addESMInstrumentation,
+  markRegisteredExplicitly,
+} from './instrumentations';
 import state from '../state';
 import {asAttributes, libraryIntegration} from './integrationMetadata';
 
@@ -859,6 +863,7 @@ export function instrumentOpenAIRealtimeAgent(): void {
  * ```
  */
 export async function patchRealtimeSession(): Promise<boolean> {
+  markRegisteredExplicitly('@openai/agents-realtime');
   if (state.integrations.openaiAgentsRealtime.patched) return true;
 
   // Dynamic `import()` (not `require()`) so this compiles cleanly to both CJS
