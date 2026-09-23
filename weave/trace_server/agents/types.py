@@ -79,6 +79,8 @@ AgentIntentSentiment = Literal[
     "delighted",
 ]
 AGENT_INTENT_SENTIMENTS = get_args(AgentIntentSentiment)
+# Insight filter fields whose values are stable topic ids rather than taxonomy names.
+TOPIC_INSIGHT_FIELDS = frozenset({"intent_topic_id", "failure_topic_id"})
 AgentSpanStatsAggregation = Literal[
     "sum",
     "avg",
@@ -872,7 +874,7 @@ class AgentInsightFilter(BaseModel):
                     f"failure_severity values must be one of: {allowed}; got: "
                     f"{', '.join(invalid)}"
                 )
-        is_topic_filter = self.field in {"intent_topic_id", "failure_topic_id"}
+        is_topic_filter = self.field in TOPIC_INSIGHT_FIELDS
         if is_topic_filter:
             normalized_topic_ids = []
             for value in self.values:

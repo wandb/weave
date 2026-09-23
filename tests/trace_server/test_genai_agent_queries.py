@@ -4018,17 +4018,20 @@ def test_filter_conversations_by_signal(ch_server):
 def test_filter_conversations_by_insights(ch_server):
     project_id = _make_project_id("insight-filter")
     now = datetime.datetime.now(tz=datetime.timezone.utc)
+    # spans[3] starts inside the older run's window only.
+    span_starts = [now + datetime.timedelta(seconds=index) for index in range(3)]
+    span_starts.append(now - datetime.timedelta(days=1, hours=12))
     spans = [
         _make_span(
             project_id,
             conversation_id=f"conv-{suffix}-{uuid.uuid4().hex[:8]}",
             operation_name="invoke_agent",
-            started_at=now + datetime.timedelta(seconds=index),
+            started_at=started_at,
         )
-        for index, suffix in enumerate(("a", "b", "c"))
+        for suffix, started_at in zip("abcd", span_starts, strict=True)
     ]
     _insert_spans(ch_server.ch_client, spans)
-    intent_ids = [uuid.uuid4() for _ in range(2)]
+    intent_ids = [uuid.uuid4() for _ in spans]
     ch_server.ch_client.insert(
         "intent_signatures",
         data=[
@@ -4115,7 +4118,7 @@ def test_filter_conversations_by_insights(ch_server):
                 "intent",
                 now - datetime.timedelta(days=offset + 1),
                 # Windows reach an hour past the spans so the latest run covers them.
-                now - datetime.timedelta(days=offset, hours=-1),
+                now - datetime.timedelta(days=offset) + datetime.timedelta(hours=1),
                 "succeeded",
                 now - datetime.timedelta(days=offset + 1),
                 now - datetime.timedelta(days=offset),
@@ -4136,8 +4139,10 @@ def test_filter_conversations_by_insights(ch_server):
     old_cluster_id = uuid.uuid4()
     latest_cluster_id = uuid.uuid4()
     moved_cluster_id = uuid.uuid4()
+    nil_cluster_id = uuid.uuid4()
     topic_id = uuid.uuid4()
     moved_topic_id = uuid.uuid4()
+    nil_topic_id = uuid.UUID(int=0)
     ch_server.ch_client.insert(
         "signature_clusters",
         data=[
@@ -4162,6 +4167,7 @@ def test_filter_conversations_by_insights(ch_server):
                     0,
                 ),
                 (latest_run_id, moved_cluster_id, moved_topic_id, "action_request", 0),
+                (latest_run_id, nil_cluster_id, nil_topic_id, "action_request", 0),
             )
         ],
         column_names=[
@@ -4204,6 +4210,8 @@ def test_filter_conversations_by_insights(ch_server):
                     ),
                 ),
                 (1, (latest_run_id, moved_cluster_id, spans[1], "action_request")),
+                (2, (latest_run_id, nil_cluster_id, spans[2], "action_request")),
+                (3, (old_run_id, old_cluster_id, spans[3], "action_request")),
             )
         ],
         column_names=[
@@ -4221,13 +4229,16 @@ def test_filter_conversations_by_insights(ch_server):
         ],
     )
 
-    def filtered_ids(*filters: AgentInsightFilter) -> list[str]:
+    def filtered_ids(
+        *filters: AgentInsightFilter,
+        started_after: datetime.datetime = now - datetime.timedelta(hours=1),
+    ) -> list[str]:
         response = ch_server.agent_spans_query(
             AgentSpansQueryReq(
                 project_id=project_id,
                 group_by=[AgentGroupByRef(source="column", key="conversation_id")],
                 insight_filters=list(filters),
-                started_after=now - datetime.timedelta(hours=1),
+                started_after=started_after,
                 started_before=now + datetime.timedelta(hours=1),
             )
         )
@@ -4284,6 +4295,23 @@ def test_filter_conversations_by_insights(ch_server):
             values=[str(moved_topic_id)],
         )
     ) == [spans[1].conversation_id]
+    # Only the older run covers spans[3], so that run's topic still applies to it.
+    assert filtered_ids(
+        AgentInsightFilter(
+            field="intent_topic_id",
+            values=[str(topic_id)],
+        ),
+        started_after=now - datetime.timedelta(days=2),
+    ) == sorted([spans[0].conversation_id, spans[3].conversation_id])
+    assert (
+        filtered_ids(
+            AgentInsightFilter(
+                field="intent_topic_id",
+                values=[str(nil_topic_id)],
+            )
+        )
+        == []
+    )
     assert (
         filtered_ids(
             AgentInsightFilter(

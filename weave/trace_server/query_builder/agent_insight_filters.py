@@ -4,22 +4,31 @@ from __future__ import annotations
 
 import datetime
 
-from weave.trace_server.agents.types import AgentInsightFilter
+from weave.trace_server.agents.types import (
+    TOPIC_INSIGHT_FIELDS,
+    AgentInsightFilter,
+)
 from weave.trace_server.orm import ParamBuilder
 
-TOPIC_FIELDS = {"intent_topic_id", "failure_topic_id"}
 INTENT_SIGNATURE_FIELDS = {"intent_category", "intent_sentiment"}
 # Runs that predate topic reconciliation left topic_id at the UUID default.
 NIL_TOPIC_ID = "toUUID('00000000-0000-0000-0000-000000000000')"
-# Successful runs sorted oldest to newest by window end, completion time, then id.
-NEWEST_RUNS_ARRAY = (
+# signature_cluster_runs is a ReplacingMergeTree(inserted_at) on these four columns;
+# every status write for one run adds a row, so only the newest row has real status.
+LATEST_RUN_ROWS = (
+    "ORDER BY inserted_at DESC LIMIT 1 BY project_id, signature_type, window_end, id"
+)
+# Sorted by (window_end, completed_at, id): window_end first so a backfill run over
+# old dates cannot outrank a run whose window covers newer trace_started_at values.
+SUCCEEDED_RUNS_BY_RECENCY = (
     "arraySort(run -> tuple(run.2, run.3, run.4), "
     "groupArray(tuple(window_start, window_end, completed_at, id)))"
 )
-# The newest run whose window covers the turn decides the turn's topic.
+# arrayLast picks the newest run whose window holds trace_started_at; with no match it
+# yields the zero tuple, so cluster_run_id compares against the nil UUID and misses.
 COVERING_RUN_ID = (
     "tupleElement(arrayLast(run -> run.1 <= trace_started_at "
-    "AND trace_started_at < run.2, newest_runs), 4)"
+    "AND trace_started_at < run.2, succeeded_runs_by_recency), 4)"
 )
 
 
@@ -64,7 +73,7 @@ def _single_insight_filter_clause(
     operator = "NOT IN" if insight_filter.exclude else "IN"
     conditions = _turn_conditions(pb, pid_slot, started_after, started_before)
 
-    if insight_filter.field in TOPIC_FIELDS:
+    if insight_filter.field in TOPIC_INSIGHT_FIELDS:
         signature_type = (
             "intent" if insight_filter.field == "intent_topic_id" else "failure"
         )
@@ -124,18 +133,22 @@ def _topic_conversations_subquery(
 
     Only the assignment rows of matching clusters are read, pruned through the
     (project_id, cluster_run_id) sort key. A turn the newest covering run left
-    unclustered has no matching row and so matches no topic.
+    unclustered has no matching row and so matches no topic; a turn no succeeded
+    run covers resolves to the nil run id and matches nothing.
     """
-    run_source = (
+    latest_runs = (
+        "SELECT window_start, window_end, completed_at, id, status "
         f"FROM signature_cluster_runs WHERE project_id = {pid_slot} "
-        f"AND signature_type = '{signature_type}' AND status = 'succeeded'"
+        f"AND signature_type = '{signature_type}' {LATEST_RUN_ROWS}"
     )
-    succeeded_run_ids = f"SELECT id {run_source}"
-    succeeded_runs = f"SELECT window_start, window_end, completed_at, id {run_source}"
+    succeeded_runs = (
+        "SELECT window_start, window_end, completed_at, id "
+        f"FROM ({latest_runs}) WHERE status = 'succeeded'"
+    )
     matching_clusters = (
         "SELECT cluster_run_id, id FROM signature_clusters "
         f"WHERE project_id = {pid_slot} AND signature_type = '{signature_type}' "
-        f"AND cluster_run_id IN ({succeeded_run_ids}) "
+        "AND cluster_run_id IN (SELECT id FROM succeeded_runs) "
         f"AND topic_id != {NIL_TOPIC_ID} "
         f"AND toString(topic_id) IN {values_slot}"
     )
@@ -147,7 +160,9 @@ def _topic_conversations_subquery(
     ]
 
     return (
-        f"WITH (SELECT {NEWEST_RUNS_ARRAY} FROM ({succeeded_runs})) AS newest_runs "
+        f"WITH succeeded_runs AS ({succeeded_runs}), "
+        f"(SELECT {SUCCEEDED_RUNS_BY_RECENCY} FROM succeeded_runs) "
+        "AS succeeded_runs_by_recency "
         "SELECT conversation_id FROM signature_cluster_assignments "
         f"WHERE {' AND '.join(conditions)} GROUP BY conversation_id"
     )
