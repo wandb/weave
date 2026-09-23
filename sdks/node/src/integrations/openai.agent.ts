@@ -15,7 +15,8 @@ import type OpenAIAgents from '@openai/agents';
 import {
   addCJSInstrumentation,
   addESMInstrumentation,
-  markRegisteredExplicitly,
+  suppressLoadOrderWarning,
+  suppressLoadOrderWarningWhenLoadedBy,
 } from './instrumentations';
 import type {TracingProcessor} from '@openai/agents';
 import {getGlobalClient} from '../clientApi';
@@ -104,9 +105,15 @@ export function getCurrentSpan(): OpenAIAgents.Span<any> | null {
  * ```
  */
 export function createOpenAIAgentsTracingProcessor(): TracingProcessor {
-  // The require hook creates one too, but it registers the processor globally,
-  // which reaches every reference to the agents module.
-  markRegisteredExplicitly('@openai/agents');
+  // Registered globally, so load order does not matter for agent runs. The
+  // agents entry loads @openai/agents-realtime too, which is exempted only here:
+  // the @openai/agents/realtime facade is in the same package, and an app that
+  // imports it early without this processor still needs the warning.
+  suppressLoadOrderWarning('@openai/agents');
+  suppressLoadOrderWarningWhenLoadedBy(
+    ['@openai/agents'],
+    ['@openai/agents-realtime']
+  );
   const settings = getGlobalClient()?.settings ?? defaultSettings();
   if (settings.useOTelV2) {
     return new WeaveOtelTracingProcessor();
@@ -218,6 +225,9 @@ function patchOpenAI(agentExports: any) {
 }
 
 export function instrumentOpenAIAgent() {
+  // @openai/agents-openai loads openai for its own use. Only a copy the app
+  // required itself is worth a load-order warning.
+  suppressLoadOrderWarningWhenLoadedBy(['@openai/agents-openai'], ['openai']);
   addCJSInstrumentation({
     moduleName: '@openai/agents',
     subPath: 'dist/index.js',

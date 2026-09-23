@@ -3,7 +3,7 @@ import {type OpOptions, type StreamReducer} from '../opType';
 import {
   addCJSInstrumentation,
   addESMInstrumentation,
-  markRegisteredExplicitly,
+  suppressLoadOrderWarning,
 } from './instrumentations';
 import {asAttributes, libraryIntegration} from './integrationMetadata';
 
@@ -241,7 +241,7 @@ function wrapGoogleGenAIModels<T extends GoogleGenAIModelsAPI>(models: T): T {
 }
 
 export function wrapGoogleGenAI<T extends GoogleGenAIAPI>(googleGenAI: T): T {
-  markRegisteredExplicitly('@google/genai');
+  suppressLoadOrderWarning('@google/genai');
   return wrapGoogleGenAIClient(googleGenAI);
 }
 

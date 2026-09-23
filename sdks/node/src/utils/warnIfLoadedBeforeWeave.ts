@@ -1,10 +1,13 @@
 import path from 'path';
+import semifies from 'semifies';
 
 import {
   getCJSInstrumentedTargets,
-  isRegisteredExplicitly,
+  getLoadOrderDependencyOwners,
+  isLoadOrderWarningSuppressed,
 } from '../integrations/instrumentations';
 import state from '../state';
+import {requirePackageJson} from './npmModuleUtils';
 import {warnOnce} from './warnOnce';
 
 /**
@@ -21,21 +24,24 @@ export function warnIfLoadedBeforeWeave(): void {
   if (loadedBeforeHook.length === 0) {
     return;
   }
-  for (const {moduleName, subPath} of getCJSInstrumentedTargets()) {
-    if (isRegisteredExplicitly(moduleName)) {
+  for (const {moduleName, subPath, versions} of getCJSInstrumentedTargets()) {
+    if (isLoadOrderWarningSuppressed(moduleName)) {
       continue;
     }
     // Match the exact file the hook patches, not the package directory: some
     // other file of the package loaded early does not stop the entry point
     // from being patched. Suffix rather than equality because pnpm keeps the
     // real files under `.pnpm/<pkg>@<ver>/node_modules/<pkg>`.
-    const patched = path.join(
-      path.sep,
-      'node_modules',
-      moduleName,
-      ...subPath.split('/')
+    const entry = path.join(...subPath.split('/'));
+    const patched = path.join(path.sep, 'node_modules', moduleName, entry);
+    const owners = getLoadOrderDependencyOwners(moduleName);
+    const unpatched = loadedBeforeHook.filter(
+      file =>
+        file.endsWith(patched) &&
+        !loadedOnlyBy(file, owners) &&
+        isPatchableVersion(file.slice(0, -(entry.length + 1)), versions)
     );
-    if (!loadedBeforeHook.some(file => file.endsWith(patched))) {
+    if (unpatched.length === 0) {
       continue;
     }
     warnOnce(
@@ -44,5 +50,27 @@ export function warnIfLoadedBeforeWeave(): void {
         `In CommonJS, require('weave') before the library. ` +
         `Ignore this if you register the integration explicitly.`
     );
+  }
+}
+
+// True when only `owners` had required `file` before the hook, i.e. another
+// package loaded it for its own use and the app never imported it itself.
+function loadedOnlyBy(file: string, owners: ReadonlySet<string>): boolean {
+  const requirers = state.requirerPackagesBeforeCjsHook?.[file] ?? [];
+  return (
+    owners.size > 0 &&
+    requirers.length > 0 &&
+    requirers.every(requirer => owners.has(requirer))
+  );
+}
+
+// The hook skips versions outside its range in any order, so advice to reorder
+// would not help them. An unreadable version keeps the warning.
+function isPatchableVersion(packageDir: string, versions: string[]): boolean {
+  try {
+    const {version} = requirePackageJson(packageDir, []);
+    return versions.some(range => semifies(version, range));
+  } catch {
+    return true;
   }
 }

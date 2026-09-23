@@ -18,6 +18,18 @@ const parse: (filePath: string) => {
 
 export let reset = () => {};
 
+function requirerPackagesOf(
+  cache: NodeJS.Dict<NodeModule>
+): Record<string, string[]> {
+  const requirers: Record<string, string[]> = {};
+  for (const [file, cached] of Object.entries(cache)) {
+    for (const child of cached?.children ?? []) {
+      (requirers[child.filename] ??= []).push(parse(file)?.name ?? '');
+    }
+  }
+  return requirers;
+}
+
 const patching = Object.create(null);
 
 const cachedModules = new Map<string, CacheEntry>();
@@ -123,9 +135,13 @@ if (typeof module !== 'undefined' && module.exports) {
   // Snapshot before the swap, unfiltered: the instrumentation registry is
   // still empty here, because `index.ts` runs `./integrations/hooks`, which
   // fills it, after this module. `warnIfLoadedBeforeWeave()` filters the
-  // snapshot at init() time instead. A second copy of the SDK keeps the first
-  // copy's snapshot.
-  state.modulesLoadedBeforeCjsHook ??= Object.keys(require.cache);
+  // snapshot at init() time instead. Only `null` means no copy has snapshotted
+  // yet. A second copy of this SDK finds an array, and an older SDK that created
+  // the shared state leaves the field undefined; its hook saw the later loads.
+  if (state.modulesLoadedBeforeCjsHook === null) {
+    state.modulesLoadedBeforeCjsHook = Object.keys(require.cache);
+    state.requirerPackagesBeforeCjsHook = requirerPackagesOf(require.cache);
+  }
 
   Module.prototype.require = patchedRequire as any;
 } else {

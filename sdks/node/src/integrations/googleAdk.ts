@@ -128,7 +128,8 @@ import {warnOnce} from '../utils/warnOnce';
 import {
   addCJSInstrumentation,
   addESMInstrumentation,
-  markRegisteredExplicitly,
+  suppressLoadOrderWarning,
+  suppressLoadOrderWarningWhenLoadedBy,
 } from './instrumentations';
 
 /** The slice of ADK's `Runner` the instrumentation hook needs. */
@@ -593,10 +594,9 @@ function findAgentInTree(
 export class WeaveAdkPlugin implements AdkBasePlugin {
   readonly name = WEAVE_ADK_PLUGIN_NAME;
 
-  // The shared auto-instrumentation plugin runs this too, but it only exists
-  // once `Runner.prototype` is patched, which covers every Runner reference.
+  // With the plugin registered, ADK tracing no longer depends on require order.
   constructor() {
-    markRegisteredExplicitly('@google/adk');
+    suppressLoadOrderWarning('@google/adk');
   }
 
   private readonly invocations = new Map<string, InvocationState>();
@@ -1417,6 +1417,10 @@ export function commonPatchGoogleADK(exports: typeof GoogleADK) {
   try {
     if (exports?.Runner) {
       patchRunnerClass(exports.Runner);
+      // The patch is on Runner.prototype, so it reaches runners created before it.
+      if ((exports.Runner.prototype as any)?.[weaveAdkRunnerPatched]) {
+        suppressLoadOrderWarning('@google/adk');
+      }
     }
   } catch (error) {
     warnOnce(
@@ -1428,6 +1432,9 @@ export function commonPatchGoogleADK(exports: typeof GoogleADK) {
 }
 
 export function instrumentGoogleADK() {
+  // ADK loads @google/genai for its own clients, which the genai hook never
+  // wraps. Only a copy the app required itself is worth a load-order warning.
+  suppressLoadOrderWarningWhenLoadedBy(['@google/adk'], ['@google/genai']);
   addCJSInstrumentation({
     moduleName: '@google/adk',
     subPath: ADK_CJS_SUBPATH,

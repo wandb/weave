@@ -83,31 +83,74 @@ export function getESMInstrumentedModules(): string[] {
 }
 
 export function getCJSInstrumentedTargets(): Array<
-  Pick<CJSInstrumentation, 'moduleName' | 'subPath'>
+  Pick<CJSInstrumentation, 'moduleName' | 'subPath'> & {versions: string[]}
 > {
-  const instrumentations = (global as any)[symCJSInstrumentations];
-  return Array.from(instrumentations.keys() as Iterable<string>, key => {
+  const instrumentations: Map<
+    string,
+    Array<Pick<CJSInstrumentation, 'version'>>
+  > = (global as any)[symCJSInstrumentations];
+  return Array.from(instrumentations, ([key, candidates]) => {
     // Keys are `${moduleName}@${subPath}`. The separator is the first `@`
     // after the leading one a scoped name starts with.
     const at = key.indexOf('@', key.startsWith('@') ? 1 : 0);
-    return {moduleName: key.slice(0, at), subPath: key.slice(at + 1)};
+    return {
+      moduleName: key.slice(0, at),
+      subPath: key.slice(at + 1),
+      versions: candidates.map(candidate => candidate.version),
+    };
   });
 }
 
-const explicitlyRegistered = globalSingleton(
-  '_weave_explicitly_registered_integrations',
+const loadOrderWarningSuppressed = globalSingleton(
+  '_weave_load_order_warning_suppressed',
   () => new Set<string>()
 );
 
 /**
- * Record that the app wired `moduleName` up itself, e.g. with `wrapOpenAI()`,
- * so it does not depend on the require hook. Implicit patching must not call
- * this.
+ * Stop `init()` from warning that these modules were loaded before `weave`.
+ *
+ * Call it when tracing no longer depends on require order: the app registered
+ * the integration itself (`wrapOpenAI()`), or a patch reaches every existing
+ * reference (a prototype patch, a global trace processor). A hook that only
+ * swaps exports must not call it, because a reference taken before the swap
+ * stays unpatched.
  */
-export function markRegisteredExplicitly(moduleName: string): void {
-  explicitlyRegistered.add(moduleName);
+export function suppressLoadOrderWarning(...moduleNames: string[]): void {
+  for (const moduleName of moduleNames) {
+    loadOrderWarningSuppressed.add(moduleName);
+  }
 }
 
-export function isRegisteredExplicitly(moduleName: string): boolean {
-  return explicitlyRegistered.has(moduleName);
+export function isLoadOrderWarningSuppressed(moduleName: string): boolean {
+  return loadOrderWarningSuppressed.has(moduleName);
+}
+
+const dependencyOwners = globalSingleton(
+  '_weave_load_order_dependency_owners',
+  () => new Map<string, Set<string>>()
+);
+
+/**
+ * Like `suppressLoadOrderWarning()`, but only while nothing except
+ * `ownerPackages` had required the module before `weave`. For an integration
+ * that loads other hooked modules for its own use, such as ADK loading
+ * `@google/genai`. If the app required the module itself, the warning stays.
+ */
+export function suppressLoadOrderWarningWhenLoadedBy(
+  ownerPackages: string[],
+  moduleNames: string[]
+): void {
+  for (const moduleName of moduleNames) {
+    const owners = dependencyOwners.get(moduleName) ?? new Set<string>();
+    for (const ownerPackage of ownerPackages) {
+      owners.add(ownerPackage);
+    }
+    dependencyOwners.set(moduleName, owners);
+  }
+}
+
+export function getLoadOrderDependencyOwners(
+  moduleName: string
+): ReadonlySet<string> {
+  return dependencyOwners.get(moduleName) ?? new Set<string>();
 }

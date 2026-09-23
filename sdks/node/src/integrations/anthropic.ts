@@ -1,5 +1,9 @@
 import {totalInputTokens} from './anthropicUsage';
-import {addCJSInstrumentation, addESMInstrumentation} from './instrumentations';
+import {
+  addCJSInstrumentation,
+  addESMInstrumentation,
+  suppressLoadOrderWarning,
+} from './instrumentations';
 import {asAttributes, libraryIntegration} from './integrationMetadata';
 import {op} from '../op';
 import {type OpOptions, type StreamReducer} from '../opType';
@@ -282,6 +286,8 @@ export function commonPatchAnthropic(exports: any) {
   patchAnthropicMessagesCreate(exports);
   patchStreamHelper(exports);
   patchBatchApi(exports);
+  // The patches are on prototypes, so they reach clients created before them.
+  suppressLoadOrderWarning('@anthropic-ai/sdk');
   return exports;
 }
 

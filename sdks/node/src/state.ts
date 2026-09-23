@@ -30,6 +30,14 @@ type State = {
    */
   modulesLoadedBeforeCjsHook: string[] | null;
 
+  /**
+   * For each file in `modulesLoadedBeforeCjsHook`, the packages whose files had
+   * required it by then; `''` stands for a file outside `node_modules`, such as
+   * the app's own code. Tells a library the app imported apart from one another
+   * package loaded for its own use. Taken together with the snapshot.
+   */
+  requirerPackagesBeforeCjsHook: Record<string, string[]> | null;
+
   genAi: {
     /**
      * The cached GenAI provider paired with the `projectId` it routes to. Held
@@ -124,6 +132,7 @@ function defaultState(): State {
     client: null,
     domain: null,
     modulesLoadedBeforeCjsHook: null,
+    requirerPackagesBeforeCjsHook: null,
 
     genAi: {
       provider: null,

@@ -176,6 +176,8 @@ function registerExitFlush(): void {
     void getGlobalClient()?.flush();
   });
   process.on('exit', () => {
+    // The init() timer does not run if the app calls process.exit() first.
+    warnIfLoadedBeforeWeave();
     const pending = getGlobalClient()?.pendingCallCount() ?? 0;
     if (pending > 0) {
       console.warn(

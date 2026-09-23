@@ -4,7 +4,7 @@ import {type OpOptions} from '../opType';
 import {
   addCJSInstrumentation,
   addESMInstrumentation,
-  markRegisteredExplicitly,
+  suppressLoadOrderWarning,
 } from './instrumentations';
 import {asAttributes, libraryIntegration} from './integrationMetadata';
 import {getGlobalClient} from '../clientApi';
@@ -761,7 +761,7 @@ interface OpenAIAPI {
  * });
  */
 export function wrapOpenAI<T extends OpenAIAPI>(openai: T): T {
-  markRegisteredExplicitly('openai');
+  suppressLoadOrderWarning('openai');
   return wrapOpenAIClient(openai);
 }
 

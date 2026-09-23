@@ -22,7 +22,7 @@ import {getGlobalClient} from '../clientApi';
 import {
   addCJSInstrumentation,
   addESMInstrumentation,
-  markRegisteredExplicitly,
+  suppressLoadOrderWarning,
 } from './instrumentations';
 import {ClaudeAgentOtelTracer} from './claude-agent-sdk/otelTracer';
 import state from '../state';
@@ -234,7 +234,7 @@ export function patchClaudeAgentSdk(exports: any): any {
 // path doesn't gate on the version, so wrapping an older build risks a wrong
 // span shape.
 export function wrapClaudeAgentSdk<T>(sdk: T): T {
-  markRegisteredExplicitly('@anthropic-ai/claude-agent-sdk');
+  suppressLoadOrderWarning('@anthropic-ai/claude-agent-sdk');
   return patchClaudeAgentSdk(sdk);
 }
 
