@@ -1101,6 +1101,11 @@ def test_create_sends_every_supported_field(
             tsi.CompletionsCreateReq(
                 project_id=PROJECT,
                 inputs={"model": "gpt-4o", "messages": [{"role": "user"}]},
+                inference_route=tsi.DedicatedInferenceRoute(
+                    connection_type="dedicated",
+                    connection="dedicated_cwc38d",
+                    base_url="https://cw.cwc38d.gw.cwinference.com/v1",
+                ),
                 wb_user_id="user-id",
             ),
             {
@@ -1136,6 +1141,11 @@ def test_create_sends_every_supported_field(
                     "prompt": None,
                     "template_vars": None,
                     "vertex_credentials": None,
+                },
+                "inference_route": {
+                    "connection_type": "dedicated",
+                    "connection": "dedicated_cwc38d",
+                    "base_url": "https://cw.cwc38d.gw.cwinference.com/v1",
                 },
                 "wb_user_id": "user-id",
                 "track_llm_call": True,

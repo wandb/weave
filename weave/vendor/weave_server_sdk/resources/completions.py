@@ -52,6 +52,7 @@ class CompletionsResource(SyncAPIResource):
         project_id: str,
         conversation_id: Optional[str] | Omit = omit,
         conversation_name: Optional[str] | Omit = omit,
+        inference_route: Optional[completion_create_params.InferenceRoute] | Omit = omit,
         parent_id: Optional[str] | Omit = omit,
         source: Optional[str] | Omit = omit,
         trace_id: Optional[str] | Omit = omit,
@@ -71,6 +72,8 @@ class CompletionsResource(SyncAPIResource):
           conversation_id: Conversation ID to group related completions into a multi-turn conversation
 
           conversation_name: Human-readable conversation name
+
+          inference_route: Server-side routing information for a dedicated inference deployment.
 
           parent_id: Parent call ID to nest this LLM call under
 
@@ -98,6 +101,7 @@ class CompletionsResource(SyncAPIResource):
                     "project_id": project_id,
                     "conversation_id": conversation_id,
                     "conversation_name": conversation_name,
+                    "inference_route": inference_route,
                     "parent_id": parent_id,
                     "source": source,
                     "trace_id": trace_id,
@@ -119,6 +123,7 @@ class CompletionsResource(SyncAPIResource):
         project_id: str,
         conversation_id: Optional[str] | Omit = omit,
         conversation_name: Optional[str] | Omit = omit,
+        inference_route: Optional[completion_create_stream_params.InferenceRoute] | Omit = omit,
         parent_id: Optional[str] | Omit = omit,
         source: Optional[str] | Omit = omit,
         trace_id: Optional[str] | Omit = omit,
@@ -138,6 +143,8 @@ class CompletionsResource(SyncAPIResource):
           conversation_id: Conversation ID to group related completions into a multi-turn conversation
 
           conversation_name: Human-readable conversation name
+
+          inference_route: Server-side routing information for a dedicated inference deployment.
 
           parent_id: Parent call ID to nest this LLM call under
 
@@ -166,6 +173,7 @@ class CompletionsResource(SyncAPIResource):
                     "project_id": project_id,
                     "conversation_id": conversation_id,
                     "conversation_name": conversation_name,
+                    "inference_route": inference_route,
                     "parent_id": parent_id,
                     "source": source,
                     "trace_id": trace_id,
@@ -209,6 +217,7 @@ class AsyncCompletionsResource(AsyncAPIResource):
         project_id: str,
         conversation_id: Optional[str] | Omit = omit,
         conversation_name: Optional[str] | Omit = omit,
+        inference_route: Optional[completion_create_params.InferenceRoute] | Omit = omit,
         parent_id: Optional[str] | Omit = omit,
         source: Optional[str] | Omit = omit,
         trace_id: Optional[str] | Omit = omit,
@@ -228,6 +237,8 @@ class AsyncCompletionsResource(AsyncAPIResource):
           conversation_id: Conversation ID to group related completions into a multi-turn conversation
 
           conversation_name: Human-readable conversation name
+
+          inference_route: Server-side routing information for a dedicated inference deployment.
 
           parent_id: Parent call ID to nest this LLM call under
 
@@ -255,6 +266,7 @@ class AsyncCompletionsResource(AsyncAPIResource):
                     "project_id": project_id,
                     "conversation_id": conversation_id,
                     "conversation_name": conversation_name,
+                    "inference_route": inference_route,
                     "parent_id": parent_id,
                     "source": source,
                     "trace_id": trace_id,
@@ -276,6 +288,7 @@ class AsyncCompletionsResource(AsyncAPIResource):
         project_id: str,
         conversation_id: Optional[str] | Omit = omit,
         conversation_name: Optional[str] | Omit = omit,
+        inference_route: Optional[completion_create_stream_params.InferenceRoute] | Omit = omit,
         parent_id: Optional[str] | Omit = omit,
         source: Optional[str] | Omit = omit,
         trace_id: Optional[str] | Omit = omit,
@@ -295,6 +308,8 @@ class AsyncCompletionsResource(AsyncAPIResource):
           conversation_id: Conversation ID to group related completions into a multi-turn conversation
 
           conversation_name: Human-readable conversation name
+
+          inference_route: Server-side routing information for a dedicated inference deployment.
 
           parent_id: Parent call ID to nest this LLM call under
 
@@ -323,6 +338,7 @@ class AsyncCompletionsResource(AsyncAPIResource):
                     "project_id": project_id,
                     "conversation_id": conversation_id,
                     "conversation_name": conversation_name,
+                    "inference_route": inference_route,
                     "parent_id": parent_id,
                     "source": source,
                     "trace_id": trace_id,

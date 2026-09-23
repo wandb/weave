@@ -546,9 +546,18 @@ class CompletionsCreateRequestInputs(BaseModel):
     )
 
 
+class DedicatedInferenceRoute(BaseModelStrict):
+    """Server-side routing information for a dedicated inference deployment."""
+
+    connection_type: Literal["dedicated"]
+    connection: str
+    base_url: str
+
+
 class CompletionsCreateReq(BaseModelStrict):
     project_id: str
     inputs: CompletionsCreateRequestInputs
+    inference_route: DedicatedInferenceRoute | None = None
     wb_user_id: str | None = Field(None, description=WB_USER_ID_DESCRIPTION)
     track_llm_call: bool | None = Field(
         True, description="Whether to track this LLM call in the trace server"
