@@ -76,7 +76,6 @@ def test_agent_span_schema_constructor_and_dump_keep_defaults() -> None:
 
 
 def test_agent_handoff_is_marked_an_empty_object() -> None:
-    # An untyped payload here spreads to every chat message that carries it.
     schema = AgentChatAgentHandoff.model_json_schema(mode="serialization")
     assert schema.get("properties") == {}
     assert schema["x-stainless-empty-object"] is True
