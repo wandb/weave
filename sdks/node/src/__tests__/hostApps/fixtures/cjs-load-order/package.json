@@ -6,7 +6,9 @@
   "scripts": {
     "start": "node library-first.cjs",
     "start-weave-first": "node weave-first.cjs",
-    "start-weave-twice": "node weave-twice.cjs"
+    "start-weave-twice": "node weave-twice.cjs",
+    "start-wrap-before-init": "node wrap-before-init.cjs",
+    "start-wrap-after-init": "node wrap-after-init.cjs"
   },
   "dependencies": {
     "openai": "file:../../../../../node_modules/openai"

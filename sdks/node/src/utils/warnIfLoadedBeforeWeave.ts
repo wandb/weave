@@ -1,6 +1,9 @@
 import path from 'path';
 
-import {getCJSInstrumentedTargets} from '../integrations/instrumentations';
+import {
+  getCJSInstrumentedTargets,
+  isRegisteredExplicitly,
+} from '../integrations/instrumentations';
 import state from '../state';
 import {warnOnce} from './warnOnce';
 
@@ -19,6 +22,9 @@ export function warnIfLoadedBeforeWeave(): void {
     return;
   }
   for (const {moduleName, subPath} of getCJSInstrumentedTargets()) {
+    if (isRegisteredExplicitly(moduleName)) {
+      continue;
+    }
     // Match the exact file the hook patches, not the package directory: some
     // other file of the package loaded early does not stop the entry point
     // from being patched. Suffix rather than equality because pnpm keeps the

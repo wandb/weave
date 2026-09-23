@@ -19,7 +19,11 @@
  * `integrations/hooks.ts`), the same mechanism used by the other integrations.
  */
 import {getGlobalClient} from '../clientApi';
-import {addCJSInstrumentation, addESMInstrumentation} from './instrumentations';
+import {
+  addCJSInstrumentation,
+  addESMInstrumentation,
+  markRegisteredExplicitly,
+} from './instrumentations';
 import {ClaudeAgentOtelTracer} from './claude-agent-sdk/otelTracer';
 import state from '../state';
 import type * as ClaudeAgentSdk from '@anthropic-ai/claude-agent-sdk';
@@ -230,6 +234,7 @@ export function patchClaudeAgentSdk(exports: any): any {
 // path doesn't gate on the version, so wrapping an older build risks a wrong
 // span shape.
 export function wrapClaudeAgentSdk<T>(sdk: T): T {
+  markRegisteredExplicitly('@anthropic-ai/claude-agent-sdk');
   return patchClaudeAgentSdk(sdk);
 }
 

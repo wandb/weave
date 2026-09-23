@@ -1,7 +1,11 @@
 import {weaveImage} from '../media';
 import {op} from '../op';
 import {type OpOptions} from '../opType';
-import {addCJSInstrumentation, addESMInstrumentation} from './instrumentations';
+import {
+  addCJSInstrumentation,
+  addESMInstrumentation,
+  markRegisteredExplicitly,
+} from './instrumentations';
 import {asAttributes, libraryIntegration} from './integrationMetadata';
 import {getGlobalClient} from '../clientApi';
 import {InternalCall} from '../call';
@@ -757,6 +761,11 @@ interface OpenAIAPI {
  * });
  */
 export function wrapOpenAI<T extends OpenAIAPI>(openai: T): T {
+  markRegisteredExplicitly('openai');
+  return wrapOpenAIClient(openai);
+}
+
+function wrapOpenAIClient<T extends OpenAIAPI>(openai: T): T {
   const chatCompletionsProxy = new Proxy(openai.chat.completions, {
     get(target, p, receiver) {
       const targetVal = Reflect.get(target, p, receiver);
@@ -879,7 +888,7 @@ function commonProxy(exports: any) {
   return new Proxy(OriginalOpenAIClass, {
     construct(target, args, _newTarget) {
       const instance = new target(...args);
-      return wrapOpenAI(instance);
+      return wrapOpenAIClient(instance);
     },
   });
 }

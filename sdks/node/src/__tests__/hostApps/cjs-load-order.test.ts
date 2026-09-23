@@ -29,4 +29,18 @@ describe('hostApps — cjs-load-order', () => {
     expect(result.stdout).toContain('create: wrappedWithAgents');
     expect(result.stderr).not.toContain('was loaded before');
   }, 60_000);
+
+  test('init() stays quiet when the client is wrapped explicitly before it', async () => {
+    const result = await launch('start-wrap-before-init');
+    expect(result.exitCode).toBe(0);
+    expect(result.stdout).toContain('create: wrappedWithAgents');
+    expect(result.stderr).not.toContain('was loaded before');
+  }, 60_000);
+
+  test('init() stays quiet when the client is wrapped explicitly right after it', async () => {
+    const result = await launch('start-wrap-after-init');
+    expect(result.exitCode).toBe(0);
+    expect(result.stdout).toContain('create: wrappedWithAgents');
+    expect(result.stderr).not.toContain('was loaded before');
+  }, 60_000);
 });

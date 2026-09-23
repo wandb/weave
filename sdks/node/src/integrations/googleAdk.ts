@@ -125,7 +125,11 @@ import {
   ATTR_GEN_AI_USAGE_TOTAL_TOKENS,
 } from '../genai/semconv';
 import {warnOnce} from '../utils/warnOnce';
-import {addCJSInstrumentation, addESMInstrumentation} from './instrumentations';
+import {
+  addCJSInstrumentation,
+  addESMInstrumentation,
+  markRegisteredExplicitly,
+} from './instrumentations';
 
 /** The slice of ADK's `Runner` the instrumentation hook needs. */
 type AdkRunnerLike = Pick<GoogleADK.Runner, 'pluginManager'>;
@@ -588,6 +592,12 @@ function findAgentInTree(
  */
 export class WeaveAdkPlugin implements AdkBasePlugin {
   readonly name = WEAVE_ADK_PLUGIN_NAME;
+
+  // The shared auto-instrumentation plugin runs this too, but it only exists
+  // once `Runner.prototype` is patched, which covers every Runner reference.
+  constructor() {
+    markRegisteredExplicitly('@google/adk');
+  }
 
   private readonly invocations = new Map<string, InvocationState>();
   private readonly beforeExitCleanup = () => {

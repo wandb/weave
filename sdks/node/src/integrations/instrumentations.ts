@@ -1,3 +1,5 @@
+import {globalSingleton} from '../utils/globalSingleton';
+
 const symCJSInstrumentations = Symbol.for('_weave_cjs_instrumentations');
 export const symESMInstrumentations = Symbol.for('_weave_esm_instrumentations');
 export const symESMCache = Symbol.for('_weave_esm_cached_patched');
@@ -90,4 +92,22 @@ export function getCJSInstrumentedTargets(): Array<
     const at = key.indexOf('@', key.startsWith('@') ? 1 : 0);
     return {moduleName: key.slice(0, at), subPath: key.slice(at + 1)};
   });
+}
+
+const explicitlyRegistered = globalSingleton(
+  '_weave_explicitly_registered_integrations',
+  () => new Set<string>()
+);
+
+/**
+ * Record that the app wired `moduleName` up itself, e.g. with `wrapOpenAI()`,
+ * so it does not depend on the require hook. Implicit patching must not call
+ * this.
+ */
+export function markRegisteredExplicitly(moduleName: string): void {
+  explicitlyRegistered.add(moduleName);
+}
+
+export function isRegisteredExplicitly(moduleName: string): boolean {
+  return explicitlyRegistered.has(moduleName);
 }

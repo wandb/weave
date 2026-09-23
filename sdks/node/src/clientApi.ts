@@ -143,7 +143,9 @@ export async function init(
     setGlobalClient(client);
     setGlobalDomain(domain);
     registerExitFlush();
-    warnIfLoadedBeforeWeave();
+    // A timer, so an integration registered explicitly right after
+    // `await init()` still counts.
+    setTimeout(warnIfLoadedBeforeWeave, 0);
     console.log(
       `View Weave data at https://${domain}/${encodeProjectId(projectId)}/weave`
     );
