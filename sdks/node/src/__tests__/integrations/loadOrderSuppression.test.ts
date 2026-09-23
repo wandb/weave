@@ -27,6 +27,7 @@ import {
   instrumentOpenAIRealtimeAgent,
   patchRealtimeSession,
 } from '../../integrations/openai.realtime.agent';
+import state from '../../state';
 
 const MODULES = [
   'openai',
@@ -63,6 +64,7 @@ class FakeMessages {
 }
 
 class FakeRunner {
+  pluginManager = {getPlugin: () => undefined, registerPlugin: () => {}};
   async *runAsync() {}
 }
 
@@ -185,7 +187,17 @@ describe('load-order warning suppression', () => {
     // registration flag checked below, so the hooks themselves record nothing.
     [
       'ADK require hook',
-      () => commonPatchGoogleADK({Runner: FakeRunner} as any),
+      async () => {
+        commonPatchGoogleADK({Runner: FakeRunner} as any);
+        // The first run registers the hook's shared plugin.
+        state.integrations.googleAdk.plugin = null;
+        for await (const _ of new FakeRunner().runAsync()) {
+          // No events.
+        }
+        expect(state.integrations.googleAdk.plugin).toBeInstanceOf(
+          WeaveAdkPlugin
+        );
+      },
       NONE,
     ],
     [

@@ -187,6 +187,9 @@ const GOOGLE_ADK_INTEGRATION_OTEL_ATTRS = asOtelAttributes(
 
 const BEFORE_EXIT_CLEANUPS = new Set<() => void>();
 let beforeExitHookRegistered = false;
+// The hook's shared plugin serves only the ADK copy it patched, so it must not
+// suppress the load-order warning for every copy the way an app's plugin does.
+let creatingSharedPlugin = false;
 
 type InvocationState = {
   invocationId: string;
@@ -602,7 +605,9 @@ export class WeaveAdkPlugin implements AdkBasePlugin {
 
   // With the plugin registered, ADK tracing no longer depends on require order.
   constructor() {
-    suppressLoadOrderWarning('@google/adk');
+    if (!creatingSharedPlugin) {
+      suppressLoadOrderWarning('@google/adk');
+    }
   }
 
   private readonly invocations = new Map<string, InvocationState>();
@@ -1313,7 +1318,12 @@ const weaveAdkRunnerPatched = Symbol.for('_weave_adk_runner_patched');
 // ESM copies of this module resolve to one plugin instance.
 function getSharedPlugin(): WeaveAdkPlugin {
   if (!state.integrations.googleAdk.plugin) {
-    state.integrations.googleAdk.plugin = new WeaveAdkPlugin();
+    creatingSharedPlugin = true;
+    try {
+      state.integrations.googleAdk.plugin = new WeaveAdkPlugin();
+    } finally {
+      creatingSharedPlugin = false;
+    }
   }
   return state.integrations.googleAdk.plugin;
 }
