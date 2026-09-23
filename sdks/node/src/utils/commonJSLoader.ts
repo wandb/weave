@@ -64,7 +64,7 @@ export function snapshotRequireCache(
       state.modulesLoadedBeforeCjsHook,
       files,
       ownLoader,
-      packageNameOf
+      file => nearestPackageName(path.dirname(file))
     )
   ) {
     return;

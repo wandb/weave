@@ -9,6 +9,9 @@ import {
   snapshotRequireCache,
 } from '../../utils/commonJSLoader';
 
+// Importing the loader installs its hook in this worker, so the active require
+// is named patchedRequire in every test below, as another tool's hook can be.
+// The snapshot decision must not depend on that name.
 const root = fs.mkdtempSync(path.join(os.tmpdir(), 'weave-cjs-loader-'));
 const nodeModules = path.join(root, 'node_modules');
 
@@ -104,15 +107,21 @@ describe('snapshotRequireCache', () => {
     expect(state.modulesLoadedBeforeCjsHook).toEqual(['taken earlier']);
   });
 
-  test('takes none after another weave copy installed its hook, linked or not', () => {
+  test('takes none after another weave copy installed its hook, aliased or linked', () => {
     const openai = pkg('openai', 'index.js');
     const installedCopy = pkg('weave', 'dist/utils/commonJSLoader.js');
+    // An npm alias installs the package under another directory name.
+    const aliasedCopy = installed(
+      path.join(nodeModules, 'weave-old'),
+      'weave',
+      'dist/utils/commonJSLoader.js'
+    );
     const linkedCopy = installed(
       path.join(root, 'weave-checkout'),
       'weave',
       'dist/utils/commonJSLoader.js'
     );
-    for (const otherLoader of [installedCopy, linkedCopy]) {
+    for (const otherLoader of [installedCopy, aliasedCopy, linkedCopy]) {
       snapshotRequireCache(
         cacheOf({[otherLoader]: [], [openai]: []}),
         ownLoader

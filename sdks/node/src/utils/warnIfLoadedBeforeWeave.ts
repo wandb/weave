@@ -64,12 +64,13 @@ const WEAVE_LOADER = path.join('dist', 'utils', 'commonJSLoader.js');
  * copy's loader is cached, because that copy's hook saw every later load. The
  * active require's function name proves nothing: other tools reuse the name.
  * An older SDK may have created the shared state without the field.
+ * `declaredNameOf` reads a file's package.json, so an npm alias still counts.
  */
 export function shouldSnapshotRequireCache(
   snapshot: string[] | null | undefined,
   cachedFiles: string[],
   ownLoader: string,
-  packageNameOf: (file: string) => string
+  declaredNameOf: (file: string) => string
 ): boolean {
   return (
     snapshot == null &&
@@ -77,7 +78,7 @@ export function shouldSnapshotRequireCache(
       file =>
         file !== ownLoader &&
         file.endsWith(path.sep + WEAVE_LOADER) &&
-        packageNameOf(file) === 'weave'
+        declaredNameOf(file) === 'weave'
     )
   );
 }
