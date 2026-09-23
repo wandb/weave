@@ -3,9 +3,9 @@
 from __future__ import annotations
 
 from typing import Dict, Union, Iterable, Optional
-from typing_extensions import Required, TypedDict
+from typing_extensions import Literal, Required, TypedDict
 
-__all__ = ["CompletionCreateParams", "Inputs"]
+__all__ = ["CompletionCreateParams", "Inputs", "InferenceRoute"]
 
 
 class CompletionCreateParams(TypedDict, total=False):
@@ -18,6 +18,9 @@ class CompletionCreateParams(TypedDict, total=False):
 
     conversation_name: Optional[str]
     """Human-readable conversation name"""
+
+    inference_route: Optional[InferenceRoute]
+    """Server-side routing information for a dedicated inference deployment."""
 
     parent_id: Optional[str]
     """Parent call ID to nest this LLM call under"""
@@ -113,3 +116,13 @@ class Inputs(TypedDict, total=False):
     When provided for vertex_ai models (e.g. vertex_ai/gemini-2.5-pro), used for
     authentication instead of api_key. Not persisted in trace storage.
     """
+
+
+class InferenceRoute(TypedDict, total=False):
+    """Server-side routing information for a dedicated inference deployment."""
+
+    base_url: Required[str]
+
+    connection: Required[str]
+
+    connection_type: Required[Literal["dedicated"]]

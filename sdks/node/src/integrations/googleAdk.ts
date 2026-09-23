@@ -125,6 +125,7 @@ import {
   ATTR_GEN_AI_USAGE_TOTAL_TOKENS,
 } from '../genai/semconv';
 import {warnOnce} from '../utils/warnOnce';
+import {asOtelAttributes, libraryIntegration} from './integrationMetadata';
 import {addCJSInstrumentation, addESMInstrumentation} from './instrumentations';
 
 /** The slice of ADK's `Runner` the instrumentation hook needs. */
@@ -173,6 +174,11 @@ const ADK_VERSION_RANGE = '>= 1.0.0';
 const ADK_CJS_SUBPATH = 'dist/cjs/index.js';
 
 const WARN_KEY_PLUGIN_ERROR = 'weave-adk-plugin-error';
+
+// Integration provenance, flattened once for OTel span attributes (scalars only).
+const GOOGLE_ADK_INTEGRATION_OTEL_ATTRS = asOtelAttributes(
+  libraryIntegration('google_adk', {packageName: '@google/adk'})
+);
 
 const BEFORE_EXIT_CLEANUPS = new Set<() => void>();
 let beforeExitHookRegistered = false;
@@ -641,6 +647,7 @@ export class WeaveAdkPlugin implements AdkBasePlugin {
       const rootAgent = ic.agent;
       const conversationId = ic.session.id;
       const attributes: Attributes = {
+        ...GOOGLE_ADK_INTEGRATION_OTEL_ATTRS,
         [ATTR_GEN_AI_OPERATION_NAME]: OPERATION_INVOKE_AGENT,
         [ATTR_GEN_AI_PROVIDER_NAME]: providerName(),
         [ATTR_GEN_AI_AGENT_ID]: invocationId,
@@ -819,6 +826,7 @@ export class WeaveAdkPlugin implements AdkBasePlugin {
       const agentSpan = this.ensureAgentSpan(state, ctx.agentName);
       const model = params.llmRequest.model ?? UNKNOWN_MODEL;
       const attributes: Attributes = {
+        ...GOOGLE_ADK_INTEGRATION_OTEL_ATTRS,
         [ATTR_GEN_AI_OPERATION_NAME]: OPERATION_CHAT,
         [ATTR_GEN_AI_PROVIDER_NAME]: providerName(),
         [ATTR_GEN_AI_REQUEST_MODEL]: model,
@@ -938,6 +946,7 @@ export class WeaveAdkPlugin implements AdkBasePlugin {
         state.syntheticToolKeys.set(queueKey, queue);
       }
       const attributes: Attributes = {
+        ...GOOGLE_ADK_INTEGRATION_OTEL_ATTRS,
         [ATTR_GEN_AI_OPERATION_NAME]: OPERATION_EXECUTE_TOOL,
         [ATTR_GEN_AI_PROVIDER_NAME]: providerName(),
         [ATTR_GEN_AI_TOOL_NAME]: params.tool.name,
@@ -1053,6 +1062,7 @@ export class WeaveAdkPlugin implements AdkBasePlugin {
     }
 
     const attributes: Attributes = {
+      ...GOOGLE_ADK_INTEGRATION_OTEL_ATTRS,
       [ATTR_GEN_AI_OPERATION_NAME]: OPERATION_INVOKE_AGENT,
       [ATTR_GEN_AI_PROVIDER_NAME]: providerName(),
       [ATTR_GEN_AI_AGENT_NAME]: agentName,
