@@ -7,6 +7,7 @@ import {getGlobalClient} from '../clientApi';
 import {InternalCall} from '../call';
 import {type WeaveClient} from '../weaveClient';
 import {warnOnce} from '../utils/warnOnce';
+import {globalSingleton} from '../utils/globalSingleton';
 import {
   getCallStackFromOpenAIAgents,
   isInOpenAIAgentsContext,
@@ -746,8 +747,25 @@ interface OpenAIAPI {
   };
 }
 
+const weaveOpenAIWrapped = Symbol.for('_weave_openai_wrapped');
+// Per realm like Weave's state, so another realm's wrapper is wrapped again.
+const weaveOpenAIWrappedValue = globalSingleton(
+  '_weave_openai_wrapped_value',
+  () => Symbol('_weave_openai_wrapped_value')
+);
+
+// A foreign proxy around a raw client may answer any key, or throw on it.
+function isWrappedByWeave(openai: OpenAIAPI): boolean {
+  try {
+    return (openai as any)[weaveOpenAIWrapped] === weaveOpenAIWrappedValue;
+  } catch {
+    return false;
+  }
+}
+
 /**
- * Wraps the OpenAI API to enable function tracing for OpenAI calls.
+ * Wraps the OpenAI API to enable function tracing for OpenAI calls. A client
+ * that Weave already wrapped is returned unchanged.
  *
  * @example
  * const openai = wrapOpenAI(new OpenAI());
@@ -757,6 +775,9 @@ interface OpenAIAPI {
  * });
  */
 export function wrapOpenAI<T extends OpenAIAPI>(openai: T): T {
+  if (isWrappedByWeave(openai)) {
+    return openai;
+  }
   const chatCompletionsProxy = new Proxy(openai.chat.completions, {
     get(target, p, receiver) {
       const targetVal = Reflect.get(target, p, receiver);
@@ -855,6 +876,10 @@ export function wrapOpenAI<T extends OpenAIAPI>(openai: T): T {
 
   return new Proxy(openai, {
     get(target, p, receiver) {
+      // Not defined on the proxy: that would reach the raw client.
+      if (p === weaveOpenAIWrapped) {
+        return weaveOpenAIWrappedValue;
+      }
       const targetVal = Reflect.get(target, p, receiver);
       if (p === 'chat') {
         return chatProxy;
