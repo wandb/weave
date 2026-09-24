@@ -460,6 +460,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 self._calls_complete_batch = []
                 self._content_obj_batch = []
                 self._bucket_uploads = BucketUploadBatch()
+                self._pending_call_end_events = []
                 self._flush_immediately = True
 
         # Always drain remaining kafka messages at shutdown.
@@ -518,6 +519,16 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
     @_calls_complete_batch.setter
     def _calls_complete_batch(self, value: list[list[Any]]) -> None:
         self._thread_local.calls_complete_batch = value
+
+    @property
+    def _pending_call_end_events(self) -> list[Callable[[], None]]:
+        if not hasattr(self._thread_local, "pending_call_end_events"):
+            self._thread_local.pending_call_end_events = []
+        return self._thread_local.pending_call_end_events
+
+    @_pending_call_end_events.setter
+    def _pending_call_end_events(self, value: list[Callable[[], None]]) -> None:
+        self._thread_local.pending_call_end_events = value
 
     @property
     def _content_obj_batch(self) -> list[tsi.ObjSchemaForInsert]:
@@ -925,7 +936,35 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             self._calls_complete_batch = []
             self._content_obj_batch = []
             self._bucket_uploads = BucketUploadBatch()
+            self._pending_call_end_events = []
             self._flush_immediately = True
+
+    def _enqueue_call_end(
+        self, project_id: str, call_id: str, ended_at: datetime.datetime
+    ) -> None:
+        """Produce a call_end event once the call it refers to is in ClickHouse.
+
+        Callers must have already written the call (or, in batched mode,
+        appended it to the call batch). With flush-immediately the write has
+        committed, so the event is produced now. Inside call_batch() the event
+        is deferred and produced by _flush_all_batches_in_order only after the
+        calls flush succeeds.
+        """
+        if self._flush_immediately:
+            maybe_enqueue_minimal_call_end(
+                self.kafka_producer, project_id, call_id, ended_at, True
+            )
+            return
+        self._pending_call_end_events.append(
+            partial(
+                maybe_enqueue_minimal_call_end,
+                self.kafka_producer,
+                project_id,
+                call_id,
+                ended_at,
+                False,
+            )
+        )
 
     def _flush_all_batches_in_order(self) -> None:
         """Flush all batches, respecting cross-table write dependencies.
@@ -935,13 +974,18 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         2. File chunks and content objects, inserted concurrently. Both must be
            durable before calls and neither reads the other. If either fails we
            raise, so calls (below) never commit referencing unwritten data.
-        3. Calls, if this fails, we raise so that clients can retry, and so we don't
-           continue and push bad ids to the queue.
-        4. Produce to kafka, if this fails, we don't raise because all of the data
-           is already in the database, we don't want the client to retry.
+        3. Calls. If this fails we raise so that clients can retry.
+        4. Produce the call_end events deferred by _enqueue_call_end, then flush
+           the producer. Events are produced only here, after step 3 succeeds;
+           if any earlier step raises they are discarded, so no event is ever
+           emitted for a call that was not written. Kafka failures are logged
+           and not raised because the data is already in the database and we
+           don't want the client to retry.
            TODO: consider kafka retry logic.
         """
         self._flush_immediately = True
+        pending_call_ends = self._pending_call_end_events
+        self._pending_call_end_events = []
 
         # Raises on fail
         try:
@@ -969,6 +1013,12 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             raise
 
         # Catch and continue on fail
+        try:
+            for produce_call_end in pending_call_ends:
+                produce_call_end()
+        except Exception:
+            logger.exception("Failed to produce call_end events")
+
         try:
             self._flush_kafka_producer()
         except Exception:
@@ -1167,13 +1217,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         self._insert_call(ch_call)
 
         if publish:
-            maybe_enqueue_minimal_call_end(
-                self.kafka_producer,
-                req.end.project_id,
-                req.end.id,
-                req.end.ended_at,
-                self._flush_immediately,
-            )
+            self._enqueue_call_end(req.end.project_id, req.end.id, req.end.ended_at)
 
         # Returns the id of the newly created call
         return tsi.CallEndRes()
@@ -1237,8 +1281,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 else:
                     self._insert_call_to_v1(ch_call)
 
-                maybe_enqueue_minimal_call_end(
-                    self.kafka_producer,
+                self._enqueue_call_end(
                     processed_complete_call.project_id,
                     processed_complete_call.id,
                     processed_complete_call.ended_at,
@@ -1380,13 +1423,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             if self._flush_immediately:
                 self._flush_calls()
 
-        maybe_enqueue_minimal_call_end(
-            self.kafka_producer,
-            req.end.project_id,
-            req.end.id,
-            req.end.ended_at,
-            self._flush_immediately,
-        )
+        self._enqueue_call_end(req.end.project_id, req.end.id, req.end.ended_at)
 
         return tsi.CallEndV2Res()
 

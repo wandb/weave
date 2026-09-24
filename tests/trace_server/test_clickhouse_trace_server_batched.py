@@ -1626,6 +1626,148 @@ def test_call_batch_flushes_kafka_once_not_per_call_end(server_with_mock_kafka):
     mock_producer.flush.assert_called_once()
 
 
+def _make_completed_call(call_id: str) -> tsi.CompletedCallSchemaForInsert:
+    now = dt.datetime.now(dt.timezone.utc)
+    return tsi.CompletedCallSchemaForInsert(
+        project_id=base64.b64encode(b"test_entity/test_project").decode("utf-8"),
+        id=call_id,
+        trace_id=str(uuid.uuid4()),
+        op_name="test_op",
+        started_at=now,
+        ended_at=now + dt.timedelta(seconds=1),
+        attributes={},
+        inputs={},
+        summary={},
+    )
+
+
+def _record_writes_and_events(server, mock_producer, fail_insert: bool) -> list:
+    """Log CH inserts and call_end produces, in order, to one shared list."""
+    events: list = []
+
+    def _insert(table, *args, **kwargs):
+        events.append(("insert", table))
+        if fail_insert:
+            raise _MockInsertError("TOO_MANY_PARTS")
+        return MagicMock()
+
+    server.ch_client.insert.side_effect = _insert
+    mock_producer.produce_call_end.side_effect = lambda end, flush: events.append(
+        ("produce_call_end", end.id)
+    )
+    return events
+
+
+@pytest.mark.disable_logging_error_check
+def test_calls_complete_failed_flush_produces_no_call_end(server_with_mock_kafka):
+    server, mock_producer = server_with_mock_kafka
+    events = _record_writes_and_events(server, mock_producer, fail_insert=True)
+    call_ids = [str(uuid.uuid4()) for _ in range(3)]
+
+    with pytest.raises(_MockInsertError):
+        server.calls_complete(
+            tsi.CallsUpsertCompleteReq(
+                batch=[_make_completed_call(call_id) for call_id in call_ids]
+            )
+        )
+
+    assert events == [("insert", "calls_complete")]
+    assert server._pending_call_end_events == []
+
+
+@pytest.mark.disable_logging_error_check
+def test_batched_call_end_failed_flush_produces_no_call_end(server_with_mock_kafka):
+    server, mock_producer = server_with_mock_kafka
+    events = _record_writes_and_events(server, mock_producer, fail_insert=True)
+
+    def _end_calls_in_batch() -> None:
+        with server.call_batch():
+            for _ in range(3):
+                server.call_end(_make_call_end_req())
+
+    with pytest.raises(_MockInsertError):
+        _end_calls_in_batch()
+
+    assert events == [("insert", "call_parts")]
+    assert server._pending_call_end_events == []
+
+
+def test_calls_complete_produces_call_end_after_insert(server_with_mock_kafka):
+    server, mock_producer = server_with_mock_kafka
+    events = _record_writes_and_events(server, mock_producer, fail_insert=False)
+    call_ids = [str(uuid.uuid4()) for _ in range(3)]
+
+    server.calls_complete(
+        tsi.CallsUpsertCompleteReq(
+            batch=[_make_completed_call(call_id) for call_id in call_ids]
+        )
+    )
+
+    assert events == [("insert", "calls_complete")] + [
+        ("produce_call_end", call_id) for call_id in call_ids
+    ]
+    mock_producer.flush.assert_called_once_with(timeout=0)
+
+
+def test_batched_call_end_produces_call_end_after_insert(server_with_mock_kafka):
+    server, mock_producer = server_with_mock_kafka
+    events = _record_writes_and_events(server, mock_producer, fail_insert=False)
+    reqs = [_make_call_end_req() for _ in range(3)]
+
+    with server.call_batch():
+        for req in reqs:
+            server.call_end(req)
+
+    assert events == [("insert", "call_parts")] + [
+        ("produce_call_end", req.end.id) for req in reqs
+    ]
+
+
+@pytest.mark.disable_logging_error_check
+def test_call_end_events_do_not_leak_into_next_batch(server_with_mock_kafka):
+    server, mock_producer = server_with_mock_kafka
+    failed_ids = [str(uuid.uuid4()) for _ in range(2)]
+    ok_ids = [str(uuid.uuid4()) for _ in range(2)]
+
+    _record_writes_and_events(server, mock_producer, fail_insert=True)
+    with pytest.raises(_MockInsertError):
+        server.calls_complete(
+            tsi.CallsUpsertCompleteReq(
+                batch=[_make_completed_call(call_id) for call_id in failed_ids]
+            )
+        )
+
+    events = _record_writes_and_events(server, mock_producer, fail_insert=False)
+    server.calls_complete(
+        tsi.CallsUpsertCompleteReq(
+            batch=[_make_completed_call(call_id) for call_id in ok_ids]
+        )
+    )
+
+    assert events == [("insert", "calls_complete")] + [
+        ("produce_call_end", call_id) for call_id in ok_ids
+    ]
+
+
+def test_call_end_events_discarded_when_batch_body_raises(server_with_mock_kafka):
+    server, mock_producer = server_with_mock_kafka
+    events = _record_writes_and_events(server, mock_producer, fail_insert=False)
+
+    def _fail_before_flush() -> None:
+        with server.call_batch():
+            server.call_end(_make_call_end_req())
+            raise RuntimeError("request failed before flush")
+
+    with pytest.raises(RuntimeError):
+        _fail_before_flush()
+
+    with server.call_batch():
+        pass
+
+    assert events == []
+    assert server._pending_call_end_events == []
+
+
 @pytest.mark.disable_logging_error_check
 def test_file_batch_clears_on_insert_failure():
     """Verify _file_batch is cleared even when insert fails."""
