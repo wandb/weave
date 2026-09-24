@@ -1,7 +1,11 @@
 import {weaveImage} from '../media';
 import {op} from '../op';
 import {type OpOptions} from '../opType';
-import {addCJSInstrumentation, addESMInstrumentation} from './instrumentations';
+import {
+  addCJSInstrumentation,
+  addESMInstrumentation,
+  suppressLoadOrderWarning,
+} from './instrumentations';
 import {asAttributes, libraryIntegration} from './integrationMetadata';
 import {getGlobalClient} from '../clientApi';
 import {InternalCall} from '../call';
@@ -775,6 +779,11 @@ function isWrappedByWeave(openai: OpenAIAPI): boolean {
  * });
  */
 export function wrapOpenAI<T extends OpenAIAPI>(openai: T): T {
+  suppressLoadOrderWarning('openai');
+  return wrapOpenAIClient(openai);
+}
+
+function wrapOpenAIClient<T extends OpenAIAPI>(openai: T): T {
   if (isWrappedByWeave(openai)) {
     return openai;
   }
@@ -904,7 +913,7 @@ function commonProxy(exports: any) {
   return new Proxy(OriginalOpenAIClass, {
     construct(target, args, _newTarget) {
       const instance = new target(...args);
-      return wrapOpenAI(instance);
+      return wrapOpenAIClient(instance);
     },
   });
 }

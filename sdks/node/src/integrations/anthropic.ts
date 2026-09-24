@@ -291,6 +291,8 @@ export function instrumentAnthropic() {
     subPath: 'index.js',
     version: '>= 0.52.0',
     hook: commonPatchAnthropic,
+    // The patches are on prototypes, so they reach clients created before them.
+    reachesEarlierReferences: true,
   });
   addESMInstrumentation({
     moduleName: '@anthropic-ai/sdk',

@@ -126,7 +126,12 @@ import {
 } from '../genai/semconv';
 import {warnOnce} from '../utils/warnOnce';
 import {asOtelAttributes, libraryIntegration} from './integrationMetadata';
-import {addCJSInstrumentation, addESMInstrumentation} from './instrumentations';
+import {
+  addCJSInstrumentation,
+  addESMInstrumentation,
+  suppressLoadOrderWarning,
+  suppressLoadOrderWarningWhenLoadedBy,
+} from './instrumentations';
 
 /** The slice of ADK's `Runner` the instrumentation hook needs. */
 type AdkRunnerLike = Pick<GoogleADK.Runner, 'pluginManager'>;
@@ -182,6 +187,9 @@ const GOOGLE_ADK_INTEGRATION_OTEL_ATTRS = asOtelAttributes(
 
 const BEFORE_EXIT_CLEANUPS = new Set<() => void>();
 let beforeExitHookRegistered = false;
+// The hook's shared plugin serves only the ADK copy it patched, so it must not
+// suppress the load-order warning for every copy the way an app's plugin does.
+let creatingSharedPlugin = false;
 
 type InvocationState = {
   invocationId: string;
@@ -594,6 +602,13 @@ function findAgentInTree(
  */
 export class WeaveAdkPlugin implements AdkBasePlugin {
   readonly name = WEAVE_ADK_PLUGIN_NAME;
+
+  // With the plugin registered, ADK tracing no longer depends on require order.
+  constructor() {
+    if (!creatingSharedPlugin) {
+      suppressLoadOrderWarning('@google/adk');
+    }
+  }
 
   private readonly invocations = new Map<string, InvocationState>();
   private readonly beforeExitCleanup = () => {
@@ -1303,7 +1318,12 @@ const weaveAdkRunnerPatched = Symbol.for('_weave_adk_runner_patched');
 // ESM copies of this module resolve to one plugin instance.
 function getSharedPlugin(): WeaveAdkPlugin {
   if (!state.integrations.googleAdk.plugin) {
-    state.integrations.googleAdk.plugin = new WeaveAdkPlugin();
+    creatingSharedPlugin = true;
+    try {
+      state.integrations.googleAdk.plugin = new WeaveAdkPlugin();
+    } finally {
+      creatingSharedPlugin = false;
+    }
   }
   return state.integrations.googleAdk.plugin;
 }
@@ -1428,11 +1448,16 @@ export function commonPatchGoogleADK(exports: typeof GoogleADK) {
 }
 
 export function instrumentGoogleADK() {
+  // ADK loads @google/genai for its own clients, which the genai hook never
+  // wraps. Only a copy the app required itself is worth a load-order warning.
+  suppressLoadOrderWarningWhenLoadedBy(['@google/adk'], ['@google/genai']);
   addCJSInstrumentation({
     moduleName: '@google/adk',
     subPath: ADK_CJS_SUBPATH,
     version: ADK_VERSION_RANGE,
     hook: commonPatchGoogleADK,
+    // The patch is on Runner.prototype, so it reaches runners created before it.
+    reachesEarlierReferences: true,
   });
   addESMInstrumentation({
     moduleName: '@google/adk',
