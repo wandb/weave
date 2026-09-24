@@ -2170,13 +2170,12 @@ def test_unsupported_summary_field_raises_invalid_field_error() -> None:
         cq.as_sql(ParamBuilder())
 
 
-def test_negative_json_array_index_raises_invalid_field_error() -> None:
-    """A negative array index in a dynamic field path must surface as
-    InvalidFieldError (HTTP 422), not a ClickHouse BAD_ARGUMENTS 502.
+def test_negative_json_array_index_hops_with_json_extract_raw() -> None:
+    """`inputs.messages.-1.content` filters and sorts on the last array element.
 
-    ClickHouse's JSON_VALUE JSONPath grammar cannot parse `[-1]`, so a getField
-    like `inputs.turn.user_prompt_parts.-1` (filter or sort) 502'd the whole
-    /calls/query_stats request. We reject it at compile time instead.
+    JSON_VALUE's JSONPath cannot express `[-1]`, so the hops through the last
+    negative index compile to JSONExtractRaw (one-based, negatives from the end)
+    and only the trailing path stays a JSONPath.
     """
     cq = CallsQuery(project_id="project")
     cq.add_field("id")
@@ -2184,20 +2183,44 @@ def test_negative_json_array_index_raises_invalid_field_error() -> None:
         tsi_query.EqOperation.model_validate(
             {
                 "$eq": [
-                    {"$getField": "inputs.turn.user_prompt_parts.-1"},
+                    {"$getField": "inputs.messages.-1.content"},
                     {"$literal": "hi"},
                 ]
             }
         )
     )
-    with pytest.raises(InvalidFieldError, match="Negative array index '-1'"):
-        cq.as_sql(ParamBuilder())
-
-    cq = CallsQuery(project_id="project")
-    cq.add_field("id")
-    cq.add_order("inputs.turn.user_prompt_parts.-1", "desc")
-    with pytest.raises(InvalidFieldError, match="Negative array index '-1'"):
-        cq.as_sql(ParamBuilder())
+    cq.add_order("inputs.turn.0.parts.-1", "desc")
+    assert_sql(
+        cq,
+        """
+        SELECT calls_merged.id AS id
+        FROM calls_merged
+        PREWHERE calls_merged.project_id = {pb_10:String}
+        WHERE ((calls_merged.inputs_dump LIKE {pb_4:String} OR calls_merged.inputs_dump IS NULL))
+        GROUP BY (calls_merged.project_id, calls_merged.id)
+        HAVING (
+            ((coalesce(nullIf(anyIf(JSON_VALUE(JSONExtractRaw(calls_merged.inputs_dump, {pb_0:String}, {pb_1:Int64}), {pb_2:String}), calls_merged.inputs_dump IS NOT NULL), 'null'), '') = {pb_3:String}))
+            AND ((any(calls_merged.deleted_at) IS NULL))
+            AND ((NOT ((any(calls_merged.op_name) IS NULL))))
+        )
+        ORDER BY (NOT (JSONType(any(calls_merged.inputs_dump), {pb_5:String}, {pb_6:String}, {pb_7:String}, {pb_8:String}) = 'Null' OR JSONType(any(calls_merged.inputs_dump), {pb_5:String}, {pb_6:String}, {pb_7:String}, {pb_8:String}) IS NULL)) desc,
+            toFloat64OrNull(coalesce(nullIf(anyIf(JSON_VALUE(JSONExtractRaw(calls_merged.inputs_dump, {pb_5:String}, {pb_9:Int64}, {pb_7:String}, {pb_1:Int64}), '$'), calls_merged.inputs_dump IS NOT NULL), 'null'), '')) DESC,
+            toString(coalesce(nullIf(anyIf(JSON_VALUE(JSONExtractRaw(calls_merged.inputs_dump, {pb_5:String}, {pb_9:Int64}, {pb_7:String}, {pb_1:Int64}), '$'), calls_merged.inputs_dump IS NOT NULL), 'null'), '')) DESC
+        """,
+        {
+            "pb_0": "messages",
+            "pb_1": -1,
+            "pb_2": '$."content"',
+            "pb_3": "hi",
+            "pb_4": '%"hi"%',
+            "pb_5": "turn",
+            "pb_6": "0",
+            "pb_7": "parts",
+            "pb_8": "-1",
+            "pb_9": 1,
+            "pb_10": "project",
+        },
+    )
 
 
 def test_unselectable_columns_raise_invalid_field_error() -> None:

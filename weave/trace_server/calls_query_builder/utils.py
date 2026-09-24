@@ -115,11 +115,14 @@ def json_dump_field_as_sql(
         'toFloat64(JSON_VALUE(any(inputs_dump), {param_1:String}))'
     """
     if cast != "exists":
+        root_sql, remaining_path = _hop_through_negative_index(
+            pb, root_field_sanitized, extra_path or []
+        )
         path_str = "'$'"
-        if extra_path:
-            param_name = pb.add_param(quote_json_path_parts(extra_path))
+        if remaining_path:
+            param_name = pb.add_param(quote_json_path_parts(remaining_path))
             path_str = param_slot(param_name, "String")
-        json_value = f"JSON_VALUE({root_field_sanitized}, {path_str})"
+        json_value = f"JSON_VALUE({root_sql}, {path_str})"
         if agg_fn:
             json_value = f"{agg_fn}If({json_value}, {root_field_sanitized} IS NOT NULL)"
         val = f"coalesce(nullIf({json_value}, 'null'), '')"
@@ -133,3 +136,45 @@ def json_dump_field_as_sql(
                 path_parts.append(", " + param_slot(pb.add_param(part), "String"))
         safe_path = "".join(path_parts)
         return f"(NOT (JSONType({root_field_sanitized}{safe_path}) = 'Null' OR JSONType({root_field_sanitized}{safe_path}) IS NULL))"
+
+
+def _hop_through_negative_index(
+    pb: ParamBuilder, root_field_sanitized: str, extra_path: list[str]
+) -> tuple[str, list[str]]:
+    """Route a path with a negative array index through `JSONExtractRaw`.
+
+    `JSON_VALUE` JSONPath has no `[-1]`, but `JSONExtractRaw` counts negative
+    indexes from the end, so every hop up to the last negative index is taken
+    with it and only the remaining parts stay a JSONPath for `JSON_VALUE`.
+    """
+    split_at = None
+    for position, part in enumerate(extra_path):
+        index = _array_index(part)
+        if index is not None and index < 0:
+            split_at = position
+
+    if split_at is None:
+        return root_field_sanitized, extra_path
+
+    hop_slots = []
+    for part in extra_path[: split_at + 1]:
+        index = _array_index(part)
+        if index is None:
+            hop_slots.append(param_slot(pb.add_param(part), "String"))
+        elif index < 0:
+            hop_slots.append(param_slot(pb.add_param(index), "Int64"))
+        else:
+            # JSONExtractRaw indexes arrays from one; JSONPath indexes from zero.
+            hop_slots.append(param_slot(pb.add_param(index + 1), "Int64"))
+    hops = ", ".join(hop_slots)
+    root_sql = f"JSONExtractRaw({root_field_sanitized}, {hops})"
+
+    return root_sql, extra_path[split_at + 1 :]
+
+
+def _array_index(part: str) -> int | None:
+    """Integer value of a path part when it is an array index, else None."""
+    if not part.removeprefix("-").isdigit():
+        return None
+
+    return int(part)
