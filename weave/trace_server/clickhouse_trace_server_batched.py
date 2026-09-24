@@ -942,14 +942,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
     def _enqueue_call_end(
         self, project_id: str, call_id: str, ended_at: datetime.datetime
     ) -> None:
-        """Produce a call_end event once the call it refers to is in ClickHouse.
-
-        Callers must have already written the call (or, in batched mode,
-        appended it to the call batch). With flush-immediately the write has
-        committed, so the event is produced now. Inside call_batch() the event
-        is deferred and produced by _flush_all_batches_in_order only after the
-        calls flush succeeds.
-        """
+        """Produce a call_end now, or after the batch's calls commit inside call_batch()."""
         if self._flush_immediately:
             maybe_enqueue_minimal_call_end(
                 self.kafka_producer, project_id, call_id, ended_at, True
@@ -975,12 +968,9 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
            durable before calls and neither reads the other. If either fails we
            raise, so calls (below) never commit referencing unwritten data.
         3. Calls. If this fails we raise so that clients can retry.
-        4. Produce the call_end events deferred by _enqueue_call_end, then flush
-           the producer. Events are produced only here, after step 3 succeeds;
-           if any earlier step raises they are discarded, so no event is ever
-           emitted for a call that was not written. Kafka failures are logged
-           and not raised because the data is already in the database and we
-           don't want the client to retry.
+        4. Produce the deferred call_end events, skipped if any step above raised.
+           If this fails, we don't raise because all of the data is already in
+           the database, we don't want the client to retry.
            TODO: consider kafka retry logic.
         """
         self._flush_immediately = True
@@ -1012,8 +1002,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             logger.exception("Failed to flush calls")
             raise
 
-        # Catch per event and continue, so one failed produce doesn't drop the
-        # rest of the batch's events.
+        # Per event, so one failed produce doesn't drop the rest.
         failed_call_ends = 0
         for produce_call_end in pending_call_ends:
             try:
