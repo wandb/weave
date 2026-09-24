@@ -2,11 +2,13 @@
 
 from __future__ import annotations
 
-from unittest.mock import MagicMock
+import datetime
+from unittest.mock import MagicMock, call
 
 import pytest
 
 from weave.trace_server import kafka
+from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.agents.kafka_events import (
     EMBED_AGENT_SPANS_TOPIC,
     SCORE_AGENT_SPANS_TOPIC,
@@ -16,6 +18,7 @@ from weave.trace_server.agents.kafka_events import (
 from weave.trace_server.kafka import (
     DELIVERY_ERROR_LOG_EVERY,
     DELIVERY_FAILED_METRIC,
+    PRODUCE_DROPPED_METRIC,
     KafkaProducer,
     _bucketed_project_key,
 )
@@ -128,6 +131,50 @@ def test_producer_publishes_under_buffer_limit(
     call_kwargs = producer.produce.call_args.kwargs
     assert call_kwargs["topic"] == topic
     assert "on_delivery" not in call_kwargs
+
+
+def _make_call_end() -> tsi.EndedCallSchemaForInsert:
+    return tsi.EndedCallSchemaForInsert(
+        project_id="p",
+        id="c",
+        ended_at=datetime.datetime.now(datetime.timezone.utc),
+        output=None,
+        summary={},
+        exception=None,
+    )
+
+
+@pytest.mark.parametrize(
+    ("buffer_size", "expected_calls"),
+    [
+        (
+            5,
+            [
+                call(
+                    PRODUCE_DROPPED_METRIC,
+                    1,
+                    ["reason:buffer_pressure", "message_type:call_end"],
+                )
+            ],
+        ),
+        (0, []),
+    ],
+)
+@pytest.mark.disable_logging_error_check
+def test_buffer_pressure_drop_is_counted(
+    monkeypatch, buffer_size: int, expected_calls: list
+) -> None:
+    producer = MagicMock(spec=KafkaProducer)
+    producer.max_buffer_size = 2
+    producer.__len__ = MagicMock(return_value=buffer_size)
+    _bind_real_methods(producer, "produce_call_end", "_check_buffer_pressure")
+    emitted = MagicMock()
+    monkeypatch.setattr(kafka, "emit_counter", emitted)
+
+    producer.produce_call_end(_make_call_end())
+
+    assert emitted.call_args_list == expected_calls
+    assert producer.produce.call_count == (0 if expected_calls else 1)
 
 
 @pytest.mark.disable_logging_error_check

@@ -181,6 +181,7 @@ from weave.trace_server.constants import (
 )
 from weave.trace_server.custom_runtime import apply_custom_runtime
 from weave.trace_server.datadog import (
+    emit_counter,
     record_db_insert,
     set_current_span_dd_tags,
     set_root_span_dd_tags,
@@ -228,7 +229,7 @@ from weave.trace_server.interface.builtin_object_classes.provider import (
 from weave.trace_server.interface.feedback_types import (
     RUNNABLE_FEEDBACK_TYPE_PREFIX,
 )
-from weave.trace_server.kafka import KafkaProducer
+from weave.trace_server.kafka import PRODUCE_DROPPED_METRIC, KafkaProducer
 from weave.trace_server.llm_completion import (
     _build_choices_array,
     _build_completion_response,
@@ -460,7 +461,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 self._calls_complete_batch = []
                 self._content_obj_batch = []
                 self._bucket_uploads = BucketUploadBatch()
-                self._pending_call_end_events = []
+                self._after_commit_callbacks = []
                 self._flush_immediately = True
 
         # Always drain remaining kafka messages at shutdown.
@@ -521,14 +522,14 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         self._thread_local.calls_complete_batch = value
 
     @property
-    def _pending_call_end_events(self) -> list[Callable[[], None]]:
-        if not hasattr(self._thread_local, "pending_call_end_events"):
-            self._thread_local.pending_call_end_events = []
-        return self._thread_local.pending_call_end_events
+    def _after_commit_callbacks(self) -> list[Callable[[], None]]:
+        if not hasattr(self._thread_local, "after_commit_callbacks"):
+            self._thread_local.after_commit_callbacks = []
+        return self._thread_local.after_commit_callbacks
 
-    @_pending_call_end_events.setter
-    def _pending_call_end_events(self, value: list[Callable[[], None]]) -> None:
-        self._thread_local.pending_call_end_events = value
+    @_after_commit_callbacks.setter
+    def _after_commit_callbacks(self, value: list[Callable[[], None]]) -> None:
+        self._thread_local.after_commit_callbacks = value
 
     @property
     def _content_obj_batch(self) -> list[tsi.ObjSchemaForInsert]:
@@ -787,9 +788,8 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         else:
             self._insert_call_batch(rows)
 
-        # Run callbacks and flush
-        for cb in event_callbacks:
-            cb()
+        # The insert has committed, so a failed produce must not fail the request.
+        _run_after_commit(event_callbacks)
         self._flush_kafka_producer()
 
         if rejected_spans > 0:
@@ -936,7 +936,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             self._calls_complete_batch = []
             self._content_obj_batch = []
             self._bucket_uploads = BucketUploadBatch()
-            self._pending_call_end_events = []
+            self._after_commit_callbacks = []
             self._flush_immediately = True
 
     def _enqueue_call_end(
@@ -948,7 +948,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 self.kafka_producer, project_id, call_id, ended_at, True
             )
             return
-        self._pending_call_end_events.append(
+        self._after_commit_callbacks.append(
             partial(
                 maybe_enqueue_minimal_call_end,
                 self.kafka_producer,
@@ -974,8 +974,8 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
            TODO: consider kafka retry logic.
         """
         self._flush_immediately = True
-        pending_call_ends = self._pending_call_end_events
-        self._pending_call_end_events = []
+        after_commit = self._after_commit_callbacks
+        self._after_commit_callbacks = []
 
         # Raises on fail
         try:
@@ -1002,21 +1002,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             logger.exception("Failed to flush calls")
             raise
 
-        # Per event, so one failed produce doesn't drop the rest.
-        failed_call_ends = 0
-        for produce_call_end in pending_call_ends:
-            try:
-                produce_call_end()
-            except Exception:
-                failed_call_ends += 1
-                if failed_call_ends == 1:
-                    logger.exception("Failed to produce call_end event")
-        if failed_call_ends:
-            logger.error(
-                "Failed to produce %d of %d call_end events",
-                failed_call_ends,
-                len(pending_call_ends),
-            )
+        _run_after_commit(after_commit)
 
         try:
             self._flush_kafka_producer()
@@ -8098,6 +8084,28 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             }
         )
         return final_batch
+
+
+def _run_after_commit(callbacks: list[Callable[[], None]]) -> None:
+    """Run post-commit produce callbacks without raising."""
+    failed = 0
+    for callback in callbacks:
+        # Per callback, so one failed produce doesn't drop the rest.
+        try:
+            callback()
+        except Exception:
+            failed += 1
+            if failed == 1:
+                logger.exception("Failed to produce call_end event")
+    if failed:
+        logger.error(
+            "Failed to produce %d of %d call_end events", failed, len(callbacks)
+        )
+        emit_counter(
+            PRODUCE_DROPPED_METRIC,
+            failed,
+            ["reason:produce_error", "message_type:call_end"],
+        )
 
 
 def _update_metadata_from_chunk(
