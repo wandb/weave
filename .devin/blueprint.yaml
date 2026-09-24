@@ -24,8 +24,8 @@ knowledge:
       uvx ruff check .
   - name: test
     contents: |
-      # Default trace tests against SQLite (Docker-free).
-      nox --no-install -e "tests-3.12(shard='trace')" -- --trace-server=sqlite
+      # Default trace tests against the in-memory fake backend (Docker-free).
+      nox --no-install -e "tests-3.12(shard='trace')" -- --trace-server=fake
   - name: notes
     contents: |
       # Other test shards (flow, trace_server, trace_server_bindings, etc.) and
