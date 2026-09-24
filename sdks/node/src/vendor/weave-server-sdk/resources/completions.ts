@@ -96,6 +96,11 @@ export interface CompletionCreateParams {
   conversation_name?: string | null;
 
   /**
+   * Server-side routing information for a dedicated inference deployment.
+   */
+  inference_route?: CompletionCreateParams.InferenceRoute | null;
+
+  /**
    * Parent call ID to nest this LLM call under
    */
   parent_id?: string | null;
@@ -200,6 +205,17 @@ export namespace CompletionCreateParams {
      */
     vertex_credentials?: string | null;
   }
+
+  /**
+   * Server-side routing information for a dedicated inference deployment.
+   */
+  export interface InferenceRoute {
+    base_url: string;
+
+    connection: string;
+
+    connection_type: 'dedicated';
+  }
 }
 
 export interface CompletionCreateStreamParams {
@@ -216,6 +232,11 @@ export interface CompletionCreateStreamParams {
    * Human-readable conversation name
    */
   conversation_name?: string | null;
+
+  /**
+   * Server-side routing information for a dedicated inference deployment.
+   */
+  inference_route?: CompletionCreateStreamParams.InferenceRoute | null;
 
   /**
    * Parent call ID to nest this LLM call under
@@ -321,6 +342,17 @@ export namespace CompletionCreateStreamParams {
      * instead of api_key. Not persisted in trace storage.
      */
     vertex_credentials?: string | null;
+  }
+
+  /**
+   * Server-side routing information for a dedicated inference deployment.
+   */
+  export interface InferenceRoute {
+    base_url: string;
+
+    connection: string;
+
+    connection_type: 'dedicated';
   }
 }
 
