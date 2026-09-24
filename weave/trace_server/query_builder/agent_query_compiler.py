@@ -37,6 +37,7 @@ from weave.trace_server.orm import (
 from weave.trace_server.query_builder.agent_custom_attrs import (
     custom_attr_value_or_null,
 )
+from weave.trace_server.query_builder.agent_usage import total_tokens_sql
 
 # Span columns queryable by their literal column name without a corresponding
 # semconv key: OTel-core span identity and W&B plumbing. Columns that are the
@@ -281,10 +282,7 @@ def _resolve_field(
             f"toUnixTimestamp64Milli({alias}.started_at)), NULL)"
         )
     if name == "total_tokens":
-        return (
-            f"toFloat64({alias}.input_tokens + {alias}.output_tokens + "
-            f"{alias}.reasoning_tokens)"
-        )
+        return total_tokens_sql(alias)
 
     # (2) Direct column name — OTel-core plus any semconv target column
     if name in _ALL_QUERYABLE_COLUMNS:

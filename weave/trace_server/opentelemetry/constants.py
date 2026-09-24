@@ -103,6 +103,7 @@ USAGE_KEYS = {
     "output_tokens": [("gen_ai.usage.output_tokens", try_parse_int)],
     # Maps Weave's "total_tokens" to keys from different standards
     "total_tokens": [
+        ("gen_ai.usage.total_tokens", try_parse_int),
         ("llm.usage.total_tokens", try_parse_int),
         ("llm.token_count.total", try_parse_int),
     ],
