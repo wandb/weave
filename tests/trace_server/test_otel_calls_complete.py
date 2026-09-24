@@ -16,7 +16,7 @@ These tests should FAIL when the OTel calls_complete write path is disabled
 import datetime
 import uuid
 from binascii import hexlify
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 import pytest
 from cachetools import TTLCache
@@ -778,12 +778,13 @@ def test_otel_export_failed_produce_does_not_fail_request(
     monkeypatch.setattr(
         "weave.trace_server.environment.wf_enable_online_eval", lambda: True
     )
-    monkeypatch.setattr(
-        clickhouse_trace_server, "_insert_call_complete_batch", recording_insert
-    )
-
     spans = [_create_otel_span(f"op_{i}") for i in range(3)]
-    res = trace_server.otel_export(_create_otel_export_req(project_id, spans))
+    # patch.object removes the instance attribute on exit; monkeypatch would leave
+    # the bound method behind on the shared server.
+    with patch.object(
+        clickhouse_trace_server, "_insert_call_complete_batch", recording_insert
+    ):
+        res = trace_server.otel_export(_create_otel_export_req(project_id, spans))
 
     assert res.partial_success is None
     call_ids = [c.id for c in _fetch_calls_stream(trace_server, project_id)]

@@ -8086,7 +8086,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         return final_batch
 
 
-def _run_after_commit(callbacks: list[Callable[[], None]]) -> None:
+def _run_after_commit(callbacks: Sequence[Callable[[], None]]) -> None:
     """Run post-commit produce callbacks without raising."""
     failed = 0
     for callback in callbacks:
