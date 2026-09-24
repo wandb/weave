@@ -130,4 +130,97 @@ describe('wrapOpenAI against the installed openai package', () => {
     });
     expect(JSON.stringify(calls[0])).not.toContain(apiKey);
   });
+
+  describe('wrapping a client twice', () => {
+    const replyingClient = () =>
+      new OpenAI({
+        apiKey: 'test-key',
+        fetch: async () =>
+          new Response(
+            JSON.stringify({
+              id: 'chatcmpl-1',
+              object: 'chat.completion',
+              created: 1,
+              model: 'gpt-4o-2024-05-13',
+              choices: [
+                {
+                  index: 0,
+                  message: {role: 'assistant', content: 'Paris', refusal: null},
+                  logprobs: null,
+                  finish_reason: 'stop',
+                },
+              ],
+              usage: {prompt_tokens: 4, completion_tokens: 1, total_tokens: 5},
+            }),
+            {status: 200, headers: {'content-type': 'application/json'}}
+          ),
+      });
+    const ask = (client: OpenAI) =>
+      client.chat.completions.create({
+        model: 'gpt-4o-2024-05-13',
+        messages: [{role: 'user', content: 'Which city?'}],
+      });
+
+    test('returns a wrapped client as is and logs one call', async () => {
+      const wrapped = wrapOpenAI(replyingClient());
+
+      const result = await ask(wrapOpenAI(wrapped));
+
+      expect(result.choices[0].message.content).toBe('Paris');
+      expect(await traceServer.getCalls(testProjectName)).toHaveLength(1);
+      expect(wrapOpenAI(wrapped)).toBe(wrapped);
+    });
+
+    test('recognizes a wrapped client behind a third-party proxy', async () => {
+      const behindProxy = new Proxy(wrapOpenAI(replyingClient()), {});
+
+      const result = await ask(wrapOpenAI(behindProxy));
+
+      expect(result.choices[0].message.content).toBe('Paris');
+      expect(await traceServer.getCalls(testProjectName)).toHaveLength(1);
+    });
+
+    const symbolProxyCases: Array<[string, () => unknown]> = [
+      ['answers true for any symbol', () => true],
+      [
+        'answers the registered marker value for any symbol',
+        () => Symbol.for('_weave_openai_wrapped_value'),
+      ],
+      [
+        'throws for any symbol',
+        () => {
+          throw new Error('symbol access denied');
+        },
+      ],
+    ];
+    test.each(symbolProxyCases)(
+      'still wraps a raw client behind a proxy that %s',
+      async (_name, onSymbol) => {
+        const behindProxy = new Proxy(replyingClient(), {
+          get(target, p, receiver) {
+            if (typeof p === 'symbol') {
+              return onSymbol();
+            }
+            return Reflect.get(target, p, receiver);
+          },
+        });
+
+        const result = await ask(wrapOpenAI(behindProxy));
+
+        expect(result.choices[0].message.content).toBe('Paris');
+        expect(await traceServer.getCalls(testProjectName)).toHaveLength(1);
+      }
+    );
+
+    test('leaves the raw client wrappable', async () => {
+      const raw = replyingClient();
+      wrapOpenAI(raw);
+
+      const second = wrapOpenAI(raw);
+      await ask(second);
+
+      expect(second).not.toBe(raw);
+      expect(await traceServer.getCalls(testProjectName)).toHaveLength(1);
+    });
+  });
 });

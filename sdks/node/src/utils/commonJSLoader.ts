@@ -5,8 +5,14 @@ import semifies from 'semifies';
 import instrumentations, {
   type CacheEntry,
   type CJSInstrumentation,
+  suppressLoadOrderWarningForFile,
 } from '../integrations/instrumentations';
-import {requirePackageJson} from './npmModuleUtils';
+import state from '../state';
+import {nearestPackageName, requirePackageJson} from './npmModuleUtils';
+import {
+  requirerPackagesOf,
+  shouldSnapshotRequireCache,
+} from './warnIfLoadedBeforeWeave';
 
 const parse: (filePath: string) => {
   name: string;
@@ -16,6 +22,59 @@ const parse: (filePath: string) => {
 } = require('module-details-from-path');
 
 export let reset = () => {};
+
+// The package a file belongs to: from its `node_modules` path, or from the
+// nearest package.json for a linked package or the app's own code.
+function packageNameOf(file: string): string {
+  return parse(file)?.name ?? nearestPackageName(path.dirname(file));
+}
+
+/**
+ * Whether the hook for this file also reached references the app took before
+ * it ran. Any compatible entry counts: an older weave copy may have registered
+ * the same target first, without the flag, and its hook patches the same
+ * prototypes.
+ */
+export function reachesEarlierReferences(
+  candidates:
+    | ReadonlyArray<
+        Pick<CJSInstrumentation, 'version' | 'reachesEarlierReferences'>
+      >
+    | undefined,
+  version: string
+): boolean {
+  return (candidates ?? []).some(
+    candidate =>
+      candidate.reachesEarlierReferences === true &&
+      semifies(version, candidate.version)
+  );
+}
+
+/**
+ * Record what the app had loaded before this copy's hook, and which packages
+ * had required each of those files, for `warnIfLoadedBeforeWeave()`.
+ */
+export function snapshotRequireCache(
+  cache: NodeJS.Dict<NodeModule>,
+  ownLoader: string
+): void {
+  const files = Object.keys(cache);
+  if (
+    !shouldSnapshotRequireCache(
+      state.modulesLoadedBeforeCjsHook,
+      files,
+      ownLoader,
+      file => nearestPackageName(path.dirname(file))
+    )
+  ) {
+    return;
+  }
+  state.modulesLoadedBeforeCjsHook = files;
+  state.requirerPackagesBeforeCjsHook = requirerPackagesOf(
+    cache,
+    packageNameOf
+  );
+}
 
 const patching = Object.create(null);
 
@@ -111,6 +170,14 @@ if (typeof module !== 'undefined' && module.exports) {
 
       cachedModules.set(filename, cacheEntry);
       delete patching[filename];
+      if (
+        reachesEarlierReferences(
+          instrumentations.get(instrumentationLookupKey),
+          version
+        )
+      ) {
+        suppressLoadOrderWarningForFile(filename);
+      }
     }
     return cachedModules.get(filename)!.patchedExports;
   }
@@ -118,6 +185,12 @@ if (typeof module !== 'undefined' && module.exports) {
   reset = () => {
     Module.prototype.require = originalRequire;
   };
+
+  // Snapshot before the swap, unfiltered: the instrumentation registry is
+  // still empty here, because `index.ts` runs `./integrations/hooks`, which
+  // fills it, after this module. `warnIfLoadedBeforeWeave()` filters the
+  // snapshot at init() time instead.
+  snapshotRequireCache(require.cache, __filename);
 
   Module.prototype.require = patchedRequire as any;
 } else {
