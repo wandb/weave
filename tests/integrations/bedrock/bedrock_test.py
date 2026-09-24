@@ -789,6 +789,62 @@ def test_bedrock_converse_stream_cache_tokens_zero(
     assert model_usage["prompt_tokens"] == 100
 
 
+@mock_aws
+@pytest.mark.parametrize(
+    ("profile_arn", "usage_key", "lookups"),
+    [
+        (
+            "arn:aws:bedrock:us-east-1:123456789012:inference-profile/us.openai.gpt-6-astra",
+            "us.openai.gpt-6-astra",
+            0,
+        ),
+        (
+            "arn:aws:bedrock:us-east-1:123456789012:inference-profile/global.openai.gpt-6-astra",
+            "global.openai.gpt-6-astra",
+            0,
+        ),
+        (
+            "arn:aws:bedrock:us-east-1:123456789012:application-inference-profile/a1b2c3d4e5f6",
+            "openai.gpt-6-astra",
+            1,
+        ),
+    ],
+)
+def test_bedrock_converse_inference_profile_arn_usage_key(
+    client: weave.trace.weave_client.WeaveClient,
+    monkeypatch: pytest.MonkeyPatch,
+    profile_arn: str,
+    usage_key: str,
+    lookups: int,
+) -> None:
+    """A system-defined profile ARN is recorded under its profile ID, like a call that passes the ID."""
+    monkeypatch.setenv("AWS_REGION_NAME", "us-east-1")
+    operations = []
+
+    def mock(self, operation_name: str, api_params: dict) -> dict:
+        operations.append(operation_name)
+        if operation_name == "GetInferenceProfile":
+            return {
+                "models": [
+                    {
+                        "modelArn": "arn:aws:bedrock:us-east-1::foundation-model/openai.gpt-6-astra"
+                    }
+                ]
+            }
+        return mock_converse_make_api_call(self, operation_name, api_params)
+
+    bedrock_client = boto3.client("bedrock-runtime", region_name="us-east-1")
+    patch_client(bedrock_client)
+
+    with patch("botocore.client.BaseClient._make_api_call", new=mock):
+        bedrock_client.converse(modelId=profile_arn, messages=messages)
+
+    calls = client.get_calls()
+    assert len(calls) == 1
+    assert list(calls[0].summary["usage"]) == [usage_key]
+    assert operations.count("GetInferenceProfile") == lookups
+
+
 def test_bedrock_mock_usage_keys_match_service_model() -> None:
     """Pin the mocks' usage keys to the botocore service model.
 
