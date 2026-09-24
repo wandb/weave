@@ -1012,12 +1012,22 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             logger.exception("Failed to flush calls")
             raise
 
-        # Catch and continue on fail
-        try:
-            for produce_call_end in pending_call_ends:
+        # Catch per event and continue, so one failed produce doesn't drop the
+        # rest of the batch's events.
+        failed_call_ends = 0
+        for produce_call_end in pending_call_ends:
+            try:
                 produce_call_end()
-        except Exception:
-            logger.exception("Failed to produce call_end events")
+            except Exception:
+                failed_call_ends += 1
+                if failed_call_ends == 1:
+                    logger.exception("Failed to produce call_end event")
+        if failed_call_ends:
+            logger.error(
+                "Failed to produce %d of %d call_end events",
+                failed_call_ends,
+                len(pending_call_ends),
+            )
 
         try:
             self._flush_kafka_producer()

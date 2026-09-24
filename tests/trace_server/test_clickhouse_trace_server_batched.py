@@ -1749,6 +1749,33 @@ def test_call_end_events_do_not_leak_into_next_batch(server_with_mock_kafka):
     ]
 
 
+@pytest.mark.disable_logging_error_check
+def test_failed_call_end_produce_does_not_drop_later_events(server_with_mock_kafka):
+    server, mock_producer = server_with_mock_kafka
+    events = _record_writes_and_events(server, mock_producer, fail_insert=False)
+    call_ids = [str(uuid.uuid4()) for _ in range(3)]
+
+    def _produce(end, flush):
+        if end.id == call_ids[1]:
+            raise BufferError("Local: Queue full")
+        events.append(("produce_call_end", end.id))
+
+    mock_producer.produce_call_end.side_effect = _produce
+
+    server.calls_complete(
+        tsi.CallsUpsertCompleteReq(
+            batch=[_make_completed_call(call_id) for call_id in call_ids]
+        )
+    )
+
+    assert events == [
+        ("insert", "calls_complete"),
+        ("produce_call_end", call_ids[0]),
+        ("produce_call_end", call_ids[2]),
+    ]
+    mock_producer.flush.assert_called_once_with(timeout=0)
+
+
 def test_call_end_events_discarded_when_batch_body_raises(server_with_mock_kafka):
     server, mock_producer = server_with_mock_kafka
     events = _record_writes_and_events(server, mock_producer, fail_insert=False)
