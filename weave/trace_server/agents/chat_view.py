@@ -122,9 +122,10 @@ def _span_sort_key(span: AgentSpanSchema) -> tuple[bool, float, bool, float, str
 
     `started_at` is non-null from ClickHouse but can be None in in-memory
     callers and tests. The `is None` first element groups nulls last
-    without forcing a datetime.min fallback. When spans share a start time,
-    prefer the later-ended span first so enclosing spans sort before shorter
-    children; span_id is only the final deterministic tiebreaker.
+    without forcing a datetime.min fallback. This key orders a flat span list,
+    so when spans share a start time the later-ended span sorts first and an
+    enclosing span precedes its children; span_id is only the final
+    deterministic tiebreaker. Siblings inside the tree use `_span_node_sort_key`.
     """
     return (
         span.started_at is None,
@@ -138,12 +139,15 @@ def _span_sort_key(span: AgentSpanSchema) -> tuple[bool, float, bool, float, str
 def _span_node_sort_key(
     node: SpanNode,
 ) -> tuple[bool, float, bool, float, str]:
-    """Order chat nodes by their precise transcript event when available.
+    """Order sibling nodes by their precise transcript event when available.
 
     Claude Code can give sibling ``chat`` spans the same coarse start time.
     Their direct ``assistant_text`` children carry the actual emission times,
     so use the earliest such child to place the whole model-response node among
-    its siblings. Other nodes retain the established span ordering policy.
+    its siblings. Siblings that still share a start sort earlier-ended first:
+    nesting is already the tree, so among siblings the span that finished first
+    happened first. Cursor stamps a tool call and the ``chat`` span reporting
+    it with one start, and the tool call must precede the message.
     """
     event_time = node.span.started_at
     if node.span.operation_name == _CHAT_OPERATION:
@@ -160,7 +164,7 @@ def _span_node_sort_key(
         event_time is None,
         _datetime_sort_seconds(event_time),
         node.span.ended_at is None,
-        -_datetime_sort_seconds(node.span.ended_at),
+        _datetime_sort_seconds(node.span.ended_at),
         node.span.span_id,
     )
 
