@@ -41,6 +41,8 @@ DEFAULT_MAX_BUFFER_SIZE = 100000
 BUFFER_WARN_THRESHOLD = 0.5
 # Counts a failed on_delivery, tagged by topic and KafkaError.name().
 DELIVERY_FAILED_METRIC = "weave_trace_server.kafka_producer.delivery_failed"
+# Counts messages that never reached librdkafka, tagged by reason and message_type.
+PRODUCE_DROPPED_METRIC = "weave_trace_server.kafka_producer.produce_dropped"
 # logger.error on count == 1 and count % DELIVERY_ERROR_LOG_EVERY == 0.
 DELIVERY_ERROR_LOG_EVERY = 100
 
@@ -265,6 +267,11 @@ class KafkaProducer(ConfluentKafkaProducer):
                 },
             )
             set_root_span_dd_tags({"kafka.producer.buffer_size": buffer_size})
+            emit_counter(
+                PRODUCE_DROPPED_METRIC,
+                1,
+                ["reason:buffer_pressure", f"message_type:{message_type}"],
+            )
             return True
 
         if buffer_size >= self.max_buffer_size * BUFFER_WARN_THRESHOLD:

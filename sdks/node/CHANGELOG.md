@@ -4,6 +4,24 @@ All notable changes to the Weave TypeScript SDK will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.16.9] - 2026-09-24
+
+### Added
+
+- Accept `totalTokens` on GenAI `Usage` and record it as `gen_ai.usage.total_tokens`, including an explicit zero. An omitted total stays unset. ([#7929](https://github.com/wandb/weave/pull/7929))
+
+### Changed
+
+- Name GenAI spans after the model, tool, or agent (`chat gpt-4o`, `execute_tool search`, `invoke_agent research-bot`). A blank or missing target stays the bare operation, and `gen_ai.operation.name` is unchanged. An alert pinned to `span_name = "chat"` no longer matches a TypeScript chat span that has a model. ([#7934](https://github.com/wandb/weave/pull/7934))
+
+### Fixed
+
+- Percent-encode each path segment of entity and project names in SDK-built links, so a project name with a space stays one URL. ([#7922](https://github.com/wandb/weave/pull/7922))
+- Stamp Google ADK spans with `weave.integration.name`, `weave.integration.version`, and `weave.integration.meta.*`, matching the other TypeScript integrations. ([#7931](https://github.com/wandb/weave/pull/7931))
+- Make `wrapOpenAI()` return a client Weave has already wrapped. Wrapping twice made non-streaming Chat Completions and Responses calls fail with `TypeError: Body is unusable`, and logged other calls twice. ([#7941](https://github.com/wandb/weave/pull/7941))
+- Warn from `init()` when CommonJS loaded an instrumented library before `weave`. The warning names the library and says to require `weave` first. It stays quiet for an explicit wrap, and when another package loaded the library. Patching is unchanged. ([#7932](https://github.com/wandb/weave/pull/7932))
+
+
 ## [0.16.8] - 2026-09-10
 
 ### Changed
