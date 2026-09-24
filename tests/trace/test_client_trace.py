@@ -1213,6 +1213,62 @@ def test_trace_call_sort_with_mixed_types(client):
             assert call.inputs["in_val"].get("prim") == seq[i]
 
 
+@pytest.mark.skipif(
+    NOT_CLICKHOUSE_BACKEND, reason="ClickHouse-only: asserts JSON hop semantics"
+)
+def test_trace_call_sort_and_filter_by_array_index(client):
+    """Array indexes, including `-1`, filter and sort; calls lacking the path sort last."""
+
+    @weave.op
+    def chat(messages: list[dict]) -> str:
+        return messages[-1]["content"]
+
+    @weave.op
+    def no_messages(x: int) -> int:
+        return x
+
+    chat([{"content": "system"}, {"content": "b"}])
+    chat([{"content": "a"}])
+    no_messages(1)
+    server = get_client_trace_server(client)
+    project_id = get_client_project_id(client)
+
+    last_is_b = server.calls_query(
+        tsi.CallsQueryReq(
+            project_id=project_id,
+            query=tsi.Query.model_validate(
+                {
+                    "$expr": {
+                        "$eq": [
+                            {"$getField": "inputs.messages.-1.content"},
+                            {"$literal": "b"},
+                        ]
+                    }
+                }
+            ),
+        )
+    )
+    assert [c.inputs["messages"][-1]["content"] for c in last_is_b.calls] == ["b"]
+
+    # Ascending sorts still put calls without the path last, for both index signs.
+    for field, expected in [
+        ("inputs.messages.-1.content", ["a", "b", None]),
+        ("inputs.messages.0.content", ["a", "system", None]),
+    ]:
+        res = server.calls_query(
+            tsi.CallsQueryReq(
+                project_id=project_id,
+                sort_by=[SortBy(field=field, direction="asc")],
+            )
+        )
+        index = int(field.split(".")[2])
+        got = [
+            c.inputs["messages"][index]["content"] if "messages" in c.inputs else None
+            for c in res.calls
+        ]
+        assert got == expected, field
+
+
 def test_trace_call_filter(client):
     @weave.op
     def basic_op(in_val: dict, delay) -> dict:

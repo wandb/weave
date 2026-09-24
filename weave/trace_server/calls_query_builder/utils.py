@@ -114,62 +114,57 @@ def json_dump_field_as_sql(
         >>> json_dump_field_as_sql(pb, "table", "any(inputs_dump)", ["model", "temperature"])
         'toFloat64(JSON_VALUE(any(inputs_dump), {param_1:String}))'
     """
-    if cast != "exists":
-        root_sql, remaining_path = _hop_through_negative_index(
-            pb, root_field_sanitized, extra_path or []
-        )
-        path_str = "'$'"
-        if remaining_path:
-            param_name = pb.add_param(quote_json_path_parts(remaining_path))
-            path_str = param_slot(param_name, "String")
-        json_value = f"JSON_VALUE({root_sql}, {path_str})"
-        if agg_fn:
-            json_value = f"{agg_fn}If({json_value}, {root_field_sanitized} IS NOT NULL)"
-        val = f"coalesce(nullIf({json_value}, 'null'), '')"
-        return clickhouse_cast_json_value(val, cast)
-    else:
-        # Note: ClickHouse has limitations in distinguishing between null, non-existent, empty string, and "null".
-        # This workaround helps to handle these cases.
-        path_parts = []
-        if extra_path:
-            for part in extra_path:
-                path_parts.append(", " + param_slot(pb.add_param(part), "String"))
-        safe_path = "".join(path_parts)
-        return f"(NOT (JSONType({root_field_sanitized}{safe_path}) = 'Null' OR JSONType({root_field_sanitized}{safe_path}) IS NULL))"
+    path = extra_path or []
+
+    if cast == "exists":
+        # JSONType cannot tell null from missing, so both read as absent.
+        hops = _json_hop_slots(pb, path)
+        return f"(NOT (JSONType({root_field_sanitized}{hops}) = 'Null' OR JSONType({root_field_sanitized}{hops}) IS NULL))"
+
+    root_sql = root_field_sanitized
+    path_str = "'$'"
+    if _has_negative_index(path):
+        # JSON_VALUE's JSONPath has no `[-1]`; JSONExtractRaw counts from the end.
+        root_sql = f"JSONExtractRaw({root_field_sanitized}{_json_hop_slots(pb, path)})"
+    elif path:
+        param_name = pb.add_param(quote_json_path_parts(path))
+        path_str = param_slot(param_name, "String")
+    json_value = f"JSON_VALUE({root_sql}, {path_str})"
+    if agg_fn:
+        json_value = f"{agg_fn}If({json_value}, {root_field_sanitized} IS NOT NULL)"
+    val = f"coalesce(nullIf({json_value}, 'null'), '')"
+
+    return clickhouse_cast_json_value(val, cast)
 
 
-def _hop_through_negative_index(
-    pb: ParamBuilder, root_field_sanitized: str, extra_path: list[str]
-) -> tuple[str, list[str]]:
-    """Route a path with a negative array index through `JSONExtractRaw`.
+def _json_hop_slots(pb: ParamBuilder, path: list[str]) -> str:
+    """Leading-comma argument list for `JSONType` and `JSONExtractRaw` hops.
 
-    `JSON_VALUE` JSONPath has no `[-1]`, but `JSONExtractRaw` counts negative
-    indexes from the end, so every hop up to the last negative index is taken
-    with it and only the remaining parts stay a JSONPath for `JSON_VALUE`.
+    Those functions read a `String` argument as an object key and an `Int64`
+    as an array index counted from one, or from the end when negative.
     """
-    split_at = None
-    for position, part in enumerate(extra_path):
-        index = _array_index(part)
-        if index is not None and index < 0:
-            split_at = position
-
-    if split_at is None:
-        return root_field_sanitized, extra_path
-
-    hop_slots = []
-    for part in extra_path[: split_at + 1]:
+    slots = []
+    for part in path:
         index = _array_index(part)
         if index is None:
-            hop_slots.append(param_slot(pb.add_param(part), "String"))
+            slots.append(", " + param_slot(pb.add_param(part), "String"))
         elif index < 0:
-            hop_slots.append(param_slot(pb.add_param(index), "Int64"))
+            slots.append(", " + param_slot(pb.add_param(index), "Int64"))
         else:
-            # JSONExtractRaw indexes arrays from one; JSONPath indexes from zero.
-            hop_slots.append(param_slot(pb.add_param(index + 1), "Int64"))
-    hops = ", ".join(hop_slots)
-    root_sql = f"JSONExtractRaw({root_field_sanitized}, {hops})"
+            slots.append(", " + param_slot(pb.add_param(index + 1), "Int64"))
+    hops = "".join(slots)
 
-    return root_sql, extra_path[split_at + 1 :]
+    return hops
+
+
+def _has_negative_index(path: list[str]) -> bool:
+    """True when any part of `path` is a negative array index."""
+    for part in path:
+        index = _array_index(part)
+        if index is not None and index < 0:
+            return True
+
+    return False
 
 
 def _array_index(part: str) -> int | None:

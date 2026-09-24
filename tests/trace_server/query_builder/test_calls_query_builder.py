@@ -2171,11 +2171,13 @@ def test_unsupported_summary_field_raises_invalid_field_error() -> None:
 
 
 def test_negative_json_array_index_hops_with_json_extract_raw() -> None:
-    """`inputs.messages.-1.content` filters and sorts on the last array element.
+    """Array indexes compile to typed JSON hops, so `-1` reads the last element.
 
-    JSON_VALUE's JSONPath cannot express `[-1]`, so the hops through the last
-    negative index compile to JSONExtractRaw (one-based, negatives from the end)
-    and only the trailing path stays a JSONPath.
+    JSON_VALUE's JSONPath cannot express `[-1]`, so a path holding a negative
+    index reads its value through JSONExtractRaw hops. Every path's existence
+    check takes the same hops, because JSONType reads a String argument as an
+    object key: the former `{pb:String}` "0" never matched an array element.
+    Hop indexes are one-based, JSONPath indexes stay zero-based.
     """
     cq = CallsQuery(project_id="project")
     cq.add_field("id")
@@ -2190,6 +2192,7 @@ def test_negative_json_array_index_hops_with_json_extract_raw() -> None:
         )
     )
     cq.add_order("inputs.turn.0.parts.-1", "desc")
+    cq.add_order("output.list.0", "asc")
     assert_sql(
         cq,
         """
@@ -2199,25 +2202,28 @@ def test_negative_json_array_index_hops_with_json_extract_raw() -> None:
         WHERE ((calls_merged.inputs_dump LIKE {pb_4:String} OR calls_merged.inputs_dump IS NULL))
         GROUP BY (calls_merged.project_id, calls_merged.id)
         HAVING (
-            ((coalesce(nullIf(anyIf(JSON_VALUE(JSONExtractRaw(calls_merged.inputs_dump, {pb_0:String}, {pb_1:Int64}), {pb_2:String}), calls_merged.inputs_dump IS NOT NULL), 'null'), '') = {pb_3:String}))
+            ((coalesce(nullIf(anyIf(JSON_VALUE(JSONExtractRaw(calls_merged.inputs_dump, {pb_0:String}, {pb_1:Int64}, {pb_2:String}), '$'), calls_merged.inputs_dump IS NOT NULL), 'null'), '') = {pb_3:String}))
             AND ((any(calls_merged.deleted_at) IS NULL))
             AND ((NOT ((any(calls_merged.op_name) IS NULL))))
         )
-        ORDER BY (NOT (JSONType(any(calls_merged.inputs_dump), {pb_5:String}, {pb_6:String}, {pb_7:String}, {pb_8:String}) = 'Null' OR JSONType(any(calls_merged.inputs_dump), {pb_5:String}, {pb_6:String}, {pb_7:String}, {pb_8:String}) IS NULL)) desc,
-            toFloat64OrNull(coalesce(nullIf(anyIf(JSON_VALUE(JSONExtractRaw(calls_merged.inputs_dump, {pb_5:String}, {pb_9:Int64}, {pb_7:String}, {pb_1:Int64}), '$'), calls_merged.inputs_dump IS NOT NULL), 'null'), '')) DESC,
-            toString(coalesce(nullIf(anyIf(JSON_VALUE(JSONExtractRaw(calls_merged.inputs_dump, {pb_5:String}, {pb_9:Int64}, {pb_7:String}, {pb_1:Int64}), '$'), calls_merged.inputs_dump IS NOT NULL), 'null'), '')) DESC
+        ORDER BY (NOT (JSONType(any(calls_merged.inputs_dump), {pb_5:String}, {pb_6:Int64}, {pb_7:String}, {pb_1:Int64}) = 'Null' OR JSONType(any(calls_merged.inputs_dump), {pb_5:String}, {pb_6:Int64}, {pb_7:String}, {pb_1:Int64}) IS NULL)) desc,
+            toFloat64OrNull(coalesce(nullIf(anyIf(JSON_VALUE(JSONExtractRaw(calls_merged.inputs_dump, {pb_5:String}, {pb_6:Int64}, {pb_7:String}, {pb_1:Int64}), '$'), calls_merged.inputs_dump IS NOT NULL), 'null'), '')) DESC,
+            toString(coalesce(nullIf(anyIf(JSON_VALUE(JSONExtractRaw(calls_merged.inputs_dump, {pb_5:String}, {pb_6:Int64}, {pb_7:String}, {pb_1:Int64}), '$'), calls_merged.inputs_dump IS NOT NULL), 'null'), '')) DESC,
+            (NOT (JSONType(any(calls_merged.output_dump), {pb_8:String}, {pb_6:Int64}) = 'Null' OR JSONType(any(calls_merged.output_dump), {pb_8:String}, {pb_6:Int64}) IS NULL)) desc,
+            toFloat64OrNull(coalesce(nullIf(anyIf(JSON_VALUE(calls_merged.output_dump, {pb_9:String}), calls_merged.output_dump IS NOT NULL), 'null'), '')) ASC,
+            toString(coalesce(nullIf(anyIf(JSON_VALUE(calls_merged.output_dump, {pb_9:String}), calls_merged.output_dump IS NOT NULL), 'null'), '')) ASC
         """,
         {
             "pb_0": "messages",
             "pb_1": -1,
-            "pb_2": '$."content"',
+            "pb_2": "content",
             "pb_3": "hi",
             "pb_4": '%"hi"%',
             "pb_5": "turn",
-            "pb_6": "0",
+            "pb_6": 1,
             "pb_7": "parts",
-            "pb_8": "-1",
-            "pb_9": 1,
+            "pb_8": "list",
+            "pb_9": '$."list"[0]',
             "pb_10": "project",
         },
     )
