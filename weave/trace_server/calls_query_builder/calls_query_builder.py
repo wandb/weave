@@ -42,6 +42,10 @@ from weave.shared.trace_server_interface_util import (
 from weave.trace_server import ch_sentinel_values
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.calls_query_builder.cte import CTECollection
+from weave.trace_server.calls_query_builder.last_turn import (
+    LAST_TURN_FIELD,
+    last_turn_text_sql,
+)
 from weave.trace_server.calls_query_builder.object_ref_query_builder import (
     ObjectRefCondition,
     ObjectRefOrderCondition,
@@ -315,10 +319,7 @@ class CallsMergedSummaryField(CallsMergedField):
         return f"{self.as_sql(pb, table_alias, use_agg_fn=use_agg_fn, read_table=read_table)} AS {safe_alias(self.field)}"
 
     def is_heavy(self) -> bool:
-        # These are computed from non-heavy fields (status uses exception and ended_at)
-        # If we add more summary fields that depend on heavy fields,
-        # this would need to be made more sophisticated
-        return False
+        return self.field == LAST_TURN_FIELD
 
 
 class CallsMergedFeedbackPayloadField(CallsMergedField):
@@ -1079,6 +1080,15 @@ class CallsQuery(BaseModel):
         # No predicate pushdown possible
         return False
 
+    def _format_sql(self, sql: str) -> str:
+        fields = [*self.select_fields, *(order.field for order in self.order_fields)]
+        for condition in self.query_conditions:
+            fields.extend(condition._get_consumed_fields())
+        # sqlparse's recursive reindent becomes prohibitively slow on nested JSON lambdas.
+        if any(field.field == LAST_TURN_FIELD for field in fields):
+            return sql
+        return safely_format_sql(sql, logger)
+
     def as_sql(self, pb: ParamBuilder, table_alias: str | None = None) -> str:
         """This is the main entry point for building the query.
 
@@ -1262,7 +1272,7 @@ class CallsQuery(BaseModel):
                 storage_scope_id_cte=storage_scope_cte_name,
             )
             if ctes.has_ctes():
-                return safely_format_sql(ctes.to_sql() + "\n" + base_sql, logger)
+                return self._format_sql(ctes.to_sql() + "\n" + base_sql)
             return base_sql
 
         if use_filter_cte:
@@ -1357,7 +1367,7 @@ class CallsQuery(BaseModel):
         if not self.include_costs:
             if ctes.has_ctes():
                 raw_sql = ctes.to_sql() + "\n" + base_sql
-                return safely_format_sql(raw_sql, logger)
+                return self._format_sql(raw_sql)
             return base_sql
 
         ctes.add_cte(CTE_ALL_CALLS, base_sql)
@@ -1369,7 +1379,7 @@ class CallsQuery(BaseModel):
         )
 
         raw_sql = ctes.to_sql() + "\n" + final_select
-        return safely_format_sql(raw_sql, logger)
+        return self._format_sql(raw_sql)
 
     def _add_cost_ctes_to_builder(self, ctes: CTECollection, pb: ParamBuilder) -> None:
         cost_cte_list = build_cost_ctes(pb, CTE_ALL_CALLS, self.project_id)
@@ -1987,7 +1997,7 @@ class CallsQuery(BaseModel):
         SELECT {distinct} {select_fields_sql}
         {body_result.sql}
         """
-        return safely_format_sql(raw_sql, logger)
+        return self._format_sql(raw_sql)
 
 
 STORAGE_SIZE_TABLE_NAME = "storage_size_tbl"
@@ -2232,11 +2242,28 @@ def _handle_trace_name_summary_field(
     END"""
 
 
+def _handle_last_turn_text_summary_field(
+    pb: ParamBuilder,
+    table_alias: str,
+    use_agg_fn: bool = True,
+    read_table: "ReadTable" = ReadTable.CALLS_MERGED,
+) -> str:
+    return last_turn_text_sql(
+        *(
+            _field_as_sql_maybe_agg(
+                get_field_by_name(field), pb, table_alias, use_agg_fn
+            )
+            for field in ("inputs_dump", "output_dump", "attributes_dump", "otel_dump")
+        )
+    )
+
+
 # Map of summary fields to their handler functions
 SUMMARY_FIELD_HANDLERS = {
     "status": _handle_status_summary_field,
     "latency_ms": _handle_latency_ms_summary_field,
     "trace_name": _handle_trace_name_summary_field,
+    "last_turn_text": _handle_last_turn_text_summary_field,
 }
 
 
@@ -3186,7 +3213,7 @@ def _build_calls_complete_stats_query(
     SELECT {stats_select}
     {body_result.sql}
     """
-    return safely_format_sql(raw_sql, logger)
+    return cq._format_sql(raw_sql)
 
 
 def _try_optimized_stats_query(

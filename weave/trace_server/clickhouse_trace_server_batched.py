@@ -115,12 +115,14 @@ from weave.trace_server.calls_query_builder.calls_query_builder import (
     build_calls_stats_query,
     combine_conditions,
 )
+from weave.trace_server.calls_query_builder.last_turn import LAST_TURN_FIELD
 from weave.trace_server.calls_query_builder.monitor_query_validation import (
     validate_monitor_query_fields,
 )
 from weave.trace_server.calls_query_builder.usage_query_builder import (
     build_usage_query,
 )
+from weave.trace_server.calls_query_builder.utils import safe_alias
 from weave.trace_server.ch_sentinel_values import SENTINEL_EPOCH
 from weave.trace_server.clickhouse.schema_converters import (
     ch_call_dict_to_call_schema_dict,
@@ -1876,7 +1878,10 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         if req.columns:
             # TODO: add support for json extract fields
             # Split out any nested column requests
-            columns = [col.split(".")[0] for col in req.columns]
+            columns = [
+                col if col == LAST_TURN_FIELD else col.split(".")[0]
+                for col in req.columns
+            ]
 
             if req.include_usernames and "wb_user_id" not in columns:
                 columns.append("wb_user_id")
@@ -1979,9 +1984,16 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             set_current_span_dd_tags({"expand_columns": "true"})
 
         def row_to_call_schema_dict(row: tuple[Any, ...]) -> dict[str, Any]:
-            return ch_call_dict_to_call_schema_dict(
-                dict(zip(select_columns, row, strict=False))
-            )
+            ch_call = dict(zip(select_columns, row, strict=False))
+            call = ch_call_dict_to_call_schema_dict(ch_call)
+            if req.columns and LAST_TURN_FIELD in req.columns:
+                column = (
+                    safe_alias(LAST_TURN_FIELD)
+                    if req.include_costs
+                    else LAST_TURN_FIELD
+                )
+                call["summary"]["weave"]["last_turn_text"] = ch_call[column]
+            return call
 
         try:
             if not expand_columns and not include_feedback:
