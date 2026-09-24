@@ -1883,42 +1883,67 @@ def test_build_span_tree_sort_is_stable_on_equal_timestamps() -> None:
     assert [r.span.span_id for r in roots] == ["a", "b", "c"]
 
 
-def test_build_span_tree_sorts_equal_starts_by_latest_end_first() -> None:
-    """Enclosing spans often share child start times and should sort first."""
+def test_sibling_spans_sharing_a_start_sort_earliest_end_first() -> None:
+    """A tool call stamped with its reporting chat span's start precedes that message.
+
+    Cursor emits a millisecond `execute_tool` span and the `chat` span that
+    reports its result with one `started_at`. Nesting is already the tree, so
+    among siblings the span that finished first happened first; the final
+    message must not read as claiming completion before the tool ran.
+    """
     t0 = datetime.datetime(2026, 1, 1, tzinfo=datetime.timezone.utc)
-    t1 = datetime.datetime(2026, 1, 1, 0, 0, 1, tzinfo=datetime.timezone.utc)
-    t2 = datetime.datetime(2026, 1, 1, 0, 0, 2, tzinfo=datetime.timezone.utc)
     spans = [
-        AgentSpanSchema(
-            project_id="p1",
-            trace_id="t1",
-            span_id="a-short",
-            span_name="short",
-            status_code="OK",
+        _span(
+            span_id="agent",
+            operation_name="invoke_agent",
+            agent_name="cursor",
             started_at=t0,
-            ended_at=t1,
+            ended_at=t0 + datetime.timedelta(seconds=3),
         ),
-        AgentSpanSchema(
-            project_id="p1",
-            trace_id="t1",
-            span_id="z-long",
-            span_name="long",
-            status_code="OK",
+        _span(
+            span_id="chat-final",
+            parent_span_id="agent",
+            operation_name="chat",
+            output_messages=[{"role": "assistant", "content": "Script ran, done."}],
             started_at=t0,
-            ended_at=t2,
+            ended_at=t0 + datetime.timedelta(seconds=2),
         ),
-        AgentSpanSchema(
-            project_id="p1",
-            trace_id="t1",
-            span_id="b-short",
-            span_name="also short",
-            status_code="OK",
+        _span(
+            span_id="tool-run",
+            parent_span_id="agent",
+            operation_name="execute_tool",
+            tool_name="Shell",
+            tool_call_result="ok",
             started_at=t0,
-            ended_at=t1,
+            ended_at=t0 + datetime.timedelta(milliseconds=5),
+        ),
+        _span(
+            span_id="tool-read",
+            parent_span_id="agent",
+            operation_name="execute_tool",
+            tool_name="Read",
+            started_at=t0,
+            ended_at=t0 + datetime.timedelta(milliseconds=5),
         ),
     ]
+
     roots = build_span_tree(spans)
-    assert [r.span.span_id for r in roots] == ["z-long", "a-short", "b-short"]
+    assert [child.span.span_id for child in roots[0].children] == [
+        "tool-read",
+        "tool-run",
+        "chat-final",
+    ]
+
+    events = [
+        (message.type, message.span_id)
+        for message in build_chat_messages(spans)
+        if message.type in {"tool_call", "assistant_message"}
+    ]
+    assert events == [
+        ("tool_call", "tool-read"),
+        ("tool_call", "tool-run"),
+        ("assistant_message", "chat-final"),
+    ]
 
 
 def _nest_in_lists(value: object, levels: int) -> object:
