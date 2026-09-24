@@ -1,0 +1,1 @@
+-- No-op: conversation tag tables are unused in production and should not be recreated.
