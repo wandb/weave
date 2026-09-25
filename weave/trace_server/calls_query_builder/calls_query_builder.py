@@ -45,6 +45,7 @@ from weave.trace_server.calls_query_builder.cte import CTECollection
 from weave.trace_server.calls_query_builder.last_turn import (
     LAST_TURN_FIELD,
     last_turn_text_sql,
+    with_last_turn_sql_helpers,
 )
 from weave.trace_server.calls_query_builder.object_ref_query_builder import (
     ObjectRefCondition,
@@ -1086,7 +1087,7 @@ class CallsQuery(BaseModel):
             fields.extend(condition._get_consumed_fields())
         # sqlparse's recursive reindent becomes prohibitively slow on nested JSON lambdas.
         if any(field.field == LAST_TURN_FIELD for field in fields):
-            return sql
+            return with_last_turn_sql_helpers(sql)
         return safely_format_sql(sql, logger)
 
     def as_sql(self, pb: ParamBuilder, table_alias: str | None = None) -> str:
@@ -2250,8 +2251,11 @@ def _handle_last_turn_text_summary_field(
 ) -> str:
     return last_turn_text_sql(
         *(
-            _field_as_sql_maybe_agg(
-                get_field_by_name(field), pb, table_alias, use_agg_fn
+            CallsMergedAggField.as_sql(
+                cast(CallsMergedAggField, get_field_by_name(field)),
+                pb,
+                table_alias,
+                use_agg_fn=use_agg_fn,
             )
             for field in ("inputs_dump", "output_dump", "attributes_dump", "otel_dump")
         )

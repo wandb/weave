@@ -1,6 +1,7 @@
 import datetime
+import json
 import uuid
-from typing import Any
+from pathlib import Path
 
 import pytest
 
@@ -49,250 +50,71 @@ def _query(server, **kwargs):
     )
 
 
-def test_provider_projections(last_turn_server):
-    examples: list[tuple[dict[str, Any], Any, dict[str, Any], str | None]] = [
-        ({"messages": [{"role": "user", "content": "hello"}]}, None, {}, "hello"),
-        (
-            {"messages": [{"role": "assistant", "content": "last assistant"}]},
-            None,
-            {},
-            "last assistant",
-        ),
-        (
-            {
-                "messages": [
-                    {
-                        "role": "user",
-                        "content": [
-                            {"type": "text", "text": "one"},
-                            {"type": "image_url", "image_url": {"url": "secret image"}},
-                            {"type": "text", "text": "two"},
-                        ],
-                    }
-                ]
-            },
-            None,
-            {},
-            "one\ntwo",
-        ),
-        ({"input": "responses input"}, {}, {}, "responses input"),
-        (
-            {
-                "input": [
-                    {"role": "user", "content": "before"},
-                    {
-                        "type": "message",
-                        "role": "user",
-                        "content": [{"type": "input_text", "text": "responses text"}],
-                    },
-                    {"type": "reasoning", "summary": [{"text": "hidden"}]},
-                ]
-            },
-            {},
-            {},
-            "responses text",
-        ),
-        (
-            {
-                "input": [
-                    {
-                        "type": "function_call",
-                        "call_id": "1",
-                        "name": "search",
-                        "arguments": "{}",
-                    },
-                    {"type": "function_call_output", "call_id": "1", "output": "found"},
-                ]
-            },
-            {},
-            {},
-            "search\n{}\nfound",
-        ),
-        ({"model": "gemini", "contents": "google input"}, {}, {}, "google input"),
-        (
-            {
-                "model": "gemini",
-                "contents": [{"role": "user", "parts": [{"text": "google parts"}]}],
-            },
-            {},
-            {},
-            "google parts",
-        ),
-        (
-            {"self": {"model_name": "gemini"}, "contents": "legacy gemini"},
-            {},
-            {},
-            "legacy gemini",
-        ),
-        (
-            {
-                "messages": [
-                    [
-                        {
-                            "id": ["langchain", "HumanMessage"],
-                            "kwargs": {"content": "first batch"},
-                        }
-                    ],
-                    [
-                        {
-                            "id": ["langchain", "HumanMessage"],
-                            "kwargs": {"content": "ignored batch"},
-                        }
-                    ],
-                ]
-            },
-            {},
-            {},
-            "first batch",
-        ),
-        (
-            {"prompt": "original"},
-            {
-                "messages": [
-                    {"role": "system", "subtype": "init"},
-                    {
-                        "role": "assistant",
-                        "content": [{"text": "agent output"}, {"thinking": "hidden"}],
-                    },
-                    {"role": "result", "result": "ignored result"},
-                ]
-            },
-            {},
-            "agent output",
-        ),
-        (
-            {
-                "history": [
-                    {"role": "system", "subtype": "init"},
-                    {"role": "user", "content": "agent history"},
-                ]
-            },
-            {},
-            {},
-            "agent history",
-        ),
-        (
-            {
-                "gen_ai.input.messages": [
-                    {
-                        "role": "user",
-                        "parts": [{"type": "text", "content": "otel text"}],
-                    }
-                ]
-            },
-            {},
-            {"otel_span": {}},
-            "otel text",
-        ),
-        (
-            {
-                "input.value": {
-                    "messages": [{"role": "user", "content": "otel messages"}]
-                }
-            },
-            {},
-            {"otel_span": {}},
-            "otel messages",
-        ),
-        ({"gen_ai.prompt": "otel string"}, {}, {"otel_span": {}}, "otel string"),
-        ({"model": "gpt-image-1", "prompt": "draw a cat"}, {}, {}, "draw a cat"),
-        ({"messages": []}, {}, {}, None),
-        ({"messages": [{"role": "user", "content": ""}]}, {}, {}, None),
-        (
-            {
-                "messages": [
-                    {
-                        "role": "user",
-                        "content": [
-                            {"type": "image_url", "image_url": {"url": "not text"}}
-                        ],
-                    }
-                ]
-            },
-            {},
-            {},
-            None,
-        ),
-        ({"messages": "malformed"}, {}, {}, None),
-        ({"arbitrary": "not chat"}, {}, {}, None),
-        ({"messages": [], "system": "system only"}, {}, {}, "system only"),
-        (
-            {"input": [], "instructions": "instructions only"},
-            {},
-            {},
-            "instructions only",
-        ),
-        (
-            {"contents": [], "config": {"systemInstruction": "google system"}},
-            {},
-            {},
-            "google system",
-        ),
-        (
-            {"gen_ai.prompt": "first", "input.value": "second"},
-            {},
-            {"otel_span": {}},
-            "first",
-        ),
-        (
-            {
-                "gcp.vertex.agent.llm_request": {
-                    "contents": [{"role": "user", "parts": [{"text": "adk text"}]}]
-                }
-            },
-            {},
-            {"otel_span": {}},
-            "adk text",
-        ),
-        (
-            {"messages": [{"role": "user", "content": "café 猫 'quoted'\\path"}]},
-            {},
-            {},
-            "café 猫 'quoted'\\path",
-        ),
-        ({"messages": [None, 42, {"content": "no role"}]}, {}, {}, None),
-    ]
-    examples.extend(
-        [
-            (
-                {
-                    "messages": [
-                        {
-                            "type": "function_call",
-                            "call_id": "1",
-                            "name": "search",
-                            "arguments": "{}",
-                        },
-                        {
-                            "type": "function_call_output",
-                            "call_id": "1",
-                            "output": "found",
-                        },
-                    ]
-                },
-                {},
-                {},
-                "search\n{}\nfound",
-            ),
-            ({"gen_ai.prompt": ["first", "last"]}, {}, {"otel_span": {}}, "last"),
-            (
-                {"gen_ai.prompt": []},
-                {},
-                {"otel_span": {}, "system": "otel system"},
-                "otel system",
-            ),
-        ]
-    )
+def test_frontend_parity(last_turn_server):
+    fixtures = json.loads(
+        (Path(__file__).parent / "fixtures" / "last_turn_frontend.json").read_text()
+    )["cases"]
     expected = {}
-    for inputs, output, attributes, text in examples:
-        call_id = _insert(last_turn_server, inputs, output, attributes=attributes)
-        expected[call_id] = text
+    names = {}
+    for fixture in fixtures:
+        call = (
+            json.loads(fixture["raw_call"])
+            if "raw_call" in fixture
+            else fixture["call"]
+        )
+        call_id = _insert(
+            last_turn_server,
+            call["inputs"],
+            call["output"],
+            attributes=call["attributes"],
+        )
+        expected[call_id] = fixture["expected"]
+        names[call_id] = fixture["name"]
     calls = _query(last_turn_server, columns=["id", LAST_TURN_FIELD])
     assert {
-        call.id: call.summary["weave"]["last_turn_text"] for call in calls
-    } == expected
+        names[call.id]: call.summary["weave"]["last_turn_text"] for call in calls
+    } == {names[call_id]: text for call_id, text in expected.items()}
     assert [call.inputs for call in calls] == [{}] * len(expected)
     assert [call.output for call in calls] == [None] * len(expected)
+    filtered = _query(
+        last_turn_server,
+        columns=["id", LAST_TURN_FIELD],
+        query={
+            "$expr": {
+                "$contains": {
+                    "input": {"$getField": LAST_TURN_FIELD},
+                    "substr": {"$literal": "found"},
+                }
+            }
+        },
+    )
+    assert {call.id: call.summary["weave"]["last_turn_text"] for call in filtered} == {
+        call_id: text
+        for call_id, text in expected.items()
+        if text is not None and "found" in text
+    }
+    sorted_calls = _query(
+        last_turn_server,
+        columns=["id", LAST_TURN_FIELD],
+        sort_by=[{"field": LAST_TURN_FIELD, "direction": "asc"}],
+    )
+    assert [call.summary["weave"]["last_turn_text"] for call in sorted_calls] == sorted(
+        expected.values(), key=lambda value: (value is None, value or "")
+    )
+    stats = last_turn_server.calls_query_stats(
+        tsi.CallsQueryStatsReq(
+            project_id="shawn/test-project",
+            query={
+                "$expr": {
+                    "$eq": [
+                        {"$getField": LAST_TURN_FIELD},
+                        {"$literal": '{"value":100000000000000000000}'},
+                    ]
+                }
+            },
+        )
+    )
+    assert stats.count == 1
 
 
 def test_trailing_tool_interaction(last_turn_server):
@@ -350,6 +172,7 @@ def test_anthropic_tool_interaction(last_turn_server):
                 },
             ]
         },
+        output={},
     )
     calls = _query(last_turn_server, columns=[LAST_TURN_FIELD])
     assert [c.summary["weave"]["last_turn_text"] for c in calls] == [
@@ -361,7 +184,9 @@ def test_anthropic_tool_interaction(last_turn_server):
 def test_filter_sort_and_paginate(last_turn_server, include_costs):
     ids = [
         _insert(
-            last_turn_server, {"messages": [{"role": "user", "content": text}]}, index=i
+            last_turn_server,
+            {"category": "chat", "messages": [{"role": "user", "content": text}]},
+            index=i,
         )
         for i, text in enumerate(["zulu", "beta", "alpha", ""])
     ]
@@ -384,11 +209,16 @@ def test_filter_sort_and_paginate(last_turn_server, include_costs):
         include_costs=include_costs,
         query={
             "$expr": {
-                "$contains": {
-                    "input": {"$getField": LAST_TURN_FIELD},
-                    "substr": {"$literal": "ALP"},
-                    "case_insensitive": True,
-                }
+                "$and": [
+                    {"$eq": [{"$getField": "inputs.category"}, {"$literal": "chat"}]},
+                    {
+                        "$contains": {
+                            "input": {"$getField": LAST_TURN_FIELD},
+                            "substr": {"$literal": "ALP"},
+                            "case_insensitive": True,
+                        }
+                    },
+                ]
             }
         },
     )

@@ -1,0 +1,6663 @@
+{
+  "frontend_commit": "7de405a0daa846ab7c95b34b4320bdc0fa935eb1",
+  "source_hashes": {
+    "frontends/app/src/weave/components/PagePanelComponents/Home/Browse3/pages/CallsPage/CallsTableDerivedColumns/LLMChatCompletions.tsx": "926477a82b3b4b6321f846f265bbcf4fcdb264141b9278d3c7fa2e6e630b4975",
+    "frontends/app/src/weave/components/PagePanelComponents/Home/Browse3/pages/ChatView/ChatFormats/anthropic.ts": "13424ba5b7e48e329492b1be9f0da593e9501aed590df22d94ffe7a4233dd700",
+    "frontends/app/src/weave/components/PagePanelComponents/Home/Browse3/pages/ChatView/ChatFormats/anthropicAgentSdk.ts": "0c81c01ac657c0a448d396d44fec0288ebeef74aea1320c7bba16782945dabc8",
+    "frontends/app/src/weave/components/PagePanelComponents/Home/Browse3/pages/ChatView/ChatFormats/gemini.ts": "233989e3a22caca926d37910474d80bd354c2780ee50f3bd223de8681c3fd99a",
+    "frontends/app/src/weave/components/PagePanelComponents/Home/Browse3/pages/ChatView/ChatFormats/google_genai.ts": "bbe1d1be1ba6768776952e6f97d50c65d23a003973f2acc554556d2b173508ff",
+    "frontends/app/src/weave/components/PagePanelComponents/Home/Browse3/pages/ChatView/ChatFormats/langchain.ts": "02d22739efdea8e1085e55c1296e7f462802e1be1077678cdde9349b443d3b68",
+    "frontends/app/src/weave/components/PagePanelComponents/Home/Browse3/pages/ChatView/ChatFormats/mistral.ts": "c13c3b0c2cafafdea022294ac6d046f9fdd3efe9f7595ed4f5d547ee0982b3fd",
+    "frontends/app/src/weave/components/PagePanelComponents/Home/Browse3/pages/ChatView/ChatFormats/openai.ts": "155d8d11bb192cf60d6e194b287bef641311435d4eded8697904e37a612e4043",
+    "frontends/app/src/weave/components/PagePanelComponents/Home/Browse3/pages/ChatView/ChatFormats/openai_image.ts": "996950cd64be6f6bace6f4719f0b5c5b513fd1519ccd7fa2902dc555282dcde4",
+    "frontends/app/src/weave/components/PagePanelComponents/Home/Browse3/pages/ChatView/ChatFormats/opentelemetry.ts": "81b7f78bb0cb4f7cc470541d52fb4ac00594af4825c79b85e6bd08f0574744d7",
+    "frontends/app/src/weave/components/PagePanelComponents/Home/Browse3/pages/ChatView/ChatFormats/parsers/adk.ts": "261aaf936813a1ea016c7ea2c28815eac867b72b80b9178fe1af62924520ba05",
+    "frontends/app/src/weave/components/PagePanelComponents/Home/Browse3/pages/ChatView/ChatFormats/schemas/adk.ts": "94abc89cbf362d95622692d2bf781620df4f67827ea035199bc09bd2205259de",
+    "frontends/app/src/weave/components/PagePanelComponents/Home/Browse3/pages/ChatView/ChatFormats/types.ts": "7caff8de35afeed556162fd5ac9d4459ef6987339568679cf589cbdb2fe246af",
+    "frontends/app/src/weave/components/PagePanelComponents/Home/Browse3/pages/ChatView/ChatFormats/utils.ts": "acf0e0e36316515be7b46d4e0358eb8b4eee9a2196ffb7a1c54796958c74e70d",
+    "frontends/app/src/weave/components/PagePanelComponents/Home/Browse3/pages/ChatView/hooks.ts": "911377aa1a6b09479df1f9dbf229d84067a561200301c52fea3545f5b606a23d"
+  },
+  "cases": [
+    {
+      "name": "existing-00",
+      "call": {
+        "inputs": {
+          "messages": [
+            {
+              "role": "user",
+              "content": "hello"
+            }
+          ]
+        },
+        "output": null,
+        "attributes": {}
+      },
+      "expected": "hello"
+    },
+    {
+      "name": "existing-01",
+      "call": {
+        "inputs": {
+          "messages": [
+            {
+              "role": "assistant",
+              "content": "last assistant"
+            }
+          ]
+        },
+        "output": null,
+        "attributes": {}
+      },
+      "expected": "last assistant"
+    },
+    {
+      "name": "existing-02",
+      "call": {
+        "inputs": {
+          "messages": [
+            {
+              "role": "user",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "one"
+                },
+                {
+                  "type": "image_url",
+                  "image_url": {
+                    "url": "secret image"
+                  }
+                },
+                {
+                  "type": "text",
+                  "text": "two"
+                }
+              ]
+            }
+          ]
+        },
+        "output": null,
+        "attributes": {}
+      },
+      "expected": "onetwo"
+    },
+    {
+      "name": "existing-03",
+      "call": {
+        "inputs": {
+          "input": "responses input"
+        },
+        "output": {},
+        "attributes": {}
+      },
+      "expected": null
+    },
+    {
+      "name": "existing-04",
+      "call": {
+        "inputs": {
+          "input": [
+            {
+              "role": "user",
+              "content": "before"
+            },
+            {
+              "type": "message",
+              "role": "user",
+              "content": [
+                {
+                  "type": "input_text",
+                  "text": "responses text"
+                }
+              ]
+            },
+            {
+              "type": "reasoning",
+              "summary": [
+                {
+                  "text": "hidden"
+                }
+              ]
+            }
+          ]
+        },
+        "output": {},
+        "attributes": {}
+      },
+      "expected": null
+    },
+    {
+      "name": "existing-05",
+      "call": {
+        "inputs": {
+          "input": [
+            {
+              "type": "function_call",
+              "call_id": "1",
+              "name": "search",
+              "arguments": "{}"
+            },
+            {
+              "type": "function_call_output",
+              "call_id": "1",
+              "output": "found"
+            }
+          ]
+        },
+        "output": {},
+        "attributes": {}
+      },
+      "expected": null
+    },
+    {
+      "name": "existing-06",
+      "call": {
+        "inputs": {
+          "model": "gemini",
+          "contents": "google input"
+        },
+        "output": {},
+        "attributes": {}
+      },
+      "expected": "google input"
+    },
+    {
+      "name": "existing-07",
+      "call": {
+        "inputs": {
+          "model": "gemini",
+          "contents": [
+            {
+              "role": "user",
+              "parts": [
+                {
+                  "text": "google parts"
+                }
+              ]
+            }
+          ]
+        },
+        "output": {},
+        "attributes": {}
+      },
+      "expected": "google parts"
+    },
+    {
+      "name": "existing-08",
+      "call": {
+        "inputs": {
+          "self": {
+            "model_name": "gemini"
+          },
+          "contents": "legacy gemini"
+        },
+        "output": {},
+        "attributes": {}
+      },
+      "expected": null
+    },
+    {
+      "name": "existing-09",
+      "call": {
+        "inputs": {
+          "messages": [
+            [
+              {
+                "id": [
+                  "langchain",
+                  "HumanMessage"
+                ],
+                "kwargs": {
+                  "content": "first batch"
+                }
+              }
+            ],
+            [
+              {
+                "id": [
+                  "langchain",
+                  "HumanMessage"
+                ],
+                "kwargs": {
+                  "content": "ignored batch"
+                }
+              }
+            ]
+          ]
+        },
+        "output": {},
+        "attributes": {}
+      },
+      "expected": null
+    },
+    {
+      "name": "existing-10",
+      "call": {
+        "inputs": {
+          "prompt": "original"
+        },
+        "output": {
+          "messages": [
+            {
+              "role": "system",
+              "subtype": "init"
+            },
+            {
+              "role": "assistant",
+              "content": [
+                {
+                  "text": "agent output"
+                },
+                {
+                  "thinking": "hidden"
+                }
+              ]
+            },
+            {
+              "role": "result",
+              "result": "ignored result"
+            }
+          ]
+        },
+        "attributes": {}
+      },
+      "expected": "agent output"
+    },
+    {
+      "name": "existing-11",
+      "call": {
+        "inputs": {
+          "history": [
+            {
+              "role": "system",
+              "subtype": "init"
+            },
+            {
+              "role": "user",
+              "content": "agent history"
+            }
+          ]
+        },
+        "output": {},
+        "attributes": {}
+      },
+      "expected": "agent history"
+    },
+    {
+      "name": "existing-12",
+      "call": {
+        "inputs": {
+          "gen_ai.input.messages": [
+            {
+              "role": "user",
+              "parts": [
+                {
+                  "type": "text",
+                  "content": "otel text"
+                }
+              ]
+            }
+          ]
+        },
+        "output": {},
+        "attributes": {
+          "otel_span": {}
+        }
+      },
+      "expected": "otel text"
+    },
+    {
+      "name": "existing-13",
+      "call": {
+        "inputs": {
+          "input.value": {
+            "messages": [
+              {
+                "role": "user",
+                "content": "otel messages"
+              }
+            ]
+          }
+        },
+        "output": {},
+        "attributes": {
+          "otel_span": {}
+        }
+      },
+      "expected": "otel messages"
+    },
+    {
+      "name": "existing-14",
+      "call": {
+        "inputs": {
+          "gen_ai.prompt": "otel string"
+        },
+        "output": {},
+        "attributes": {
+          "otel_span": {}
+        }
+      },
+      "expected": "otel string"
+    },
+    {
+      "name": "existing-15",
+      "call": {
+        "inputs": {
+          "model": "gpt-image-1",
+          "prompt": "draw a cat"
+        },
+        "output": {},
+        "attributes": {}
+      },
+      "expected": "draw a cat"
+    },
+    {
+      "name": "existing-16",
+      "call": {
+        "inputs": {
+          "messages": []
+        },
+        "output": {},
+        "attributes": {}
+      },
+      "expected": null
+    },
+    {
+      "name": "existing-17",
+      "call": {
+        "inputs": {
+          "messages": [
+            {
+              "role": "user",
+              "content": ""
+            }
+          ]
+        },
+        "output": {},
+        "attributes": {}
+      },
+      "expected": null
+    },
+    {
+      "name": "existing-18",
+      "call": {
+        "inputs": {
+          "messages": [
+            {
+              "role": "user",
+              "content": [
+                {
+                  "type": "image_url",
+                  "image_url": {
+                    "url": "not text"
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        "output": {},
+        "attributes": {}
+      },
+      "expected": null
+    },
+    {
+      "name": "existing-19",
+      "call": {
+        "inputs": {
+          "messages": "malformed"
+        },
+        "output": {},
+        "attributes": {}
+      },
+      "expected": null
+    },
+    {
+      "name": "existing-20",
+      "call": {
+        "inputs": {
+          "arbitrary": "not chat"
+        },
+        "output": {},
+        "attributes": {}
+      },
+      "expected": null
+    },
+    {
+      "name": "existing-21",
+      "call": {
+        "inputs": {
+          "messages": [],
+          "system": "system only"
+        },
+        "output": {},
+        "attributes": {}
+      },
+      "expected": null
+    },
+    {
+      "name": "existing-22",
+      "call": {
+        "inputs": {
+          "input": [],
+          "instructions": "instructions only"
+        },
+        "output": {},
+        "attributes": {}
+      },
+      "expected": null
+    },
+    {
+      "name": "existing-23",
+      "call": {
+        "inputs": {
+          "contents": [],
+          "config": {
+            "systemInstruction": "google system"
+          }
+        },
+        "output": {},
+        "attributes": {}
+      },
+      "expected": null
+    },
+    {
+      "name": "existing-24",
+      "call": {
+        "inputs": {
+          "gen_ai.prompt": "first",
+          "input.value": "second"
+        },
+        "output": {},
+        "attributes": {
+          "otel_span": {}
+        }
+      },
+      "expected": "first"
+    },
+    {
+      "name": "existing-25",
+      "call": {
+        "inputs": {
+          "gcp.vertex.agent.llm_request": {
+            "contents": [
+              {
+                "role": "user",
+                "parts": [
+                  {
+                    "text": "adk text"
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "output": {},
+        "attributes": {
+          "otel_span": {}
+        }
+      },
+      "expected": "adk text"
+    },
+    {
+      "name": "existing-26",
+      "call": {
+        "inputs": {
+          "messages": [
+            {
+              "role": "user",
+              "content": "café 猫 'quoted'\\path"
+            }
+          ]
+        },
+        "output": {},
+        "attributes": {}
+      },
+      "expected": "café 猫 'quoted'\\path"
+    },
+    {
+      "name": "existing-27",
+      "call": {
+        "inputs": {
+          "messages": [
+            null,
+            42,
+            {
+              "content": "no role"
+            }
+          ]
+        },
+        "output": {},
+        "attributes": {}
+      },
+      "expected": null
+    },
+    {
+      "name": "existing-28",
+      "call": {
+        "inputs": {
+          "messages": [
+            {
+              "type": "function_call",
+              "call_id": "1",
+              "name": "search",
+              "arguments": "{}"
+            },
+            {
+              "type": "function_call_output",
+              "call_id": "1",
+              "output": "found"
+            }
+          ]
+        },
+        "output": {},
+        "attributes": {}
+      },
+      "expected": null
+    },
+    {
+      "name": "existing-29",
+      "call": {
+        "inputs": {
+          "gen_ai.prompt": [
+            "first",
+            "last"
+          ]
+        },
+        "output": {},
+        "attributes": {
+          "otel_span": {}
+        }
+      },
+      "expected": "last"
+    },
+    {
+      "name": "existing-30",
+      "call": {
+        "inputs": {
+          "gen_ai.prompt": []
+        },
+        "output": {},
+        "attributes": {
+          "otel_span": {},
+          "system": "otel system"
+        }
+      },
+      "expected": "otel system"
+    },
+    {
+      "name": "standard-two-text-blocks",
+      "call": {
+        "inputs": {
+          "messages": [
+            {
+              "role": "user",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "one"
+                },
+                {
+                  "type": "text",
+                  "text": "two"
+                }
+              ]
+            }
+          ]
+        },
+        "output": {},
+        "attributes": {}
+      },
+      "expected": "onetwo"
+    },
+    {
+      "name": "standard-invalid-last-role",
+      "call": {
+        "inputs": {
+          "messages": [
+            {
+              "role": "user",
+              "content": "previous"
+            },
+            {
+              "content": "last"
+            }
+          ]
+        },
+        "output": {},
+        "attributes": {}
+      },
+      "expected": null
+    },
+    {
+      "name": "anthropic-system-blocks",
+      "call": {
+        "inputs": {
+          "messages": [],
+          "system": [
+            {
+              "type": "text",
+              "text": "one"
+            },
+            {
+              "type": "text",
+              "text": "two"
+            }
+          ]
+        },
+        "output": {},
+        "attributes": {}
+      },
+      "expected": null
+    },
+    {
+      "name": "langchain-two-text-blocks",
+      "call": {
+        "inputs": {
+          "messages": [
+            [
+              {
+                "lc": 1,
+                "type": "constructor",
+                "id": [
+                  "langchain",
+                  "HumanMessage"
+                ],
+                "kwargs": {
+                  "content": [
+                    {
+                      "type": "text",
+                      "text": "one"
+                    },
+                    {
+                      "type": "text",
+                      "text": "two"
+                    }
+                  ]
+                }
+              }
+            ]
+          ]
+        },
+        "output": {},
+        "attributes": {}
+      },
+      "expected": "onetwo"
+    },
+    {
+      "name": "responses-valid",
+      "call": {
+        "inputs": {
+          "self": {},
+          "model": "gpt-4",
+          "input": "last"
+        },
+        "output": {},
+        "attributes": {}
+      },
+      "expected": "last"
+    },
+    {
+      "name": "responses-running",
+      "call": {
+        "inputs": {
+          "self": {},
+          "model": "gpt-4",
+          "input": "last"
+        },
+        "output": null,
+        "attributes": {}
+      },
+      "expected": null
+    },
+    {
+      "name": "responses-two-text-blocks",
+      "call": {
+        "inputs": {
+          "self": {},
+          "model": "gpt-4",
+          "input": [
+            {
+              "role": "user",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "one"
+                },
+                {
+                  "type": "text",
+                  "text": "two"
+                }
+              ]
+            }
+          ]
+        },
+        "output": {},
+        "attributes": {}
+      },
+      "expected": "onetwo"
+    },
+    {
+      "name": "google-valid-two-text-blocks",
+      "call": {
+        "inputs": {
+          "model": "gemini",
+          "contents": [
+            {
+              "role": "user",
+              "parts": [
+                {
+                  "text": "one"
+                },
+                {
+                  "text": "two"
+                }
+              ]
+            }
+          ]
+        },
+        "output": {},
+        "attributes": {}
+      },
+      "expected": "one\ntwo"
+    },
+    {
+      "name": "google-running",
+      "call": {
+        "inputs": {
+          "model": "gemini",
+          "contents": "last"
+        },
+        "output": null,
+        "attributes": {}
+      },
+      "expected": null
+    },
+    {
+      "name": "google-chat-module",
+      "call": {
+        "inputs": {
+          "self": {
+            "__class__": {
+              "module": "custom.module"
+            }
+          },
+          "model": "gemini",
+          "message": "last"
+        },
+        "output": {},
+        "attributes": {}
+      },
+      "expected": "last"
+    },
+    {
+      "name": "google-priority-over-messages",
+      "call": {
+        "inputs": {
+          "model": "gemini",
+          "contents": "google",
+          "messages": [
+            {
+              "role": "user",
+              "content": "messages"
+            }
+          ]
+        },
+        "output": {},
+        "attributes": {}
+      },
+      "expected": "google"
+    },
+    {
+      "name": "otel-array-content",
+      "call": {
+        "inputs": {
+          "gen_ai.prompt": [
+            {
+              "role": "user",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "one"
+                },
+                {
+                  "type": "text",
+                  "text": "two"
+                }
+              ]
+            }
+          ]
+        },
+        "output": {},
+        "attributes": {
+          "otel_span": {}
+        }
+      },
+      "expected": "two"
+    },
+    {
+      "name": "otel-object-content",
+      "call": {
+        "inputs": {
+          "input.value": {
+            "messages": [
+              {
+                "role": "user",
+                "content": {
+                  "answer": 42
+                }
+              }
+            ]
+          }
+        },
+        "output": {},
+        "attributes": {
+          "otel_span": {}
+        }
+      },
+      "expected": "{\"answer\":42}"
+    },
+    {
+      "name": "otel-empty-prompt-system",
+      "call": {
+        "inputs": {
+          "gen_ai.prompt": ""
+        },
+        "output": {},
+        "attributes": {
+          "otel_span": {},
+          "system": "system"
+        }
+      },
+      "expected": null
+    },
+    {
+      "name": "otel-semconv-two-text-blocks",
+      "call": {
+        "inputs": {
+          "gen_ai.input.messages": [
+            {
+              "role": "user",
+              "parts": [
+                {
+                  "type": "text",
+                  "content": "one"
+                },
+                {
+                  "type": "text",
+                  "content": "two"
+                }
+              ]
+            }
+          ]
+        },
+        "output": {},
+        "attributes": {
+          "otel_span": {}
+        }
+      },
+      "expected": "one\ntwo"
+    },
+    {
+      "name": "adk-two-text-blocks",
+      "call": {
+        "inputs": {
+          "gcp.vertex.agent.llm_request": {
+            "contents": [
+              {
+                "role": "user",
+                "parts": [
+                  {
+                    "text": "one"
+                  },
+                  {
+                    "text": "two"
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "output": {},
+        "attributes": {
+          "otel_span": {}
+        }
+      },
+      "expected": "onetwo"
+    },
+    {
+      "name": "adk-empty-trailing-message",
+      "call": {
+        "inputs": {
+          "gcp.vertex.agent.llm_request": {
+            "contents": [
+              {
+                "role": "user",
+                "parts": [
+                  {
+                    "text": "previous"
+                  }
+                ]
+              },
+              {
+                "role": "model",
+                "parts": []
+              }
+            ]
+          }
+        },
+        "output": {},
+        "attributes": {
+          "otel_span": {}
+        }
+      },
+      "expected": null
+    },
+    {
+      "name": "agent-object-result",
+      "call": {
+        "inputs": {
+          "history": [
+            {
+              "role": "system",
+              "subtype": "init"
+            },
+            {
+              "role": "user",
+              "content": [
+                {
+                  "tool_use_id": "t",
+                  "content": {
+                    "answer": 42
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        "output": {},
+        "attributes": {}
+      },
+      "expected": "{\"answer\":42}"
+    },
+    {
+      "name": "agent-array-result",
+      "call": {
+        "inputs": {
+          "history": [
+            {
+              "role": "system",
+              "subtype": "init"
+            },
+            {
+              "role": "user",
+              "content": [
+                {
+                  "tool_use_id": "t",
+                  "content": [
+                    {
+                      "type": "image",
+                      "source": "x"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        "output": {},
+        "attributes": {}
+      },
+      "expected": "```json\n[\n  {\n    \"type\": \"image\",\n    \"source\": \"x\"\n  }\n]\n```"
+    },
+    {
+      "name": "agent-assistant-string",
+      "call": {
+        "inputs": {
+          "history": [
+            {
+              "role": "system",
+              "subtype": "init"
+            },
+            {
+              "role": "user",
+              "content": "previous"
+            },
+            {
+              "role": "assistant",
+              "content": "last"
+            }
+          ]
+        },
+        "output": {},
+        "attributes": {}
+      },
+      "expected": "previous"
+    },
+    {
+      "name": "agent-child-prompt-fallback",
+      "call": {
+        "inputs": {
+          "prompt": "initial prompt",
+          "history": [
+            {
+              "role": "system",
+              "subtype": "init"
+            }
+          ]
+        },
+        "output": {},
+        "attributes": {}
+      },
+      "expected": "initial prompt"
+    },
+    {
+      "name": "agent-child-wrong-role",
+      "call": {
+        "inputs": {
+          "history": [
+            {
+              "role": "user",
+              "subtype": "init"
+            },
+            {
+              "role": "user",
+              "content": "last"
+            }
+          ]
+        },
+        "output": {},
+        "attributes": {}
+      },
+      "expected": null
+    },
+    {
+      "name": "standard-custom-content-part",
+      "call": {
+        "inputs": {
+          "messages": [
+            {
+              "role": "user",
+              "content": [
+                {
+                  "type": "custom",
+                  "content": "visible"
+                }
+              ]
+            }
+          ]
+        },
+        "output": {},
+        "attributes": {}
+      },
+      "expected": "visible"
+    },
+    {
+      "name": "tool-group",
+      "call": {
+        "inputs": {
+          "messages": [
+            {
+              "role": "assistant",
+              "content": "narration",
+              "tool_calls": [
+                {
+                  "id": "t",
+                  "function": {
+                    "name": "search",
+                    "arguments": "{}"
+                  }
+                }
+              ]
+            },
+            {
+              "role": "tool",
+              "tool_call_id": "t",
+              "content": "found"
+            }
+          ]
+        },
+        "output": {},
+        "attributes": {}
+      },
+      "expected": "found"
+    },
+    {
+      "name": "tool-group-latest-invocation",
+      "call": {
+        "inputs": {
+          "messages": [
+            {
+              "role": "assistant",
+              "tool_calls": [
+                {
+                  "id": "t",
+                  "function": {
+                    "name": "old",
+                    "arguments": "{}"
+                  }
+                }
+              ]
+            },
+            {
+              "role": "assistant",
+              "tool_calls": [
+                {
+                  "id": "t",
+                  "function": {
+                    "name": "latest",
+                    "arguments": "{}"
+                  }
+                }
+              ]
+            },
+            {
+              "role": "tool",
+              "tool_call_id": "t",
+              "content": "found"
+            }
+          ]
+        },
+        "output": {},
+        "attributes": {}
+      },
+      "expected": "latest\n{}\nfound"
+    },
+    {
+      "name": "malformed-output",
+      "call": {
+        "inputs": {
+          "messages": [
+            {
+              "role": "user",
+              "content": "last"
+            }
+          ]
+        },
+        "output": {
+          "object": "response"
+        },
+        "attributes": {}
+      },
+      "expected": null
+    },
+    {
+      "name": "matrix-null-user-string",
+      "call": {
+        "inputs": {
+          "messages": [
+            {
+              "role": "user",
+              "content": "hello"
+            }
+          ]
+        },
+        "output": null,
+        "attributes": {}
+      },
+      "expected": "hello"
+    },
+    {
+      "name": "matrix-null-user-empty",
+      "call": {
+        "inputs": {
+          "messages": [
+            {
+              "role": "user",
+              "content": ""
+            }
+          ]
+        },
+        "output": null,
+        "attributes": {}
+      },
+      "expected": null
+    },
+    {
+      "name": "matrix-null-user-null",
+      "call": {
+        "inputs": {
+          "messages": [
+            {
+              "role": "user",
+              "content": null
+            }
+          ]
+        },
+        "output": null,
+        "attributes": {}
+      },
+      "expected": null
+    },
+    {
+      "name": "matrix-null-user-blocks",
+      "call": {
+        "inputs": {
+          "messages": [
+            {
+              "role": "user",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "one"
+                },
+                {
+                  "type": "text",
+                  "text": "two"
+                }
+              ]
+            }
+          ]
+        },
+        "output": null,
+        "attributes": {}
+      },
+      "expected": "onetwo"
+    },
+    {
+      "name": "matrix-null-user-object",
+      "call": {
+        "inputs": {
+          "messages": [
+            {
+              "role": "user",
+              "content": {
+                "answer": 42
+              }
+            }
+          ]
+        },
+        "output": null,
+        "attributes": {}
+      },
+      "expected": null
+    },
+    {
+      "name": "matrix-null-assistant-string",
+      "call": {
+        "inputs": {
+          "messages": [
+            {
+              "role": "assistant",
+              "content": "hello"
+            }
+          ]
+        },
+        "output": null,
+        "attributes": {}
+      },
+      "expected": "hello"
+    },
+    {
+      "name": "matrix-null-assistant-empty",
+      "call": {
+        "inputs": {
+          "messages": [
+            {
+              "role": "assistant",
+              "content": ""
+            }
+          ]
+        },
+        "output": null,
+        "attributes": {}
+      },
+      "expected": null
+    },
+    {
+      "name": "matrix-null-assistant-null",
+      "call": {
+        "inputs": {
+          "messages": [
+            {
+              "role": "assistant",
+              "content": null
+            }
+          ]
+        },
+        "output": null,
+        "attributes": {}
+      },
+      "expected": null
+    },
+    {
+      "name": "matrix-null-assistant-blocks",
+      "call": {
+        "inputs": {
+          "messages": [
+            {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "one"
+                },
+                {
+                  "type": "text",
+                  "text": "two"
+                }
+              ]
+            }
+          ]
+        },
+        "output": null,
+        "attributes": {}
+      },
+      "expected": "onetwo"
+    },
+    {
+      "name": "matrix-null-assistant-object",
+      "call": {
+        "inputs": {
+          "messages": [
+            {
+              "role": "assistant",
+              "content": {
+                "answer": 42
+              }
+            }
+          ]
+        },
+        "output": null,
+        "attributes": {}
+      },
+      "expected": null
+    },
+    {
+      "name": "matrix-null-tool-string",
+      "call": {
+        "inputs": {
+          "messages": [
+            {
+              "role": "tool",
+              "content": "hello"
+            }
+          ]
+        },
+        "output": null,
+        "attributes": {}
+      },
+      "expected": "hello"
+    },
+    {
+      "name": "matrix-null-tool-empty",
+      "call": {
+        "inputs": {
+          "messages": [
+            {
+              "role": "tool",
+              "content": ""
+            }
+          ]
+        },
+        "output": null,
+        "attributes": {}
+      },
+      "expected": null
+    },
+    {
+      "name": "matrix-null-tool-null",
+      "call": {
+        "inputs": {
+          "messages": [
+            {
+              "role": "tool",
+              "content": null
+            }
+          ]
+        },
+        "output": null,
+        "attributes": {}
+      },
+      "expected": null
+    },
+    {
+      "name": "matrix-null-tool-blocks",
+      "call": {
+        "inputs": {
+          "messages": [
+            {
+              "role": "tool",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "one"
+                },
+                {
+                  "type": "text",
+                  "text": "two"
+                }
+              ]
+            }
+          ]
+        },
+        "output": null,
+        "attributes": {}
+      },
+      "expected": "onetwo"
+    },
+    {
+      "name": "matrix-null-tool-object",
+      "call": {
+        "inputs": {
+          "messages": [
+            {
+              "role": "tool",
+              "content": {
+                "answer": 42
+              }
+            }
+          ]
+        },
+        "output": null,
+        "attributes": {}
+      },
+      "expected": null
+    },
+    {
+      "name": "matrix-null--string",
+      "call": {
+        "inputs": {
+          "messages": [
+            {
+              "role": "",
+              "content": "hello"
+            }
+          ]
+        },
+        "output": null,
+        "attributes": {}
+      },
+      "expected": "hello"
+    },
+    {
+      "name": "matrix-null--empty",
+      "call": {
+        "inputs": {
+          "messages": [
+            {
+              "role": "",
+              "content": ""
+            }
+          ]
+        },
+        "output": null,
+        "attributes": {}
+      },
+      "expected": null
+    },
+    {
+      "name": "matrix-null--null",
+      "call": {
+        "inputs": {
+          "messages": [
+            {
+              "role": "",
+              "content": null
+            }
+          ]
+        },
+        "output": null,
+        "attributes": {}
+      },
+      "expected": null
+    },
+    {
+      "name": "matrix-null--blocks",
+      "call": {
+        "inputs": {
+          "messages": [
+            {
+              "role": "",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "one"
+                },
+                {
+                  "type": "text",
+                  "text": "two"
+                }
+              ]
+            }
+          ]
+        },
+        "output": null,
+        "attributes": {}
+      },
+      "expected": "onetwo"
+    },
+    {
+      "name": "matrix-null--object",
+      "call": {
+        "inputs": {
+          "messages": [
+            {
+              "role": "",
+              "content": {
+                "answer": 42
+              }
+            }
+          ]
+        },
+        "output": null,
+        "attributes": {}
+      },
+      "expected": null
+    },
+    {
+      "name": "matrix-null-None-string",
+      "call": {
+        "inputs": {
+          "messages": [
+            {
+              "role": null,
+              "content": "hello"
+            }
+          ]
+        },
+        "output": null,
+        "attributes": {}
+      },
+      "expected": "hello"
+    },
+    {
+      "name": "matrix-null-None-empty",
+      "call": {
+        "inputs": {
+          "messages": [
+            {
+              "role": null,
+              "content": ""
+            }
+          ]
+        },
+        "output": null,
+        "attributes": {}
+      },
+      "expected": null
+    },
+    {
+      "name": "matrix-null-None-null",
+      "call": {
+        "inputs": {
+          "messages": [
+            {
+              "role": null,
+              "content": null
+            }
+          ]
+        },
+        "output": null,
+        "attributes": {}
+      },
+      "expected": null
+    },
+    {
+      "name": "matrix-null-None-blocks",
+      "call": {
+        "inputs": {
+          "messages": [
+            {
+              "role": null,
+              "content": [
+                {
+                  "type": "text",
+                  "text": "one"
+                },
+                {
+                  "type": "text",
+                  "text": "two"
+                }
+              ]
+            }
+          ]
+        },
+        "output": null,
+        "attributes": {}
+      },
+      "expected": "onetwo"
+    },
+    {
+      "name": "matrix-null-None-object",
+      "call": {
+        "inputs": {
+          "messages": [
+            {
+              "role": null,
+              "content": {
+                "answer": 42
+              }
+            }
+          ]
+        },
+        "output": null,
+        "attributes": {}
+      },
+      "expected": null
+    },
+    {
+      "name": "matrix-null-12-string",
+      "call": {
+        "inputs": {
+          "messages": [
+            {
+              "role": 12,
+              "content": "hello"
+            }
+          ]
+        },
+        "output": null,
+        "attributes": {}
+      },
+      "expected": "hello"
+    },
+    {
+      "name": "matrix-null-12-empty",
+      "call": {
+        "inputs": {
+          "messages": [
+            {
+              "role": 12,
+              "content": ""
+            }
+          ]
+        },
+        "output": null,
+        "attributes": {}
+      },
+      "expected": null
+    },
+    {
+      "name": "matrix-null-12-null",
+      "call": {
+        "inputs": {
+          "messages": [
+            {
+              "role": 12,
+              "content": null
+            }
+          ]
+        },
+        "output": null,
+        "attributes": {}
+      },
+      "expected": null
+    },
+    {
+      "name": "matrix-null-12-blocks",
+      "call": {
+        "inputs": {
+          "messages": [
+            {
+              "role": 12,
+              "content": [
+                {
+                  "type": "text",
+                  "text": "one"
+                },
+                {
+                  "type": "text",
+                  "text": "two"
+                }
+              ]
+            }
+          ]
+        },
+        "output": null,
+        "attributes": {}
+      },
+      "expected": "onetwo"
+    },
+    {
+      "name": "matrix-null-12-object",
+      "call": {
+        "inputs": {
+          "messages": [
+            {
+              "role": 12,
+              "content": {
+                "answer": 42
+              }
+            }
+          ]
+        },
+        "output": null,
+        "attributes": {}
+      },
+      "expected": null
+    },
+    {
+      "name": "matrix-empty-user-string",
+      "call": {
+        "inputs": {
+          "messages": [
+            {
+              "role": "user",
+              "content": "hello"
+            }
+          ]
+        },
+        "output": {},
+        "attributes": {}
+      },
+      "expected": "hello"
+    },
+    {
+      "name": "matrix-empty-user-empty",
+      "call": {
+        "inputs": {
+          "messages": [
+            {
+              "role": "user",
+              "content": ""
+            }
+          ]
+        },
+        "output": {},
+        "attributes": {}
+      },
+      "expected": null
+    },
+    {
+      "name": "matrix-empty-user-null",
+      "call": {
+        "inputs": {
+          "messages": [
+            {
+              "role": "user",
+              "content": null
+            }
+          ]
+        },
+        "output": {},
+        "attributes": {}
+      },
+      "expected": null
+    },
+    {
+      "name": "matrix-empty-user-blocks",
+      "call": {
+        "inputs": {
+          "messages": [
+            {
+              "role": "user",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "one"
+                },
+                {
+                  "type": "text",
+                  "text": "two"
+                }
+              ]
+            }
+          ]
+        },
+        "output": {},
+        "attributes": {}
+      },
+      "expected": "onetwo"
+    },
+    {
+      "name": "matrix-empty-user-object",
+      "call": {
+        "inputs": {
+          "messages": [
+            {
+              "role": "user",
+              "content": {
+                "answer": 42
+              }
+            }
+          ]
+        },
+        "output": {},
+        "attributes": {}
+      },
+      "expected": null
+    },
+    {
+      "name": "matrix-empty-assistant-string",
+      "call": {
+        "inputs": {
+          "messages": [
+            {
+              "role": "assistant",
+              "content": "hello"
+            }
+          ]
+        },
+        "output": {},
+        "attributes": {}
+      },
+      "expected": "hello"
+    },
+    {
+      "name": "matrix-empty-assistant-empty",
+      "call": {
+        "inputs": {
+          "messages": [
+            {
+              "role": "assistant",
+              "content": ""
+            }
+          ]
+        },
+        "output": {},
+        "attributes": {}
+      },
+      "expected": null
+    },
+    {
+      "name": "matrix-empty-assistant-null",
+      "call": {
+        "inputs": {
+          "messages": [
+            {
+              "role": "assistant",
+              "content": null
+            }
+          ]
+        },
+        "output": {},
+        "attributes": {}
+      },
+      "expected": null
+    },
+    {
+      "name": "matrix-empty-assistant-blocks",
+      "call": {
+        "inputs": {
+          "messages": [
+            {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "one"
+                },
+                {
+                  "type": "text",
+                  "text": "two"
+                }
+              ]
+            }
+          ]
+        },
+        "output": {},
+        "attributes": {}
+      },
+      "expected": "onetwo"
+    },
+    {
+      "name": "matrix-empty-assistant-object",
+      "call": {
+        "inputs": {
+          "messages": [
+            {
+              "role": "assistant",
+              "content": {
+                "answer": 42
+              }
+            }
+          ]
+        },
+        "output": {},
+        "attributes": {}
+      },
+      "expected": null
+    },
+    {
+      "name": "matrix-empty-tool-string",
+      "call": {
+        "inputs": {
+          "messages": [
+            {
+              "role": "tool",
+              "content": "hello"
+            }
+          ]
+        },
+        "output": {},
+        "attributes": {}
+      },
+      "expected": "hello"
+    },
+    {
+      "name": "matrix-empty-tool-empty",
+      "call": {
+        "inputs": {
+          "messages": [
+            {
+              "role": "tool",
+              "content": ""
+            }
+          ]
+        },
+        "output": {},
+        "attributes": {}
+      },
+      "expected": null
+    },
+    {
+      "name": "matrix-empty-tool-null",
+      "call": {
+        "inputs": {
+          "messages": [
+            {
+              "role": "tool",
+              "content": null
+            }
+          ]
+        },
+        "output": {},
+        "attributes": {}
+      },
+      "expected": null
+    },
+    {
+      "name": "matrix-empty-tool-blocks",
+      "call": {
+        "inputs": {
+          "messages": [
+            {
+              "role": "tool",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "one"
+                },
+                {
+                  "type": "text",
+                  "text": "two"
+                }
+              ]
+            }
+          ]
+        },
+        "output": {},
+        "attributes": {}
+      },
+      "expected": "onetwo"
+    },
+    {
+      "name": "matrix-empty-tool-object",
+      "call": {
+        "inputs": {
+          "messages": [
+            {
+              "role": "tool",
+              "content": {
+                "answer": 42
+              }
+            }
+          ]
+        },
+        "output": {},
+        "attributes": {}
+      },
+      "expected": null
+    },
+    {
+      "name": "matrix-empty--string",
+      "call": {
+        "inputs": {
+          "messages": [
+            {
+              "role": "",
+              "content": "hello"
+            }
+          ]
+        },
+        "output": {},
+        "attributes": {}
+      },
+      "expected": "hello"
+    },
+    {
+      "name": "matrix-empty--empty",
+      "call": {
+        "inputs": {
+          "messages": [
+            {
+              "role": "",
+              "content": ""
+            }
+          ]
+        },
+        "output": {},
+        "attributes": {}
+      },
+      "expected": null
+    },
+    {
+      "name": "matrix-empty--null",
+      "call": {
+        "inputs": {
+          "messages": [
+            {
+              "role": "",
+              "content": null
+            }
+          ]
+        },
+        "output": {},
+        "attributes": {}
+      },
+      "expected": null
+    },
+    {
+      "name": "matrix-empty--blocks",
+      "call": {
+        "inputs": {
+          "messages": [
+            {
+              "role": "",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "one"
+                },
+                {
+                  "type": "text",
+                  "text": "two"
+                }
+              ]
+            }
+          ]
+        },
+        "output": {},
+        "attributes": {}
+      },
+      "expected": "onetwo"
+    },
+    {
+      "name": "matrix-empty--object",
+      "call": {
+        "inputs": {
+          "messages": [
+            {
+              "role": "",
+              "content": {
+                "answer": 42
+              }
+            }
+          ]
+        },
+        "output": {},
+        "attributes": {}
+      },
+      "expected": null
+    },
+    {
+      "name": "matrix-empty-None-string",
+      "call": {
+        "inputs": {
+          "messages": [
+            {
+              "role": null,
+              "content": "hello"
+            }
+          ]
+        },
+        "output": {},
+        "attributes": {}
+      },
+      "expected": null
+    },
+    {
+      "name": "matrix-empty-None-empty",
+      "call": {
+        "inputs": {
+          "messages": [
+            {
+              "role": null,
+              "content": ""
+            }
+          ]
+        },
+        "output": {},
+        "attributes": {}
+      },
+      "expected": null
+    },
+    {
+      "name": "matrix-empty-None-null",
+      "call": {
+        "inputs": {
+          "messages": [
+            {
+              "role": null,
+              "content": null
+            }
+          ]
+        },
+        "output": {},
+        "attributes": {}
+      },
+      "expected": null
+    },
+    {
+      "name": "matrix-empty-None-blocks",
+      "call": {
+        "inputs": {
+          "messages": [
+            {
+              "role": null,
+              "content": [
+                {
+                  "type": "text",
+                  "text": "one"
+                },
+                {
+                  "type": "text",
+                  "text": "two"
+                }
+              ]
+            }
+          ]
+        },
+        "output": {},
+        "attributes": {}
+      },
+      "expected": null
+    },
+    {
+      "name": "matrix-empty-None-object",
+      "call": {
+        "inputs": {
+          "messages": [
+            {
+              "role": null,
+              "content": {
+                "answer": 42
+              }
+            }
+          ]
+        },
+        "output": {},
+        "attributes": {}
+      },
+      "expected": null
+    },
+    {
+      "name": "matrix-empty-12-string",
+      "call": {
+        "inputs": {
+          "messages": [
+            {
+              "role": 12,
+              "content": "hello"
+            }
+          ]
+        },
+        "output": {},
+        "attributes": {}
+      },
+      "expected": null
+    },
+    {
+      "name": "matrix-empty-12-empty",
+      "call": {
+        "inputs": {
+          "messages": [
+            {
+              "role": 12,
+              "content": ""
+            }
+          ]
+        },
+        "output": {},
+        "attributes": {}
+      },
+      "expected": null
+    },
+    {
+      "name": "matrix-empty-12-null",
+      "call": {
+        "inputs": {
+          "messages": [
+            {
+              "role": 12,
+              "content": null
+            }
+          ]
+        },
+        "output": {},
+        "attributes": {}
+      },
+      "expected": null
+    },
+    {
+      "name": "matrix-empty-12-blocks",
+      "call": {
+        "inputs": {
+          "messages": [
+            {
+              "role": 12,
+              "content": [
+                {
+                  "type": "text",
+                  "text": "one"
+                },
+                {
+                  "type": "text",
+                  "text": "two"
+                }
+              ]
+            }
+          ]
+        },
+        "output": {},
+        "attributes": {}
+      },
+      "expected": null
+    },
+    {
+      "name": "matrix-empty-12-object",
+      "call": {
+        "inputs": {
+          "messages": [
+            {
+              "role": 12,
+              "content": {
+                "answer": 42
+              }
+            }
+          ]
+        },
+        "output": {},
+        "attributes": {}
+      },
+      "expected": null
+    },
+    {
+      "name": "matrix-false-user-string",
+      "call": {
+        "inputs": {
+          "messages": [
+            {
+              "role": "user",
+              "content": "hello"
+            }
+          ]
+        },
+        "output": false,
+        "attributes": {}
+      },
+      "expected": "hello"
+    },
+    {
+      "name": "matrix-false-user-empty",
+      "call": {
+        "inputs": {
+          "messages": [
+            {
+              "role": "user",
+              "content": ""
+            }
+          ]
+        },
+        "output": false,
+        "attributes": {}
+      },
+      "expected": null
+    },
+    {
+      "name": "matrix-false-user-null",
+      "call": {
+        "inputs": {
+          "messages": [
+            {
+              "role": "user",
+              "content": null
+            }
+          ]
+        },
+        "output": false,
+        "attributes": {}
+      },
+      "expected": null
+    },
+    {
+      "name": "matrix-false-user-blocks",
+      "call": {
+        "inputs": {
+          "messages": [
+            {
+              "role": "user",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "one"
+                },
+                {
+                  "type": "text",
+                  "text": "two"
+                }
+              ]
+            }
+          ]
+        },
+        "output": false,
+        "attributes": {}
+      },
+      "expected": "onetwo"
+    },
+    {
+      "name": "matrix-false-user-object",
+      "call": {
+        "inputs": {
+          "messages": [
+            {
+              "role": "user",
+              "content": {
+                "answer": 42
+              }
+            }
+          ]
+        },
+        "output": false,
+        "attributes": {}
+      },
+      "expected": null
+    },
+    {
+      "name": "matrix-false-assistant-string",
+      "call": {
+        "inputs": {
+          "messages": [
+            {
+              "role": "assistant",
+              "content": "hello"
+            }
+          ]
+        },
+        "output": false,
+        "attributes": {}
+      },
+      "expected": "hello"
+    },
+    {
+      "name": "matrix-false-assistant-empty",
+      "call": {
+        "inputs": {
+          "messages": [
+            {
+              "role": "assistant",
+              "content": ""
+            }
+          ]
+        },
+        "output": false,
+        "attributes": {}
+      },
+      "expected": null
+    },
+    {
+      "name": "matrix-false-assistant-null",
+      "call": {
+        "inputs": {
+          "messages": [
+            {
+              "role": "assistant",
+              "content": null
+            }
+          ]
+        },
+        "output": false,
+        "attributes": {}
+      },
+      "expected": null
+    },
+    {
+      "name": "matrix-false-assistant-blocks",
+      "call": {
+        "inputs": {
+          "messages": [
+            {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "one"
+                },
+                {
+                  "type": "text",
+                  "text": "two"
+                }
+              ]
+            }
+          ]
+        },
+        "output": false,
+        "attributes": {}
+      },
+      "expected": "onetwo"
+    },
+    {
+      "name": "matrix-false-assistant-object",
+      "call": {
+        "inputs": {
+          "messages": [
+            {
+              "role": "assistant",
+              "content": {
+                "answer": 42
+              }
+            }
+          ]
+        },
+        "output": false,
+        "attributes": {}
+      },
+      "expected": null
+    },
+    {
+      "name": "matrix-false-tool-string",
+      "call": {
+        "inputs": {
+          "messages": [
+            {
+              "role": "tool",
+              "content": "hello"
+            }
+          ]
+        },
+        "output": false,
+        "attributes": {}
+      },
+      "expected": "hello"
+    },
+    {
+      "name": "matrix-false-tool-empty",
+      "call": {
+        "inputs": {
+          "messages": [
+            {
+              "role": "tool",
+              "content": ""
+            }
+          ]
+        },
+        "output": false,
+        "attributes": {}
+      },
+      "expected": null
+    },
+    {
+      "name": "matrix-false-tool-null",
+      "call": {
+        "inputs": {
+          "messages": [
+            {
+              "role": "tool",
+              "content": null
+            }
+          ]
+        },
+        "output": false,
+        "attributes": {}
+      },
+      "expected": null
+    },
+    {
+      "name": "matrix-false-tool-blocks",
+      "call": {
+        "inputs": {
+          "messages": [
+            {
+              "role": "tool",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "one"
+                },
+                {
+                  "type": "text",
+                  "text": "two"
+                }
+              ]
+            }
+          ]
+        },
+        "output": false,
+        "attributes": {}
+      },
+      "expected": "onetwo"
+    },
+    {
+      "name": "matrix-false-tool-object",
+      "call": {
+        "inputs": {
+          "messages": [
+            {
+              "role": "tool",
+              "content": {
+                "answer": 42
+              }
+            }
+          ]
+        },
+        "output": false,
+        "attributes": {}
+      },
+      "expected": null
+    },
+    {
+      "name": "matrix-false--string",
+      "call": {
+        "inputs": {
+          "messages": [
+            {
+              "role": "",
+              "content": "hello"
+            }
+          ]
+        },
+        "output": false,
+        "attributes": {}
+      },
+      "expected": "hello"
+    },
+    {
+      "name": "matrix-false--empty",
+      "call": {
+        "inputs": {
+          "messages": [
+            {
+              "role": "",
+              "content": ""
+            }
+          ]
+        },
+        "output": false,
+        "attributes": {}
+      },
+      "expected": null
+    },
+    {
+      "name": "matrix-false--null",
+      "call": {
+        "inputs": {
+          "messages": [
+            {
+              "role": "",
+              "content": null
+            }
+          ]
+        },
+        "output": false,
+        "attributes": {}
+      },
+      "expected": null
+    },
+    {
+      "name": "matrix-false--blocks",
+      "call": {
+        "inputs": {
+          "messages": [
+            {
+              "role": "",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "one"
+                },
+                {
+                  "type": "text",
+                  "text": "two"
+                }
+              ]
+            }
+          ]
+        },
+        "output": false,
+        "attributes": {}
+      },
+      "expected": "onetwo"
+    },
+    {
+      "name": "matrix-false--object",
+      "call": {
+        "inputs": {
+          "messages": [
+            {
+              "role": "",
+              "content": {
+                "answer": 42
+              }
+            }
+          ]
+        },
+        "output": false,
+        "attributes": {}
+      },
+      "expected": null
+    },
+    {
+      "name": "matrix-false-None-string",
+      "call": {
+        "inputs": {
+          "messages": [
+            {
+              "role": null,
+              "content": "hello"
+            }
+          ]
+        },
+        "output": false,
+        "attributes": {}
+      },
+      "expected": "hello"
+    },
+    {
+      "name": "matrix-false-None-empty",
+      "call": {
+        "inputs": {
+          "messages": [
+            {
+              "role": null,
+              "content": ""
+            }
+          ]
+        },
+        "output": false,
+        "attributes": {}
+      },
+      "expected": null
+    },
+    {
+      "name": "matrix-false-None-null",
+      "call": {
+        "inputs": {
+          "messages": [
+            {
+              "role": null,
+              "content": null
+            }
+          ]
+        },
+        "output": false,
+        "attributes": {}
+      },
+      "expected": null
+    },
+    {
+      "name": "matrix-false-None-blocks",
+      "call": {
+        "inputs": {
+          "messages": [
+            {
+              "role": null,
+              "content": [
+                {
+                  "type": "text",
+                  "text": "one"
+                },
+                {
+                  "type": "text",
+                  "text": "two"
+                }
+              ]
+            }
+          ]
+        },
+        "output": false,
+        "attributes": {}
+      },
+      "expected": "onetwo"
+    },
+    {
+      "name": "matrix-false-None-object",
+      "call": {
+        "inputs": {
+          "messages": [
+            {
+              "role": null,
+              "content": {
+                "answer": 42
+              }
+            }
+          ]
+        },
+        "output": false,
+        "attributes": {}
+      },
+      "expected": null
+    },
+    {
+      "name": "matrix-false-12-string",
+      "call": {
+        "inputs": {
+          "messages": [
+            {
+              "role": 12,
+              "content": "hello"
+            }
+          ]
+        },
+        "output": false,
+        "attributes": {}
+      },
+      "expected": "hello"
+    },
+    {
+      "name": "matrix-false-12-empty",
+      "call": {
+        "inputs": {
+          "messages": [
+            {
+              "role": 12,
+              "content": ""
+            }
+          ]
+        },
+        "output": false,
+        "attributes": {}
+      },
+      "expected": null
+    },
+    {
+      "name": "matrix-false-12-null",
+      "call": {
+        "inputs": {
+          "messages": [
+            {
+              "role": 12,
+              "content": null
+            }
+          ]
+        },
+        "output": false,
+        "attributes": {}
+      },
+      "expected": null
+    },
+    {
+      "name": "matrix-false-12-blocks",
+      "call": {
+        "inputs": {
+          "messages": [
+            {
+              "role": 12,
+              "content": [
+                {
+                  "type": "text",
+                  "text": "one"
+                },
+                {
+                  "type": "text",
+                  "text": "two"
+                }
+              ]
+            }
+          ]
+        },
+        "output": false,
+        "attributes": {}
+      },
+      "expected": "onetwo"
+    },
+    {
+      "name": "matrix-false-12-object",
+      "call": {
+        "inputs": {
+          "messages": [
+            {
+              "role": 12,
+              "content": {
+                "answer": 42
+              }
+            }
+          ]
+        },
+        "output": false,
+        "attributes": {}
+      },
+      "expected": null
+    },
+    {
+      "name": "matrix-zero-user-string",
+      "call": {
+        "inputs": {
+          "messages": [
+            {
+              "role": "user",
+              "content": "hello"
+            }
+          ]
+        },
+        "output": 0,
+        "attributes": {}
+      },
+      "expected": "hello"
+    },
+    {
+      "name": "matrix-zero-user-empty",
+      "call": {
+        "inputs": {
+          "messages": [
+            {
+              "role": "user",
+              "content": ""
+            }
+          ]
+        },
+        "output": 0,
+        "attributes": {}
+      },
+      "expected": null
+    },
+    {
+      "name": "matrix-zero-user-null",
+      "call": {
+        "inputs": {
+          "messages": [
+            {
+              "role": "user",
+              "content": null
+            }
+          ]
+        },
+        "output": 0,
+        "attributes": {}
+      },
+      "expected": null
+    },
+    {
+      "name": "matrix-zero-user-blocks",
+      "call": {
+        "inputs": {
+          "messages": [
+            {
+              "role": "user",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "one"
+                },
+                {
+                  "type": "text",
+                  "text": "two"
+                }
+              ]
+            }
+          ]
+        },
+        "output": 0,
+        "attributes": {}
+      },
+      "expected": "onetwo"
+    },
+    {
+      "name": "matrix-zero-user-object",
+      "call": {
+        "inputs": {
+          "messages": [
+            {
+              "role": "user",
+              "content": {
+                "answer": 42
+              }
+            }
+          ]
+        },
+        "output": 0,
+        "attributes": {}
+      },
+      "expected": null
+    },
+    {
+      "name": "matrix-zero-assistant-string",
+      "call": {
+        "inputs": {
+          "messages": [
+            {
+              "role": "assistant",
+              "content": "hello"
+            }
+          ]
+        },
+        "output": 0,
+        "attributes": {}
+      },
+      "expected": "hello"
+    },
+    {
+      "name": "matrix-zero-assistant-empty",
+      "call": {
+        "inputs": {
+          "messages": [
+            {
+              "role": "assistant",
+              "content": ""
+            }
+          ]
+        },
+        "output": 0,
+        "attributes": {}
+      },
+      "expected": null
+    },
+    {
+      "name": "matrix-zero-assistant-null",
+      "call": {
+        "inputs": {
+          "messages": [
+            {
+              "role": "assistant",
+              "content": null
+            }
+          ]
+        },
+        "output": 0,
+        "attributes": {}
+      },
+      "expected": null
+    },
+    {
+      "name": "matrix-zero-assistant-blocks",
+      "call": {
+        "inputs": {
+          "messages": [
+            {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "one"
+                },
+                {
+                  "type": "text",
+                  "text": "two"
+                }
+              ]
+            }
+          ]
+        },
+        "output": 0,
+        "attributes": {}
+      },
+      "expected": "onetwo"
+    },
+    {
+      "name": "matrix-zero-assistant-object",
+      "call": {
+        "inputs": {
+          "messages": [
+            {
+              "role": "assistant",
+              "content": {
+                "answer": 42
+              }
+            }
+          ]
+        },
+        "output": 0,
+        "attributes": {}
+      },
+      "expected": null
+    },
+    {
+      "name": "matrix-zero-tool-string",
+      "call": {
+        "inputs": {
+          "messages": [
+            {
+              "role": "tool",
+              "content": "hello"
+            }
+          ]
+        },
+        "output": 0,
+        "attributes": {}
+      },
+      "expected": "hello"
+    },
+    {
+      "name": "matrix-zero-tool-empty",
+      "call": {
+        "inputs": {
+          "messages": [
+            {
+              "role": "tool",
+              "content": ""
+            }
+          ]
+        },
+        "output": 0,
+        "attributes": {}
+      },
+      "expected": null
+    },
+    {
+      "name": "matrix-zero-tool-null",
+      "call": {
+        "inputs": {
+          "messages": [
+            {
+              "role": "tool",
+              "content": null
+            }
+          ]
+        },
+        "output": 0,
+        "attributes": {}
+      },
+      "expected": null
+    },
+    {
+      "name": "matrix-zero-tool-blocks",
+      "call": {
+        "inputs": {
+          "messages": [
+            {
+              "role": "tool",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "one"
+                },
+                {
+                  "type": "text",
+                  "text": "two"
+                }
+              ]
+            }
+          ]
+        },
+        "output": 0,
+        "attributes": {}
+      },
+      "expected": "onetwo"
+    },
+    {
+      "name": "matrix-zero-tool-object",
+      "call": {
+        "inputs": {
+          "messages": [
+            {
+              "role": "tool",
+              "content": {
+                "answer": 42
+              }
+            }
+          ]
+        },
+        "output": 0,
+        "attributes": {}
+      },
+      "expected": null
+    },
+    {
+      "name": "matrix-zero--string",
+      "call": {
+        "inputs": {
+          "messages": [
+            {
+              "role": "",
+              "content": "hello"
+            }
+          ]
+        },
+        "output": 0,
+        "attributes": {}
+      },
+      "expected": "hello"
+    },
+    {
+      "name": "matrix-zero--empty",
+      "call": {
+        "inputs": {
+          "messages": [
+            {
+              "role": "",
+              "content": ""
+            }
+          ]
+        },
+        "output": 0,
+        "attributes": {}
+      },
+      "expected": null
+    },
+    {
+      "name": "matrix-zero--null",
+      "call": {
+        "inputs": {
+          "messages": [
+            {
+              "role": "",
+              "content": null
+            }
+          ]
+        },
+        "output": 0,
+        "attributes": {}
+      },
+      "expected": null
+    },
+    {
+      "name": "matrix-zero--blocks",
+      "call": {
+        "inputs": {
+          "messages": [
+            {
+              "role": "",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "one"
+                },
+                {
+                  "type": "text",
+                  "text": "two"
+                }
+              ]
+            }
+          ]
+        },
+        "output": 0,
+        "attributes": {}
+      },
+      "expected": "onetwo"
+    },
+    {
+      "name": "matrix-zero--object",
+      "call": {
+        "inputs": {
+          "messages": [
+            {
+              "role": "",
+              "content": {
+                "answer": 42
+              }
+            }
+          ]
+        },
+        "output": 0,
+        "attributes": {}
+      },
+      "expected": null
+    },
+    {
+      "name": "matrix-zero-None-string",
+      "call": {
+        "inputs": {
+          "messages": [
+            {
+              "role": null,
+              "content": "hello"
+            }
+          ]
+        },
+        "output": 0,
+        "attributes": {}
+      },
+      "expected": "hello"
+    },
+    {
+      "name": "matrix-zero-None-empty",
+      "call": {
+        "inputs": {
+          "messages": [
+            {
+              "role": null,
+              "content": ""
+            }
+          ]
+        },
+        "output": 0,
+        "attributes": {}
+      },
+      "expected": null
+    },
+    {
+      "name": "matrix-zero-None-null",
+      "call": {
+        "inputs": {
+          "messages": [
+            {
+              "role": null,
+              "content": null
+            }
+          ]
+        },
+        "output": 0,
+        "attributes": {}
+      },
+      "expected": null
+    },
+    {
+      "name": "matrix-zero-None-blocks",
+      "call": {
+        "inputs": {
+          "messages": [
+            {
+              "role": null,
+              "content": [
+                {
+                  "type": "text",
+                  "text": "one"
+                },
+                {
+                  "type": "text",
+                  "text": "two"
+                }
+              ]
+            }
+          ]
+        },
+        "output": 0,
+        "attributes": {}
+      },
+      "expected": "onetwo"
+    },
+    {
+      "name": "matrix-zero-None-object",
+      "call": {
+        "inputs": {
+          "messages": [
+            {
+              "role": null,
+              "content": {
+                "answer": 42
+              }
+            }
+          ]
+        },
+        "output": 0,
+        "attributes": {}
+      },
+      "expected": null
+    },
+    {
+      "name": "matrix-zero-12-string",
+      "call": {
+        "inputs": {
+          "messages": [
+            {
+              "role": 12,
+              "content": "hello"
+            }
+          ]
+        },
+        "output": 0,
+        "attributes": {}
+      },
+      "expected": "hello"
+    },
+    {
+      "name": "matrix-zero-12-empty",
+      "call": {
+        "inputs": {
+          "messages": [
+            {
+              "role": 12,
+              "content": ""
+            }
+          ]
+        },
+        "output": 0,
+        "attributes": {}
+      },
+      "expected": null
+    },
+    {
+      "name": "matrix-zero-12-null",
+      "call": {
+        "inputs": {
+          "messages": [
+            {
+              "role": 12,
+              "content": null
+            }
+          ]
+        },
+        "output": 0,
+        "attributes": {}
+      },
+      "expected": null
+    },
+    {
+      "name": "matrix-zero-12-blocks",
+      "call": {
+        "inputs": {
+          "messages": [
+            {
+              "role": 12,
+              "content": [
+                {
+                  "type": "text",
+                  "text": "one"
+                },
+                {
+                  "type": "text",
+                  "text": "two"
+                }
+              ]
+            }
+          ]
+        },
+        "output": 0,
+        "attributes": {}
+      },
+      "expected": "onetwo"
+    },
+    {
+      "name": "matrix-zero-12-object",
+      "call": {
+        "inputs": {
+          "messages": [
+            {
+              "role": 12,
+              "content": {
+                "answer": 42
+              }
+            }
+          ]
+        },
+        "output": 0,
+        "attributes": {}
+      },
+      "expected": null
+    },
+    {
+      "name": "matrix-text-user-string",
+      "call": {
+        "inputs": {
+          "messages": [
+            {
+              "role": "user",
+              "content": "hello"
+            }
+          ]
+        },
+        "output": "output",
+        "attributes": {}
+      },
+      "expected": "hello"
+    },
+    {
+      "name": "matrix-text-user-empty",
+      "call": {
+        "inputs": {
+          "messages": [
+            {
+              "role": "user",
+              "content": ""
+            }
+          ]
+        },
+        "output": "output",
+        "attributes": {}
+      },
+      "expected": null
+    },
+    {
+      "name": "matrix-text-user-null",
+      "call": {
+        "inputs": {
+          "messages": [
+            {
+              "role": "user",
+              "content": null
+            }
+          ]
+        },
+        "output": "output",
+        "attributes": {}
+      },
+      "expected": null
+    },
+    {
+      "name": "matrix-text-user-blocks",
+      "call": {
+        "inputs": {
+          "messages": [
+            {
+              "role": "user",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "one"
+                },
+                {
+                  "type": "text",
+                  "text": "two"
+                }
+              ]
+            }
+          ]
+        },
+        "output": "output",
+        "attributes": {}
+      },
+      "expected": "onetwo"
+    },
+    {
+      "name": "matrix-text-user-object",
+      "call": {
+        "inputs": {
+          "messages": [
+            {
+              "role": "user",
+              "content": {
+                "answer": 42
+              }
+            }
+          ]
+        },
+        "output": "output",
+        "attributes": {}
+      },
+      "expected": null
+    },
+    {
+      "name": "matrix-text-assistant-string",
+      "call": {
+        "inputs": {
+          "messages": [
+            {
+              "role": "assistant",
+              "content": "hello"
+            }
+          ]
+        },
+        "output": "output",
+        "attributes": {}
+      },
+      "expected": "hello"
+    },
+    {
+      "name": "matrix-text-assistant-empty",
+      "call": {
+        "inputs": {
+          "messages": [
+            {
+              "role": "assistant",
+              "content": ""
+            }
+          ]
+        },
+        "output": "output",
+        "attributes": {}
+      },
+      "expected": null
+    },
+    {
+      "name": "matrix-text-assistant-null",
+      "call": {
+        "inputs": {
+          "messages": [
+            {
+              "role": "assistant",
+              "content": null
+            }
+          ]
+        },
+        "output": "output",
+        "attributes": {}
+      },
+      "expected": null
+    },
+    {
+      "name": "matrix-text-assistant-blocks",
+      "call": {
+        "inputs": {
+          "messages": [
+            {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "one"
+                },
+                {
+                  "type": "text",
+                  "text": "two"
+                }
+              ]
+            }
+          ]
+        },
+        "output": "output",
+        "attributes": {}
+      },
+      "expected": "onetwo"
+    },
+    {
+      "name": "matrix-text-assistant-object",
+      "call": {
+        "inputs": {
+          "messages": [
+            {
+              "role": "assistant",
+              "content": {
+                "answer": 42
+              }
+            }
+          ]
+        },
+        "output": "output",
+        "attributes": {}
+      },
+      "expected": null
+    },
+    {
+      "name": "matrix-text-tool-string",
+      "call": {
+        "inputs": {
+          "messages": [
+            {
+              "role": "tool",
+              "content": "hello"
+            }
+          ]
+        },
+        "output": "output",
+        "attributes": {}
+      },
+      "expected": "hello"
+    },
+    {
+      "name": "matrix-text-tool-empty",
+      "call": {
+        "inputs": {
+          "messages": [
+            {
+              "role": "tool",
+              "content": ""
+            }
+          ]
+        },
+        "output": "output",
+        "attributes": {}
+      },
+      "expected": null
+    },
+    {
+      "name": "matrix-text-tool-null",
+      "call": {
+        "inputs": {
+          "messages": [
+            {
+              "role": "tool",
+              "content": null
+            }
+          ]
+        },
+        "output": "output",
+        "attributes": {}
+      },
+      "expected": null
+    },
+    {
+      "name": "matrix-text-tool-blocks",
+      "call": {
+        "inputs": {
+          "messages": [
+            {
+              "role": "tool",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "one"
+                },
+                {
+                  "type": "text",
+                  "text": "two"
+                }
+              ]
+            }
+          ]
+        },
+        "output": "output",
+        "attributes": {}
+      },
+      "expected": "onetwo"
+    },
+    {
+      "name": "matrix-text-tool-object",
+      "call": {
+        "inputs": {
+          "messages": [
+            {
+              "role": "tool",
+              "content": {
+                "answer": 42
+              }
+            }
+          ]
+        },
+        "output": "output",
+        "attributes": {}
+      },
+      "expected": null
+    },
+    {
+      "name": "matrix-text--string",
+      "call": {
+        "inputs": {
+          "messages": [
+            {
+              "role": "",
+              "content": "hello"
+            }
+          ]
+        },
+        "output": "output",
+        "attributes": {}
+      },
+      "expected": "hello"
+    },
+    {
+      "name": "matrix-text--empty",
+      "call": {
+        "inputs": {
+          "messages": [
+            {
+              "role": "",
+              "content": ""
+            }
+          ]
+        },
+        "output": "output",
+        "attributes": {}
+      },
+      "expected": null
+    },
+    {
+      "name": "matrix-text--null",
+      "call": {
+        "inputs": {
+          "messages": [
+            {
+              "role": "",
+              "content": null
+            }
+          ]
+        },
+        "output": "output",
+        "attributes": {}
+      },
+      "expected": null
+    },
+    {
+      "name": "matrix-text--blocks",
+      "call": {
+        "inputs": {
+          "messages": [
+            {
+              "role": "",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "one"
+                },
+                {
+                  "type": "text",
+                  "text": "two"
+                }
+              ]
+            }
+          ]
+        },
+        "output": "output",
+        "attributes": {}
+      },
+      "expected": "onetwo"
+    },
+    {
+      "name": "matrix-text--object",
+      "call": {
+        "inputs": {
+          "messages": [
+            {
+              "role": "",
+              "content": {
+                "answer": 42
+              }
+            }
+          ]
+        },
+        "output": "output",
+        "attributes": {}
+      },
+      "expected": null
+    },
+    {
+      "name": "matrix-text-None-string",
+      "call": {
+        "inputs": {
+          "messages": [
+            {
+              "role": null,
+              "content": "hello"
+            }
+          ]
+        },
+        "output": "output",
+        "attributes": {}
+      },
+      "expected": null
+    },
+    {
+      "name": "matrix-text-None-empty",
+      "call": {
+        "inputs": {
+          "messages": [
+            {
+              "role": null,
+              "content": ""
+            }
+          ]
+        },
+        "output": "output",
+        "attributes": {}
+      },
+      "expected": null
+    },
+    {
+      "name": "matrix-text-None-null",
+      "call": {
+        "inputs": {
+          "messages": [
+            {
+              "role": null,
+              "content": null
+            }
+          ]
+        },
+        "output": "output",
+        "attributes": {}
+      },
+      "expected": null
+    },
+    {
+      "name": "matrix-text-None-blocks",
+      "call": {
+        "inputs": {
+          "messages": [
+            {
+              "role": null,
+              "content": [
+                {
+                  "type": "text",
+                  "text": "one"
+                },
+                {
+                  "type": "text",
+                  "text": "two"
+                }
+              ]
+            }
+          ]
+        },
+        "output": "output",
+        "attributes": {}
+      },
+      "expected": null
+    },
+    {
+      "name": "matrix-text-None-object",
+      "call": {
+        "inputs": {
+          "messages": [
+            {
+              "role": null,
+              "content": {
+                "answer": 42
+              }
+            }
+          ]
+        },
+        "output": "output",
+        "attributes": {}
+      },
+      "expected": null
+    },
+    {
+      "name": "matrix-text-12-string",
+      "call": {
+        "inputs": {
+          "messages": [
+            {
+              "role": 12,
+              "content": "hello"
+            }
+          ]
+        },
+        "output": "output",
+        "attributes": {}
+      },
+      "expected": null
+    },
+    {
+      "name": "matrix-text-12-empty",
+      "call": {
+        "inputs": {
+          "messages": [
+            {
+              "role": 12,
+              "content": ""
+            }
+          ]
+        },
+        "output": "output",
+        "attributes": {}
+      },
+      "expected": null
+    },
+    {
+      "name": "matrix-text-12-null",
+      "call": {
+        "inputs": {
+          "messages": [
+            {
+              "role": 12,
+              "content": null
+            }
+          ]
+        },
+        "output": "output",
+        "attributes": {}
+      },
+      "expected": null
+    },
+    {
+      "name": "matrix-text-12-blocks",
+      "call": {
+        "inputs": {
+          "messages": [
+            {
+              "role": 12,
+              "content": [
+                {
+                  "type": "text",
+                  "text": "one"
+                },
+                {
+                  "type": "text",
+                  "text": "two"
+                }
+              ]
+            }
+          ]
+        },
+        "output": "output",
+        "attributes": {}
+      },
+      "expected": null
+    },
+    {
+      "name": "matrix-text-12-object",
+      "call": {
+        "inputs": {
+          "messages": [
+            {
+              "role": 12,
+              "content": {
+                "answer": 42
+              }
+            }
+          ]
+        },
+        "output": "output",
+        "attributes": {}
+      },
+      "expected": null
+    },
+    {
+      "name": "standard-part-raw-string",
+      "call": {
+        "inputs": {
+          "messages": [
+            {
+              "role": "user",
+              "content": [
+                "hello",
+                {
+                  "type": "text",
+                  "text": "end"
+                }
+              ]
+            }
+          ]
+        },
+        "output": {},
+        "attributes": {}
+      },
+      "expected": "helloend"
+    },
+    {
+      "name": "responses-part-raw-string",
+      "call": {
+        "inputs": {
+          "self": {},
+          "model": "gpt-4",
+          "input": [
+            {
+              "role": "user",
+              "content": [
+                "hello",
+                {
+                  "type": "text",
+                  "text": "end"
+                }
+              ]
+            }
+          ]
+        },
+        "output": {},
+        "attributes": {}
+      },
+      "expected": "end"
+    },
+    {
+      "name": "agent-part-raw-string",
+      "call": {
+        "inputs": {
+          "history": [
+            {
+              "role": "system",
+              "subtype": "init"
+            },
+            {
+              "role": "user",
+              "content": [
+                "hello",
+                {
+                  "type": "text",
+                  "text": "end"
+                }
+              ]
+            }
+          ]
+        },
+        "output": {},
+        "attributes": {}
+      },
+      "expected": null
+    },
+    {
+      "name": "standard-part-text",
+      "call": {
+        "inputs": {
+          "messages": [
+            {
+              "role": "user",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "hello"
+                },
+                {
+                  "type": "text",
+                  "text": "end"
+                }
+              ]
+            }
+          ]
+        },
+        "output": {},
+        "attributes": {}
+      },
+      "expected": "helloend"
+    },
+    {
+      "name": "responses-part-text",
+      "call": {
+        "inputs": {
+          "self": {},
+          "model": "gpt-4",
+          "input": [
+            {
+              "role": "user",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "hello"
+                },
+                {
+                  "type": "text",
+                  "text": "end"
+                }
+              ]
+            }
+          ]
+        },
+        "output": {},
+        "attributes": {}
+      },
+      "expected": "helloend"
+    },
+    {
+      "name": "agent-part-text",
+      "call": {
+        "inputs": {
+          "history": [
+            {
+              "role": "system",
+              "subtype": "init"
+            },
+            {
+              "role": "user",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "hello"
+                },
+                {
+                  "type": "text",
+                  "text": "end"
+                }
+              ]
+            }
+          ]
+        },
+        "output": {},
+        "attributes": {}
+      },
+      "expected": "end"
+    },
+    {
+      "name": "standard-part-input-text",
+      "call": {
+        "inputs": {
+          "messages": [
+            {
+              "role": "user",
+              "content": [
+                {
+                  "type": "input_text",
+                  "text": "hello"
+                },
+                {
+                  "type": "text",
+                  "text": "end"
+                }
+              ]
+            }
+          ]
+        },
+        "output": {},
+        "attributes": {}
+      },
+      "expected": "end"
+    },
+    {
+      "name": "responses-part-input-text",
+      "call": {
+        "inputs": {
+          "self": {},
+          "model": "gpt-4",
+          "input": [
+            {
+              "role": "user",
+              "content": [
+                {
+                  "type": "input_text",
+                  "text": "hello"
+                },
+                {
+                  "type": "text",
+                  "text": "end"
+                }
+              ]
+            }
+          ]
+        },
+        "output": {},
+        "attributes": {}
+      },
+      "expected": "helloend"
+    },
+    {
+      "name": "agent-part-input-text",
+      "call": {
+        "inputs": {
+          "history": [
+            {
+              "role": "system",
+              "subtype": "init"
+            },
+            {
+              "role": "user",
+              "content": [
+                {
+                  "type": "input_text",
+                  "text": "hello"
+                },
+                {
+                  "type": "text",
+                  "text": "end"
+                }
+              ]
+            }
+          ]
+        },
+        "output": {},
+        "attributes": {}
+      },
+      "expected": "end"
+    },
+    {
+      "name": "standard-part-untyped-text",
+      "call": {
+        "inputs": {
+          "messages": [
+            {
+              "role": "user",
+              "content": [
+                {
+                  "text": "hello"
+                },
+                {
+                  "type": "text",
+                  "text": "end"
+                }
+              ]
+            }
+          ]
+        },
+        "output": {},
+        "attributes": {}
+      },
+      "expected": "end"
+    },
+    {
+      "name": "responses-part-untyped-text",
+      "call": {
+        "inputs": {
+          "self": {},
+          "model": "gpt-4",
+          "input": [
+            {
+              "role": "user",
+              "content": [
+                {
+                  "text": "hello"
+                },
+                {
+                  "type": "text",
+                  "text": "end"
+                }
+              ]
+            }
+          ]
+        },
+        "output": {},
+        "attributes": {}
+      },
+      "expected": "end"
+    },
+    {
+      "name": "agent-part-untyped-text",
+      "call": {
+        "inputs": {
+          "history": [
+            {
+              "role": "system",
+              "subtype": "init"
+            },
+            {
+              "role": "user",
+              "content": [
+                {
+                  "text": "hello"
+                },
+                {
+                  "type": "text",
+                  "text": "end"
+                }
+              ]
+            }
+          ]
+        },
+        "output": {},
+        "attributes": {}
+      },
+      "expected": "end"
+    },
+    {
+      "name": "standard-part-content",
+      "call": {
+        "inputs": {
+          "messages": [
+            {
+              "role": "user",
+              "content": [
+                {
+                  "content": "hello"
+                },
+                {
+                  "type": "text",
+                  "text": "end"
+                }
+              ]
+            }
+          ]
+        },
+        "output": {},
+        "attributes": {}
+      },
+      "expected": "helloend"
+    },
+    {
+      "name": "responses-part-content",
+      "call": {
+        "inputs": {
+          "self": {},
+          "model": "gpt-4",
+          "input": [
+            {
+              "role": "user",
+              "content": [
+                {
+                  "content": "hello"
+                },
+                {
+                  "type": "text",
+                  "text": "end"
+                }
+              ]
+            }
+          ]
+        },
+        "output": {},
+        "attributes": {}
+      },
+      "expected": "end"
+    },
+    {
+      "name": "agent-part-content",
+      "call": {
+        "inputs": {
+          "history": [
+            {
+              "role": "system",
+              "subtype": "init"
+            },
+            {
+              "role": "user",
+              "content": [
+                {
+                  "content": "hello"
+                },
+                {
+                  "type": "text",
+                  "text": "end"
+                }
+              ]
+            }
+          ]
+        },
+        "output": {},
+        "attributes": {}
+      },
+      "expected": "end"
+    },
+    {
+      "name": "standard-part-text-content",
+      "call": {
+        "inputs": {
+          "messages": [
+            {
+              "role": "user",
+              "content": [
+                {
+                  "type": "text",
+                  "content": "hello"
+                },
+                {
+                  "type": "text",
+                  "text": "end"
+                }
+              ]
+            }
+          ]
+        },
+        "output": {},
+        "attributes": {}
+      },
+      "expected": "end"
+    },
+    {
+      "name": "responses-part-text-content",
+      "call": {
+        "inputs": {
+          "self": {},
+          "model": "gpt-4",
+          "input": [
+            {
+              "role": "user",
+              "content": [
+                {
+                  "type": "text",
+                  "content": "hello"
+                },
+                {
+                  "type": "text",
+                  "text": "end"
+                }
+              ]
+            }
+          ]
+        },
+        "output": {},
+        "attributes": {}
+      },
+      "expected": "end"
+    },
+    {
+      "name": "agent-part-text-content",
+      "call": {
+        "inputs": {
+          "history": [
+            {
+              "role": "system",
+              "subtype": "init"
+            },
+            {
+              "role": "user",
+              "content": [
+                {
+                  "type": "text",
+                  "content": "hello"
+                },
+                {
+                  "type": "text",
+                  "text": "end"
+                }
+              ]
+            }
+          ]
+        },
+        "output": {},
+        "attributes": {}
+      },
+      "expected": "end"
+    },
+    {
+      "name": "standard-part-custom",
+      "call": {
+        "inputs": {
+          "messages": [
+            {
+              "role": "user",
+              "content": [
+                {
+                  "type": "custom",
+                  "content": "hello"
+                },
+                {
+                  "type": "text",
+                  "text": "end"
+                }
+              ]
+            }
+          ]
+        },
+        "output": {},
+        "attributes": {}
+      },
+      "expected": "helloend"
+    },
+    {
+      "name": "responses-part-custom",
+      "call": {
+        "inputs": {
+          "self": {},
+          "model": "gpt-4",
+          "input": [
+            {
+              "role": "user",
+              "content": [
+                {
+                  "type": "custom",
+                  "content": "hello"
+                },
+                {
+                  "type": "text",
+                  "text": "end"
+                }
+              ]
+            }
+          ]
+        },
+        "output": {},
+        "attributes": {}
+      },
+      "expected": "end"
+    },
+    {
+      "name": "agent-part-custom",
+      "call": {
+        "inputs": {
+          "history": [
+            {
+              "role": "system",
+              "subtype": "init"
+            },
+            {
+              "role": "user",
+              "content": [
+                {
+                  "type": "custom",
+                  "content": "hello"
+                },
+                {
+                  "type": "text",
+                  "text": "end"
+                }
+              ]
+            }
+          ]
+        },
+        "output": {},
+        "attributes": {}
+      },
+      "expected": "end"
+    },
+    {
+      "name": "standard-part-tool-use",
+      "call": {
+        "inputs": {
+          "messages": [
+            {
+              "role": "user",
+              "content": [
+                {
+                  "type": "tool_use",
+                  "id": "t",
+                  "name": "search",
+                  "input": {
+                    "q": "cat"
+                  }
+                },
+                {
+                  "type": "text",
+                  "text": "end"
+                }
+              ]
+            }
+          ]
+        },
+        "output": {},
+        "attributes": {}
+      },
+      "expected": "end\nsearch\n{\"q\":\"cat\"}"
+    },
+    {
+      "name": "responses-part-tool-use",
+      "call": {
+        "inputs": {
+          "self": {},
+          "model": "gpt-4",
+          "input": [
+            {
+              "role": "user",
+              "content": [
+                {
+                  "type": "tool_use",
+                  "id": "t",
+                  "name": "search",
+                  "input": {
+                    "q": "cat"
+                  }
+                },
+                {
+                  "type": "text",
+                  "text": "end"
+                }
+              ]
+            }
+          ]
+        },
+        "output": {},
+        "attributes": {}
+      },
+      "expected": "end"
+    },
+    {
+      "name": "agent-part-tool-use",
+      "call": {
+        "inputs": {
+          "history": [
+            {
+              "role": "system",
+              "subtype": "init"
+            },
+            {
+              "role": "user",
+              "content": [
+                {
+                  "type": "tool_use",
+                  "id": "t",
+                  "name": "search",
+                  "input": {
+                    "q": "cat"
+                  }
+                },
+                {
+                  "type": "text",
+                  "text": "end"
+                }
+              ]
+            }
+          ]
+        },
+        "output": {},
+        "attributes": {}
+      },
+      "expected": "end"
+    },
+    {
+      "name": "standard-part-tool-result",
+      "call": {
+        "inputs": {
+          "messages": [
+            {
+              "role": "user",
+              "content": [
+                {
+                  "type": "tool_result",
+                  "tool_use_id": "t",
+                  "content": "found"
+                },
+                {
+                  "type": "text",
+                  "text": "end"
+                }
+              ]
+            }
+          ]
+        },
+        "output": {},
+        "attributes": {}
+      },
+      "expected": "found"
+    },
+    {
+      "name": "responses-part-tool-result",
+      "call": {
+        "inputs": {
+          "self": {},
+          "model": "gpt-4",
+          "input": [
+            {
+              "role": "user",
+              "content": [
+                {
+                  "type": "tool_result",
+                  "tool_use_id": "t",
+                  "content": "found"
+                },
+                {
+                  "type": "text",
+                  "text": "end"
+                }
+              ]
+            }
+          ]
+        },
+        "output": {},
+        "attributes": {}
+      },
+      "expected": "end"
+    },
+    {
+      "name": "agent-part-tool-result",
+      "call": {
+        "inputs": {
+          "history": [
+            {
+              "role": "system",
+              "subtype": "init"
+            },
+            {
+              "role": "user",
+              "content": [
+                {
+                  "type": "tool_result",
+                  "tool_use_id": "t",
+                  "content": "found"
+                },
+                {
+                  "type": "text",
+                  "text": "end"
+                }
+              ]
+            }
+          ]
+        },
+        "output": {},
+        "attributes": {}
+      },
+      "expected": "end"
+    },
+    {
+      "name": "standard-part-tool-result-incomplete",
+      "call": {
+        "inputs": {
+          "messages": [
+            {
+              "role": "user",
+              "content": [
+                {
+                  "type": "tool_result",
+                  "content": "found"
+                },
+                {
+                  "type": "text",
+                  "text": "end"
+                }
+              ]
+            }
+          ]
+        },
+        "output": {},
+        "attributes": {}
+      },
+      "expected": "end"
+    },
+    {
+      "name": "responses-part-tool-result-incomplete",
+      "call": {
+        "inputs": {
+          "self": {},
+          "model": "gpt-4",
+          "input": [
+            {
+              "role": "user",
+              "content": [
+                {
+                  "type": "tool_result",
+                  "content": "found"
+                },
+                {
+                  "type": "text",
+                  "text": "end"
+                }
+              ]
+            }
+          ]
+        },
+        "output": {},
+        "attributes": {}
+      },
+      "expected": "end"
+    },
+    {
+      "name": "agent-part-tool-result-incomplete",
+      "call": {
+        "inputs": {
+          "history": [
+            {
+              "role": "system",
+              "subtype": "init"
+            },
+            {
+              "role": "user",
+              "content": [
+                {
+                  "type": "tool_result",
+                  "content": "found"
+                },
+                {
+                  "type": "text",
+                  "text": "end"
+                }
+              ]
+            }
+          ]
+        },
+        "output": {},
+        "attributes": {}
+      },
+      "expected": "end"
+    },
+    {
+      "name": "standard-part-media",
+      "call": {
+        "inputs": {
+          "messages": [
+            {
+              "role": "user",
+              "content": [
+                {
+                  "type": "image_url",
+                  "image_url": {
+                    "url": "x"
+                  }
+                },
+                {
+                  "type": "text",
+                  "text": "end"
+                }
+              ]
+            }
+          ]
+        },
+        "output": {},
+        "attributes": {}
+      },
+      "expected": "end"
+    },
+    {
+      "name": "responses-part-media",
+      "call": {
+        "inputs": {
+          "self": {},
+          "model": "gpt-4",
+          "input": [
+            {
+              "role": "user",
+              "content": [
+                {
+                  "type": "image_url",
+                  "image_url": {
+                    "url": "x"
+                  }
+                },
+                {
+                  "type": "text",
+                  "text": "end"
+                }
+              ]
+            }
+          ]
+        },
+        "output": {},
+        "attributes": {}
+      },
+      "expected": "end"
+    },
+    {
+      "name": "agent-part-media",
+      "call": {
+        "inputs": {
+          "history": [
+            {
+              "role": "system",
+              "subtype": "init"
+            },
+            {
+              "role": "user",
+              "content": [
+                {
+                  "type": "image_url",
+                  "image_url": {
+                    "url": "x"
+                  }
+                },
+                {
+                  "type": "text",
+                  "text": "end"
+                }
+              ]
+            }
+          ]
+        },
+        "output": {},
+        "attributes": {}
+      },
+      "expected": "end"
+    },
+    {
+      "name": "otel-recursive-null",
+      "call": {
+        "inputs": {
+          "gen_ai.prompt": null
+        },
+        "output": {},
+        "attributes": {
+          "otel_span": {}
+        }
+      },
+      "expected": null
+    },
+    {
+      "name": "otel-recursive-number",
+      "call": {
+        "inputs": {
+          "gen_ai.prompt": 42
+        },
+        "output": {},
+        "attributes": {
+          "otel_span": {}
+        }
+      },
+      "expected": "42"
+    },
+    {
+      "name": "otel-recursive-array",
+      "call": {
+        "inputs": {
+          "gen_ai.prompt": [
+            1,
+            2
+          ]
+        },
+        "output": {},
+        "attributes": {
+          "otel_span": {}
+        }
+      },
+      "expected": "2"
+    },
+    {
+      "name": "otel-recursive-object",
+      "call": {
+        "inputs": {
+          "gen_ai.prompt": {
+            "answer": 42
+          }
+        },
+        "output": {},
+        "attributes": {
+          "otel_span": {}
+        }
+      },
+      "expected": "{\"answer\":42}"
+    },
+    {
+      "name": "otel-recursive-nested",
+      "call": {
+        "inputs": {
+          "gen_ai.prompt": [
+            [
+              {
+                "role": "user",
+                "content": "deep"
+              }
+            ]
+          ]
+        },
+        "output": {},
+        "attributes": {
+          "otel_span": {}
+        }
+      },
+      "expected": "deep"
+    },
+    {
+      "name": "otel-recursive-false",
+      "call": {
+        "inputs": {
+          "gen_ai.prompt": false
+        },
+        "output": {},
+        "attributes": {
+          "otel_span": {}
+        }
+      },
+      "expected": null
+    },
+    {
+      "name": "otel-recursive-empty-array",
+      "call": {
+        "inputs": {
+          "gen_ai.prompt": []
+        },
+        "output": {},
+        "attributes": {
+          "otel_span": {}
+        }
+      },
+      "expected": null
+    },
+    {
+      "name": "otel-recursive-empty-object",
+      "call": {
+        "inputs": {
+          "gen_ai.prompt": {}
+        },
+        "output": {},
+        "attributes": {
+          "otel_span": {}
+        }
+      },
+      "expected": "{}"
+    },
+    {
+      "name": "otel-recursive-prompt-object",
+      "call": {
+        "inputs": {
+          "gen_ai.prompt": {
+            "prompt": {
+              "answer": 42
+            }
+          }
+        },
+        "output": {},
+        "attributes": {
+          "otel_span": {}
+        }
+      },
+      "expected": "{\"answer\":42}"
+    },
+    {
+      "name": "otel-recursive-role-content-array",
+      "call": {
+        "inputs": {
+          "gen_ai.prompt": {
+            "role": "assistant",
+            "content": [
+              {
+                "text": "one"
+              },
+              {
+                "text": {
+                  "role": "user",
+                  "content": "two"
+                }
+              }
+            ]
+          }
+        },
+        "output": {},
+        "attributes": {
+          "otel_span": {}
+        }
+      },
+      "expected": "two"
+    },
+    {
+      "name": "agent-result-json-empty",
+      "call": {
+        "inputs": {
+          "history": [
+            {
+              "role": "system",
+              "subtype": "init"
+            },
+            {
+              "role": "user",
+              "content": [
+                {
+                  "tool_use_id": "t",
+                  "content": {}
+                }
+              ]
+            }
+          ]
+        },
+        "output": {},
+        "attributes": {}
+      },
+      "expected": "{}"
+    },
+    {
+      "name": "google-function-empty",
+      "call": {
+        "inputs": {
+          "model": "gemini",
+          "contents": [
+            {
+              "role": "model",
+              "parts": [
+                {
+                  "functionCall": {
+                    "id": "t",
+                    "name": "search",
+                    "args": {}
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        "output": {},
+        "attributes": {}
+      },
+      "expected": "{}\nsearch\n{}"
+    },
+    {
+      "name": "google-result-empty",
+      "call": {
+        "inputs": {
+          "model": "gemini",
+          "contents": [
+            {
+              "role": "user",
+              "parts": [
+                {
+                  "functionResponse": {
+                    "id": "t",
+                    "name": "search",
+                    "response": {}
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        "output": {},
+        "attributes": {}
+      },
+      "expected": "{}"
+    },
+    {
+      "name": "agent-result-json-null",
+      "call": {
+        "inputs": {
+          "history": [
+            {
+              "role": "system",
+              "subtype": "init"
+            },
+            {
+              "role": "user",
+              "content": [
+                {
+                  "tool_use_id": "t",
+                  "content": null
+                }
+              ]
+            }
+          ]
+        },
+        "output": {},
+        "attributes": {}
+      },
+      "expected": "null"
+    },
+    {
+      "name": "google-function-null",
+      "call": {
+        "inputs": {
+          "model": "gemini",
+          "contents": [
+            {
+              "role": "model",
+              "parts": [
+                {
+                  "functionCall": {
+                    "id": "t",
+                    "name": "search",
+                    "args": null
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        "output": {},
+        "attributes": {}
+      },
+      "expected": "{}\nsearch\n{}"
+    },
+    {
+      "name": "google-result-null",
+      "call": {
+        "inputs": {
+          "model": "gemini",
+          "contents": [
+            {
+              "role": "user",
+              "parts": [
+                {
+                  "functionResponse": {
+                    "id": "t",
+                    "name": "search",
+                    "response": null
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        "output": {},
+        "attributes": {}
+      },
+      "expected": "{}"
+    },
+    {
+      "name": "agent-result-json-nested",
+      "call": {
+        "inputs": {
+          "history": [
+            {
+              "role": "system",
+              "subtype": "init"
+            },
+            {
+              "role": "user",
+              "content": [
+                {
+                  "tool_use_id": "t",
+                  "content": {
+                    "a": [
+                      1,
+                      true,
+                      null,
+                      {
+                        "text": "a b \"quoted\" 猫"
+                      }
+                    ]
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        "output": {},
+        "attributes": {}
+      },
+      "expected": "{\"a\":[1,true,null,{\"text\":\"a b \\\"quoted\\\" 猫\"}]}"
+    },
+    {
+      "name": "google-function-nested",
+      "call": {
+        "inputs": {
+          "model": "gemini",
+          "contents": [
+            {
+              "role": "model",
+              "parts": [
+                {
+                  "functionCall": {
+                    "id": "t",
+                    "name": "search",
+                    "args": {
+                      "a": [
+                        1,
+                        true,
+                        null,
+                        {
+                          "text": "a b \"quoted\" 猫"
+                        }
+                      ]
+                    }
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        "output": {},
+        "attributes": {}
+      },
+      "expected": "{\"a\":[1,true,null,{\"text\":\"a b \\\"quoted\\\" 猫\"}]}\nsearch\n{\"a\":[1,true,null,{\"text\":\"a b \\\"quoted\\\" 猫\"}]}"
+    },
+    {
+      "name": "google-result-nested",
+      "call": {
+        "inputs": {
+          "model": "gemini",
+          "contents": [
+            {
+              "role": "user",
+              "parts": [
+                {
+                  "functionResponse": {
+                    "id": "t",
+                    "name": "search",
+                    "response": {
+                      "a": [
+                        1,
+                        true,
+                        null,
+                        {
+                          "text": "a b \"quoted\" 猫"
+                        }
+                      ]
+                    }
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        "output": {},
+        "attributes": {}
+      },
+      "expected": "{\"a\":[1,true,null,{\"text\":\"a b \\\"quoted\\\" 猫\"}]}"
+    },
+    {
+      "name": "agent-result-json-array",
+      "call": {
+        "inputs": {
+          "history": [
+            {
+              "role": "system",
+              "subtype": "init"
+            },
+            {
+              "role": "user",
+              "content": [
+                {
+                  "tool_use_id": "t",
+                  "content": [
+                    {
+                      "type": "image",
+                      "source": "猫"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        "output": {},
+        "attributes": {}
+      },
+      "expected": "```json\n[\n  {\n    \"type\": \"image\",\n    \"source\": \"猫\"\n  }\n]\n```"
+    },
+    {
+      "name": "google-function-array",
+      "call": {
+        "inputs": {
+          "model": "gemini",
+          "contents": [
+            {
+              "role": "model",
+              "parts": [
+                {
+                  "functionCall": {
+                    "id": "t",
+                    "name": "search",
+                    "args": [
+                      {
+                        "type": "image",
+                        "source": "猫"
+                      }
+                    ]
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        "output": {},
+        "attributes": {}
+      },
+      "expected": null
+    },
+    {
+      "name": "google-result-array",
+      "call": {
+        "inputs": {
+          "model": "gemini",
+          "contents": [
+            {
+              "role": "user",
+              "parts": [
+                {
+                  "functionResponse": {
+                    "id": "t",
+                    "name": "search",
+                    "response": [
+                      {
+                        "type": "image",
+                        "source": "猫"
+                      }
+                    ]
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        "output": {},
+        "attributes": {}
+      },
+      "expected": "[{\"type\":\"image\",\"source\":\"猫\"}]"
+    },
+    {
+      "name": "standard-complete-tool-interaction",
+      "call": {
+        "inputs": {
+          "messages": [
+            {
+              "role": "assistant",
+              "tool_calls": [
+                {
+                  "id": "t",
+                  "type": "function",
+                  "function": {
+                    "name": "search",
+                    "arguments": "{\"q\":\"cat\"}"
+                  }
+                }
+              ]
+            },
+            {
+              "role": "tool",
+              "tool_call_id": "t",
+              "content": "found"
+            }
+          ]
+        },
+        "output": {},
+        "attributes": {}
+      },
+      "expected": "search\n{\"q\":\"cat\"}\nfound"
+    },
+    {
+      "name": "anthropic-complete-tool-interaction",
+      "call": {
+        "inputs": {
+          "messages": [
+            {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "tool_use",
+                  "id": "t",
+                  "name": "search",
+                  "input": {
+                    "q": "cat"
+                  }
+                }
+              ]
+            },
+            {
+              "role": "user",
+              "content": [
+                {
+                  "type": "tool_result",
+                  "tool_use_id": "t",
+                  "content": "found"
+                }
+              ]
+            }
+          ]
+        },
+        "output": {},
+        "attributes": {}
+      },
+      "expected": "search\n{\"q\":\"cat\"}\nfound"
+    },
+    {
+      "name": "responses-complete-tool-interaction",
+      "call": {
+        "inputs": {
+          "self": {},
+          "model": "gpt-4",
+          "input": [
+            {
+              "type": "function_call",
+              "call_id": "t",
+              "name": "search",
+              "arguments": "{\"q\":\"cat\"}"
+            },
+            {
+              "type": "function_call_output",
+              "call_id": "t",
+              "output": "found"
+            }
+          ]
+        },
+        "output": {},
+        "attributes": {}
+      },
+      "expected": "search\n{\"q\":\"cat\"}\nfound"
+    },
+    {
+      "name": "agent-complete-tool-interaction",
+      "call": {
+        "inputs": {
+          "history": [
+            {
+              "role": "system",
+              "subtype": "init"
+            },
+            {
+              "role": "assistant",
+              "content": [
+                {
+                  "id": "t",
+                  "name": "search",
+                  "input": {
+                    "q": "cat"
+                  }
+                }
+              ]
+            },
+            {
+              "role": "user",
+              "content": [
+                {
+                  "tool_use_id": "t",
+                  "content": "found"
+                }
+              ]
+            }
+          ]
+        },
+        "output": {},
+        "attributes": {}
+      },
+      "expected": "search\n{\"q\":\"cat\"}\nfound"
+    },
+    {
+      "name": "google-complete-tool-interaction",
+      "call": {
+        "inputs": {
+          "model": "gemini",
+          "contents": [
+            {
+              "role": "model",
+              "parts": [
+                {
+                  "functionCall": {
+                    "id": "t",
+                    "name": "search",
+                    "args": {
+                      "q": "cat"
+                    }
+                  }
+                }
+              ]
+            },
+            {
+              "role": "user",
+              "parts": [
+                {
+                  "functionResponse": {
+                    "id": "t",
+                    "name": "search",
+                    "response": "found"
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        "output": {},
+        "attributes": {}
+      },
+      "expected": "found"
+    },
+    {
+      "name": "otel-complete-tool-interaction",
+      "call": {
+        "inputs": {
+          "gen_ai.input.messages": [
+            {
+              "role": "assistant",
+              "parts": [
+                {
+                  "type": "tool_call",
+                  "id": "t",
+                  "name": "search",
+                  "arguments": {
+                    "q": "cat"
+                  }
+                }
+              ]
+            },
+            {
+              "role": "tool",
+              "parts": [
+                {
+                  "type": "tool_call_response",
+                  "id": "t",
+                  "result": "found"
+                }
+              ]
+            }
+          ]
+        },
+        "output": {},
+        "attributes": {
+          "otel_span": {}
+        }
+      },
+      "expected": "search\n{\"q\":\"cat\"}\nfound"
+    },
+    {
+      "name": "adk-complete-tool-interaction",
+      "call": {
+        "inputs": {
+          "gcp.vertex.agent.llm_request": {
+            "contents": [
+              {
+                "role": "model",
+                "parts": [
+                  {
+                    "function_call": {
+                      "id": "t",
+                      "name": "search",
+                      "args": {
+                        "q": "cat"
+                      }
+                    }
+                  }
+                ]
+              },
+              {
+                "role": "user",
+                "parts": [
+                  {
+                    "function_response": {
+                      "response": {
+                        "message": "found"
+                      }
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "output": {},
+        "attributes": {
+          "otel_span": {}
+        }
+      },
+      "expected": "found"
+    },
+    {
+      "name": "standard-malformed-part-null",
+      "call": {
+        "inputs": {
+          "messages": [
+            {
+              "role": "user",
+              "content": [
+                "prefix",
+                null,
+                {
+                  "type": "text",
+                  "text": "last"
+                }
+              ]
+            }
+          ]
+        },
+        "output": {},
+        "attributes": {}
+      },
+      "expected": null
+    },
+    {
+      "name": "responses-malformed-item-null",
+      "call": {
+        "inputs": {
+          "model": "gpt",
+          "self": {},
+          "input": [
+            {
+              "role": "user",
+              "content": "previous"
+            },
+            null
+          ]
+        },
+        "output": {},
+        "attributes": {}
+      },
+      "expected": null
+    },
+    {
+      "name": "agent-malformed-part-null",
+      "call": {
+        "inputs": {
+          "history": [
+            {
+              "role": "system",
+              "subtype": "init"
+            },
+            {
+              "role": "user",
+              "content": [
+                null,
+                {
+                  "text": "last"
+                }
+              ]
+            }
+          ]
+        },
+        "output": {},
+        "attributes": {}
+      },
+      "expected": null
+    },
+    {
+      "name": "standard-malformed-part-number",
+      "call": {
+        "inputs": {
+          "messages": [
+            {
+              "role": "user",
+              "content": [
+                "prefix",
+                42,
+                {
+                  "type": "text",
+                  "text": "last"
+                }
+              ]
+            }
+          ]
+        },
+        "output": {},
+        "attributes": {}
+      },
+      "expected": null
+    },
+    {
+      "name": "responses-malformed-item-number",
+      "call": {
+        "inputs": {
+          "model": "gpt",
+          "self": {},
+          "input": [
+            {
+              "role": "user",
+              "content": "previous"
+            },
+            42
+          ]
+        },
+        "output": {},
+        "attributes": {}
+      },
+      "expected": null
+    },
+    {
+      "name": "agent-malformed-part-number",
+      "call": {
+        "inputs": {
+          "history": [
+            {
+              "role": "system",
+              "subtype": "init"
+            },
+            {
+              "role": "user",
+              "content": [
+                42,
+                {
+                  "text": "last"
+                }
+              ]
+            }
+          ]
+        },
+        "output": {},
+        "attributes": {}
+      },
+      "expected": null
+    },
+    {
+      "name": "standard-malformed-part-bool",
+      "call": {
+        "inputs": {
+          "messages": [
+            {
+              "role": "user",
+              "content": [
+                "prefix",
+                true,
+                {
+                  "type": "text",
+                  "text": "last"
+                }
+              ]
+            }
+          ]
+        },
+        "output": {},
+        "attributes": {}
+      },
+      "expected": null
+    },
+    {
+      "name": "responses-malformed-item-bool",
+      "call": {
+        "inputs": {
+          "model": "gpt",
+          "self": {},
+          "input": [
+            {
+              "role": "user",
+              "content": "previous"
+            },
+            true
+          ]
+        },
+        "output": {},
+        "attributes": {}
+      },
+      "expected": null
+    },
+    {
+      "name": "agent-malformed-part-bool",
+      "call": {
+        "inputs": {
+          "history": [
+            {
+              "role": "system",
+              "subtype": "init"
+            },
+            {
+              "role": "user",
+              "content": [
+                true,
+                {
+                  "text": "last"
+                }
+              ]
+            }
+          ]
+        },
+        "output": {},
+        "attributes": {}
+      },
+      "expected": null
+    },
+    {
+      "name": "standard-malformed-part-text-number",
+      "call": {
+        "inputs": {
+          "messages": [
+            {
+              "role": "user",
+              "content": [
+                "prefix",
+                {
+                  "type": "text",
+                  "text": 42
+                },
+                {
+                  "type": "text",
+                  "text": "last"
+                }
+              ]
+            }
+          ]
+        },
+        "output": {},
+        "attributes": {}
+      },
+      "expected": "prefixlast"
+    },
+    {
+      "name": "responses-malformed-item-text-number",
+      "call": {
+        "inputs": {
+          "model": "gpt",
+          "self": {},
+          "input": [
+            {
+              "role": "user",
+              "content": "previous"
+            },
+            {
+              "type": "text",
+              "text": 42
+            }
+          ]
+        },
+        "output": {},
+        "attributes": {}
+      },
+      "expected": "previous"
+    },
+    {
+      "name": "agent-malformed-part-text-number",
+      "call": {
+        "inputs": {
+          "history": [
+            {
+              "role": "system",
+              "subtype": "init"
+            },
+            {
+              "role": "user",
+              "content": [
+                {
+                  "type": "text",
+                  "text": 42
+                },
+                {
+                  "text": "last"
+                }
+              ]
+            }
+          ]
+        },
+        "output": {},
+        "attributes": {}
+      },
+      "expected": "last"
+    },
+    {
+      "name": "responses-typed-null",
+      "call": {
+        "inputs": {
+          "model": "gpt",
+          "self": {},
+          "input": [
+            {
+              "role": "user",
+              "content": "previous"
+            },
+            null
+          ]
+        },
+        "output": {},
+        "attributes": {}
+      },
+      "expected": null
+    },
+    {
+      "name": "responses-typed-array",
+      "call": {
+        "inputs": {
+          "model": "gpt",
+          "self": {},
+          "input": [
+            {
+              "role": "user",
+              "content": "previous"
+            },
+            []
+          ]
+        },
+        "output": {},
+        "attributes": {}
+      },
+      "expected": "previous"
+    },
+    {
+      "name": "responses-typed-content-string",
+      "call": {
+        "inputs": {
+          "model": "gpt",
+          "self": {},
+          "input": [
+            {
+              "role": "user",
+              "content": "previous"
+            },
+            {
+              "type": "message",
+              "role": "user",
+              "content": "invalid"
+            }
+          ]
+        },
+        "output": {},
+        "attributes": {}
+      },
+      "expected": null
+    },
+    {
+      "name": "responses-typed-content-null",
+      "call": {
+        "inputs": {
+          "model": "gpt",
+          "self": {},
+          "input": [
+            {
+              "role": "user",
+              "content": "previous"
+            },
+            {
+              "type": "message",
+              "role": "user",
+              "content": null
+            }
+          ]
+        },
+        "output": {},
+        "attributes": {}
+      },
+      "expected": null
+    },
+    {
+      "name": "google-schema-config-0",
+      "call": {
+        "inputs": {
+          "model": "gemini",
+          "contents": "google",
+          "messages": [
+            {
+              "role": "user",
+              "content": "fallback"
+            }
+          ],
+          "config": {
+            "systemInstruction": 42
+          }
+        },
+        "output": {},
+        "attributes": {}
+      },
+      "expected": "fallback"
+    },
+    {
+      "name": "google-schema-config-1",
+      "call": {
+        "inputs": {
+          "model": "gemini",
+          "contents": "google",
+          "messages": [
+            {
+              "role": "user",
+              "content": "fallback"
+            }
+          ],
+          "config": {
+            "responseMimeType": 42
+          }
+        },
+        "output": {},
+        "attributes": {}
+      },
+      "expected": "fallback"
+    },
+    {
+      "name": "google-schema-config-2",
+      "call": {
+        "inputs": {
+          "model": "gemini",
+          "contents": "google",
+          "messages": [
+            {
+              "role": "user",
+              "content": "fallback"
+            }
+          ],
+          "config": {
+            "seed": "42"
+          }
+        },
+        "output": {},
+        "attributes": {}
+      },
+      "expected": "fallback"
+    },
+    {
+      "name": "google-schema-self-0",
+      "call": {
+        "inputs": {
+          "model": "gemini",
+          "contents": "google",
+          "messages": [
+            {
+              "role": "user",
+              "content": "fallback"
+            }
+          ],
+          "self": {
+            "__class__": null
+          }
+        },
+        "output": {},
+        "attributes": {}
+      },
+      "expected": "fallback"
+    },
+    {
+      "name": "google-schema-self-1",
+      "call": {
+        "inputs": {
+          "model": "gemini",
+          "contents": "google",
+          "messages": [
+            {
+              "role": "user",
+              "content": "fallback"
+            }
+          ],
+          "self": {
+            "__class__": {
+              "module": 42
+            }
+          }
+        },
+        "output": {},
+        "attributes": {}
+      },
+      "expected": "fallback"
+    },
+    {
+      "name": "google-schema-self-2",
+      "call": {
+        "inputs": {
+          "model": "gemini",
+          "contents": "google",
+          "messages": [
+            {
+              "role": "user",
+              "content": "fallback"
+            }
+          ],
+          "self": {
+            "GoogleGenAIai": 42
+          }
+        },
+        "output": {},
+        "attributes": {}
+      },
+      "expected": "fallback"
+    },
+    {
+      "name": "google-schema-contents-0",
+      "call": {
+        "inputs": {
+          "model": "gemini",
+          "contents": [
+            {
+              "role": "user",
+              "parts": null
+            }
+          ],
+          "messages": [
+            {
+              "role": "user",
+              "content": "fallback"
+            }
+          ]
+        },
+        "output": {},
+        "attributes": {}
+      },
+      "expected": "fallback"
+    },
+    {
+      "name": "google-schema-contents-1",
+      "call": {
+        "inputs": {
+          "model": "gemini",
+          "contents": [
+            {
+              "role": "user",
+              "parts": [
+                null
+              ]
+            }
+          ],
+          "messages": [
+            {
+              "role": "user",
+              "content": "fallback"
+            }
+          ]
+        },
+        "output": {},
+        "attributes": {}
+      },
+      "expected": "fallback"
+    },
+    {
+      "name": "output-invalid-anthropic-no-usage",
+      "call": {
+        "inputs": {
+          "messages": [
+            {
+              "role": "user",
+              "content": "last"
+            }
+          ]
+        },
+        "output": {
+          "type": "message",
+          "role": "assistant",
+          "model": "claude",
+          "content": [
+            {
+              "type": "text",
+              "text": "ok"
+            }
+          ]
+        },
+        "attributes": {}
+      },
+      "expected": null
+    },
+    {
+      "name": "output-invalid-responses-null-item",
+      "call": {
+        "inputs": {
+          "messages": [
+            {
+              "role": "user",
+              "content": "last"
+            }
+          ]
+        },
+        "output": {
+          "object": "response",
+          "output": [
+            null
+          ]
+        },
+        "attributes": {}
+      },
+      "expected": "last"
+    },
+    {
+      "name": "output-invalid-messages-null-item",
+      "call": {
+        "inputs": {
+          "messages": [
+            {
+              "role": "user",
+              "content": "last"
+            }
+          ]
+        },
+        "output": {
+          "messages": [
+            null
+          ]
+        },
+        "attributes": {}
+      },
+      "expected": null
+    },
+    {
+      "name": "output-invalid-responses-malformed-message",
+      "call": {
+        "inputs": {
+          "messages": [
+            {
+              "role": "user",
+              "content": "last"
+            }
+          ]
+        },
+        "output": {
+          "object": "response",
+          "output": [
+            {
+              "type": "message",
+              "content": "oops"
+            }
+          ]
+        },
+        "attributes": {}
+      },
+      "expected": "last"
+    },
+    {
+      "name": "otel-semconv-response-null",
+      "call": {
+        "inputs": {
+          "gen_ai.prompt": [
+            {
+              "role": "tool",
+              "parts": [
+                {
+                  "type": "tool_call_response",
+                  "id": "t",
+                  "result": null,
+                  "response": "fallback"
+                }
+              ]
+            }
+          ]
+        },
+        "output": {},
+        "attributes": {
+          "otel_span": {}
+        }
+      },
+      "expected": "fallback"
+    },
+    {
+      "name": "otel-semconv-text-object",
+      "call": {
+        "inputs": {
+          "gen_ai.prompt": [
+            {
+              "role": "tool",
+              "parts": [
+                {
+                  "type": "text",
+                  "content": {
+                    "answer": 42
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        "output": {},
+        "attributes": {
+          "otel_span": {}
+        }
+      },
+      "expected": "[object Object]"
+    },
+    {
+      "name": "otel-semconv-mixed-parts",
+      "call": {
+        "inputs": {
+          "gen_ai.prompt": [
+            {
+              "role": "tool",
+              "parts": [
+                {
+                  "type": "text",
+                  "content": "one"
+                },
+                {
+                  "type": "custom",
+                  "content": {
+                    "answer": 42
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        "output": {},
+        "attributes": {
+          "otel_span": {}
+        }
+      },
+      "expected": "one\n{\"answer\":42}"
+    },
+    {
+      "name": "serialization-scientific",
+      "raw_call": "{\"inputs\": {\"history\": [{\"role\": \"system\", \"subtype\": \"init\"}, {\"role\": \"user\", \"content\": [{\"tool_use_id\": \"t\", \"content\": {\"value\": 1e-07}}]}]}, \"output\": {}, \"attributes\": {}}",
+      "expected": "{\"value\":1e-7}"
+    },
+    {
+      "name": "serialization-small",
+      "raw_call": "{\"inputs\": {\"history\": [{\"role\": \"system\", \"subtype\": \"init\"}, {\"role\": \"user\", \"content\": [{\"tool_use_id\": \"t\", \"content\": {\"value\": 1e-06}}]}]}, \"output\": {}, \"attributes\": {}}",
+      "expected": "{\"value\":0.000001}"
+    },
+    {
+      "name": "serialization-large",
+      "raw_call": "{\"inputs\": {\"history\": [{\"role\": \"system\", \"subtype\": \"init\"}, {\"role\": \"user\", \"content\": [{\"tool_use_id\": \"t\", \"content\": {\"value\": 1e+20}}]}]}, \"output\": {}, \"attributes\": {}}",
+      "expected": "{\"value\":100000000000000000000}"
+    },
+    {
+      "name": "serialization-float",
+      "raw_call": "{\"inputs\": {\"history\": [{\"role\": \"system\", \"subtype\": \"init\"}, {\"role\": \"user\", \"content\": [{\"tool_use_id\": \"t\", \"content\": {\"value\": 1.0}}]}]}, \"output\": {}, \"attributes\": {}}",
+      "expected": "{\"value\":1}"
+    },
+    {
+      "name": "serialization-large-int",
+      "raw_call": "{\"inputs\": {\"history\": [{\"role\": \"system\", \"subtype\": \"init\"}, {\"role\": \"user\", \"content\": [{\"tool_use_id\": \"t\", \"content\": {\"value\": 9007199254740993}}]}]}, \"output\": {}, \"attributes\": {}}",
+      "expected": "{\"value\":9007199254740992}"
+    },
+    {
+      "name": "serialization-negative-zero",
+      "raw_call": "{\"inputs\": {\"history\": [{\"role\": \"system\", \"subtype\": \"init\"}, {\"role\": \"user\", \"content\": [{\"tool_use_id\": \"t\", \"content\": {\"value\": -0.0}}]}]}, \"output\": {}, \"attributes\": {}}",
+      "expected": "{\"value\":0}"
+    },
+    {
+      "name": "serialization-integer-keys",
+      "raw_call": "{\"inputs\": {\"history\": [{\"role\": \"system\", \"subtype\": \"init\"}, {\"role\": \"user\", \"content\": [{\"tool_use_id\": \"t\", \"content\": {\"value\": {\"10\": \"ten\", \"2\": \"two\", \"x\": \"last\"}}}]}]}, \"output\": {}, \"attributes\": {}}",
+      "expected": "{\"value\":{\"2\":\"two\",\"10\":\"ten\",\"x\":\"last\"}}"
+    },
+    {
+      "name": "serialization-nested-integer-keys",
+      "raw_call": "{\"inputs\": {\"history\": [{\"role\": \"system\", \"subtype\": \"init\"}, {\"role\": \"user\", \"content\": [{\"tool_use_id\": \"t\", \"content\": {\"value\": [{\"10\": \"ten\", \"2\": \"two\"}]}}]}]}, \"output\": {}, \"attributes\": {}}",
+      "expected": "{\"value\":[{\"2\":\"two\",\"10\":\"ten\"}]}"
+    },
+    {
+      "name": "serialization-unicode",
+      "raw_call": "{\"inputs\": {\"history\": [{\"role\": \"system\", \"subtype\": \"init\"}, {\"role\": \"user\", \"content\": [{\"tool_use_id\": \"t\", \"content\": {\"value\": {\"text\": \"\\u732b\\n\\t\\\"quoted\\\"/\\u2028\"}}}]}]}, \"output\": {}, \"attributes\": {}}",
+      "expected": "{\"value\":{\"text\":\"猫\\n\\t\\\"quoted\\\"/ \"}}"
+    },
+    {
+      "name": "image-prompt-precedes-messages",
+      "call": {
+        "inputs": {
+          "model": "gpt-image-1",
+          "prompt": "draw",
+          "messages": [
+            {
+              "role": "user",
+              "content": "other"
+            }
+          ]
+        },
+        "output": {},
+        "attributes": {}
+      },
+      "expected": "draw"
+    },
+    {
+      "name": "otel-output-final-result",
+      "call": {
+        "inputs": {
+          "messages": [
+            {
+              "role": "user",
+              "content": "last"
+            }
+          ]
+        },
+        "output": {
+          "final_result": "output"
+        },
+        "attributes": {
+          "otel_span": {}
+        }
+      },
+      "expected": null
+    },
+    {
+      "name": "google-chat-invalid-class",
+      "call": {
+        "inputs": {
+          "model": "gemini",
+          "message": "google",
+          "self": {
+            "__class__": {
+              "module": "google",
+              "qualname": 42
+            }
+          },
+          "messages": [
+            {
+              "role": "user",
+              "content": "fallback"
+            }
+          ]
+        },
+        "output": {},
+        "attributes": {}
+      },
+      "expected": "fallback"
+    },
+    {
+      "name": "responses-text-number",
+      "call": {
+        "inputs": {
+          "model": "gpt",
+          "self": {},
+          "input": [
+            {
+              "role": "user",
+              "content": [
+                {
+                  "type": "input_text",
+                  "text": 42
+                },
+                {
+                  "type": "input_text",
+                  "text": "last"
+                }
+              ]
+            }
+          ]
+        },
+        "output": {},
+        "attributes": {}
+      },
+      "expected": "last"
+    },
+    {
+      "name": "nul-one-True",
+      "call": {
+        "inputs": {
+          "messages": [
+            {
+              "role": "user",
+              "content": "\u0000"
+            }
+          ]
+        },
+        "output": null,
+        "attributes": {}
+      },
+      "expected": "\u0000"
+    },
+    {
+      "name": "nul-one-False",
+      "call": {
+        "inputs": {
+          "messages": [
+            {
+              "role": "user",
+              "content": "\u0000"
+            }
+          ]
+        },
+        "output": {},
+        "attributes": {}
+      },
+      "expected": "\u0000"
+    },
+    {
+      "name": "nul-many-True",
+      "call": {
+        "inputs": {
+          "messages": [
+            {
+              "role": "user",
+              "content": "\u0000\u0000\u0000"
+            }
+          ]
+        },
+        "output": null,
+        "attributes": {}
+      },
+      "expected": "\u0000\u0000\u0000"
+    },
+    {
+      "name": "nul-many-False",
+      "call": {
+        "inputs": {
+          "messages": [
+            {
+              "role": "user",
+              "content": "\u0000\u0000\u0000"
+            }
+          ]
+        },
+        "output": {},
+        "attributes": {}
+      },
+      "expected": "\u0000\u0000\u0000"
+    },
+    {
+      "name": "nul-looks-like-token-True",
+      "call": {
+        "inputs": {
+          "messages": [
+            {
+              "role": "user",
+              "content": "\u0000JYWJj\u0000PbnVsbA==\u0000"
+            }
+          ]
+        },
+        "output": null,
+        "attributes": {}
+      },
+      "expected": "\u0000JYWJj\u0000PbnVsbA==\u0000"
+    },
+    {
+      "name": "nul-looks-like-token-False",
+      "call": {
+        "inputs": {
+          "messages": [
+            {
+              "role": "user",
+              "content": "\u0000JYWJj\u0000PbnVsbA==\u0000"
+            }
+          ]
+        },
+        "output": {},
+        "attributes": {}
+      },
+      "expected": "\u0000JYWJj\u0000PbnVsbA==\u0000"
+    },
+    {
+      "name": "nul-surrounded-True",
+      "call": {
+        "inputs": {
+          "messages": [
+            {
+              "role": "user",
+              "content": "a\u0000b\u0000c"
+            }
+          ]
+        },
+        "output": null,
+        "attributes": {}
+      },
+      "expected": "a\u0000b\u0000c"
+    },
+    {
+      "name": "nul-surrounded-False",
+      "call": {
+        "inputs": {
+          "messages": [
+            {
+              "role": "user",
+              "content": "a\u0000b\u0000c"
+            }
+          ]
+        },
+        "output": {},
+        "attributes": {}
+      },
+      "expected": "a\u0000b\u0000c"
+    },
+    {
+      "name": "nul-tool-arguments",
+      "call": {
+        "inputs": {
+          "messages": [
+            {
+              "role": "assistant",
+              "tool_calls": [
+                {
+                  "id": "t",
+                  "function": {
+                    "name": "\u0000search\u0000",
+                    "arguments": "\u0000JYWJj\u0000"
+                  }
+                }
+              ]
+            },
+            {
+              "role": "tool",
+              "tool_call_id": "t",
+              "content": "\u0000found\u0000"
+            }
+          ]
+        },
+        "output": {},
+        "attributes": {}
+      },
+      "expected": "\u0000search\u0000\n\u0000JYWJj\u0000\n\u0000found\u0000"
+    },
+    {
+      "name": "nul-agent-json-result",
+      "call": {
+        "inputs": {
+          "history": [
+            {
+              "role": "system",
+              "subtype": "init"
+            },
+            {
+              "role": "user",
+              "content": [
+                {
+                  "tool_use_id": "t",
+                  "content": {
+                    "text": "\u0000JYWJj\u0000"
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        "output": {},
+        "attributes": {}
+      },
+      "expected": "{\"text\":\"\\u0000JYWJj\\u0000\"}"
+    },
+    {
+      "name": "adjacent-json-results",
+      "call": {
+        "inputs": {
+          "model": "gemini",
+          "contents": [
+            {
+              "role": "user",
+              "parts": [
+                {
+                  "text": "\u0000"
+                },
+                {
+                  "functionResponse": {
+                    "response": {
+                      "a": 1
+                    }
+                  }
+                },
+                {
+                  "functionResponse": {
+                    "response": {
+                      "b": 2
+                    }
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        "output": {},
+        "attributes": {}
+      },
+      "expected": "\u0000{\"a\":1}{\"b\":2}"
+    },
+    {
+      "name": "agent-empty-array-result",
+      "call": {
+        "inputs": {
+          "history": [
+            {
+              "role": "system",
+              "subtype": "init"
+            },
+            {
+              "role": "user",
+              "content": [
+                {
+                  "tool_use_id": "t",
+                  "content": []
+                }
+              ]
+            }
+          ]
+        },
+        "output": {},
+        "attributes": {}
+      },
+      "expected": "```json\n[]\n```"
+    },
+    {
+      "name": "serialization-positive-exponent",
+      "raw_call": "{\"inputs\": {\"history\": [{\"role\": \"system\", \"subtype\": \"init\"}, {\"role\": \"user\", \"content\": [{\"tool_use_id\": \"t\", \"content\": {\"value\": 1000000000000000000000}}]}]}, \"output\": {}, \"attributes\": {}}",
+      "expected": "{\"value\":1e+21}"
+    },
+    {
+      "name": "serialization-negative-exponent",
+      "raw_call": "{\"inputs\": {\"history\": [{\"role\": \"system\", \"subtype\": \"init\"}, {\"role\": \"user\", \"content\": [{\"tool_use_id\": \"t\", \"content\": {\"value\": -10000000000000000000000000}}]}]}, \"output\": {}, \"attributes\": {}}",
+      "expected": "{\"value\":-1e+25}"
+    },
+    {
+      "name": "serialization-large-integer",
+      "raw_call": "{\"inputs\": {\"history\": [{\"role\": \"system\", \"subtype\": \"init\"}, {\"role\": \"user\", \"content\": [{\"tool_use_id\": \"t\", \"content\": {\"value\": 1237940039285380274899124224}}]}]}, \"output\": {}, \"attributes\": {}}",
+      "expected": "{\"value\":1.2379400392853803e+27}"
+    },
+    {
+      "name": "serialization-numeric-string",
+      "raw_call": "{\"inputs\": {\"history\": [{\"role\": \"system\", \"subtype\": \"init\"}, {\"role\": \"user\", \"content\": [{\"tool_use_id\": \"t\", \"content\": {\"value\": \"1000000000000000000000000000000\"}}]}]}, \"output\": {}, \"attributes\": {}}",
+      "expected": "{\"value\":\"1000000000000000000000000000000\"}"
+    }
+  ]
+}
