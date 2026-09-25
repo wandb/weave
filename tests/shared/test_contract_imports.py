@@ -4,10 +4,12 @@ import pytest
 
 from weave.shared import (
     common_interface,
+    errors,
     feedback_types,
     http_service_interface,
     project_id,
     query,
+    refs_conversion,
     service_interface,
 )
 from weave.shared.builtin_object_classes import (
@@ -16,8 +18,10 @@ from weave.shared.builtin_object_classes import (
     leaderboard,
 )
 from weave.trace_server import common_interface as legacy_common
+from weave.trace_server import errors as legacy_errors
 from weave.trace_server import http_service_interface as legacy_http
 from weave.trace_server import service_interface as legacy_service
+from weave.trace_server import trace_server_converter as legacy_converter
 from weave.trace_server.interface import feedback_types as legacy_feedback
 from weave.trace_server.interface import query as legacy_query
 from weave.trace_server.interface.builtin_object_classes import (
@@ -36,6 +40,7 @@ from weave.utils import project_id as legacy_project_id
     ("legacy_module", "shared_module"),
     [
         (legacy_common, common_interface),
+        (legacy_converter, refs_conversion),
         (legacy_annotation, annotation_spec),
         (legacy_base, base_object_def),
         (legacy_leaderboard, leaderboard),
@@ -51,3 +56,12 @@ def test_legacy_contract_exports_preserve_identity(
 ) -> None:
     for name in vars(legacy_module)["__all__"]:
         assert vars(legacy_module)[name] is vars(shared_module)[name]
+
+
+def test_legacy_exceptions_preserve_identity() -> None:
+    for name, value in vars(errors).items():
+        if isinstance(value, type) and issubclass(value, Exception):
+            assert vars(legacy_errors)[name] is value
+
+    with pytest.raises(legacy_errors.InvalidExternalRef, match="bad ref"):
+        raise errors.InvalidExternalRef("bad ref")
