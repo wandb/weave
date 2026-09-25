@@ -60,9 +60,9 @@ _NON_USER_PROMPT_ROLES = {
 _CLAUDE_TASK_NOTIFICATION_OPEN = "<task-notification>"
 _CLAUDE_TASK_NOTIFICATION_CLOSE = "</task-notification>"
 _CHAT_OPERATION = "chat"
+_ASSISTANT_TEXT_OPERATION = "assistant_text"
 # OTel GenAI output part type for a tool call the model requested.
 _TOOL_CALL_PART_TYPE = "tool_call"
-_ASSISTANT_TEXT_OPERATION = "assistant_text"
 
 
 # ---------------------------------------------------------------------------
@@ -100,6 +100,15 @@ class TokenTotals:
     input_cost_usd: float | None = None
     output_cost_usd: float | None = None
     total_cost_usd: float | None = None
+
+
+@dataclass(frozen=True)
+class _OutputToolCall:
+    """A tool call the model requested in an output message part."""
+
+    id: str | None
+    name: str
+    arguments: str
 
 
 def add_optional_cost(acc: float | None, value: float | None) -> float | None:
@@ -319,8 +328,9 @@ def build_chat_messages(spans: list[AgentSpanSchema]) -> list[AgentChatMessage]:
         return []
 
     tree = build_span_tree(spans)
-    tool_spans = [span for span in spans if span.operation_name == OP_EXECUTE_TOOL]
-    traversal = ChatTraversal(tool_spans=tool_spans)
+    pending = _pending_tool_calls_by_span(spans)
+
+    traversal = ChatTraversal(pending_tool_calls=pending)
     traversal.walk_roots(tree)
 
     messages = traversal.messages
@@ -359,8 +369,8 @@ class ChatTraversal:
     """
 
     messages: list[AgentChatMessage] = field(default_factory=list)
-    # Every `execute_tool` span of the trace, read by `_emit_pending_tool_calls`.
-    tool_spans: list[AgentSpanSchema] = field(default_factory=list)
+    # Output tool calls no `execute_tool` span ran, keyed by the emitting span's id.
+    pending_tool_calls: dict[str, list[_OutputToolCall]] = field(default_factory=dict)
     # True once any per-turn user message has been emitted during the walk;
     # gates the invoke_agent leading-prompt fallback in build_chat_messages.
     emitted_user: bool = False
@@ -557,14 +567,15 @@ class ChatTraversal:
 
         msg = _emit_assistant_message(span, agent_name)
         emitted_text = False
-        if msg is not None and _coalesce_mirrored_child_assistant(
-            node, self.messages[child_message_start:], msg
-        ):
-            emitted_text = True
-        elif msg is not None:
-            self.messages.append(msg)
-            assistant = msg.assistant_message
-            emitted_text = bool(assistant and assistant.text)
+        if msg is not None:
+            if _coalesce_mirrored_child_assistant(
+                node, self.messages[child_message_start:], msg
+            ):
+                emitted_text = True
+            else:
+                self.messages.append(msg)
+                assistant = msg.assistant_message
+                emitted_text = bool(assistant and assistant.text)
 
         self._emit_pending_tool_calls(span, agent_name)
         return emitted_text or subtree_emitted_assistant
@@ -575,14 +586,14 @@ class ChatTraversal:
         """Emit a result-less tool_call for each output tool call no tool span ran."""
         # A call the runtime hands to the user (an approval, a question) gets no
         # `execute_tool` span, and without this the turn would end on nothing.
-        for call in _unmatched_tool_calls(span, self.tool_spans):
+        for call in self.pending_tool_calls.get(span.span_id, []):
             self.messages.append(
                 AgentChatMessage(
                     type="tool_call",
                     span_id=span.span_id,
                     agent_name=agent_name,
                     agent_version=span.agent_version,
-                    started_at=span.ended_at or span.started_at,
+                    started_at=span.started_at,
                     tool_call=AgentChatToolCall(
                         tool_name=call.name, tool_arguments=call.arguments
                     ),
@@ -976,13 +987,6 @@ def _extract_non_user_output_text(messages: list[NormalizedMessage]) -> str:
     return "\n\n".join(texts)
 
 
-@dataclass(frozen=True)
-class _OutputToolCall:
-    id: str
-    name: str
-    arguments: str
-
-
 def _output_tool_calls(messages: list[NormalizedMessage]) -> list[_OutputToolCall]:
     """Tool-call parts of every non-user message in `messages`, in order."""
     calls: list[_OutputToolCall] = []
@@ -995,9 +999,10 @@ def _output_tool_calls(messages: list[NormalizedMessage]) -> list[_OutputToolCal
             arguments = part.get("arguments", "")
             if not isinstance(arguments, str):
                 arguments = json.dumps(arguments)
+            call_id = str(part["id"]) if part.get("id") else None
             calls.append(
                 _OutputToolCall(
-                    id=str(part.get("id") or ""),
+                    id=call_id,
                     name=str(part.get("name") or ""),
                     arguments=arguments,
                 )
@@ -1006,19 +1011,51 @@ def _output_tool_calls(messages: list[NormalizedMessage]) -> list[_OutputToolCal
     return calls
 
 
-def _unmatched_tool_calls(
-    span: AgentSpanSchema, tool_spans: list[AgentSpanSchema]
-) -> list[_OutputToolCall]:
-    """Output tool calls of `span` that no span in `tool_spans` ran."""
-    pending: list[_OutputToolCall] = []
-    for call in _output_tool_calls(span.output_messages):
-        if any(
-            _tool_span_ran(tool_span, call, span.started_at) for tool_span in tool_spans
-        ):
+def _pending_tool_calls_by_span(
+    spans: list[AgentSpanSchema],
+) -> dict[str, list[_OutputToolCall]]:
+    """Output tool calls no `execute_tool` span ran, keyed by the emitting span's id."""
+    pool = sorted(
+        (span for span in spans if span.operation_name == OP_EXECUTE_TOOL),
+        key=_span_sort_key,
+    )
+    consumed: set[str] = set()
+    seen_call_ids: set[str] = set()
+    pending: dict[str, list[_OutputToolCall]] = {}
+    for span in sorted(spans, key=_span_sort_key):
+        # Only content spans emit pending calls, in `_walk_content_span`.
+        if span.operation_name in {OP_INVOKE_AGENT, OP_EXECUTE_TOOL}:
             continue
-        pending.append(call)
+        for call in _output_tool_calls(span.output_messages):
+            # A `chat` span and its `assistant_text` child mirror the same call;
+            # the first copy owns it and the mirror is neither matched nor pending.
+            if call.id is not None and call.id in seen_call_ids:
+                continue
+            if call.id is not None:
+                seen_call_ids.add(call.id)
+            match = _first_unconsumed_tool_span(pool, consumed, call, span.started_at)
+            if match is None:
+                pending.setdefault(span.span_id, []).append(call)
+                continue
+            consumed.add(match.span_id)
 
     return pending
+
+
+def _first_unconsumed_tool_span(
+    pool: list[AgentSpanSchema],
+    consumed: set[str],
+    call: _OutputToolCall,
+    not_before: datetime | None,
+) -> AgentSpanSchema | None:
+    """First span in `pool` not yet consumed that ran `call`, else None."""
+    for tool_span in pool:
+        if tool_span.span_id in consumed:
+            continue
+        if _tool_span_ran(tool_span, call, not_before):
+            return tool_span
+
+    return None
 
 
 def _tool_span_ran(

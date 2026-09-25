@@ -211,7 +211,7 @@ def test_agent_chat_message_requires_matching_payload() -> None:
 
 
 def test_output_tool_call_without_a_tool_span_renders_as_pending() -> None:
-    """An LLM tool call no tool span ran is a result-less tool_call; one that ran is not repeated."""
+    """A tool call no span ran is a result-less tool_call; each tool span pairs with at most one call, by id or by name and time."""
 
     def at(seconds: int) -> datetime.datetime:
         return datetime.datetime(
@@ -261,7 +261,7 @@ def test_output_tool_call_without_a_tool_span_renders_as_pending() -> None:
     assert call.tool_arguments == '{"domains":["example.org"]}'
     assert call.tool_result is None
     assert call.status is None
-    assert pending[1].started_at == at(3)
+    assert pending[1].started_at == at(2)
 
     ran = _span(
         span_id="ran",
@@ -278,6 +278,75 @@ def test_output_tool_call_without_a_tool_span_renders_as_pending() -> None:
     ]
 
     assert [m.span_id for m in executed] == ["ran"]
+
+    ran_by_name = _span(
+        span_id="ran_by_name",
+        parent_span_id="agent",
+        operation_name="execute_tool",
+        tool_name="request_network_access",
+        tool_call_result="granted",
+        started_at=at(3),
+    )
+
+    matched_by_name = [
+        m
+        for m in build_chat_messages([root, llm, ran_by_name])
+        if m.type == "tool_call"
+    ]
+
+    assert [m.span_id for m in matched_by_name] == ["ran_by_name"]
+
+    two_calls = _parts(
+        {
+            "type": "tool_call",
+            "id": "call_1",
+            "name": "request_network_access",
+            "arguments": '{"domains":["example.org"]}',
+        },
+        {
+            "type": "tool_call",
+            "id": "call_2",
+            "name": "request_network_access",
+            "arguments": '{"domains":["example.org"]}',
+        },
+    )
+    llm_two = _span(
+        span_id="llm2",
+        parent_span_id="agent",
+        output_messages=[{"role": "assistant", "content": two_calls}],
+        output_tokens=40,
+        started_at=at(2),
+        ended_at=at(3),
+    )
+
+    one_to_one = [
+        m
+        for m in build_chat_messages([root, llm_two, ran_by_name])
+        if m.type == "tool_call"
+    ]
+
+    assert [m.span_id for m in one_to_one] == ["llm2", "ran_by_name"]
+    assert _tool_payload(one_to_one[0]).tool_result is None
+
+    mirror = _span(
+        span_id="mirror",
+        parent_span_id="llm",
+        operation_name="assistant_text",
+        output_messages=[{"role": "assistant", "content": approval}],
+        started_at=at(2),
+        ended_at=at(3),
+    )
+
+    mirrored = [
+        m for m in build_chat_messages([root, llm, mirror]) if m.type == "tool_call"
+    ]
+
+    assert [m.span_id for m in mirrored] == ["llm"]
+    assert [
+        m.span_id
+        for m in build_chat_messages([root, llm, mirror, ran])
+        if m.type == "tool_call"
+    ] == ["ran"]
 
 
 def test_full_agent_turn() -> None:
