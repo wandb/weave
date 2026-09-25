@@ -102,6 +102,14 @@ prevent request traffic from repeatedly calling an unavailable token endpoint.
 If the credentials file is not writable, the exchanged token remains cached
 in-process and credential persistence emits one warning per credentials object.
 
+### OTel SDK resource identity
+
+The Python conversation provider and Node GenAI provider identify their spans
+with `wandb.sdk.name = "weave"`, `wandb.sdk.version`, and
+`wandb.sdk.language` (`"python"` or `"node"`). SDK identity is an OTel Resource
+attribute, independent of `service.name`. Keep project routing in the exporter's
+`project_id` header so reinitialization can switch projects.
+
 ## Generated Files — Do Not Hand-Edit
 
 `weave/trace_server/model_providers/model_providers.json` and `weave/trace_server/costs/cost_checkpoint.json` are generated. Never edit them by hand — regenerate with `make update_model_providers` / `make update_costs` (see `weave/Makefile`).

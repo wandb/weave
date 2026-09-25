@@ -12,7 +12,7 @@ import {
   getWeaveTracerProviderProjectId,
   shutdownWeaveTracerProvider,
 } from '../../genai/provider';
-import {WEAVE_RESOURCE_ATTR} from '../../genai/weaveResource';
+import {WANDB_RESOURCE_ATTR} from '../../genai/wandbResource';
 import {OpLinkSpanProcessor} from '../../opLinkSpanProcessor';
 import {packageVersion} from '../../utils/packageVersion';
 
@@ -53,7 +53,7 @@ describe('otel/provider', () => {
     expect(getWeaveTracerProvider()).toBe(providerA);
   });
 
-  it('sets only the weave SDK resource attributes (no wandb.entity/project)', () => {
+  it('sets W&B SDK identity without project routing attributes', () => {
     installFakeClient();
     getWeaveTracer('weave-genai');
     const provider = getWeaveTracerProvider();
@@ -62,14 +62,15 @@ describe('otel/provider', () => {
     // against `wandb.entity`/`wandb.project` reappearing on the Resource, which
     // would misroute spans (the server ranks those above the project_id header).
     const attrs = provider!.resource.attributes;
-    const weaveOwned = Object.fromEntries(
+    const sdkAttrs = Object.fromEntries(
       Object.entries(attrs).filter(
         ([k]) => k.startsWith('weave.') || k.startsWith('wandb.')
       )
     );
-    expect(weaveOwned).toEqual({
-      [WEAVE_RESOURCE_ATTR.WEAVE_SDK_VERSION]: packageVersion,
-      [WEAVE_RESOURCE_ATTR.WEAVE_SDK_LANGUAGE]: 'node',
+    expect(sdkAttrs).toEqual({
+      'wandb.sdk.name': 'weave',
+      'wandb.sdk.version': packageVersion,
+      'wandb.sdk.language': 'node',
     });
   });
 
@@ -95,7 +96,13 @@ describe('otel/provider', () => {
     expect(finished[0].name).toBe('user-supplied-processor-span');
     // Resource attributes propagate from the provider to the exported span.
     expect(
-      finished[0].resource.attributes[WEAVE_RESOURCE_ATTR.WEAVE_SDK_LANGUAGE]
+      finished[0].resource.attributes[WANDB_RESOURCE_ATTR.WANDB_SDK_NAME]
+    ).toBe('weave');
+    expect(
+      finished[0].resource.attributes[WANDB_RESOURCE_ATTR.WANDB_SDK_VERSION]
+    ).toBe(packageVersion);
+    expect(
+      finished[0].resource.attributes[WANDB_RESOURCE_ATTR.WANDB_SDK_LANGUAGE]
     ).toBe('node');
   });
 

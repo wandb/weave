@@ -29,6 +29,7 @@ from weave.trace_server_bindings.caching_middleware_trace_server import (
 from weave.trace_server_bindings.client_interface import TraceServerClientInterface
 from weave.trace_server_bindings.remote_http_trace_server import RemoteHTTPTraceServer
 from weave.trace_server_version import MIN_TRACE_SERVER_VERSION
+from weave.version import VERSION
 from weave.wandb_interface.auth import (
     ApiKeyCredentials,
     WandbCredentials,
@@ -206,7 +207,14 @@ def _setup_conversation_tracing(
         return
 
     endpoint = otel_traces_endpoint(trace_server_url)
-    resource = Resource.create({"service.name": "weave-conversation-sdk"})
+    resource = Resource.create(
+        {
+            "service.name": "weave-conversation-sdk",
+            "wandb.sdk.name": "weave",
+            "wandb.sdk.version": VERSION,
+            "wandb.sdk.language": "python",
+        }
+    )
     exporter = OTLPSpanExporter(endpoint=endpoint, headers=headers)
     exporter._session.auth = (
         credentials.requests_auth() if credentials is not None else None
