@@ -7,8 +7,8 @@ import httpx
 import tenacity
 from typing_extensions import ParamSpec
 
+from weave.shared.errors import NotFoundError, ObjectDeletedError
 from weave.trace_server import trace_server_interface as tsi
-from weave.trace_server.errors import NotFoundError, ObjectDeletedError
 from weave.trace_server_bindings.async_batch_processor import AsyncBatchProcessor
 from weave.utils.retry import _http_response, _is_retryable_exception, with_retry
 
@@ -401,7 +401,7 @@ def retry_on_not_found(func: Callable[P, R]) -> Callable[P, R]:
 
 
 # Error code from server when project requires calls_complete mode
-# This matches the ErrorCode.CALLS_COMPLETE_MODE_REQUIRED from weave.trace_server.errors
+# This matches the ErrorCode.CALLS_COMPLETE_MODE_REQUIRED from weave.shared.errors
 ERROR_CODE_CALLS_COMPLETE_MODE_REQUIRED = "CALLS_COMPLETE_MODE_REQUIRED"
 
 
