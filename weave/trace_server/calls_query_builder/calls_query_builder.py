@@ -28,7 +28,7 @@ Outstanding Optimizations/Work:
 import logging
 import re
 from collections.abc import Callable, Collection, KeysView, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Any, Literal, cast
 
 from pydantic import BaseModel, Field
@@ -42,6 +42,15 @@ from weave.shared.trace_server_interface_util import (
 from weave.trace_server import ch_sentinel_values
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.calls_query_builder.cte import CTECollection
+from weave.trace_server.calls_query_builder.last_turn import (
+    LAST_TURN_COLUMN,
+    LAST_TURN_COST_PAGE_MAX_ROWS,
+    LAST_TURN_FIELD,
+    LAST_TURN_INPUT_COLUMNS,
+    LAST_TURN_MAX_BLOCK_SIZE,
+    last_turn_from_sql,
+    with_last_turn_sql_helpers,
+)
 from weave.trace_server.calls_query_builder.object_ref_query_builder import (
     ObjectRefCondition,
     ObjectRefOrderCondition,
@@ -315,10 +324,7 @@ class CallsMergedSummaryField(CallsMergedField):
         return f"{self.as_sql(pb, table_alias, use_agg_fn=use_agg_fn, read_table=read_table)} AS {safe_alias(self.field)}"
 
     def is_heavy(self) -> bool:
-        # These are computed from non-heavy fields (status uses exception and ended_at)
-        # If we add more summary fields that depend on heavy fields,
-        # this would need to be made more sophisticated
-        return False
+        return self.field == LAST_TURN_FIELD
 
 
 class CallsMergedFeedbackPayloadField(CallsMergedField):
@@ -639,6 +645,7 @@ class OrderField(BaseModel):
         field_to_object_join_alias_map: dict[str, str] | None = None,
         use_agg_fn: bool = True,
         read_table: "ReadTable" = ReadTable.CALLS_MERGED,
+        materialize: Callable[[str], str] | None = None,
     ) -> str:
         options: list[tuple[tsi_query.CastTo | None, str]]
         if isinstance(
@@ -670,11 +677,13 @@ class OrderField(BaseModel):
             )
             cte_alias = field_to_object_join_alias_map.get(order_condition.unique_key)
             if cte_alias:
-                return self._build_object_ref_order_sql(cte_alias, options, use_agg_fn)
+                return self._build_object_ref_order_sql(
+                    cte_alias, options, use_agg_fn, materialize
+                )
 
         # Standard field ordering logic
         return self._build_standard_order_sql(
-            pb, table_alias, options, use_agg_fn, read_table
+            pb, table_alias, options, use_agg_fn, read_table, materialize
         )
 
     def _build_object_ref_order_sql(
@@ -682,6 +691,7 @@ class OrderField(BaseModel):
         cte_alias: str,
         options: list[tuple[tsi_query.CastTo | None, str]],
         use_agg_fn: bool,
+        materialize: Callable[[str], str] | None = None,
     ) -> str:
         """Build ORDER BY SQL for object reference fields."""
         base_expr = f"{cte_alias}.object_val_dump"
@@ -694,7 +704,9 @@ class OrderField(BaseModel):
                 cast_sql = f"(NOT (JSONType({json_expr}) = 'Null' OR JSONType({json_expr}) IS NULL))"
             else:
                 cast_sql = clickhouse_cast(base_sql, cast_to)
-            parts.append(f"{cast_sql} {direction}")
+            parts.append(
+                f"{materialize(cast_sql) if materialize else cast_sql} {direction}"
+            )
         return ", ".join(parts)
 
     def _build_standard_order_sql(
@@ -704,6 +716,7 @@ class OrderField(BaseModel):
         options: list[tuple[tsi_query.CastTo | None, str]],
         use_agg_fn: bool,
         read_table: "ReadTable" = ReadTable.CALLS_MERGED,
+        materialize: Callable[[str], str] | None = None,
     ) -> str:
         """Build ORDER BY SQL for standard fields."""
         parts = []
@@ -728,7 +741,9 @@ class OrderField(BaseModel):
                 )
             else:
                 field_sql = self.field.as_sql(pb, table_alias, cast_to)
-            parts.append(f"{field_sql} {direction}")
+            parts.append(
+                f"{materialize(field_sql) if materialize else field_sql} {direction}"
+            )
         return ", ".join(parts)
 
     @property
@@ -751,6 +766,52 @@ class OrderField(BaseModel):
 class Condition(BaseModel):
     operand: "tsi_query.Operand"
     _consumed_fields: list[CallsMergedField] | None = None
+
+    def uses_last_turn(self) -> bool:
+        return any(
+            field.field == LAST_TURN_FIELD for field in self._get_consumed_fields()
+        )
+
+    def as_materialized_sql(
+        self,
+        pb: ParamBuilder,
+        table_alias: str,
+        materialize: Callable[[str], str],
+        expand_columns: list[str] | None,
+        field_to_object_join_alias_map: dict[str, str] | None,
+        use_agg_fn: bool,
+        read_table: "ReadTable",
+    ) -> str:
+        def visit(operand: tsi_query.Operand) -> str:
+            if isinstance(operand, tsi_query.AndOperation):
+                return combine_conditions([visit(op) for op in operand.and_], "AND")
+            if isinstance(operand, tsi_query.OrOperation):
+                return combine_conditions([visit(op) for op in operand.or_], "OR")
+            if isinstance(operand, tsi_query.NotOperation):
+                return f"NOT ({visit(operand.not_[0])})"
+            leaf = Condition(operand=operand)
+            if not leaf.uses_last_turn():
+                return materialize(
+                    leaf.as_sql(
+                        pb,
+                        table_alias,
+                        expand_columns,
+                        field_to_object_join_alias_map,
+                        use_agg_fn=use_agg_fn,
+                        read_table=read_table,
+                    )
+                )
+            result = process_query_to_conditions(
+                tsi_query.Query(expr_=operand),
+                pb,
+                table_alias,
+                use_agg_fn=use_agg_fn,
+                read_table=read_table,
+                materialize=materialize,
+            )
+            return combine_conditions(result.conditions, "AND")
+
+        return visit(self.operand)
 
     def as_sql(
         self,
@@ -1079,6 +1140,15 @@ class CallsQuery(BaseModel):
         # No predicate pushdown possible
         return False
 
+    def _format_sql(self, sql: str) -> str:
+        fields = [*self.select_fields, *(order.field for order in self.order_fields)]
+        for condition in self.query_conditions:
+            fields.extend(condition._get_consumed_fields())
+        # sqlparse's recursive reindent becomes prohibitively slow on nested JSON lambdas.
+        if any(field.field == LAST_TURN_FIELD for field in fields):
+            return sql
+        return safely_format_sql(sql, logger)
+
     def as_sql(self, pb: ParamBuilder, table_alias: str | None = None) -> str:
         """This is the main entry point for building the query.
 
@@ -1262,7 +1332,7 @@ class CallsQuery(BaseModel):
                 storage_scope_id_cte=storage_scope_cte_name,
             )
             if ctes.has_ctes():
-                return safely_format_sql(ctes.to_sql() + "\n" + base_sql, logger)
+                return self._format_sql(ctes.to_sql() + "\n" + base_sql)
             return base_sql
 
         if use_filter_cte:
@@ -1357,9 +1427,26 @@ class CallsQuery(BaseModel):
         if not self.include_costs:
             if ctes.has_ctes():
                 raw_sql = ctes.to_sql() + "\n" + base_sql
-                return safely_format_sql(raw_sql, logger)
+                return self._format_sql(raw_sql)
             return base_sql
 
+        if (
+            self.uses_last_turn()
+            and self.limit is not None
+            and self.limit <= LAST_TURN_COST_PAGE_MAX_ROWS
+        ):
+            page_fields = list(self.select_fields)
+            self._ensure_order_fields_selected(page_fields)
+            page_columns = [safe_alias(field.field) for field in page_fields]
+            unpack = ", ".join(
+                f"__lt_page_row.{index} AS {column}"
+                for index, column in enumerate(page_columns, 1)
+            )
+            # Materialize the bounded page before expanding the cost CTEs.
+            base_sql = (
+                f"SELECT {unpack} FROM (SELECT arrayJoin((SELECT "
+                f"groupArray(tuple({', '.join(page_columns)})) FROM ({base_sql}))) AS __lt_page_row)"
+            )
         ctes.add_cte(CTE_ALL_CALLS, base_sql)
         self._add_cost_ctes_to_builder(ctes, pb)
 
@@ -1369,7 +1456,7 @@ class CallsQuery(BaseModel):
         )
 
         raw_sql = ctes.to_sql() + "\n" + final_select
-        return safely_format_sql(raw_sql, logger)
+        return self._format_sql(raw_sql)
 
     def _add_cost_ctes_to_builder(self, ctes: CTECollection, pb: ParamBuilder) -> None:
         cost_cte_list = build_cost_ctes(pb, CTE_ALL_CALLS, self.project_id)
@@ -1787,6 +1874,8 @@ class CallsQuery(BaseModel):
         expand_columns: list[str] | None = None,
         storage_scope_id_cte: str | None = None,
         page_started_at_bound: bool = False,
+        filter_override: FilterConditionsResult | None = None,
+        order_override: OrderLimitOffsetResult | None = None,
     ) -> QueryBodyResult:
         """Build the SQL query body: everything from FROM through OFFSET.
 
@@ -1806,13 +1895,13 @@ class CallsQuery(BaseModel):
         Returns:
             SQL query body string (FROM through OFFSET, not formatted)
         """
-        filter_result = self._build_filter_conditions(
+        filter_result = filter_override or self._build_filter_conditions(
             pb, table_alias, expand_columns, field_to_object_join_alias_map
         )
         where_filters = self._build_where_clause_optimizations(
             pb, table_alias, expand_columns, id_subquery_name, page_started_at_bound
         )
-        order_result = self._build_order_limit_offset(
+        order_result = order_override or self._build_order_limit_offset(
             pb, table_alias, expand_columns, field_to_object_join_alias_map
         )
         project_param = pb.add_param(self.project_id)
@@ -1934,6 +2023,137 @@ class CallsQuery(BaseModel):
             expand_columns=self.expand_columns,
         )
 
+    def uses_last_turn(self) -> bool:
+        return (
+            any(field.field == LAST_TURN_FIELD for field in self.select_fields)
+            or any(order.field.field == LAST_TURN_FIELD for order in self.order_fields)
+            or any(condition.uses_last_turn() for condition in self.query_conditions)
+        )
+
+    def _as_sql_last_turn(
+        self,
+        pb: ParamBuilder,
+        table_alias: str,
+        id_subquery_name: str | None,
+        field_to_object_join_alias_map: dict[str, str] | None,
+        expand_columns: list[str] | None,
+        storage_scope_id_cte: str | None,
+        page_started_at_bound: bool,
+    ) -> str:
+        derived_sql = _handle_last_turn_text_summary_field(
+            pb, table_alias, self.use_agg_fn, self.read_table
+        )
+        dependencies: dict[str, str] = {}
+
+        def materialize(sql: str) -> str:
+            if sql == derived_sql:
+                return LAST_TURN_COLUMN
+            if sql not in dependencies:
+                dependencies[sql] = f"__lt_dependency_{len(dependencies)}"
+            return dependencies[sql]
+
+        deferred = [c for c in self.query_conditions if c.uses_last_turn()]
+        outer_filters = [
+            c.as_materialized_sql(
+                pb,
+                table_alias,
+                materialize,
+                expand_columns,
+                field_to_object_join_alias_map,
+                self.use_agg_fn,
+                self.read_table,
+            )
+            for c in deferred
+        ]
+        outer_order = [
+            order.as_sql(
+                pb,
+                table_alias,
+                expand_columns,
+                field_to_object_join_alias_map,
+                use_agg_fn=self.use_agg_fn,
+                read_table=self.read_table,
+                materialize=materialize,
+            )
+            for order in self.order_fields
+        ]
+        filter_result = self._build_filter_conditions(
+            pb, table_alias, expand_columns, field_to_object_join_alias_map
+        )
+        order_result = self._build_order_limit_offset(
+            pb, table_alias, expand_columns, field_to_object_join_alias_map
+        )
+        inner = self.model_copy(
+            update={
+                "query_conditions": [
+                    c for c in self.query_conditions if not c.uses_last_turn()
+                ]
+            }
+        )
+        inner_filters = inner._build_filter_conditions(
+            pb, table_alias, expand_columns, field_to_object_join_alias_map
+        )
+        push_page = (
+            not deferred
+            and not any(
+                order.field.field == LAST_TURN_FIELD for order in self.order_fields
+            )
+            and not (filter_result.needs_feedback or order_result.needs_feedback)
+        )
+        body = self._build_query_body(
+            pb,
+            table_alias,
+            id_subquery_name,
+            field_to_object_join_alias_map,
+            expand_columns,
+            storage_scope_id_cte,
+            page_started_at_bound,
+            filter_override=replace(filter_result, filter_sql=inner_filters.filter_sql),
+            order_override=order_result
+            if push_page
+            else replace(order_result, order_by_sql="", limit_sql="", offset_sql=""),
+        )
+        inner_columns = [
+            field.as_select_sql(
+                pb, table_alias, use_agg_fn=self.use_agg_fn, read_table=self.read_table
+            )
+            for field in self.select_fields
+            if field.field != LAST_TURN_FIELD
+        ]
+        for field_name, alias in zip(
+            ("inputs_dump", "output_dump", "attributes_dump", "otel_dump"),
+            LAST_TURN_INPUT_COLUMNS,
+            strict=True,
+        ):
+            field = cast(CallsMergedAggField, get_field_by_name(field_name))
+            sql = CallsMergedAggField.as_sql(
+                field, pb, table_alias, use_agg_fn=self.use_agg_fn
+            )
+            inner_columns.append(f"{sql} AS {alias}")
+        inner_columns.extend(f"{sql} AS {alias}" for sql, alias in dependencies.items())
+        call_sql = f"SELECT {', '.join(inner_columns)} {body.sql}"
+        columns = [
+            f"{LAST_TURN_COLUMN} AS {safe_alias(field.field)}"
+            if field.field == LAST_TURN_FIELD
+            else safe_alias(field.field)
+            for field in self.select_fields
+        ]
+        distinct = (
+            "DISTINCT"
+            if self.read_table == ReadTable.CALLS_COMPLETE and body.needs_feedback_join
+            else ""
+        )
+        where = (
+            "WHERE " + combine_conditions(outer_filters, "AND") if outer_filters else ""
+        )
+        order = "ORDER BY " + ", ".join(outer_order) if outer_order else ""
+        limit = "" if push_page else order_result.limit_sql
+        offset = "" if push_page else order_result.offset_sql
+        return with_last_turn_sql_helpers(
+            f"SELECT {distinct} {', '.join(columns)} {last_turn_from_sql(call_sql)} "
+            f"{where} {order} {limit} {offset}"
+        )
+
     def _as_sql_base_format(
         self,
         pb: ParamBuilder,
@@ -1961,6 +2181,16 @@ class CallsQuery(BaseModel):
         Returns:
             Complete SQL query string
         """
+        if self.uses_last_turn():
+            return self._as_sql_last_turn(
+                pb,
+                table_alias,
+                id_subquery_name,
+                field_to_object_join_alias_map,
+                expand_columns,
+                storage_scope_id_cte,
+                page_started_at_bound,
+            )
         select_fields_sql = ", ".join(
             field.as_select_sql(
                 pb, table_alias, use_agg_fn=self.use_agg_fn, read_table=self.read_table
@@ -1987,7 +2217,7 @@ class CallsQuery(BaseModel):
         SELECT {distinct} {select_fields_sql}
         {body_result.sql}
         """
-        return safely_format_sql(raw_sql, logger)
+        return self._format_sql(raw_sql)
 
 
 STORAGE_SIZE_TABLE_NAME = "storage_size_tbl"
@@ -2232,11 +2462,21 @@ def _handle_trace_name_summary_field(
     END"""
 
 
+def _handle_last_turn_text_summary_field(
+    pb: ParamBuilder,
+    table_alias: str,
+    use_agg_fn: bool = True,
+    read_table: "ReadTable" = ReadTable.CALLS_MERGED,
+) -> str:
+    return LAST_TURN_COLUMN
+
+
 # Map of summary fields to their handler functions
 SUMMARY_FIELD_HANDLERS = {
     "status": _handle_status_summary_field,
     "latency_ms": _handle_latency_ms_summary_field,
     "trace_name": _handle_trace_name_summary_field,
+    "last_turn_text": _handle_last_turn_text_summary_field,
 }
 
 
@@ -2315,10 +2555,12 @@ def process_query_to_conditions(
     table_alias: str,
     use_agg_fn: bool = True,
     read_table: "ReadTable" = ReadTable.CALLS_MERGED,
+    materialize: Callable[[str], str] | None = None,
 ) -> FilterToConditions:
     """Converts a Query to a list of conditions for a clickhouse query."""
     conditions = []
     raw_fields_used: dict[str, CallsMergedField] = {}
+    field_sql = materialize or (lambda sql: sql)
 
     # This is the mongo-style query
     def process_operation(operation: tsi_query.Operation) -> str:
@@ -2336,11 +2578,13 @@ def process_query_to_conditions(
             structured_field = get_field_by_name(operand.get_field_)
             if isinstance(structured_field, CallsMergedDynamicField):
                 raw_fields_used[structured_field.field] = structured_field
-                return structured_field.as_sql(
-                    param_builder,
-                    table_alias,
-                    cast=cast,
-                    use_agg_fn=use_agg_fn,
+                return field_sql(
+                    structured_field.as_sql(
+                        param_builder,
+                        table_alias,
+                        cast=cast,
+                        use_agg_fn=use_agg_fn,
+                    )
                 )
             if (
                 isinstance(structured_field, CallsMergedFeedbackPayloadField)
@@ -2348,11 +2592,13 @@ def process_query_to_conditions(
                 and not structured_field.is_multi_value
             ):
                 raw_fields_used[structured_field.field] = structured_field
-                return structured_field.as_sql(
-                    param_builder,
-                    table_alias,
-                    cast=cast,
-                    use_agg_fn=use_agg_fn,
+                return field_sql(
+                    structured_field.as_sql(
+                        param_builder,
+                        table_alias,
+                        cast=cast,
+                        use_agg_fn=use_agg_fn,
+                    )
                 )
             return None
 
@@ -2395,7 +2641,7 @@ def process_query_to_conditions(
             ops = _maybe_convert_datetime_operands(operation.eq_)
             mv_field = _get_multi_value_feedback_field(ops[0]) if use_agg_fn else None
             if mv_field is not None:
-                array_expr = mv_field.as_array_sql(param_builder)
+                array_expr = field_sql(mv_field.as_array_sql(param_builder))
                 raw_fields_used[mv_field.feedback_type] = mv_field
                 if (
                     isinstance(ops[1], tsi_query.LiteralOperation)
@@ -2455,7 +2701,7 @@ def process_query_to_conditions(
                 else None
             )
             if mv_field is not None:
-                array_expr = mv_field.as_array_sql(param_builder)
+                array_expr = field_sql(mv_field.as_array_sql(param_builder))
                 rhs_part = process_operand(operation.contains_.substr)
                 raw_fields_used[mv_field.feedback_type] = mv_field
                 position_operation = "position"
@@ -2508,7 +2754,7 @@ def process_query_to_conditions(
             else:
                 field = structured_field.as_sql(param_builder, table_alias)
             raw_fields_used[structured_field.field] = structured_field
-            return field
+            return field_sql(field)
         elif isinstance(operand, tsi_query.ConvertOperation):
             field = process_operand(operand.convert_.input)
             return clickhouse_cast(field, operand.convert_.to)
@@ -3055,6 +3301,8 @@ def build_calls_stats_query(
         "has_more": "toUInt8(0)",
     }
     settings: dict[str, int | str] = {}
+    if _build_stats_calls_query(req, read_table).uses_last_turn():
+        settings["max_block_size"] = LAST_TURN_MAX_BLOCK_SIZE
 
     if opt_query := _try_optimized_stats_query(req, param_builder, read_table):
         return (opt_query, aggregated_columns.keys(), settings)
@@ -3075,7 +3323,10 @@ def build_calls_stats_query(
     # For calls_complete, use a flat query (10x+ faster, avoids subquery materialization):
     #   Fast:  SELECT count() FROM calls_complete WHERE ...
     #   Slow:  SELECT count() FROM (SELECT id FROM calls_complete WHERE ...)
-    if read_table == ReadTable.CALLS_COMPLETE:
+    if (
+        read_table == ReadTable.CALLS_COMPLETE
+        and not _build_stats_calls_query(req, read_table).uses_last_turn()
+    ):
         query = _build_calls_complete_stats_query(
             req, param_builder, aggregated_columns
         )
@@ -3186,7 +3437,7 @@ def _build_calls_complete_stats_query(
     SELECT {stats_select}
     {body_result.sql}
     """
-    return safely_format_sql(raw_sql, logger)
+    return cq._format_sql(raw_sql)
 
 
 def _try_optimized_stats_query(

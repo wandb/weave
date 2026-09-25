@@ -164,13 +164,19 @@ def make_derived_summary_fields(
     used to store derived fields, adhering to the tsi.SummaryMap type.
     """
     weave_summary = summary.pop("weave", {})
-    # Server-derived fields are recomputed below — discard any stored values
+    # Server-derived fields are recomputed below or supplied by the query; discard stored values
     # so historically-malformed rows (e.g. a list-shaped `trace_name` written
     # by an earlier rescore-worker bug that copied `summary["weave"]` from a
     # source call into a synthetic child, where `sum_dict_leaves` then bubbled
     # the string up into the parent as a list) don't escape CallSchema
-    # validation. These keys are owned by this function alone.
-    for derived_key in ("status", "trace_name", "latency_ms", "display_name"):
+    # validation. These keys are owned by the server.
+    for derived_key in (
+        "status",
+        "trace_name",
+        "latency_ms",
+        "display_name",
+        "last_turn_text",
+    ):
         weave_summary.pop(derived_key, None)
 
     status = tsi.TraceStatus.SUCCESS
