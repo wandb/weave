@@ -1,6 +1,6 @@
 # Weave
 
-Weave is a library for tracing and monitoring AI applications.
+Weave is a library for tracing and monitoring AI agents.
 
 ## Installation
 
@@ -10,9 +10,7 @@ You can install Weave via npm:
 npm install weave
 ```
 
-Ensure you have a wandb API key in ~/.netrc.
-
-Like
+Put a wandb API key in `~/.netrc`, or set `WANDB_API_KEY`.
 
 ```
 machine api.wandb.ai
@@ -20,9 +18,15 @@ machine api.wandb.ai
   password <wandb-api-key>
 ```
 
-Get your wandb API key from [here](https://wandb.ai/authorize).
+Get your wandb API key from [here](https://wandb.ai/authorize). The example below also needs `OPENAI_API_KEY`.
 
 ## Quickstart
+
+This example uses the OpenAI Agents SDK. Weave autopatches it. Traces land in the **Agents** tab, not the Calls tab.
+
+```bash
+npm install weave @openai/agents zod
+```
 
 Put this in a file called `main.mjs`:
 
@@ -96,17 +100,19 @@ and then run
 node --import=weave/instrument main.mjs
 ```
 
+ESM needs that `--import=weave/instrument` flag. For CommonJS, `require('weave')` before requiring the agent SDK; no preload flag is needed.
+
 ## Usage
 
 ### Initializing a Project
 
-Before you can start tracing your agent or application, you need to initialize a project.
+Before you can start tracing your agent or application, you need to initialize a project. `init` is async. Await it before any traced work.
 
 ```typescript
 import {init} from 'weave';
 
 // Initialize your project with a unique project name
-init('my-awesome-ai-project');
+await init('my-awesome-ai-project');
 ```
 
 ### Integrations
@@ -117,11 +123,13 @@ Import the library, call `weave.init(...)`, and Weave picks it up. For ESM proje
 
 #### Agent SDKs
 
-- [OpenAI Agents SDK](https://docs.wandb.ai/weave/guides/integrations/openai_agents) (`@openai/agents`, `@openai/agents-realtime`)
-- [Google Agent Development Kit (ADK)](https://docs.wandb.ai/weave/guides/integrations/google_adk) (`@google/adk`)
-- [Claude Agent SDK](https://docs.wandb.ai/weave/guides/integrations/claude_agent_sdk) (`@anthropic-ai/claude-agent-sdk`)
+- [OpenAI Agents SDK](https://docs.wandb.ai/weave/guides/integrations/agents/openai-agents-sdk) (`@openai/agents`, `@openai/agents-realtime`)
+- [Google Agent Development Kit (ADK)](https://docs.wandb.ai/weave/guides/integrations/agents/google-adk) (`@google/adk`)
+- [Claude Agent SDK](https://docs.wandb.ai/weave/guides/integrations/agents/claude-agents-sdk) (`@anthropic-ai/claude-agent-sdk`)
 
 #### LLM providers
+
+These land in the **Calls** tab, not the Agents tab. For the Agents tab from a model SDK, use the Conversation SDK below.
 
 - [OpenAI](https://docs.wandb.ai/weave/guides/integrations/openai) (`openai`)
 - [Anthropic](https://docs.wandb.ai/weave/guides/integrations/anthropic) (`@anthropic-ai/sdk`)
@@ -129,8 +137,44 @@ Import the library, call `weave.init(...)`, and Weave picks it up. For ESM proje
 
 #### Custom agents and OpenTelemetry
 
-- [Quickstart: Manually instrument an agent](https://docs.wandb.ai/weave/agent-integration-quickstart#custom-agents-and-opentelemetry)
-- [Trace your agents](https://docs.wandb.ai/weave/guides/tracking/tracing)
+- [Quickstart: Manually instrument an agent](https://docs.wandb.ai/weave/custom-agents-quickstart)
+- [Trace your agents](https://docs.wandb.ai/weave/guides/tracking/trace-agents)
+
+### Custom agents
+
+If you are not using a supported agent SDK, wrap your own loop. Group turns with `startConversation`. Create spans with `startTurn`, `startLLM`, and `startTool`. The class names `Conversation`, `Turn`, `LLM`, and `Tool` are types only; there is no `new Turn()`. `startSession` is deprecated. Close every span in `finally`.
+
+```javascript
+import * as weave from 'weave';
+
+await weave.init('<your-team>/<your-project-name>');
+
+const conversation = weave.startConversation({agentName: 'research-bot'});
+try {
+  const turn = weave.startTurn({
+    model: 'gpt-4o-mini',
+    userMessage: 'Who founded Anthropic?',
+  });
+  try {
+    const llm = weave.startLLM({model: 'gpt-4o-mini', providerName: 'openai'});
+    try {
+      llm.output('Anthropic was founded by former OpenAI researchers.');
+      llm.record({
+        usage: {inputTokens: 12, outputTokens: 9},
+        responseModel: 'gpt-4o-mini',
+      });
+    } finally {
+      llm.end();
+    }
+  } finally {
+    turn.end();
+  }
+} finally {
+  conversation.end();
+}
+```
+
+`startLLM` throws if no turn is open. For a short-lived process, call `await weave.flushOTel()` before exit or the last spans may not export. A longer loop with tools is in the [custom agents quickstart](https://docs.wandb.ai/weave/custom-agents-quickstart).
 
 ### Evaluations
 
@@ -231,4 +275,3 @@ Get your wandb API key from [here](https://wandb.ai/authorize).
 ## License
 
 This project is licensed under the Apache2 License - see the [LICENSE](../../LICENSE) file for details.
-
