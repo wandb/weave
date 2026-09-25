@@ -12,6 +12,10 @@ import re
 from weave.trace_server.opentelemetry.constants import INPUT_KEYS, OUTPUT_KEYS
 
 LAST_TURN_FIELD = "summary.weave.last_turn_text"
+LAST_TURN_MAX_BLOCK_SIZE = 256
+LAST_TURN_COST_PAGE_MAX_ROWS = 1000
+LAST_TURN_COLUMN = "__weave_last_turn_text"
+LAST_TURN_INPUT_COLUMNS = ("__lt_inputs", "__lt_output", "__lt_attributes", "__lt_otel")
 
 
 def _bind(name: str, value: str, body: str) -> str:
@@ -102,12 +106,7 @@ def with_last_turn_sql_helpers(sql: str) -> str:
     safe_json = (
         "if(match(raw, '[0-9]{20}'), arrayStringConcat(arrayMap(token -> "
         "if(match(token, '^-?[0-9]{20,}$'), "
-        + _bind(
-            "number",
-            "toString(toFloat64OrZero(token))",
-            "if(position(number, 'e') > 0, number, concat(number, 'e0'))",
-        )
-        + ", token), "
+        "replaceRegexpOne(toString(toFloat64OrZero(token)), '^([^e]+)$', '\\\\1e0'), token), "
         + _tokens("raw")
         + ")), raw)"
     )
@@ -343,6 +342,13 @@ def _agent_messages(source: str) -> str:
 
 
 def _responses_messages(source: str) -> str:
+    retained = _bind(
+        "items",
+        "JSONExtractArrayRaw(response_input)",
+        "if(JSONExtractString(items[-1], 'role') != 'tool' AND "
+        "arrayAll(m -> NOT JSONHas(m, 'type') AND JSONType(m, 'role') = 'String' "
+        "AND JSONType(m, 'content') = 'String', items), arraySlice(items, -1), items)",
+    )
     tools = _tool(
         "JSONExtractString(m, 'call_id')",
         "JSONExtractString(m, 'name')",
@@ -375,7 +381,8 @@ def _responses_messages(source: str) -> str:
         f"arrayMap(m -> {message}, arrayFilter(m -> "
         "JSONExtractString(m, 'type') IN ('message', 'function_call', 'mcp_call') OR "
         "(NOT JSONHas(m, 'type') AND JSONHas(m, 'role') AND JSONHas(m, 'content')), "
-        "JSONExtractArrayRaw(response_input))))",
+        + retained
+        + ")))",
     )
 
 
@@ -696,6 +703,13 @@ def _google_valid() -> str:
 
 
 def _normalized_messages() -> str:
+    raw_messages = _bind(
+        "items",
+        "JSONExtractArrayRaw(i, 'messages')",
+        "arrayMap(m -> "
+        + _raw_message()
+        + ", if(JSONExtractString(items[-1], 'role') = 'tool', items, arraySlice(items, -1)))",
+    )
     otel_key = (
         "arrayFirst(k -> JSONHas(i, k), ["
         + ", ".join(f"'{key}'" for key in INPUT_KEYS)
@@ -788,9 +802,9 @@ def _normalized_messages() -> str:
         + _truthy("o")
         + " OR NOT "
         + _truthy("i")
-        + ", arrayMap(m -> "
-        + _raw_message()
-        + ", JSONExtractArrayRaw(i, 'messages')), "
+        + ", "
+        + raw_messages
+        + ", "
         "arrayExists(m -> JSONType(m) = 'Null', JSONExtractArrayRaw(o, 'messages')), [], "
         "arrayExists(m -> JSONExtractString(m, 'role') = 'result' OR (JSONExtractString(m, 'role') = 'system' AND JSONExtractString(m, 'subtype') = 'init'), JSONExtractArrayRaw(o, 'messages')), "
         + _agent_messages("JSONExtractArrayRaw(o, 'messages')")
@@ -813,8 +827,7 @@ def _normalized_messages() -> str:
     return source
 
 
-def last_turn_text_sql(inputs: str, output: str, attributes: str, otel: str) -> str:
-    """Return a Nullable(String) expression over the assembled logical call."""
+def _selected_message() -> str:
     tool_text = _join("arrayMap(tc -> tc.2, m.4)")
     trailing = "arraySlice(messages, arrayLastIndex(m -> m.1 != 'tool', messages) + 1)"
     invoking_indices = (
@@ -838,21 +851,27 @@ def last_turn_text_sql(inputs: str, output: str, attributes: str, otel: str) -> 
         "messages[-1]",
         "if(isNull(m.2), NULL, " + _join(f"[m.2, {tool_text}]") + ")",
     )
-    selected = _bind(
-        "messages",
-        _normalized_messages(),
-        f"if(messages[-1].1 = 'tool', {tool_group}, {single})",
-    )
-    projected = _bind(
-        "selected",
-        selected,
+    return f"if(messages[-1].1 = 'tool', {tool_group}, {single})"
+
+
+def _projected_text() -> str:
+    return (
         "if(isNull(selected), NULL, nullIf(arrayStringConcat(arrayMap((part, idx) -> "
         "if(idx % 2 = 1, part, multiIf(part = '', char(0), startsWith(part, 'P'), __weave_last_turn_pretty_json(base64Decode(substring(part, 2))), "
         "__weave_last_turn_json(base64Decode(substring(part, 2))))), splitByChar(char(0), assumeNotNull(selected)), "
-        "arrayEnumerate(splitByChar(char(0), assumeNotNull(selected))))), ''))",
+        "arrayEnumerate(splitByChar(char(0), assumeNotNull(selected))))), ''))"
     )
-    return (
-        f"arrayMap((i, o, a, otel) -> {_prepare_json_reads(projected)}, [__weave_last_turn_safe_json(ifNull({inputs}, '{{}}'))], "
-        f"[__weave_last_turn_safe_json(ifNull({output}, 'null'))], [__weave_last_turn_safe_json(ifNull({attributes}, '{{}}'))], "
-        f"[ifNull({otel}, '')])[1]"
+
+
+def last_turn_from_sql(call_sql: str) -> str:
+    """Evaluate each stage once; singleton ARRAY JOINs preserve call cardinality."""
+    return f"""FROM (
+        SELECT *, __weave_last_turn_safe_json(ifNull(__lt_inputs, '{{}}')) AS i,
+            __weave_last_turn_safe_json(ifNull(__lt_output, 'null')) AS o,
+            __weave_last_turn_safe_json(ifNull(__lt_attributes, '{{}}')) AS a,
+            ifNull(__lt_otel, '') AS otel
+        FROM ({call_sql})
     )
+    ARRAY JOIN [{_prepare_json_reads(_normalized_messages())}] AS messages
+    ARRAY JOIN [{_prepare_json_reads(_selected_message())}] AS selected
+    ARRAY JOIN [{_projected_text()}] AS {LAST_TURN_COLUMN}"""

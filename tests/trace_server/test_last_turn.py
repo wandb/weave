@@ -248,11 +248,27 @@ def test_filter_sort_and_paginate(last_turn_server, include_costs):
     null_calls = _query(
         last_turn_server,
         columns=[LAST_TURN_FIELD],
+        include_costs=include_costs,
+        limit=1,
         query={"$expr": {"$eq": [{"$getField": LAST_TURN_FIELD}, {"$literal": None}]}},
     )
     assert [(c.id, c.summary["weave"]["last_turn_text"]) for c in null_calls] == [
         (ids[3], None)
     ]
+    assert (
+        _query(
+            last_turn_server,
+            columns=[LAST_TURN_FIELD],
+            include_costs=include_costs,
+            limit=1,
+            query={
+                "$expr": {
+                    "$eq": [{"$getField": LAST_TURN_FIELD}, {"$literal": "absent"}]
+                }
+            },
+        )
+        == []
+    )
 
 
 def test_default_projection_is_unchanged(last_turn_server):
@@ -312,3 +328,135 @@ def test_agent_output_from_separate_call_parts(trace_server, ch_server):
     assert [(c.id, c.inputs, c.summary["weave"]["last_turn_text"]) for c in calls] == [
         (call.id, {"prompt": "original"}, "final answer")
     ]
+
+
+def test_staged_mixed_filters_and_pagination(last_turn_server):
+    ids = [
+        _insert(
+            last_turn_server,
+            {
+                "score": score,
+                "expected": expected,
+                "messages": [{"role": "user", "content": text}],
+            },
+            index=index,
+        )
+        for index, (text, score, expected) in enumerate(
+            [("alpha", 30, "alpha"), ("beta", 20, "different"), ("gamma", 10, "gamma")]
+        )
+    ]
+    calls = _query(
+        last_turn_server,
+        columns=[LAST_TURN_FIELD],
+        sort_by=[{"field": "inputs.score", "direction": "asc"}],
+        limit=1,
+        offset=1,
+    )
+    assert [(c.id, c.summary["weave"]["last_turn_text"]) for c in calls] == [
+        (ids[1], "beta")
+    ]
+    query = {
+        "$expr": {
+            "$or": [
+                {"$eq": [{"$getField": LAST_TURN_FIELD}, {"$literal": "alpha"}]},
+                {
+                    "$and": [
+                        {"$gt": [{"$getField": "inputs.score"}, {"$literal": 15}]},
+                        {
+                            "$not": [
+                                {
+                                    "$eq": [
+                                        {"$getField": LAST_TURN_FIELD},
+                                        {"$literal": "gamma"},
+                                    ]
+                                }
+                            ]
+                        },
+                    ]
+                },
+            ]
+        }
+    }
+    calls = _query(
+        last_turn_server,
+        columns=["id"],
+        query=query,
+        sort_by=[
+            {"field": "inputs.score", "direction": "asc"},
+            {"field": LAST_TURN_FIELD, "direction": "desc"},
+        ],
+        limit=1,
+        offset=1,
+    )
+    assert [c.id for c in calls] == [ids[0]]
+    assert (
+        last_turn_server.calls_query_stats(
+            tsi.CallsQueryStatsReq(project_id="shawn/test-project", query=query)
+        ).count
+        == 2
+    )
+    calls = _query(
+        last_turn_server,
+        columns=["id"],
+        query={
+            "$expr": {
+                "$eq": [
+                    {"$getField": LAST_TURN_FIELD},
+                    {"$getField": "inputs.expected"},
+                ]
+            }
+        },
+    )
+    assert {c.id for c in calls} == {ids[0], ids[2]}
+    calls = _query(
+        last_turn_server,
+        columns=[LAST_TURN_FIELD],
+        query={
+            "$expr": {"$eq": [{"$getField": LAST_TURN_FIELD}, {"$literal": "absent"}]}
+        },
+    )
+    assert calls == []
+
+
+def test_staged_feedback_deduplication(last_turn_server):
+    call_id = _insert(
+        last_turn_server, {"messages": [{"role": "user", "content": "alpha"}]}
+    )
+    for user in ("alice", "bob"):
+        last_turn_server.feedback_create(
+            tsi.FeedbackCreateReq(
+                project_id="shawn/test-project",
+                weave_ref=f"weave:///shawn/test-project/call/{call_id}",
+                feedback_type="wandb.reaction.1",
+                payload={"emoji": "👍"},
+                wb_user_id=user,
+            )
+        )
+    query = {
+        "$expr": {
+            "$or": [
+                {"$eq": [{"$getField": LAST_TURN_FIELD}, {"$literal": "alpha"}]},
+                {
+                    "$eq": [
+                        {"$getField": "feedback.[wandb.reaction.1].payload.emoji"},
+                        {"$literal": "👍"},
+                    ]
+                },
+            ]
+        }
+    }
+    calls = _query(
+        last_turn_server,
+        columns=[LAST_TURN_FIELD],
+        query=query,
+        sort_by=[{"field": LAST_TURN_FIELD, "direction": "asc"}],
+    )
+    assert [(c.id, c.summary["weave"]["last_turn_text"]) for c in calls] == [
+        (call_id, "alpha")
+    ]
+    assert (
+        last_turn_server.calls_query_stats(
+            tsi.CallsQueryStatsReq(project_id="shawn/test-project", query=query)
+        ).count
+        == 1
+    )

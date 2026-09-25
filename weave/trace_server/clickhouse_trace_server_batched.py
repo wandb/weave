@@ -115,7 +115,10 @@ from weave.trace_server.calls_query_builder.calls_query_builder import (
     build_calls_stats_query,
     combine_conditions,
 )
-from weave.trace_server.calls_query_builder.last_turn import LAST_TURN_FIELD
+from weave.trace_server.calls_query_builder.last_turn import (
+    LAST_TURN_FIELD,
+    LAST_TURN_MAX_BLOCK_SIZE,
+)
 from weave.trace_server.calls_query_builder.monitor_query_validation import (
     validate_monitor_query_fields,
 )
@@ -1964,6 +1967,9 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             settings = ch_settings.update_settings_for_calls_complete_read(settings)
             if req.latest_only:
                 settings = {**settings, "final": 1}
+
+        if cq.uses_last_turn():
+            settings = {**(settings or {}), "max_block_size": LAST_TURN_MAX_BLOCK_SIZE}
 
         pb = ParamBuilder()
         raw_res = self._query_stream(cq.as_sql(pb), pb.get_params(), settings=settings)
