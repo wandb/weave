@@ -2098,3 +2098,34 @@ def test_list_sends_limit_and_offset(
         expected_path,
     )
     assert dict(mock_server.requests[0].url.params) == {"limit": "10", "offset": "5"}
+
+
+def test_call_stats_returns_a_populated_bucket_unchanged():
+    """Test that a bucket survives the generated client with every key intact."""
+    bucket = {
+        "timestamp": "2026-08-20T00:00:00+00:00",
+        "model": "gpt-4o",
+        "count": 2,
+        "count_input_tokens": 2,
+        "sum_input_tokens": 1200.0,
+        "max_total_tokens": None,
+    }
+    mock_server = _mock_server(
+        httpx.Response(
+            200,
+            json={
+                "start": "2026-08-20T00:00:00Z",
+                "end": "2026-08-21T00:00:00Z",
+                "granularity": 3600,
+                "timezone": "UTC",
+                "usage_buckets": [bucket],
+                "call_buckets": [],
+            },
+        )
+    )
+
+    res = mock_server.server.call_stats(
+        tsi.CallStatsReq(project_id=PROJECT, start=START, end=END)
+    )
+
+    assert res.usage_buckets == [bucket]
