@@ -675,15 +675,11 @@ allow_indirect_imports = true
 # TEMPORARY: existing client -> trace_server imports to untangle. Do not add.
 # Most of these reach for the server's interface/contract surface
 # (trace_server_interface, service_interface, common_interface, interface.*,
-# constants, errors, ids) — the natural target to extract into a neutral
-# contract package as untangling proceeds.
+# errors) — the natural target to extract into a neutral contract package as
+# untangling proceeds.
 ignore_imports = [
-  "weave.chat.completions -> weave.trace_server.constants",
-  "weave.chat.inference_models -> weave.trace_server.constants",
   "weave.durability.wal_sender -> weave.trace_server.trace_server_interface",
-  "weave.evaluation.eval -> weave.trace_server.constants",
   "weave.evaluation.eval -> weave.trace_server.trace_server_interface",
-  "weave.evaluation.otel_eval_linker -> weave.trace_server.constants",
   "weave.flow.annotation_spec -> weave.trace_server.interface.builtin_object_classes.annotation_spec",
   "weave.flow.leaderboard -> weave.trace_server.interface.builtin_object_classes.leaderboard",
   "weave.flow.leaderboard -> weave.trace_server.trace_server_interface",
@@ -692,13 +688,10 @@ ignore_imports = [
   "weave.flow.saved_view -> weave.trace_server.interface.builtin_object_classes.saved_view",
   "weave.flow.saved_view -> weave.trace_server.interface.query",
   "weave.flow.saved_view -> weave.trace_server.trace_server_interface",
-  "weave.integrations.integration_utilities -> weave.trace_server.constants",
   "weave.scorers.llm_as_a_judge_scorer -> weave.trace_server.interface.builtin_object_classes.llm_structured_model",
-  "weave.trace.api -> weave.trace_server.ids",
   "weave.trace.api -> weave.trace_server.interface.builtin_object_classes.leaderboard",
   "weave.trace.base_objects -> weave.trace_server.interface.builtin_object_classes.builtin_object_registry",
   "weave.trace.call -> weave.trace_server.common_interface",
-  "weave.trace.call -> weave.trace_server.constants",
   "weave.trace.call -> weave.trace_server.interface.query",
   "weave.trace.call -> weave.trace_server.trace_server_interface",
   "weave.trace.casting -> weave.trace_server.common_interface",
@@ -716,9 +709,7 @@ ignore_imports = [
   "weave.trace.vals -> weave.trace_server.errors",
   "weave.trace.vals -> weave.trace_server.trace_server_interface",
   "weave.trace.weave_client -> weave.trace_server.common_interface",
-  "weave.trace.weave_client -> weave.trace_server.constants",
   "weave.trace.weave_client -> weave.trace_server.errors",
-  "weave.trace.weave_client -> weave.trace_server.ids",
   "weave.trace.weave_client -> weave.trace_server.interface.feedback_types",
   "weave.trace.weave_client -> weave.trace_server.trace_server_converter",
   "weave.trace.weave_client -> weave.trace_server.trace_server_interface",
@@ -735,13 +726,10 @@ ignore_imports = [
   "weave.trace_server_bindings.link_asset_to_registry -> weave.trace_server.common_interface",
   "weave.trace_server_bindings.models -> weave.trace_server.trace_server_interface",
   "weave.trace_server_bindings.remote_http_trace_server -> weave.trace_server.http_service_interface",
-  "weave.trace_server_bindings.remote_http_trace_server -> weave.trace_server.ids",
   "weave.trace_server_bindings.remote_http_trace_server -> weave.trace_server.service_interface",
   "weave.trace_server_bindings.remote_http_trace_server -> weave.trace_server.trace_server_interface",
-  "weave.trace_server_bindings.stainless_remote_http_trace_server -> weave.trace_server.ids",
   "weave.trace_server_bindings.stainless_remote_http_trace_server -> weave.trace_server.service_interface",
   "weave.trace_server_bindings.stainless_remote_http_trace_server -> weave.trace_server.trace_server_interface",
-  "weave.utils.retry -> weave.trace_server.ids",
 ]
 
 [[tool.importlinter.contracts]]
