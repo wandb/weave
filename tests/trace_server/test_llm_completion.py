@@ -2470,5 +2470,51 @@ def test_custom_streaming_completion_supports_header_auth_without_api_key(
     assert captured_requests[0].headers["X-API-Key"] == "header-secret"
 
 
+@pytest.mark.parametrize(
+    ("aws_region_name", "model_name", "expected_model_prefix"),
+    [
+        # ap-* regions must use "apac" prefix, not "ap"
+        ("ap-southeast-1", "amazon.nova-pro-v1:0", "apac"),
+        ("ap-northeast-1", "amazon.nova-lite-v1:0", "apac"),
+        ("ap-south-1", "amazon.nova-micro-v1:0", "apac"),
+        # us-* regions keep "us" prefix unchanged
+        ("us-east-1", "amazon.nova-pro-v1:0", "us"),
+        ("us-west-2", "amazon.nova-lite-v1:0", "us"),
+        # eu-* regions keep "eu" prefix unchanged
+        ("eu-west-1", "amazon.nova-pro-v1:0", "eu"),
+        ("eu-central-1", "amazon.nova-micro-v1:0", "eu"),
+    ],
+)
+def test_bedrock_nova_region_prefix_mapping(
+    aws_region_name: str,
+    model_name: str,
+    expected_model_prefix: str,
+):
+    """Nova cross-region inference profile IDs use geography prefixes that do not
+    always match the first segment of the AWS region name.  Specifically, ap-*
+    regions must resolve to "apac", not "ap"."""
+    mock_secret_fetcher = MagicMock()
+    mock_secret_fetcher.fetch.side_effect = lambda key: {
+        "secrets": {
+            "AWS_ACCESS_KEY_ID": "test-key-id",
+            "AWS_SECRET_ACCESS_KEY": "test-secret-key",
+            "AWS_REGION_NAME": aws_region_name,
+        }
+    }
+    token = _secret_fetcher_context.set(mock_secret_fetcher)
+    try:
+        inputs = tsi.CompletionsCreateRequestInputs(
+            model=model_name,
+            messages=[{"role": "user", "content": "hi"}],
+        )
+        llm_mod._setup_provider_credentials_and_model(inputs, provider="bedrock")
+        assert inputs.model.startswith(f"bedrock/{expected_model_prefix}."), (
+            f"Expected model to start with 'bedrock/{expected_model_prefix}.' "
+            f"for region {aws_region_name!r}, got {inputs.model!r}"
+        )
+    finally:
+        _secret_fetcher_context.reset(token)
+
+
 if __name__ == "__main__":
     unittest.main()
