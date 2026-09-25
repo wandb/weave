@@ -12,6 +12,7 @@ from typing import Any, cast
 # There is probably a better place for this, but including here for now to get the fix in.
 from weave import type_handlers  # noqa: F401
 from weave.shared.ids import generate_id
+from weave.shared.interface.builtin_object_classes import leaderboard
 from weave.trace import urls, weave_client, weave_init
 from weave.trace.autopatch import AutopatchSettings
 from weave.trace.constants import TRACE_OBJECT_EMOJI
@@ -28,7 +29,6 @@ from weave.trace.settings import (
 )
 from weave.trace.table import Table
 from weave.trace.view_utils import set_call_view
-from weave.trace_server.interface.builtin_object_classes import leaderboard
 from weave.trace_server_bindings.link_asset_to_registry import LinkAssetToRegistryRes
 from weave.type_wrappers.Content.content import Content
 

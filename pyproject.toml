@@ -630,11 +630,10 @@ allow_indirect_imports = true
 # listed here because the root cannot be a forbidden module without also
 # forbidding trace_server's internal imports; every file that does so also
 # leaks via a client subpackage below, so none escape the contract.
+# After the builtin move, llm_structured_model still imports the client SDK
+# from weave.shared. Those rows left this list because the source is no longer
+# weave.trace_server. The coupling is real and not enforced here.
 ignore_imports = [
-  "weave.trace_server.interface.builtin_object_classes.llm_structured_model -> weave.prompt.prompt",
-  "weave.trace_server.interface.builtin_object_classes.llm_structured_model -> weave.trace.context.weave_client_context",
-  "weave.trace_server.interface.builtin_object_classes.llm_structured_model -> weave.trace.vals",
-  "weave.trace_server.interface.builtin_object_classes.llm_structured_model -> weave.utils.project_id",
   "weave.trace_server.isolated_client_executor -> weave.trace.context.weave_client_context",
   "weave.trace_server.isolated_client_executor -> weave.trace.weave_client",
   "weave.trace_server.workers.evaluate_model_worker.evaluate_model_worker -> weave.evaluation.eval",
@@ -674,35 +673,21 @@ forbidden_modules = ["weave.trace_server"]
 allow_indirect_imports = true
 # TEMPORARY: existing client -> trace_server imports to untangle. Do not add.
 # Most of these reach for the server's interface/contract surface
-# (trace_server_interface, service_interface, common_interface, interface.*)
-# the natural target to extract into a neutral contract package as
-# untangling proceeds.
+# (trace_server_interface, service_interface, common_interface).
+# The natural target is a neutral contract package as untangling proceeds.
 ignore_imports = [
   "weave.durability.wal_sender -> weave.trace_server.trace_server_interface",
   "weave.evaluation.eval -> weave.trace_server.trace_server_interface",
-  "weave.flow.annotation_spec -> weave.trace_server.interface.builtin_object_classes.annotation_spec",
-  "weave.flow.leaderboard -> weave.trace_server.interface.builtin_object_classes.leaderboard",
   "weave.flow.leaderboard -> weave.trace_server.trace_server_interface",
-  "weave.flow.monitor -> weave.trace_server.interface.query",
   "weave.flow.saved_view -> weave.trace_server.common_interface",
-  "weave.flow.saved_view -> weave.trace_server.interface.builtin_object_classes.saved_view",
-  "weave.flow.saved_view -> weave.trace_server.interface.query",
   "weave.flow.saved_view -> weave.trace_server.trace_server_interface",
-  "weave.scorers.llm_as_a_judge_scorer -> weave.trace_server.interface.builtin_object_classes.llm_structured_model",
-  "weave.trace.api -> weave.trace_server.interface.builtin_object_classes.leaderboard",
-  "weave.trace.base_objects -> weave.trace_server.interface.builtin_object_classes.builtin_object_registry",
   "weave.trace.call -> weave.trace_server.common_interface",
-  "weave.trace.call -> weave.trace_server.interface.query",
   "weave.trace.call -> weave.trace_server.trace_server_interface",
   "weave.trace.casting -> weave.trace_server.common_interface",
-  "weave.trace.casting -> weave.trace_server.interface.query",
   "weave.trace.casting -> weave.trace_server.trace_server_interface",
-  "weave.trace.feedback -> weave.trace_server.interface.query",
   "weave.trace.feedback -> weave.trace_server.trace_server_interface",
-  "weave.trace.interface_query_builder -> weave.trace_server.interface.query",
   "weave.trace.project_id_resolver -> weave.trace_server.trace_server_interface",
   "weave.trace.serialization.custom_objs -> weave.trace_server.trace_server_interface",
-  "weave.trace.serialization.serialize -> weave.trace_server.interface.builtin_object_classes.builtin_object_registry",
   "weave.trace.serialization.serialize -> weave.trace_server.trace_server_interface",
   "weave.trace.vals -> weave.trace_server.trace_server_interface",
   "weave.trace.weave_client -> weave.trace_server.common_interface",
