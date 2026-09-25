@@ -16,7 +16,7 @@ import {packageVersion} from '../utils/packageVersion';
 import type {WeaveClient} from '../weaveClient';
 import {getWandbConfigs} from '../wandb/settings';
 
-import {WEAVE_RESOURCE_ATTR} from './weaveResource';
+import {WANDB_RESOURCE_ATTR} from './wandbResource';
 import state from '../state';
 
 const SDK_LANGUAGE = 'node';
@@ -93,8 +93,9 @@ function getOrBuildProvider(client: WeaveClient): BasicTracerProvider {
   }
 
   const resource = new Resource({
-    [WEAVE_RESOURCE_ATTR.WEAVE_SDK_VERSION]: packageVersion,
-    [WEAVE_RESOURCE_ATTR.WEAVE_SDK_LANGUAGE]: SDK_LANGUAGE,
+    [WANDB_RESOURCE_ATTR.WANDB_SDK_NAME]: 'weave',
+    [WANDB_RESOURCE_ATTR.WANDB_SDK_VERSION]: packageVersion,
+    [WANDB_RESOURCE_ATTR.WANDB_SDK_LANGUAGE]: SDK_LANGUAGE,
   });
 
   const tracerProvider = new BasicTracerProvider({

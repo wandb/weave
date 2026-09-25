@@ -21,6 +21,7 @@ from opentelemetry.util._once import Once
 from weave.evaluation.otel_eval_linker import EvalLinkSpanProcessor
 from weave.trace import weave_init
 from weave.trace.otel_op_linker import OpLinkSpanProcessor
+from weave.version import VERSION
 from weave.wandb_interface import auth as wandb_auth
 
 
@@ -36,6 +37,7 @@ def _reset_global_tracer_provider(monkeypatch: pytest.MonkeyPatch):
     )
 
 
+@pytest.mark.trace_server
 def test_conversation_tracing_reroutes_project_on_reinit(
     monkeypatch: pytest.MonkeyPatch,
 ):
@@ -49,13 +51,19 @@ def test_conversation_tracing_reroutes_project_on_reinit(
     assert provider is weave_init._conversation_tracer_provider
     assert exporter is not None
 
-    # Project rides the header; the Resource carries only service.name (an
-    # immutable Resource can't follow a re-init).
+    # Project routing stays in the header because the Resource is immutable.
     assert exporter._session.headers["project_id"] == "ent/proj-a"
     assert exporter._session.headers["Authorization"].startswith("Basic ")
     assert provider.resource.attributes["service.name"] == "weave-conversation-sdk"
-    assert "wandb.project" not in provider.resource.attributes
-    assert "wandb.entity" not in provider.resource.attributes
+    assert {
+        key: value
+        for key, value in provider.resource.attributes.items()
+        if key.startswith(("weave.", "wandb."))
+    } == {
+        "wandb.sdk.name": "weave",
+        "wandb.sdk.version": VERSION,
+        "wandb.sdk.language": "python",
+    }
 
     # Re-init to a different project: same provider + exporter objects (OTel's
     # global provider is set-once), header now points at the new project.
