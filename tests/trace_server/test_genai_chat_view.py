@@ -210,6 +210,76 @@ def test_agent_chat_message_requires_matching_payload() -> None:
         )
 
 
+def test_output_tool_call_without_a_tool_span_renders_as_pending() -> None:
+    """An LLM tool call no tool span ran is a result-less tool_call; one that ran is not repeated."""
+
+    def at(seconds: int) -> datetime.datetime:
+        return datetime.datetime(
+            2026, 1, 1, 0, 0, seconds, tzinfo=datetime.timezone.utc
+        )
+
+    approval = _parts(
+        {
+            "type": "tool_call",
+            "id": "call_1",
+            "name": "request_network_access",
+            "arguments": '{"domains":["example.org"]}',
+        }
+    )
+    root = _span(
+        span_id="agent",
+        operation_name="invoke_agent",
+        agent_name="bot",
+        input_messages=[{"role": "user", "content": "fetch example.org"}],
+        started_at=at(0),
+        ended_at=at(4),
+    )
+    preread = _span(
+        span_id="pre",
+        parent_span_id="agent",
+        operation_name="execute_tool",
+        tool_name="request_network_access",
+        tool_call_result="granted last turn",
+        started_at=at(1),
+    )
+    llm = _span(
+        span_id="llm",
+        parent_span_id="agent",
+        output_messages=[{"role": "assistant", "content": approval}],
+        output_tokens=40,
+        started_at=at(2),
+        ended_at=at(3),
+    )
+
+    pending = [
+        m for m in build_chat_messages([root, preread, llm]) if m.type == "tool_call"
+    ]
+
+    assert [m.span_id for m in pending] == ["pre", "llm"]
+    call = _tool_payload(pending[1])
+    assert call.tool_name == "request_network_access"
+    assert call.tool_arguments == '{"domains":["example.org"]}'
+    assert call.tool_result is None
+    assert call.status is None
+    assert pending[1].started_at == at(3)
+
+    ran = _span(
+        span_id="ran",
+        parent_span_id="agent",
+        operation_name="execute_tool",
+        tool_name="request_network_access",
+        tool_call_id="call_1",
+        tool_call_result="granted",
+        started_at=at(3),
+    )
+
+    executed = [
+        m for m in build_chat_messages([root, llm, ran]) if m.type == "tool_call"
+    ]
+
+    assert [m.span_id for m in executed] == ["ran"]
+
+
 def test_full_agent_turn() -> None:
     """A realistic agent trace exercising every message type the projection
     emits (user_message, agent_start, tool_call, context_compacted,
