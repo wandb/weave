@@ -1,7 +1,28 @@
 import pytest
 
 from weave.trace_server import validation
-from weave.trace_server.errors import InvalidRequest
+from weave.trace_server.errors import InvalidFieldError, InvalidRequest
+
+
+def test_object_id_validator_invalid_chars():
+    # Invalid characters should raise an error describing the constraint,
+    # not a stale version-upgrade hint.
+    with pytest.raises(InvalidFieldError) as e:
+        validation.object_id_validator("bad name!")
+    msg = str(e.value)
+    assert "Invalid object name" in msg
+    assert "Contains invalid characters" in msg
+    assert "alphanumeric" in msg, "Error should describe valid character constraint"
+    assert "0.51" not in msg, "Error must not reference a stale version number"
+    assert "upgrade" not in msg.lower(), "Error must not suggest an upgrade"
+
+    # Valid names must pass through unchanged
+    assert validation.object_id_validator("valid-name_1.0") == "valid-name_1.0"
+
+    # Empty name should also raise
+    with pytest.raises(InvalidFieldError, match="cannot be empty"):
+        validation.object_id_validator("")
+
 
 
 def test_validate_dict_one_key():
