@@ -58,7 +58,7 @@ dependencies = [
   # Conversation SDK — uses OTel GenAI semantic conventions for span emission
   "opentelemetry-api>=1.28.0",
   "opentelemetry-sdk>=1.28.0",
-  "opentelemetry-exporter-otlp-proto-http>=1.28.0",
+  "opentelemetry-exporter-otlp-proto-http>=1.28.0,<1.45", # 1.45 removed the private _session and _certificate_file used by weave_init.py
   # NOTE: do not pin opentelemetry-semantic-conventions. It ships transitively
   # via opentelemetry-sdk, and pinning >=0.63b0 (sdk>=1.42) makes weave +
   # google-adk (which pins sdk<=1.41.1) an unsatisfiable install. The ADK
@@ -382,7 +382,7 @@ module = "weave.vendor.weave_server_sdk.*"
 ignore_errors = true
 
 [tool.bumpversion]
-current_version = "0.53.11-dev0"
+current_version = "0.53.12-dev0"
 parse = """(?x)
     (?P<major>0|[1-9]\\d*)\\.
     (?P<minor>0|[1-9]\\d*)\\.
