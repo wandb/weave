@@ -10,7 +10,7 @@
      skip-indexed column (our calls_merged trace_id bloom-filter CTE): the query
      condition cache is poisoned and later reads under-count / drop rows. See
      https://github.com/ClickHouse/ClickHouse/issues/104781 (fixed by PR #105686,
-     backported to 26.3/26.4/26.5 but not yet in the pinned image). conftest
+     backported to 26.3+, so it never lands on the pinned 26.2 image). conftest
      disables it per-query, but only on trace-server reads; setting it
      server-side also covers the direct clickhouse-connect queries
      (truncate/migrate/etc.) that would otherwise poison the shared cache.
