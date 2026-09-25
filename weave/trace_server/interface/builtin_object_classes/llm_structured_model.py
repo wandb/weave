@@ -5,14 +5,14 @@ from pydantic import BaseModel, BeforeValidator, Field
 
 from weave import Model, op
 from weave.prompt.prompt import format_message_with_template_vars
+from weave.shared.builtin_object_classes import base_object_def
+from weave.shared.project_id import to_project_id
 from weave.trace import vals
 from weave.trace.context.weave_client_context import WeaveInitError, get_weave_client
-from weave.trace_server.interface.builtin_object_classes import base_object_def
 from weave.trace_server.trace_server_interface import (
     CompletionsCreateReq,
     CompletionsCreateRequestInputs,
 )
-from weave.utils.project_id import to_project_id
 
 ResponseFormat = Literal["json_object", "json_schema", "text"]
 
