@@ -69,3 +69,37 @@ def test_insights_namer_and_judge_are_never_the_same_identity() -> None:
         SIGNALS_AGENT_NAME,
         INSIGHTS_JUDGE_AGENT_NAME,
     }
+
+
+def test_a_system_message_moves_to_system_instructions_not_input_messages() -> None:
+    """A system message is stored once in `system_instructions`, not dropped and
+    not left in `input_messages`, which keeps only the turn's own messages.
+    """
+    system_prompt = "You are a cluster namer. Follow the schema."
+    span = build_completion_span(
+        project_id="p1",
+        trace_id="t1",
+        span_id="s1",
+        conversation_id="c1",
+        conversation_name="conv",
+        started_at=STARTED_AT,
+        ended_at=ENDED_AT,
+        provider_name="openai",
+        model_name="gpt-test",
+        request_inputs=CompletionsCreateRequestInputs(
+            model="gpt-test",
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": '{"category": "tool_failure"}'},
+            ],
+        ),
+        response={"choices": [{"message": {"role": "assistant", "content": "{}"}}]},
+        wb_user_id="",
+        retention_days=30,
+        source="insights_cluster",
+    )
+
+    assert span.system_instructions == [system_prompt]
+    assert [(m.role, m.content) for m in span.input_messages] == [
+        ("user", '{"category": "tool_failure"}')
+    ]
