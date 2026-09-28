@@ -488,6 +488,11 @@ deterministic.
   explicit provider-reported total as the Weave extension
   `gen_ai.usage.total_tokens`; do not derive it from the component counts.
   Python uses `None` for an absent total and preserves explicit zero.
+- Agent `total_tokens` filters and statistics prefer a nonnegative integer
+  `gen_ai.usage.total_tokens` from `custom_attrs_int`, including explicit zero.
+  Reading it at query time also covers stored spans without a backfill. Missing
+  or invalid totals retain the legacy input + output + reasoning fallback.
+  The calls OTel importer also recognizes this key before older total aliases.
 - Every TypeScript GenAI span handle supports
   `recordError(error)` to mark a failure without ending the span; terminal
   failures can use `end({error})`. The SDK derives `error.type` from

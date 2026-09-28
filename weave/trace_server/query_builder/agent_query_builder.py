@@ -63,6 +63,7 @@ from weave.trace_server.query_builder.agent_insight_filters import (
 from weave.trace_server.query_builder.agent_signal_filters import (
     build_signal_filter_clause,
 )
+from weave.trace_server.query_builder.agent_usage import total_tokens_sql
 
 # ---------------------------------------------------------------------------
 # Column whitelists — only these can appear in WHERE/ORDER BY/GROUP BY
@@ -669,10 +670,7 @@ def _derived_value_sql(
         )
     if metric == _DERIVED_TOTAL_TOKENS:
         return SpanValueSQL(
-            value_sql=(
-                f"toFloat64({table_alias}.input_tokens + "
-                f"{table_alias}.output_tokens + {table_alias}.reasoning_tokens)"
-            ),
+            value_sql=total_tokens_sql(table_alias),
             valid_sql="1",
             value_type=_VALUE_TYPE_NUMBER,
         )

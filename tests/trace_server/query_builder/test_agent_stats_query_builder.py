@@ -845,8 +845,8 @@ def test_time_stats_apply_group_filters() -> None:
           (SELECT s.conversation_id AS conversation_id
            FROM filtered_spans s
            GROUP BY conversation_id
-           HAVING sumOrNull(if((1), toFloat64(s.input_tokens + s.output_tokens + s.reasoning_tokens), NULL)) >= {genai_12:Float64}
-           AND sumOrNull(if((1), toFloat64(s.input_tokens + s.output_tokens + s.reasoning_tokens), NULL)) <= {genai_13:Float64}),
+           HAVING sumOrNull(if((1), toFloat64(if(mapContains(s.custom_attrs_int, 'gen_ai.usage.total_tokens') AND s.custom_attrs_int['gen_ai.usage.total_tokens'] >= 0, toUInt64(s.custom_attrs_int['gen_ai.usage.total_tokens']), s.input_tokens + s.output_tokens + s.reasoning_tokens)), NULL)) >= {genai_12:Float64}
+           AND sumOrNull(if((1), toFloat64(if(mapContains(s.custom_attrs_int, 'gen_ai.usage.total_tokens') AND s.custom_attrs_int['gen_ai.usage.total_tokens'] >= 0, toUInt64(s.custom_attrs_int['gen_ai.usage.total_tokens']), s.input_tokens + s.output_tokens + s.reasoning_tokens)), NULL)) <= {genai_13:Float64}),
              filtered_metric_spans AS
           (SELECT s.*
            FROM filtered_spans s
