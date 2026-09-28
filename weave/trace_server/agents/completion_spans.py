@@ -26,10 +26,18 @@ logger = logging.getLogger(__name__)
 
 PLAYGROUND_AGENT_NAME = "Weave Chat Playground"
 SIGNALS_AGENT_NAME = "Weave Signals"
+INSIGHTS_NAMER_AGENT_NAME = "Weave Insights Namer"
+INSIGHTS_JUDGE_AGENT_NAME = "Weave Insights Judge"
 
 _SOURCE_TO_AGENT_NAME: dict[str | None, str] = {
     "playground": PLAYGROUND_AGENT_NAME,
     "signals": SIGNALS_AGENT_NAME,
+    # Insights worker `TRACE_SOURCE` values (wandb/core `insights_cluster.naming`
+    # and `insights_worker.inference`). Unmapped, both fell back to
+    # `PLAYGROUND_AGENT_NAME` and were indistinguishable from real playground
+    # traffic and from each other.
+    "insights_cluster": INSIGHTS_NAMER_AGENT_NAME,
+    "insights_worker": INSIGHTS_JUDGE_AGENT_NAME,
 }
 
 
