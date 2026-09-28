@@ -1616,6 +1616,52 @@ def test_output_media_attaches_to_assistant_message() -> None:
     assert _assistant_payload(assistant).content_refs == [image_internal]
 
 
+@pytest.mark.trace_server
+def test_output_image_without_text_emits_one_assistant_message() -> None:
+    """A server-converted Forge blob is assistant output even without text."""
+    image_internal = "weave-trace-internal:///PID/object/generated.png:GENIMG"
+    output_messages = [
+        {
+            "role": "assistant",
+            "content": _parts(
+                {
+                    "type": "blob",
+                    "content": image_internal,
+                    "mime_type": "image/png",
+                    "modality": "image",
+                }
+            ),
+        }
+    ]
+    spans = [
+        _span(
+            span_id="agent",
+            operation_name="invoke_agent",
+            agent_name="image-gen",
+            input_messages=[{"role": "user", "content": "Draw a cat."}],
+            output_messages=output_messages,
+        ),
+        _span(
+            span_id="chat",
+            parent_span_id="agent",
+            operation_name="chat",
+            input_messages=[{"role": "user", "content": "Draw a cat."}],
+            output_messages=output_messages,
+        ),
+    ]
+
+    messages = build_chat_messages(spans)
+
+    assert [message.type for message in messages] == [
+        "user_message",
+        "agent_start",
+        "assistant_message",
+    ]
+    assistant = _assistant_payload(messages[-1])
+    assert assistant.text == ""
+    assert assistant.content_refs == [image_internal]
+
+
 def test_prior_assistant_media_in_input_history_not_attached_to_user() -> None:
     """Regression: a multi-turn turn replays the prior assistant turn — audio
     and all — into its ``input_messages`` as an assistant-role message. That

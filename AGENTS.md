@@ -703,8 +703,9 @@ deterministic.
   status-message values take precedence, and handled exception events on
   non-error spans remain raw-only.
 - Content spans with `ERROR` status emit a chat message even without text or
-  reasoning so the conversation timeline retains the failure. Successful empty
-  tool-calling steps remain omitted.
+  reasoning so the conversation timeline retains the failure. Successful
+  media-only assistant outputs also emit and suppress a mirrored parent output;
+  successful empty tool-calling steps remain omitted.
 - Use the Trace tree view for parentage comparisons. The default flamegraph
   collapses overlapping siblings into synthetic groups, which can make flat
   and nested traces look deceptively similar; give live-example spans realistic
