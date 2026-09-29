@@ -598,6 +598,11 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
             req,
             agent_types.AgentTraceChatRes,
             self._stainless_client.agents.traces.chat,
+            # Internal options are intentionally absent from the generated SDK.
+            exclude={"include_model_tool_calls"},
+            extra_body={"include_model_tool_calls": True}
+            if req.include_model_tool_calls
+            else {},
         )
 
     @validate_call
@@ -616,6 +621,11 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
             req,
             agent_types.AgentConversationChatRes,
             self._stainless_client.agents.conversations.chat,
+            # Internal options are intentionally absent from the generated SDK.
+            exclude={"include_model_tool_calls"},
+            extra_body={"include_model_tool_calls": True}
+            if req.include_model_tool_calls
+            else {},
         )
 
     @validate_call
