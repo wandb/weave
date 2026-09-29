@@ -142,7 +142,7 @@ def test_non_calls_do_not_create_tool_activity(content: str) -> None:
 
 
 @pytest.mark.parametrize("request_type", [AgentTraceChatReq, AgentConversationChatReq])
-def test_internal_tool_call_option_stays_out_of_public_schema(
+def test_tool_call_option_is_public_and_defaults_to_false(
     request_type: type[AgentTraceChatReq] | type[AgentConversationChatReq],
 ) -> None:
     payload = {
@@ -158,12 +158,21 @@ def test_internal_tool_call_option_stays_out_of_public_schema(
         ).include_model_tool_calls
         is True
     )
-    assert "include_model_tool_calls" not in json.dumps(
-        request_type.model_json_schema(mode="validation")
-    )
-    assert "include_model_tool_calls" not in json.dumps(
-        request_type.model_json_schema(mode="serialization")
-    )
+    for schema in (
+        request_type.model_json_schema(mode="validation"),
+        request_type.model_json_schema(mode="serialization"),
+    ):
+        assert schema["properties"]["include_model_tool_calls"] == {
+            "title": "Include Model Tool Calls",
+            "type": "boolean",
+            "default": False,
+            "description": (
+                "Include tool calls requested in model outputs, even when no execution span "
+                "was recorded. Requests without execution evidence have no status, duration, "
+                "or result. Defaults to false."
+            ),
+        }
+        assert "include_model_tool_calls" not in schema["required"]
 
 
 def _span(

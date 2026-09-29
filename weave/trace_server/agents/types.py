@@ -22,7 +22,6 @@ from pydantic import (
     field_validator,
     model_validator,
 )
-from pydantic.json_schema import SkipJsonSchema
 
 from weave.trace_server.agents import semconv
 from weave.trace_server.agents.constants import (
@@ -49,6 +48,12 @@ from weave.trace_server.agents.schema import (
 from weave.trace_server.interface.feedback_types import AgentSpanFeedbackType
 from weave.trace_server.interface.query import Query
 from weave.trace_server.sensitive_data.policy import SensitiveDataPolicy
+
+MODEL_TOOL_CALLS_DESCRIPTION = (
+    "Include tool calls requested in model outputs, even when no execution span "
+    "was recorded. Requests without execution evidence have no status, duration, "
+    "or result. Defaults to false."
+)
 
 if TYPE_CHECKING:
     from weave.trace_server.trace_server_interface import ProcessedResourceSpans
@@ -1266,7 +1271,9 @@ class AgentTraceChatReq(BaseModel):
     project_id: str
     trace_id: str
     include_feedback: bool = False
-    include_model_tool_calls: SkipJsonSchema[bool] = False
+    include_model_tool_calls: bool = Field(
+        default=False, description=MODEL_TOOL_CALLS_DESCRIPTION
+    )
 
 
 class AgentTraceChatRes(AgentResponseModel):
@@ -1327,7 +1334,9 @@ class AgentConversationChatReq(BaseModel):
         ),
     )
     include_feedback: bool = False
-    include_model_tool_calls: SkipJsonSchema[bool] = False
+    include_model_tool_calls: bool = Field(
+        default=False, description=MODEL_TOOL_CALLS_DESCRIPTION
+    )
 
 
 class AgentConversationChatRes(AgentResponseModel):
