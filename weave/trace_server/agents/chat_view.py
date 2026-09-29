@@ -28,6 +28,7 @@ from weave.trace_server.agents.constants import (
     OP_INVOKE_AGENT,
 )
 from weave.trace_server.agents.model_tool_calls import (
+    model_output_segments,
     model_tool_call_messages,
     parse_content_parts,
 )
@@ -486,7 +487,7 @@ class ChatTraversal:
         subtree_emitted_assistant = self._walk_children(
             node, nearest_agent=subtree_agent, depth=depth
         )
-        if self.include_model_tool_calls:
+        if self.include_model_tool_calls and subtree_emitted_assistant:
             self.messages.extend(
                 model_tool_call_messages(
                     span, agent_name=subtree_agent, seen_call_ids=self.seen_call_ids
@@ -526,8 +527,24 @@ class ChatTraversal:
                         )
                     )
                 else:
-                    self.messages.append(msg)
+                    if self.include_model_tool_calls:
+                        self.messages.extend(
+                            _ordered_model_output(
+                                span,
+                                msg,
+                                agent_name=subtree_agent,
+                                seen_call_ids=self.seen_call_ids,
+                            )
+                        )
+                    else:
+                        self.messages.append(msg)
                     subtree_emitted_assistant = True
+            elif self.include_model_tool_calls:
+                self.messages.extend(
+                    model_tool_call_messages(
+                        span, agent_name=subtree_agent, seen_call_ids=self.seen_call_ids
+                    )
+                )
 
         return subtree_emitted_assistant
 
@@ -578,23 +595,35 @@ class ChatTraversal:
         subtree_emitted_assistant = self._walk_children(
             node, nearest_agent=agent_name, depth=depth
         )
-        if self.include_model_tool_calls:
-            self.messages.extend(
-                model_tool_call_messages(
-                    span, agent_name=agent_name, seen_call_ids=self.seen_call_ids
-                )
-            )
-
         msg = _emit_assistant_message(span, agent_name)
         if msg is None:
+            if self.include_model_tool_calls:
+                self.messages.extend(
+                    model_tool_call_messages(
+                        span, agent_name=agent_name, seen_call_ids=self.seen_call_ids
+                    )
+                )
             return subtree_emitted_assistant
         if _coalesce_mirrored_child_assistant(
             node,
             self.messages[child_message_start:],
             msg,
         ):
+            if self.include_model_tool_calls:
+                self.messages.extend(
+                    model_tool_call_messages(
+                        span, agent_name=agent_name, seen_call_ids=self.seen_call_ids
+                    )
+                )
             return True
-        self.messages.append(msg)
+        if self.include_model_tool_calls:
+            self.messages.extend(
+                _ordered_model_output(
+                    span, msg, agent_name=agent_name, seen_call_ids=self.seen_call_ids
+                )
+            )
+        else:
+            self.messages.append(msg)
         assistant = msg.assistant_message
         emitted_text = bool(assistant and assistant.text)
         return emitted_text or subtree_emitted_assistant
@@ -1353,6 +1382,73 @@ def _coalesce_mirrored_child_assistant(
         )
         return True
     return False
+
+
+def _ordered_model_output(
+    span: AgentSpanSchema,
+    assistant_event: AgentChatMessage,
+    *,
+    agent_name: str | None,
+    seen_call_ids: set[tuple[str, str]],
+) -> list[AgentChatMessage]:
+    """Interleave assistant content and requests without repeating span usage."""
+    segments = list(
+        model_output_segments(span, agent_name=agent_name, seen_call_ids=seen_call_ids)
+    )
+    if len(segments) == 1:
+        return [assistant_event]
+
+    template = assistant_event.assistant_message
+    if template is None:
+        raise ValueError("Expected an assistant event")
+
+    has_reasoning_parts = any(
+        part.get("type") == "reasoning"
+        for message in span.output_messages
+        for part in parse_content_parts(message.content)
+    )
+    messages: list[AgentChatMessage] = []
+    emitted_assistant = False
+    for content, request in segments:
+        reasoning = [
+            value
+            for message in content
+            for part in parse_content_parts(message.content)
+            if part.get("type") == "reasoning"
+            and isinstance(value := part.get("content"), str)
+        ]
+        text = _extract_non_user_output_text(content)
+        reasoning_content = _join_or_none(reasoning)
+        if not has_reasoning_parts and not emitted_assistant:
+            reasoning_content = template.reasoning_content
+        refs = _message_content_refs(span, content)
+        if text or reasoning_content or refs:
+            payload = template.model_copy(
+                update={
+                    "text": text,
+                    "reasoning_content": reasoning_content,
+                    "content_refs": refs,
+                }
+            )
+            if emitted_assistant:
+                payload.input_tokens = None
+                payload.output_tokens = None
+                payload.reasoning_tokens = None
+                payload.input_cost_usd = None
+                payload.output_cost_usd = None
+                payload.total_cost_usd = None
+                payload.duration_ms = None
+            messages.append(
+                assistant_event.model_copy(update={"assistant_message": payload})
+            )
+            emitted_assistant = True
+        if request is not None:
+            messages.append(request)
+
+    if not emitted_assistant:
+        messages.append(assistant_event)
+
+    return messages
 
 
 def _emit_assistant_message(

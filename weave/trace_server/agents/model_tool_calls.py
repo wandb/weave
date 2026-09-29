@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Iterator
 
+from weave.trace_server.agents.schema import NormalizedMessage
 from weave.trace_server.agents.types import (
     AgentChatMessage,
     AgentChatToolCall,
@@ -59,6 +61,56 @@ def model_tool_call_messages(
             )
 
     return messages
+
+
+def model_output_segments(
+    span: AgentSpanSchema,
+    *,
+    agent_name: str | None,
+    seen_call_ids: set[tuple[str, str]],
+) -> Iterator[tuple[list[NormalizedMessage], AgentChatMessage | None]]:
+    """Split output at unmatched requests while retaining source order."""
+    pending: list[NormalizedMessage] = []
+    for message in span.output_messages:
+        parts = parse_content_parts(message.content)
+        if message.role != "assistant" or not parts:
+            pending.append(message)
+            continue
+
+        content_parts: list[dict[str, object]] = []
+        for part in parts:
+            if part.get("type") != "tool_call":
+                content_parts.append(part)
+                continue
+
+            request_span = span.model_copy(
+                update={
+                    "output_messages": [
+                        message.model_copy(update={"content": json.dumps([part])})
+                    ]
+                }
+            )
+            requests = model_tool_call_messages(
+                request_span, agent_name=agent_name, seen_call_ids=seen_call_ids
+            )
+            if not requests:
+                content_parts.append(part)
+                continue
+
+            if content_parts:
+                pending.append(
+                    message.model_copy(update={"content": json.dumps(content_parts)})
+                )
+                content_parts = []
+            yield pending, requests[0]
+            pending = []
+
+        if content_parts:
+            pending.append(
+                message.model_copy(update={"content": json.dumps(content_parts)})
+            )
+
+    yield pending, None
 
 
 def parse_content_parts(content: str) -> list[dict[str, object]]:
