@@ -665,7 +665,9 @@ class AgentQueryHandler:
     def traces_chat(self, req: AgentTraceChatReq) -> AgentTraceChatRes:
         """Build chat trajectory for a single trace."""
         spans = self.trace_detail_spans(req.project_id, req.trace_id)
-        res = build_trace_chat(spans, req.trace_id)
+        res = build_trace_chat(
+            spans, req.trace_id, include_model_tool_calls=req.include_model_tool_calls
+        )
 
         if req.include_feedback:
             span_ids = [m.span_id for m in res.messages if m.span_id]
@@ -717,7 +719,9 @@ class AgentQueryHandler:
             spans_by_trace.setdefault(span.trace_id, []).append(span)
 
         turns = [
-            build_trace_chat(trace_spans, tid)
+            build_trace_chat(
+                trace_spans, tid, include_model_tool_calls=req.include_model_tool_calls
+            )
             for tid, trace_spans in spans_by_trace.items()
             if trace_spans
         ]

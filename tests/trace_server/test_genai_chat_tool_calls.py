@@ -7,7 +7,12 @@ import pytest
 
 from weave.trace_server.agents.chat_view import build_chat_messages
 from weave.trace_server.agents.schema import NormalizedMessage, StatusCodeLiteral
-from weave.trace_server.agents.types import AgentChatToolCall, AgentSpanSchema
+from weave.trace_server.agents.types import (
+    AgentChatToolCall,
+    AgentConversationChatReq,
+    AgentSpanSchema,
+    AgentTraceChatReq,
+)
 
 START = datetime.datetime(2026, 1, 1, tzinfo=datetime.timezone.utc)
 END = START + datetime.timedelta(seconds=1)
@@ -63,7 +68,7 @@ def test_model_call_and_rendered_reply_preserve_execution_evidence(
             duration_ms=1000,
         )
 
-    messages = build_chat_messages(list(reversed(spans)))
+    messages = build_chat_messages(list(reversed(spans)), include_model_tool_calls=True)
 
     assert [message.type for message in messages] == [
         "agent_start",
@@ -96,7 +101,7 @@ def test_distinct_requests_survive_without_replaying_inputs(
     unrelated.trace_id = "other"
     unrelated.tool_call_id = "first"
 
-    messages = build_chat_messages([model, unrelated])
+    messages = build_chat_messages([model, unrelated], include_model_tool_calls=True)
     requests = [
         message
         for message in messages
@@ -131,9 +136,34 @@ def test_non_calls_do_not_create_tool_activity(content: str) -> None:
         NormalizedMessage(role="tool", content=history),
     ]
 
-    messages = build_chat_messages([model])
+    messages = build_chat_messages([model], include_model_tool_calls=True)
 
     assert [message.tool_call for message in messages if message.tool_call] == []
+
+
+@pytest.mark.parametrize("request_type", [AgentTraceChatReq, AgentConversationChatReq])
+def test_internal_tool_call_option_stays_out_of_public_schema(
+    request_type: type[AgentTraceChatReq] | type[AgentConversationChatReq],
+) -> None:
+    payload = {
+        "project_id": "project",
+        "trace_id": "trace",
+        "conversation_id": "conversation",
+    }
+    assert request_type.model_validate(payload).include_model_tool_calls is False
+    enabled = request_type.model_validate({**payload, "include_model_tool_calls": True})
+    assert (
+        request_type.model_validate_json(
+            enabled.model_dump_json()
+        ).include_model_tool_calls
+        is True
+    )
+    assert "include_model_tool_calls" not in json.dumps(
+        request_type.model_json_schema(mode="validation")
+    )
+    assert "include_model_tool_calls" not in json.dumps(
+        request_type.model_json_schema(mode="serialization")
+    )
 
 
 def _span(

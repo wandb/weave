@@ -22,6 +22,7 @@ from pydantic import (
     field_validator,
     model_validator,
 )
+from pydantic.json_schema import SkipJsonSchema
 
 from weave.trace_server.agents import semconv
 from weave.trace_server.agents.constants import (
@@ -1265,6 +1266,7 @@ class AgentTraceChatReq(BaseModel):
     project_id: str
     trace_id: str
     include_feedback: bool = False
+    include_model_tool_calls: SkipJsonSchema[bool] = False
 
 
 class AgentTraceChatRes(AgentResponseModel):
@@ -1325,6 +1327,7 @@ class AgentConversationChatReq(BaseModel):
         ),
     )
     include_feedback: bool = False
+    include_model_tool_calls: SkipJsonSchema[bool] = False
 
 
 class AgentConversationChatRes(AgentResponseModel):

@@ -226,9 +226,13 @@ def _join_or_none(items: list[str]) -> str | None:
 def build_trace_chat(
     spans: list[AgentSpanSchema],
     trace_id: str,
+    *,
+    include_model_tool_calls: bool = False,
 ) -> AgentTraceChatRes:
     """Build the full chat response for a trace."""
-    messages = build_chat_messages(spans)
+    messages = build_chat_messages(
+        spans, include_model_tool_calls=include_model_tool_calls
+    )
 
     root_span_name: str | None = None
     root_agent_name: str | None = None
@@ -305,7 +309,9 @@ def _sum_trace_tokens(spans: list[AgentSpanSchema]) -> TraceTokenTotals:
     )
 
 
-def build_chat_messages(spans: list[AgentSpanSchema]) -> list[AgentChatMessage]:
+def build_chat_messages(
+    spans: list[AgentSpanSchema], *, include_model_tool_calls: bool = False
+) -> list[AgentChatMessage]:
     """Convert a list of agent spans into a linear chat trajectory.
 
     Walk the parent-child tree, emitting one user message per turn — each LLM
@@ -325,11 +331,12 @@ def build_chat_messages(spans: list[AgentSpanSchema]) -> list[AgentChatMessage]:
 
     tree = build_span_tree(spans)
     traversal = ChatTraversal(
+        include_model_tool_calls=include_model_tool_calls,
         seen_call_ids={
             (span.trace_id, span.tool_call_id)
             for span in spans
             if span.operation_name == OP_EXECUTE_TOOL and span.tool_call_id
-        }
+        },
     )
     traversal.walk_roots(tree)
 
@@ -370,6 +377,7 @@ class ChatTraversal:
 
     messages: list[AgentChatMessage] = field(default_factory=list)
     seen_call_ids: set[tuple[str, str]] = field(default_factory=set)
+    include_model_tool_calls: bool = False
     # True once any per-turn user message has been emitted during the walk;
     # gates the invoke_agent leading-prompt fallback in build_chat_messages.
     emitted_user: bool = False
@@ -477,11 +485,12 @@ class ChatTraversal:
         subtree_emitted_assistant = self._walk_children(
             node, nearest_agent=subtree_agent, depth=depth
         )
-        self.messages.extend(
-            model_tool_call_messages(
-                span, agent_name=subtree_agent, seen_call_ids=self.seen_call_ids
+        if self.include_model_tool_calls:
+            self.messages.extend(
+                model_tool_call_messages(
+                    span, agent_name=subtree_agent, seen_call_ids=self.seen_call_ids
+                )
             )
-        )
         if not subtree_emitted_assistant:
             msg = _emit_assistant_message(span, subtree_agent, aggregate_node=node)
             if msg:
@@ -568,11 +577,12 @@ class ChatTraversal:
         subtree_emitted_assistant = self._walk_children(
             node, nearest_agent=agent_name, depth=depth
         )
-        self.messages.extend(
-            model_tool_call_messages(
-                span, agent_name=agent_name, seen_call_ids=self.seen_call_ids
+        if self.include_model_tool_calls:
+            self.messages.extend(
+                model_tool_call_messages(
+                    span, agent_name=agent_name, seen_call_ids=self.seen_call_ids
+                )
             )
-        )
 
         msg = _emit_assistant_message(span, agent_name)
         if msg is None:
