@@ -335,7 +335,8 @@ def build_chat_messages(
         seen_call_ids={
             (span.trace_id, span.tool_call_id)
             for span in spans
-            if span.operation_name == OP_EXECUTE_TOOL and span.tool_call_id
+            if span.operation_name in {OP_EXECUTE_TOOL, OP_INVOKE_AGENT}
+            and span.tool_call_id
         },
     )
     traversal.walk_roots(tree)

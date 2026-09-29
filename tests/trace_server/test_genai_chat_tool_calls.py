@@ -175,6 +175,48 @@ def test_tool_call_option_is_public_and_defaults_to_false(
         assert "include_model_tool_calls" not in schema["required"]
 
 
+@pytest.mark.parametrize("tool_name", ["Agent", "Task"])
+@pytest.mark.parametrize("execution_trace", ["trace", "other"])
+def test_subagent_execution_matches_only_requests_in_its_trace(
+    tool_name: str, execution_trace: str
+) -> None:
+    model = _span("model")
+    model.output_messages = [
+        NormalizedMessage(
+            role="assistant",
+            content=json.dumps(
+                [{"type": "tool_call", "id": "launch", "name": tool_name}]
+            ),
+        )
+    ]
+    execution = _span("subagent", operation_name="invoke_agent")
+    execution.trace_id = execution_trace
+    execution.tool_call_id = "launch"
+    execution.agent_name = "Explore"
+    execution.status_code = "OK"
+    execution.output_messages = [
+        NormalizedMessage(
+            role="assistant",
+            content=json.dumps(
+                {"isAsync": True, "status": "async_launched", "agentId": "worker"}
+            ),
+        )
+    ]
+    spans = [model, execution]
+    baseline = build_chat_messages(spans)
+    messages = build_chat_messages(spans, include_model_tool_calls=True)
+    tools = [message.tool_call for message in messages if message.tool_call]
+
+    assert tools[-1].tool_name == "Start Explore"
+    assert tools[-1].status == "OK"
+    if execution_trace == "trace":
+        assert messages == baseline
+        assert len(tools) == 1
+    else:
+        assert len(tools) == 2
+        assert tools[0] == AgentChatToolCall(tool_name=tool_name)
+
+
 def _span(
     span_id: str, *, operation_name: str = "chat", parent_span_id: str = ""
 ) -> AgentSpanSchema:
