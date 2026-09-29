@@ -133,6 +133,10 @@ from weave.trace_server.trace_server_interface import (
     TraceServerInterface,
 )
 from weave.trace_server.tracing import traced
+from weave.trace_server.ttl_settings import (
+    compute_expire_at,
+    get_project_retention_days,
+)
 
 if TYPE_CHECKING:
     from clickhouse_connect.driver.client import Client as CHClient
@@ -964,6 +968,15 @@ class AgentWriteHandler:
                 span_rows.append(row)
 
         if span_rows:
+            retention_days = get_project_retention_days(req.project_id, self._ch_client)
+
+            for row in span_rows:
+                # OTel parsing produces naive local timestamps; TTL expects UTC.
+                started_at = row.started_at.astimezone(datetime.timezone.utc)
+                expire_at = compute_expire_at(retention_days, started_at)
+                if expire_at is not None:
+                    row.expire_at = expire_at
+
             self.insert_spans(span_rows)
 
         if failure_counts:

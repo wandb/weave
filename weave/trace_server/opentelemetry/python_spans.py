@@ -319,8 +319,14 @@ class Span:
         wandb_attributes = get_wandb_attributes(self.attributes) or {}
         overrides = get_span_overrides(self.attributes) or {}
 
-        start_time = overrides.get("start_time") or self.start_time
-        end_time = overrides.get("end_time") or self.end_time
+        # TODO: Standardize OTel events, overrides, and server timestamps on aware UTC.
+        # Preserve explicit overrides and raw dumps while normalizing default call times.
+        start_time = overrides.get("start_time") or self.start_time.astimezone(
+            datetime.timezone.utc
+        )
+        end_time = overrides.get("end_time") or self.end_time.astimezone(
+            datetime.timezone.utc
+        )
 
         llm_usage = tsi.LLMUsageSchema(
             input_tokens=usage.get("input_tokens"),
