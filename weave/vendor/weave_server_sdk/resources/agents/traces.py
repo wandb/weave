@@ -47,7 +47,6 @@ class TracesResource(SyncAPIResource):
         project_id: str,
         trace_id: str,
         include_feedback: bool | Omit = omit,
-        include_model_tool_calls: bool | Omit = omit,
         # Use the following arguments if you need to pass additional parameters to the API that aren't available via kwargs.
         # The extra values given here take precedence over values defined on the client or passed to this method.
         extra_headers: Headers | None = None,
@@ -59,10 +58,6 @@ class TracesResource(SyncAPIResource):
         Genai Traces Chat
 
         Args:
-          include_model_tool_calls: Include tool calls requested in model outputs, even when no execution span was
-              recorded. Requests without execution evidence have no status, duration, or
-              result. Defaults to false.
-
           extra_headers: Send extra headers
 
           extra_query: Add additional query parameters to the request
@@ -78,7 +73,6 @@ class TracesResource(SyncAPIResource):
                     "project_id": project_id,
                     "trace_id": trace_id,
                     "include_feedback": include_feedback,
-                    "include_model_tool_calls": include_model_tool_calls,
                 },
                 trace_chat_params.TraceChatParams,
             ),
@@ -115,7 +109,6 @@ class AsyncTracesResource(AsyncAPIResource):
         project_id: str,
         trace_id: str,
         include_feedback: bool | Omit = omit,
-        include_model_tool_calls: bool | Omit = omit,
         # Use the following arguments if you need to pass additional parameters to the API that aren't available via kwargs.
         # The extra values given here take precedence over values defined on the client or passed to this method.
         extra_headers: Headers | None = None,
@@ -127,10 +120,6 @@ class AsyncTracesResource(AsyncAPIResource):
         Genai Traces Chat
 
         Args:
-          include_model_tool_calls: Include tool calls requested in model outputs, even when no execution span was
-              recorded. Requests without execution evidence have no status, duration, or
-              result. Defaults to false.
-
           extra_headers: Send extra headers
 
           extra_query: Add additional query parameters to the request
@@ -146,7 +135,6 @@ class AsyncTracesResource(AsyncAPIResource):
                     "project_id": project_id,
                     "trace_id": trace_id,
                     "include_feedback": include_feedback,
-                    "include_model_tool_calls": include_model_tool_calls,
                 },
                 trace_chat_params.TraceChatParams,
             ),

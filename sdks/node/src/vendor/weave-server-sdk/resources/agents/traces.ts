@@ -20,13 +20,6 @@ export interface TraceChatParams {
   trace_id: string;
 
   include_feedback?: boolean;
-
-  /**
-   * Include tool calls requested in model outputs, even when no execution span was
-   * recorded. Requests without execution evidence have no status, duration, or
-   * result. Defaults to false.
-   */
-  include_model_tool_calls?: boolean;
 }
 
 export declare namespace Traces {

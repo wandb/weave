@@ -51,7 +51,6 @@ class ConversationsResource(SyncAPIResource):
         conversation_id: str,
         project_id: str,
         include_feedback: bool | Omit = omit,
-        include_model_tool_calls: bool | Omit = omit,
         limit: int | Omit = omit,
         offset: int | Omit = omit,
         # Use the following arguments if you need to pass additional parameters to the API that aren't available via kwargs.
@@ -65,10 +64,6 @@ class ConversationsResource(SyncAPIResource):
         Genai Conversation Chat
 
         Args:
-          include_model_tool_calls: Include tool calls requested in model outputs, even when no execution span was
-              recorded. Requests without execution evidence have no status, duration, or
-              result. Defaults to false.
-
           limit: Maximum number of conversation turns to return.
 
           offset: Number of most-recent turns to skip. Results are returned in chronological order
@@ -89,7 +84,6 @@ class ConversationsResource(SyncAPIResource):
                     "conversation_id": conversation_id,
                     "project_id": project_id,
                     "include_feedback": include_feedback,
-                    "include_model_tool_calls": include_model_tool_calls,
                     "limit": limit,
                     "offset": offset,
                 },
@@ -171,7 +165,6 @@ class AsyncConversationsResource(AsyncAPIResource):
         conversation_id: str,
         project_id: str,
         include_feedback: bool | Omit = omit,
-        include_model_tool_calls: bool | Omit = omit,
         limit: int | Omit = omit,
         offset: int | Omit = omit,
         # Use the following arguments if you need to pass additional parameters to the API that aren't available via kwargs.
@@ -185,10 +178,6 @@ class AsyncConversationsResource(AsyncAPIResource):
         Genai Conversation Chat
 
         Args:
-          include_model_tool_calls: Include tool calls requested in model outputs, even when no execution span was
-              recorded. Requests without execution evidence have no status, duration, or
-              result. Defaults to false.
-
           limit: Maximum number of conversation turns to return.
 
           offset: Number of most-recent turns to skip. Results are returned in chronological order
@@ -209,7 +198,6 @@ class AsyncConversationsResource(AsyncAPIResource):
                     "conversation_id": conversation_id,
                     "project_id": project_id,
                     "include_feedback": include_feedback,
-                    "include_model_tool_calls": include_model_tool_calls,
                     "limit": limit,
                     "offset": offset,
                 },
