@@ -14,6 +14,13 @@ class ConversationChatParams(TypedDict, total=False):
 
     include_feedback: bool
 
+    include_model_tool_calls: bool
+    """
+    Include tool calls requested in model outputs, even when no execution span was
+    recorded. Requests without execution evidence have no status, duration, or
+    result. Defaults to false.
+    """
+
     limit: int
     """Maximum number of conversation turns to return."""
 

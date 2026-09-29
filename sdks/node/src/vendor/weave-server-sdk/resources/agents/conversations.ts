@@ -183,6 +183,13 @@ export interface ConversationChatParams {
   include_feedback?: boolean;
 
   /**
+   * Include tool calls requested in model outputs, even when no execution span was
+   * recorded. Requests without execution evidence have no status, duration, or
+   * result. Defaults to false.
+   */
+  include_model_tool_calls?: boolean;
+
+  /**
    * Maximum number of conversation turns to return.
    */
   limit?: number;

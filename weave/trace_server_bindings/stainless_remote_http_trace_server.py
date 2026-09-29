@@ -598,11 +598,6 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
             req,
             agent_types.AgentTraceChatRes,
             self._stainless_client.agents.traces.chat,
-            # The vendored SDK does not yet accept this public option as a keyword.
-            exclude={"include_model_tool_calls"},
-            extra_body={"include_model_tool_calls": True}
-            if req.include_model_tool_calls
-            else {},
         )
 
     @validate_call
@@ -621,11 +616,6 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
             req,
             agent_types.AgentConversationChatRes,
             self._stainless_client.agents.conversations.chat,
-            # The vendored SDK does not yet accept this public option as a keyword.
-            exclude={"include_model_tool_calls"},
-            extra_body={"include_model_tool_calls": True}
-            if req.include_model_tool_calls
-            else {},
         )
 
     @validate_call

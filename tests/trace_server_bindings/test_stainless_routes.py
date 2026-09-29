@@ -1479,7 +1479,7 @@ def test_route_sends_every_supported_field(
 
 
 @pytest.mark.parametrize("include_model_tool_calls", [None, False, True])
-def test_chat_tool_call_option_reaches_http_only_when_enabled(
+def test_chat_tool_call_option_reaches_http(
     include_model_tool_calls: bool | None,
 ) -> None:
     mock_server = _mock_server(httpx.Response(200, json=V1_RESPONSE))
@@ -1510,9 +1510,8 @@ def test_chat_tool_call_option_reaches_http_only_when_enabled(
             "offset": 0,
         },
     ]
-    if include_model_tool_calls is True:
-        for body in expected_bodies:
-            body["include_model_tool_calls"] = True
+    for body in expected_bodies:
+        body["include_model_tool_calls"] = include_model_tool_calls is True
 
     assert [
         json.loads(request.content) for request in mock_server.requests
