@@ -1831,7 +1831,10 @@ def test_unbatched_call_end_v2_produces_after_calls_complete_update(
 
     server.call_end_v2(req)
 
-    assert events == [("update", "calls_complete"), ("produce_call_end", req.end.id)]
+    expected_table = (
+        "calls_complete_local" if server.use_distributed_mode else "calls_complete"
+    )
+    assert events == [("update", expected_table), ("produce_call_end", req.end.id)]
 
 
 @pytest.mark.disable_logging_error_check
