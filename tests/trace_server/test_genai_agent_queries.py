@@ -2621,7 +2621,10 @@ def test_conversation_chat_paginates_turns(ch_server):
     assert [turn.trace_id for turn in second_page.turns] == [trace_ids[0]]
 
 
-def test_conversation_chat_includes_child_spans_without_conversation_id(ch_server):
+@pytest.mark.parametrize("include_model_tool_calls", [None, False, True])
+def test_conversation_chat_includes_child_spans_without_conversation_id(
+    ch_server, include_model_tool_calls: bool | None
+):
     """Conversation membership is trace-scoped after selecting conversation turns.
 
     Some producers attach ``conversation_id`` only to the root/invoke span. The
@@ -2654,7 +2657,20 @@ def test_conversation_chat_includes_child_spans_without_conversation_id(ch_serve
             parent_span_id=root_span_id,
             operation_name="chat",
             output_messages=[
-                NormalizedMessage(role="assistant", content="hello from child")
+                NormalizedMessage(
+                    role="assistant",
+                    content=json.dumps(
+                        [
+                            {
+                                "type": "tool_call",
+                                "id": "call-1",
+                                "name": "publish_answer",
+                                "arguments": {"message": "hello from child"},
+                            },
+                            {"type": "text", "content": "hello from child"},
+                        ]
+                    ),
+                )
             ],
             input_tokens=12,
             output_tokens=7,
@@ -2677,18 +2693,46 @@ def test_conversation_chat_includes_child_spans_without_conversation_id(ch_serve
     ]
     _insert_spans(ch_server.ch_client, spans)
 
-    res = ch_server.agent_conversation_chat(
-        AgentConversationChatReq(
-            project_id=project_id,
-            conversation_id=conversation_id,
-        )
+    conversation_req = AgentConversationChatReq(
+        project_id=project_id, conversation_id=conversation_id
     )
+    trace_req = AgentTraceChatReq(project_id=project_id, trace_id=trace_id)
+    if include_model_tool_calls is not None:
+        conversation_req.include_model_tool_calls = include_model_tool_calls
+        trace_req.include_model_tool_calls = include_model_tool_calls
+
+    res = ch_server.agent_conversation_chat(conversation_req)
+    trace = ch_server.agent_traces_chat(trace_req)
 
     assert res.total_turns == 1
     assert len(res.turns) == 1
     messages = res.turns[0].messages
     assistant = next(msg for msg in messages if msg.type == "assistant_message")
-    tool = next(msg for msg in messages if msg.type == "tool_call")
+    assert trace.messages == messages
+    tool = next(
+        msg for msg in messages if msg.tool_call and msg.tool_call.tool_name == "lookup"
+    )
+    requests = [
+        msg
+        for msg in messages
+        if msg.tool_call and msg.tool_call.tool_name == "publish_answer"
+    ]
+    assert len(requests) == int(include_model_tool_calls is True)
+    if requests:
+        assert requests[0].span_id == spans[1].span_id
+        assert requests[0].tool_call is not None
+        assert requests[0].tool_call.status is None
+        assert requests[0].tool_call.tool_result is None
+        assert requests[0].tool_call.tool_arguments == json.dumps(
+            {"message": "hello from child"}
+        )
+
+    assert [msg.type for msg in messages if msg not in requests] == [
+        "user_message",
+        "agent_start",
+        "assistant_message",
+        "tool_call",
+    ]
 
     assert assistant.assistant_message is not None
     assert assistant.assistant_message.text == "hello from child"

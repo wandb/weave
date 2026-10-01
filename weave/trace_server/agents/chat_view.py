@@ -20,7 +20,6 @@ import logging
 from collections.abc import Iterator
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Any
 
 from weave.shared.refs_internal import WEAVE_INTERNAL_SCHEME
 from weave.trace_server.agents.constants import (
@@ -28,7 +27,12 @@ from weave.trace_server.agents.constants import (
     OP_EXECUTE_TOOL,
     OP_INVOKE_AGENT,
 )
-from weave.trace_server.agents.schema import NormalizedMessage
+from weave.trace_server.agents.model_tool_calls import (
+    model_output_segments,
+    model_tool_call_messages,
+    parse_content_parts,
+)
+from weave.trace_server.agents.schema import NormalizedMessage, StatusCodeLiteral
 from weave.trace_server.agents.types import (
     AgentChatAgentStart,
     AgentChatAssistantMessage,
@@ -61,6 +65,10 @@ _CLAUDE_TASK_NOTIFICATION_OPEN = "<task-notification>"
 _CLAUDE_TASK_NOTIFICATION_CLOSE = "</task-notification>"
 _CHAT_OPERATION = "chat"
 _ASSISTANT_TEXT_OPERATION = "assistant_text"
+_MEDIA_PART_TYPES = {"uri", "blob", "file"}
+_INTERNAL_REF_PREFIX = f"{WEAVE_INTERNAL_SCHEME}:///"
+# Bound recursive decoding of nested JSON strings as well as containers.
+_MAX_REF_SEARCH_DEPTH = 8
 
 
 # ---------------------------------------------------------------------------
@@ -219,14 +227,18 @@ def _join_or_none(items: list[str]) -> str | None:
 def build_trace_chat(
     spans: list[AgentSpanSchema],
     trace_id: str,
+    *,
+    include_model_tool_calls: bool = False,
 ) -> AgentTraceChatRes:
     """Build the full chat response for a trace."""
-    messages = build_chat_messages(spans)
+    messages = build_chat_messages(
+        spans, include_model_tool_calls=include_model_tool_calls
+    )
 
     root_span_name: str | None = None
     root_agent_name: str | None = None
     root_agent_version: str | None = None
-    root_status_code: str | None = None
+    root_status_code: StatusCodeLiteral | None = None
     provider: str | None = None
     root_started_at: datetime | None = None
     root_ended_at: datetime | None = None
@@ -298,7 +310,9 @@ def _sum_trace_tokens(spans: list[AgentSpanSchema]) -> TraceTokenTotals:
     )
 
 
-def build_chat_messages(spans: list[AgentSpanSchema]) -> list[AgentChatMessage]:
+def build_chat_messages(
+    spans: list[AgentSpanSchema], *, include_model_tool_calls: bool = False
+) -> list[AgentChatMessage]:
     """Convert a list of agent spans into a linear chat trajectory.
 
     Walk the parent-child tree, emitting one user message per turn — each LLM
@@ -317,7 +331,15 @@ def build_chat_messages(spans: list[AgentSpanSchema]) -> list[AgentChatMessage]:
         return []
 
     tree = build_span_tree(spans)
-    traversal = ChatTraversal()
+    traversal = ChatTraversal(
+        include_model_tool_calls=include_model_tool_calls,
+        seen_call_ids={
+            (span.trace_id, span.tool_call_id)
+            for span in spans
+            if span.operation_name in {OP_EXECUTE_TOOL, OP_INVOKE_AGENT}
+            and span.tool_call_id
+        },
+    )
     traversal.walk_roots(tree)
 
     messages = traversal.messages
@@ -356,6 +378,8 @@ class ChatTraversal:
     """
 
     messages: list[AgentChatMessage] = field(default_factory=list)
+    seen_call_ids: set[tuple[str, str]] = field(default_factory=set)
+    include_model_tool_calls: bool = False
     # True once any per-turn user message has been emitted during the walk;
     # gates the invoke_agent leading-prompt fallback in build_chat_messages.
     emitted_user: bool = False
@@ -463,6 +487,12 @@ class ChatTraversal:
         subtree_emitted_assistant = self._walk_children(
             node, nearest_agent=subtree_agent, depth=depth
         )
+        if self.include_model_tool_calls and subtree_emitted_assistant:
+            self.messages.extend(
+                model_tool_call_messages(
+                    span, agent_name=subtree_agent, seen_call_ids=self.seen_call_ids
+                )
+            )
         if not subtree_emitted_assistant:
             msg = _emit_assistant_message(span, subtree_agent, aggregate_node=node)
             if msg:
@@ -497,8 +527,24 @@ class ChatTraversal:
                         )
                     )
                 else:
-                    self.messages.append(msg)
+                    if self.include_model_tool_calls:
+                        self.messages.extend(
+                            _ordered_model_output(
+                                span,
+                                msg,
+                                agent_name=subtree_agent,
+                                seen_call_ids=self.seen_call_ids,
+                            )
+                        )
+                    else:
+                        self.messages.append(msg)
                     subtree_emitted_assistant = True
+            elif self.include_model_tool_calls:
+                self.messages.extend(
+                    model_tool_call_messages(
+                        span, agent_name=subtree_agent, seen_call_ids=self.seen_call_ids
+                    )
+                )
 
         return subtree_emitted_assistant
 
@@ -549,17 +595,35 @@ class ChatTraversal:
         subtree_emitted_assistant = self._walk_children(
             node, nearest_agent=agent_name, depth=depth
         )
-
         msg = _emit_assistant_message(span, agent_name)
         if msg is None:
+            if self.include_model_tool_calls:
+                self.messages.extend(
+                    model_tool_call_messages(
+                        span, agent_name=agent_name, seen_call_ids=self.seen_call_ids
+                    )
+                )
             return subtree_emitted_assistant
         if _coalesce_mirrored_child_assistant(
             node,
             self.messages[child_message_start:],
             msg,
         ):
+            if self.include_model_tool_calls:
+                self.messages.extend(
+                    model_tool_call_messages(
+                        span, agent_name=agent_name, seen_call_ids=self.seen_call_ids
+                    )
+                )
             return True
-        self.messages.append(msg)
+        if self.include_model_tool_calls:
+            self.messages.extend(
+                _ordered_model_output(
+                    span, msg, agent_name=agent_name, seen_call_ids=self.seen_call_ids
+                )
+            )
+        else:
+            self.messages.append(msg)
         assistant = msg.assistant_message
         emitted_text = bool(assistant and assistant.text)
         return emitted_text or subtree_emitted_assistant
@@ -804,7 +868,7 @@ def _is_claude_task_notification(message: NormalizedMessage) -> bool:
     )
 
 
-def _claude_async_agent_launch(text: str) -> dict[str, Any] | None:
+def _claude_async_agent_launch(text: str) -> dict[str, object] | None:
     """Parse Claude Code's non-conversational async subagent launch result."""
     try:
         payload = json.loads(text)
@@ -964,31 +1028,6 @@ def _content_refs(span: AgentSpanSchema) -> list[str]:
     return [str(r) for r in (span.content_refs or []) if r]
 
 
-# Content part types that reference uploaded media by ref rather than inlining
-# text. The conversation SDK emits attached media as ``uri`` parts (see
-# weave/conversation/conversation_otel.py::_media_to_part); ``blob``/``file`` are accepted
-# defensively in case other producers use a ref-bearing variant.
-_MEDIA_PART_TYPES = {"uri", "blob", "file"}
-
-
-def _parse_content_parts(content: str) -> list[dict]:
-    """Parse a message ``content`` field into its parts array.
-
-    Multimodal content is a JSON-serialized parts array (see
-    genai_extraction._normalize_single_message); plain-text/legacy content is
-    not a JSON list and yields nothing.
-    """
-    if not content or not content.startswith("["):
-        return []
-    try:
-        parsed = json.loads(content)
-    except (json.JSONDecodeError, TypeError):
-        return []
-    if not isinstance(parsed, list):
-        return []
-    return [p for p in parsed if isinstance(p, dict)]
-
-
 def _ref_digest(ref: str) -> str:
     """Return the trailing object digest of a content ref.
 
@@ -1011,7 +1050,7 @@ def _media_part_digests(messages: list[NormalizedMessage]) -> set[str]:
     """
     digests: set[str] = set()
     for message in messages:
-        for part in _parse_content_parts(message.content):
+        for part in parse_content_parts(message.content):
             if part.get("type") in _MEDIA_PART_TYPES:
                 uri = part.get("uri")
                 if isinstance(uri, str) and uri:
@@ -1036,20 +1075,7 @@ def _directional_content_refs(
     return [r for r in _content_refs(span) if _ref_digest(r) in part_digests]
 
 
-_INTERNAL_REF_PREFIX = f"{WEAVE_INTERNAL_SCHEME}:///"
-
-# Cap on how far ``_iter_internal_refs`` will descend. It walks nested
-# dicts/lists AND re-parses JSON-encoded strings (JSON-inside-JSON), so a deeply
-# nested or adversarial span payload could otherwise exceed Python's recursion
-# limit and raise ``RecursionError`` on the OTel ingest path, rejecting an
-# otherwise-valid span. Realistic message-part nesting is only a handful of
-# levels deep (message dict -> content JSON -> parts list -> part dict ->
-# image_url dict -> url string), so 8 leaves ample headroom while staying far
-# below ``sys.getrecursionlimit()`` (1000 by default).
-_MAX_REF_SEARCH_DEPTH = 8
-
-
-def _iter_internal_refs(value: Any, depth: int = 0) -> Iterator[str]:
+def _iter_internal_refs(value: object, depth: int = 0) -> Iterator[str]:
     """Yield every internal weave ref found anywhere in ``value``.
 
     Recurses through dicts/lists and attempts ``json.loads`` on strings so refs
@@ -1356,6 +1382,73 @@ def _coalesce_mirrored_child_assistant(
         )
         return True
     return False
+
+
+def _ordered_model_output(
+    span: AgentSpanSchema,
+    assistant_event: AgentChatMessage,
+    *,
+    agent_name: str | None,
+    seen_call_ids: set[tuple[str, str]],
+) -> list[AgentChatMessage]:
+    """Interleave assistant content and requests without repeating span usage."""
+    segments = list(
+        model_output_segments(span, agent_name=agent_name, seen_call_ids=seen_call_ids)
+    )
+    if len(segments) == 1:
+        return [assistant_event]
+
+    template = assistant_event.assistant_message
+    if template is None:
+        raise ValueError("Expected an assistant event")
+
+    has_reasoning_parts = any(
+        part.get("type") == "reasoning"
+        for message in span.output_messages
+        for part in parse_content_parts(message.content)
+    )
+    messages: list[AgentChatMessage] = []
+    emitted_assistant = False
+    for content, request in segments:
+        reasoning = [
+            value
+            for message in content
+            for part in parse_content_parts(message.content)
+            if part.get("type") == "reasoning"
+            and isinstance(value := part.get("content"), str)
+        ]
+        text = _extract_non_user_output_text(content)
+        reasoning_content = _join_or_none(reasoning)
+        if not has_reasoning_parts and not emitted_assistant:
+            reasoning_content = template.reasoning_content
+        refs = _message_content_refs(span, content)
+        if text or reasoning_content or refs:
+            payload = template.model_copy(
+                update={
+                    "text": text,
+                    "reasoning_content": reasoning_content,
+                    "content_refs": refs,
+                }
+            )
+            if emitted_assistant:
+                payload.input_tokens = None
+                payload.output_tokens = None
+                payload.reasoning_tokens = None
+                payload.input_cost_usd = None
+                payload.output_cost_usd = None
+                payload.total_cost_usd = None
+                payload.duration_ms = None
+            messages.append(
+                assistant_event.model_copy(update={"assistant_message": payload})
+            )
+            emitted_assistant = True
+        if request is not None:
+            messages.append(request)
+
+    if not emitted_assistant:
+        messages.append(assistant_event)
+
+    return messages
 
 
 def _emit_assistant_message(
