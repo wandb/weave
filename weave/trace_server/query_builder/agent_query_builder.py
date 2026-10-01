@@ -63,7 +63,7 @@ from weave.trace_server.query_builder.agent_insight_filters import (
 from weave.trace_server.query_builder.agent_signal_filters import (
     build_signal_filter_clause,
 )
-from weave.trace_server.query_builder.agent_span_lookup import span_lookup_relation
+from weave.trace_server.query_builder.agent_span_lookup import get_span_lookup_relation
 
 # ---------------------------------------------------------------------------
 # Column whitelists — only these can appear in WHERE/ORDER BY/GROUP BY
@@ -1003,7 +1003,9 @@ def _spans_source(
         started_after=req.started_after,
         started_before=req.started_before,
         base_relation=base,
-        fallback_scope_relation=span_lookup_relation(
+        # A required span ID limits candidate traces, but inherited identity
+        # still needs other spans in those traces before identity filters apply.
+        fallback_scope_relation=get_span_lookup_relation(
             pb, project_id=req.project_id, query=req.query
         ),
     )

@@ -4,14 +4,14 @@ from weave.trace_server.interface import query as tsi_query
 from weave.trace_server.orm import ParamBuilder
 
 
-def span_lookup_relation(
+def get_span_lookup_relation(
     pb: ParamBuilder, *, project_id: str, query: tsi_query.Query | None
 ) -> str | None:
     """Scope attribution only when every matching row must have one span ID."""
     if query is None:
         return None
 
-    span_id = _required_span_id(query.expr_)
+    span_id = _get_required_span_id(query.expr_)
     if span_id is None:
         return None
 
@@ -25,10 +25,11 @@ def span_lookup_relation(
     return relation
 
 
-def _required_span_id(operand: tsi_query.Operand) -> str | None:
+def _get_required_span_id(operand: tsi_query.Operand) -> str | None:
+    """Return a span-ID equality required by the operand, ignoring OR and NOT branches."""
     if isinstance(operand, tsi_query.AndOperation):
         for child in operand.and_:
-            span_id = _required_span_id(child)
+            span_id = _get_required_span_id(child)
             if span_id is not None:
                 return span_id
 
