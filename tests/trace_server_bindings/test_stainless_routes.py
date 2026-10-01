@@ -1478,6 +1478,46 @@ def test_route_sends_every_supported_field(
     assert json.loads(mock_server.requests[0].content) == expected_body
 
 
+@pytest.mark.parametrize("include_model_tool_calls", [None, False, True])
+def test_chat_tool_call_option_reaches_http(
+    include_model_tool_calls: bool | None,
+) -> None:
+    mock_server = _mock_server(httpx.Response(200, json=V1_RESPONSE))
+    trace_req = agent_types.AgentTraceChatReq(project_id=PROJECT, trace_id="t1")
+    conversation_req = agent_types.AgentConversationChatReq(
+        project_id=PROJECT, conversation_id="conv1"
+    )
+    if include_model_tool_calls is not None:
+        trace_req.include_model_tool_calls = include_model_tool_calls
+        conversation_req.include_model_tool_calls = include_model_tool_calls
+
+    trace = mock_server.server.agent_traces_chat(trace_req)
+    conversation = mock_server.server.agent_conversation_chat(conversation_req)
+
+    assert isinstance(trace, agent_types.AgentTraceChatRes)
+    assert isinstance(conversation, agent_types.AgentConversationChatRes)
+    assert [request.url.path for request in mock_server.requests] == [
+        "/agents/traces/chat",
+        "/agents/conversations/chat",
+    ]
+    expected_bodies = [
+        {"project_id": PROJECT, "trace_id": "t1", "include_feedback": False},
+        {
+            "project_id": PROJECT,
+            "conversation_id": "conv1",
+            "include_feedback": False,
+            "limit": conversation_req.limit,
+            "offset": 0,
+        },
+    ]
+    for body in expected_bodies:
+        body["include_model_tool_calls"] = include_model_tool_calls is True
+
+    assert [
+        json.loads(request.content) for request in mock_server.requests
+    ] == expected_bodies
+
+
 def test_agent_spans_stats_sends_insight_filters() -> None:
     mock_server = _mock_server(httpx.Response(200, json=V1_RESPONSE))
     req = agent_types.AgentSpanStatsReq(

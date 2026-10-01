@@ -1124,6 +1124,7 @@ def test_interleaved_reasoning_before_tool_call_is_surfaced() -> None:
             span_name="execute_tool shell",
             tool_name="shell",
             tool_call_arguments='{"command": "ls"}',
+            tool_call_id="tc1",
             tool_call_result="17 files",
             started_at=at(2),
         ),
@@ -1205,6 +1206,7 @@ def test_tool_call_step_without_reasoning_emits_no_assistant_message() -> None:
             span_name="execute_tool shell",
             tool_name="shell",
             tool_call_result="done",
+            tool_call_id="tc1",
             started_at=at(2),
         ),
     ]

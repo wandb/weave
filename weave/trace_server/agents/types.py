@@ -1265,6 +1265,14 @@ class AgentTraceChatReq(BaseModel):
     project_id: str
     trace_id: str
     include_feedback: bool = False
+    include_model_tool_calls: bool = Field(
+        default=False,
+        description=(
+            "Include tool calls requested in model outputs, even when no execution span "
+            "was recorded. Requests without execution evidence have no status, duration, "
+            "or result. Defaults to false."
+        ),
+    )
 
 
 class AgentTraceChatRes(AgentResponseModel):
@@ -1325,6 +1333,14 @@ class AgentConversationChatReq(BaseModel):
         ),
     )
     include_feedback: bool = False
+    include_model_tool_calls: bool = Field(
+        default=False,
+        description=(
+            "Include tool calls requested in model outputs, even when no execution span "
+            "was recorded. Requests without execution evidence have no status, duration, "
+            "or result. Defaults to false."
+        ),
+    )
 
 
 class AgentConversationChatRes(AgentResponseModel):
