@@ -65,7 +65,7 @@ SHARDS_WITHOUT_EXTRAS = {
     "pandas_test",
     "scorers",
     # google_adk is installed post-sync (see tests()) rather than via an
-    # extra: google-adk pins opentelemetry-sdk<=1.41.1, so locking it
+    # extra: google-adk 2.10.0 pins opentelemetry-sdk<=1.42.1, so locking it
     # universally would drag every shard's shared resolution down to that
     # ceiling. Keeping it out of the lock leaves the shared resolution alone.
     "google_adk",
@@ -162,10 +162,26 @@ def tests(session: nox.Session, shard: str):
 
     if shard == "google_adk":
         # Installed here (not via an extra) so it stays out of the shared
-        # uv.lock — google-adk pins opentelemetry-sdk<=1.41.1, which weave now
-        # tolerates (the ADK integration vendors its GenAI semconv keys). This
-        # downgrades otel in this env only; weave works on the older semconv.
+        # uv.lock — google-adk 2.10.0 pins opentelemetry-sdk<=1.42.1, which
+        # weave tolerates (the ADK integration vendors its GenAI semconv
+        # keys). This downgrades otel in this env only.
         session.run("uv", "pip", "install", "google-adk>=2.2.0")
+        # That install downgrades the SDK to 1.42.1 and leaves the locked
+        # 1.45 HTTP exporter, which still requires SDK 1.45. Match the
+        # exporter to the SDK and drop the 1.45-only transport packages.
+        session.run(
+            "uv",
+            "pip",
+            "install",
+            "opentelemetry-exporter-otlp-proto-http==1.42.1",
+        )
+        session.run(
+            "uv",
+            "pip",
+            "uninstall",
+            "opentelemetry-exporter-otlp-common",
+            "opentelemetry-exporter-http-transport",
+        )
 
     env = {
         k: session.env.get(k) or os.getenv(k)
