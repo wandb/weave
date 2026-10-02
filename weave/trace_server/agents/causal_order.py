@@ -1,4 +1,12 @@
-"""Order each tool execution directly after the model span that requested it."""
+"""Order each tool execution directly after the model span that requested it.
+
+Some agents run tools in a different process from the model loop, and that
+process stamps `execute_tool` spans with its own clock, off by seconds to
+minutes. Sorting siblings by `started_at` then trusts two clocks that disagree,
+so an execution can land after the model call that already consumed its result.
+A model span's output names each `tool_call_id` it requests, which links the
+request to its execution without trusting either clock.
+"""
 
 from typing import NamedTuple
 
@@ -13,7 +21,9 @@ class ToolCallKey(NamedTuple):
 
 
 def causal_span_order(spans: list[AgentSpanSchema]) -> list[int]:
-    """Return clock order with each execution moved behind its unique requester."""
+    """Return indexes that place each tool execution right after its requester."""
+    # Collect every model span that requested each call id. More than one
+    # requester makes the id ambiguous.
     call_key_to_requester_indexes: dict[ToolCallKey, set[int]] = {}
     for index, span in enumerate(spans):
         if span.operation_name in TOOL_EXECUTION_OPS:
@@ -23,8 +33,8 @@ def causal_span_order(spans: list[AgentSpanSchema]) -> list[int]:
             key = ToolCallKey(span.trace_id, call_id)
             call_key_to_requester_indexes.setdefault(key, set()).add(index)
 
-    # Producer clocks can disagree, so an execution sorts by its requester's
-    # position; ambiguous or unmatched ids keep the execution's own position.
+    # An execution sorts at its unique requester's position; an unmatched or
+    # ambiguous id keeps the execution at its own clock position.
     anchors: list[int] = []
     for index, span in enumerate(spans):
         anchor = index
@@ -35,6 +45,8 @@ def causal_span_order(spans: list[AgentSpanSchema]) -> list[int]:
                 anchor = next(iter(requester_indexes))
         anchors.append(anchor)
 
+    # Spans sharing an anchor sort as the requester first (`anchor == index`),
+    # then the executions it requested in their original clock order.
     order = sorted(
         range(len(spans)),
         key=lambda index: (anchors[index], anchors[index] != index, index),
