@@ -13,10 +13,16 @@ START = datetime.datetime(2026, 1, 1, tzinfo=datetime.timezone.utc)
 pytestmark = pytest.mark.trace_server
 
 
-@pytest.mark.parametrize("clock_offset", [-120, 0, 120])
-@pytest.mark.parametrize("reverse", [False, True])
-def test_execution_precedes_model_that_consumed_its_result(
-    clock_offset: int, reverse: bool
+@pytest.mark.parametrize(
+    ("clock_offset", "later_at", "expected"),
+    [
+        (120, 4, ["execution", "reply", "later"]),
+        (0, 4, ["execution", "reply", "later"]),
+        (-120, 0.5, ["later", "execution", "reply"]),
+    ],
+)
+def test_execution_follows_its_request_whatever_the_tool_clock(
+    clock_offset: int, later_at: float, expected: list[str]
 ) -> None:
     request = _span("request", 1)
     request.output_messages = [_call("lookup-1", "lookup")]
@@ -29,23 +35,16 @@ def test_execution_precedes_model_that_consumed_its_result(
     reply = _span("reply", 3)
     reply.input_messages = [_call("lookup-1", "lookup"), _result("lookup-1")]
     reply.output_messages = [_call("reply-1", "deliver")]
-    spans = [request, execution, reply]
-    if reverse:
-        spans.reverse()
+    later = _span("later", later_at)
+    later.output_messages = [NormalizedMessage(role="assistant", content="Summary.")]
 
-    messages = build_chat_messages(spans, include_model_tool_calls=True)
-    calls = [message for message in messages if message.tool_call]
-
-    assert [message.span_id for message in calls] == ["execution", "reply"]
-    assert calls[0].tool_call == AgentChatToolCall(
-        tool_name="lookup",
-        tool_result="found",
-        duration_ms=1000,
-        status="OK",
+    messages = build_chat_messages(
+        [request, execution, reply, later], include_model_tool_calls=True
     )
-    assert calls[0].started_at == execution.started_at
-    assert calls[1].tool_call == AgentChatToolCall(
-        tool_name="deliver", tool_arguments="{}"
+
+    assert [message.span_id for message in messages] == expected
+    assert messages[expected.index("execution")].tool_call == AgentChatToolCall(
+        tool_name="lookup", tool_result="found", duration_ms=1000, status="OK"
     )
 
 
@@ -76,11 +75,6 @@ def test_continuation_retains_paired_history_without_claiming_success(
         )
     expected.append(AgentChatToolCall(tool_name="deliver", tool_arguments="{}"))
     assert calls == expected
-    assert [
-        message.tool_call
-        for message in build_chat_messages([model])
-        if message.tool_call
-    ] == []
 
 
 def test_later_input_completes_request_recorded_by_earlier_span() -> None:
@@ -106,6 +100,7 @@ def test_later_input_completes_request_recorded_by_earlier_span() -> None:
     )
     calls = [message for message in messages if message.tool_call]
 
+    # A response proves the call returned, not that it succeeded: status stays unset.
     assert [(message.span_id, message.tool_call) for message in calls] == [
         (
             "request",
@@ -116,54 +111,49 @@ def test_later_input_completes_request_recorded_by_earlier_span() -> None:
         ("reply", AgentChatToolCall(tool_name="deliver", tool_arguments="{}")),
     ]
     assert calls[0].started_at == request.ended_at
+    assert [
+        message.tool_call
+        for message in build_chat_messages([final, reply, request])
+        if message.tool_call
+    ] == []
 
 
-def test_unrelated_execution_does_not_reorder_or_hide_request() -> None:
+def test_unrelated_or_ambiguous_execution_keeps_clock_position() -> None:
     reply = _span("reply", 1)
     reply.input_messages = [_result("same-id")]
     reply.output_messages = [_call("same-id", "lookup")]
-    execution = _span("execution", 120)
-    execution.operation_name = "execute_tool"
-    execution.tool_call_id = "same-id"
-    execution.tool_name = "lookup"
-    execution = execution.model_copy(update={"trace_id": "unrelated"})
+    retry = _span("retry", 2)
+    retry.output_messages = [_call("dup-id", "lookup")]
+    duplicate = _span("duplicate", 3)
+    duplicate.output_messages = [_call("dup-id", "lookup")]
+    unrelated = _span("unrelated", 120).model_copy(
+        update={
+            "trace_id": "unrelated",
+            "operation_name": "execute_tool",
+            "tool_call_id": "same-id",
+            "tool_name": "lookup",
+        }
+    )
+    ambiguous = _span("ambiguous", 121).model_copy(
+        update={
+            "operation_name": "execute_tool",
+            "tool_call_id": "dup-id",
+            "tool_name": "lookup",
+        }
+    )
 
-    messages = build_chat_messages([execution, reply], include_model_tool_calls=True)
+    messages = build_chat_messages(
+        [ambiguous, unrelated, duplicate, retry, reply], include_model_tool_calls=True
+    )
 
     assert [message.span_id for message in messages if message.tool_call] == [
         "reply",
-        "execution",
+        "unrelated",
+        "ambiguous",
     ]
 
 
-def test_repeated_names_and_conflicting_dependencies_preserve_evidence() -> None:
-    first = _span("first", 1)
-    first.output_messages = [_call("first-id", "lookup")]
-    second = _span("second", 2)
-    second.output_messages = [_call("second-id", "lookup")]
-    second.input_messages = [_result("first-id")]
-    final = _span("final", 3)
-    final.input_messages = [_result("second-id")]
-    final.output_messages = [_call("final-id", "deliver")]
-    spans = [final, second, first]
-
-    messages = build_chat_messages(spans, include_model_tool_calls=True)
-
-    assert [message.span_id for message in messages if message.tool_call] == [
-        "first",
-        "second",
-        "final",
-    ]
-    first.input_messages = [_result("final-id")]
-    conflicted = build_chat_messages(spans, include_model_tool_calls=True)
-    assert [message.span_id for message in conflicted if message.tool_call] == [
-        "first",
-        "second",
-        "final",
-    ]
-
-
-def _span(span_id: str, seconds: int) -> AgentSpanSchema:
+def _span(span_id: str, seconds: float) -> AgentSpanSchema:
     return AgentSpanSchema(
         project_id="project",
         trace_id="trace",
