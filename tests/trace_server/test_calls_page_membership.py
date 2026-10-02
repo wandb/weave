@@ -41,7 +41,7 @@ def test_page_membership_preserves_ties_and_empty_pages(
     params = ParamBuilder()
     sql = query.as_sql(params)
 
-    result = ch_server.ch_client.query(sql, parameters=params.get_params())
+    result = ch_server._query(sql, parameters=params.get_params())
 
     assert result.result_rows == [
         (value, "{}") for value in ["a", "b", "c", "z"][offset : offset + 2]
