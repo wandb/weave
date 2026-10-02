@@ -575,8 +575,8 @@ class CallsResource(SyncAPIResource):
 
           include_costs: If true, include cost calculations in the usage.
 
-          limit: Maximum number of calls to process across all traces. Acts as a safety limit to
-              prevent unbounded memory usage.
+          limit: Maximum calls per aggregation batch. Larger batches are split by trace; a single
+              trace exceeding this limit returns an error, never partial usage.
 
           extra_headers: Send extra headers
 
@@ -1136,8 +1136,8 @@ class AsyncCallsResource(AsyncAPIResource):
 
           include_costs: If true, include cost calculations in the usage.
 
-          limit: Maximum number of calls to process across all traces. Acts as a safety limit to
-              prevent unbounded memory usage.
+          limit: Maximum calls per aggregation batch. Larger batches are split by trace; a single
+              trace exceeding this limit returns an error, never partial usage.
 
           extra_headers: Send extra headers
 
