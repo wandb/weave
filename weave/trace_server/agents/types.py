@@ -1269,8 +1269,10 @@ class AgentTraceChatReq(BaseModel):
         default=False,
         description=(
             "Include tool calls requested in model outputs, even when no execution span "
-            "was recorded. Requests without execution evidence have no status, duration, "
-            "or result. Defaults to false."
+            "was recorded, and place each execution span after the model span that "
+            "requested it. A request without an execution span takes its result from a "
+            "later model input that replays the response, and never gets a status or "
+            "duration. Defaults to false."
         ),
     )
 
@@ -1337,8 +1339,10 @@ class AgentConversationChatReq(BaseModel):
         default=False,
         description=(
             "Include tool calls requested in model outputs, even when no execution span "
-            "was recorded. Requests without execution evidence have no status, duration, "
-            "or result. Defaults to false."
+            "was recorded, and place each execution span after the model span that "
+            "requested it. A request without an execution span takes its result from a "
+            "later model input that replays the response, and never gets a status or "
+            "duration. Defaults to false."
         ),
     )
 
