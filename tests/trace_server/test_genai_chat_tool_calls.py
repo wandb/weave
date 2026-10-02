@@ -168,7 +168,8 @@ def test_tool_call_option_is_public_and_defaults_to_false(
             "default": False,
             "description": (
                 "Include tool calls requested in model outputs, even when no execution span "
-                "was recorded. Requests without execution evidence have no status, duration, "
+                "was recorded, and place each execution span after the model span that "
+                "requested it. Requests without execution evidence have no status, duration, "
                 "or result. Defaults to false."
             ),
         }

@@ -22,10 +22,12 @@ from dataclasses import dataclass, field
 from datetime import datetime
 
 from weave.shared.refs_internal import WEAVE_INTERNAL_SCHEME
+from weave.trace_server.agents.causal_order import causal_span_order
 from weave.trace_server.agents.constants import (
     MAX_WALK_DEPTH,
     OP_EXECUTE_TOOL,
     OP_INVOKE_AGENT,
+    TOOL_EXECUTION_OPS,
 )
 from weave.trace_server.agents.model_tool_calls import (
     model_output_segments,
@@ -330,14 +332,15 @@ def build_chat_messages(
     if not spans:
         return []
 
-    tree = build_span_tree(spans)
+    # The default view keeps producer clock order; only the opt-in tool-evidence
+    # projection lets recorded dependencies override clocks.
+    tree = build_span_tree(spans, causal_order=include_model_tool_calls)
     traversal = ChatTraversal(
         include_model_tool_calls=include_model_tool_calls,
         seen_call_ids={
             (span.trace_id, span.tool_call_id)
             for span in spans
-            if span.operation_name in {OP_EXECUTE_TOOL, OP_INVOKE_AGENT}
-            and span.tool_call_id
+            if span.operation_name in TOOL_EXECUTION_OPS and span.tool_call_id
         },
     )
     traversal.walk_roots(tree)
@@ -762,7 +765,9 @@ class ChatTraversal:
         return emitted_assistant
 
 
-def build_span_tree(spans: list[AgentSpanSchema]) -> list[SpanNode]:
+def build_span_tree(
+    spans: list[AgentSpanSchema], *, causal_order: bool = False
+) -> list[SpanNode]:
     """Build a parent-child tree from flat spans, sorted by start time."""
     node_map = {s.span_id: SpanNode(span=s) for s in spans}
     roots: list[SpanNode] = []
@@ -783,6 +788,9 @@ def build_span_tree(spans: list[AgentSpanSchema]) -> list[SpanNode]:
 
     def _sort(nodes: list[SpanNode]) -> None:
         nodes.sort(key=_span_node_sort_key)
+        if causal_order:
+            order = causal_span_order([node.span for node in nodes])
+            nodes[:] = [nodes[index] for index in order]
         for n in nodes:
             _sort(n.children)
 
