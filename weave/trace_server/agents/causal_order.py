@@ -10,17 +10,21 @@ from weave.trace_server.agents.types import AgentSpanSchema
 
 def causal_span_order(spans: list[AgentSpanSchema]) -> list[int]:
     """Return stable topological indexes, retaining input order on conflicting evidence."""
-    executions: dict[tuple[str, str, str], list[int]] = {}
-    producers: dict[tuple[str, str, str], list[int]] = {}
+    # Continuation inputs replay shared history, so parse each content string once.
+    parsed: dict[str, list[dict[str, object]]] = {}
+    executions: dict[tuple[str, str], list[int]] = {}
+    producers: dict[tuple[str, str], list[int]] = {}
     for index, span in enumerate(spans):
         if span.operation_name in {OP_EXECUTE_TOOL, OP_INVOKE_AGENT}:
             if span.tool_call_id:
-                key = (span.project_id, span.trace_id, span.tool_call_id)
+                key = (span.trace_id, span.tool_call_id)
                 executions.setdefault(key, []).append(index)
             continue
 
-        for call_id in _part_ids(span.output_messages, "assistant", "tool_call"):
-            key = (span.project_id, span.trace_id, call_id)
+        for call_id in _part_ids(
+            span.output_messages, "assistant", "tool_call", parsed
+        ):
+            key = (span.trace_id, call_id)
             producers.setdefault(key, []).append(index)
 
     predecessors: list[set[int]] = [set() for _ in spans]
@@ -30,8 +34,9 @@ def causal_span_order(spans: list[AgentSpanSchema]) -> list[int]:
             predecessors[indexes[0]].add(origins[0])
 
     for index, span in enumerate(spans):
-        for call_id in _part_ids(span.input_messages, "tool", "tool_call_response"):
-            key = (span.project_id, span.trace_id, call_id)
+        input_ids = _part_ids(span.input_messages, "tool", "tool_call_response", parsed)
+        for call_id in input_ids:
+            key = (span.trace_id, call_id)
             origins = executions.get(key, producers.get(key, []))
             if len(origins) == 1 and origins[0] != index:
                 predecessors[index].add(origins[0])
@@ -59,13 +64,23 @@ def causal_span_order(spans: list[AgentSpanSchema]) -> list[int]:
     return ordered
 
 
-def _part_ids(messages: list[NormalizedMessage], role: str, kind: str) -> set[str]:
+def _part_ids(
+    messages: list[NormalizedMessage],
+    role: str,
+    kind: str,
+    parsed: dict[str, list[dict[str, object]]],
+) -> set[str]:
     ids: set[str] = set()
     for message in messages:
         if message.role != role:
             continue
 
-        for part in parse_content_parts(message.content):
+        parts = parsed.get(message.content)
+        if parts is None:
+            parts = parse_content_parts(message.content)
+            parsed[message.content] = parts
+
+        for part in parts:
             call_id = part.get("id")
             if part.get("type") == kind and isinstance(call_id, str) and call_id:
                 ids.add(call_id)

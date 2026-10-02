@@ -12,12 +12,16 @@ from weave.trace_server.agents.types import (
     AgentSpanSchema,
 )
 
+# Model-requested call keys mapped to the emitted call; execution spans map to
+# None because they record their own result.
+SeenCalls = dict[tuple[str, str], AgentChatToolCall | None]
+
 
 def model_tool_call_messages(
     span: AgentSpanSchema,
     *,
     agent_name: str | None,
-    seen_call_ids: set[tuple[str, str, str]],
+    seen_call_ids: SeenCalls,
 ) -> list[AgentChatMessage]:
     """Project observed requests without claiming execution or success."""
     messages: list[AgentChatMessage] = []
@@ -35,17 +39,19 @@ def model_tool_call_messages(
                 continue
 
             call_id = part.get("id")
+            key: tuple[str, str] | None = None
             if isinstance(call_id, str) and call_id:
-                key = (span.project_id, span.trace_id, call_id)
+                key = (span.trace_id, call_id)
                 if key in seen_call_ids:
                     continue
-
-                seen_call_ids.add(key)
 
             arguments = part.get("arguments")
             if arguments is not None and not isinstance(arguments, str):
                 arguments = json.dumps(arguments)
 
+            tool_call = AgentChatToolCall(tool_name=name, tool_arguments=arguments)
+            if key is not None:
+                seen_call_ids[key] = tool_call
             messages.append(
                 AgentChatMessage(
                     type="tool_call",
@@ -53,10 +59,7 @@ def model_tool_call_messages(
                     agent_name=agent_name,
                     agent_version=span.agent_version,
                     started_at=span.ended_at or span.started_at,
-                    tool_call=AgentChatToolCall(
-                        tool_name=name,
-                        tool_arguments=arguments,
-                    ),
+                    tool_call=tool_call,
                 )
             )
 
@@ -67,7 +70,7 @@ def model_output_segments(
     span: AgentSpanSchema,
     *,
     agent_name: str | None,
-    seen_call_ids: set[tuple[str, str, str]],
+    seen_call_ids: SeenCalls,
 ) -> Iterator[tuple[list[NormalizedMessage], AgentChatMessage | None]]:
     """Split output at unmatched requests while retaining source order."""
     pending: list[NormalizedMessage] = []

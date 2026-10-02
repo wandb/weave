@@ -29,6 +29,7 @@ from weave.trace_server.agents.constants import (
     OP_INVOKE_AGENT,
 )
 from weave.trace_server.agents.model_tool_calls import (
+    SeenCalls,
     model_output_segments,
     model_tool_call_messages,
     parse_content_parts,
@@ -332,11 +333,13 @@ def build_chat_messages(
     if not spans:
         return []
 
+    # The default view keeps producer clock order; only the opt-in tool-evidence
+    # projection lets recorded dependencies override clocks.
     tree = build_span_tree(spans, causal_order=include_model_tool_calls)
     traversal = ChatTraversal(
         include_model_tool_calls=include_model_tool_calls,
         seen_call_ids={
-            (span.project_id, span.trace_id, span.tool_call_id)
+            (span.trace_id, span.tool_call_id): None
             for span in spans
             if span.operation_name in {OP_EXECUTE_TOOL, OP_INVOKE_AGENT}
             and span.tool_call_id
@@ -380,7 +383,7 @@ class ChatTraversal:
     """
 
     messages: list[AgentChatMessage] = field(default_factory=list)
-    seen_call_ids: set[tuple[str, str, str]] = field(default_factory=set)
+    seen_call_ids: SeenCalls = field(default_factory=dict)
     include_model_tool_calls: bool = False
     # True once any per-turn user message has been emitted during the walk;
     # gates the invoke_agent leading-prompt fallback in build_chat_messages.
@@ -1402,7 +1405,7 @@ def _ordered_model_output(
     assistant_event: AgentChatMessage,
     *,
     agent_name: str | None,
-    seen_call_ids: set[tuple[str, str, str]],
+    seen_call_ids: SeenCalls,
 ) -> list[AgentChatMessage]:
     """Interleave assistant content and requests without repeating span usage."""
     segments = list(
