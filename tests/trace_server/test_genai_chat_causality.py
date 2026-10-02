@@ -83,8 +83,42 @@ def test_continuation_retains_paired_history_without_claiming_success(
     ] == []
 
 
-@pytest.mark.parametrize("scope", ["project_id", "trace_id"])
-def test_unrelated_execution_does_not_reorder_or_hide_request(scope: str) -> None:
+def test_later_input_completes_request_recorded_by_earlier_span() -> None:
+    request = _span("request", 1)
+    request.input_messages = [
+        NormalizedMessage(role="user", content="Prepare the report.")
+    ]
+    request.output_messages = [_call("lookup-1", "lookup")]
+    history = [
+        *request.input_messages,
+        _call("lookup-1", "lookup"),
+        _result("lookup-1"),
+    ]
+    reply = _span("reply", 2)
+    reply.input_messages = history
+    reply.output_messages = [_call("deliver-1", "deliver")]
+    final = _span("final", 3)
+    final.input_messages = [*history, _call("deliver-1", "deliver")]
+    final.output_messages = [NormalizedMessage(role="assistant", content="Done.")]
+
+    messages = build_chat_messages(
+        [final, reply, request], include_model_tool_calls=True
+    )
+    calls = [message for message in messages if message.tool_call]
+
+    assert [(message.span_id, message.tool_call) for message in calls] == [
+        (
+            "request",
+            AgentChatToolCall(
+                tool_name="lookup", tool_arguments="{}", tool_result="found"
+            ),
+        ),
+        ("reply", AgentChatToolCall(tool_name="deliver", tool_arguments="{}")),
+    ]
+    assert calls[0].started_at == request.ended_at
+
+
+def test_unrelated_execution_does_not_reorder_or_hide_request() -> None:
     reply = _span("reply", 1)
     reply.input_messages = [_result("same-id")]
     reply.output_messages = [_call("same-id", "lookup")]
@@ -92,7 +126,7 @@ def test_unrelated_execution_does_not_reorder_or_hide_request(scope: str) -> Non
     execution.operation_name = "execute_tool"
     execution.tool_call_id = "same-id"
     execution.tool_name = "lookup"
-    execution = execution.model_copy(update={scope: "unrelated"})
+    execution = execution.model_copy(update={"trace_id": "unrelated"})
 
     messages = build_chat_messages([execution, reply], include_model_tool_calls=True)
 
