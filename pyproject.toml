@@ -674,8 +674,8 @@ forbidden_modules = ["weave.trace_server"]
 allow_indirect_imports = true
 # TEMPORARY: existing client -> trace_server imports to untangle. Do not add.
 # Most of these reach for the server's interface/contract surface
-# (trace_server_interface, service_interface, common_interface, interface.*,
-# errors) — the natural target to extract into a neutral contract package as
+# (trace_server_interface, service_interface, common_interface, interface.*)
+# the natural target to extract into a neutral contract package as
 # untangling proceeds.
 ignore_imports = [
   "weave.durability.wal_sender -> weave.trace_server.trace_server_interface",
@@ -700,16 +700,12 @@ ignore_imports = [
   "weave.trace.feedback -> weave.trace_server.interface.query",
   "weave.trace.feedback -> weave.trace_server.trace_server_interface",
   "weave.trace.interface_query_builder -> weave.trace_server.interface.query",
-  "weave.trace.project_id_resolver -> weave.trace_server.errors",
   "weave.trace.project_id_resolver -> weave.trace_server.trace_server_interface",
-  "weave.trace.refs -> weave.trace_server.errors",
   "weave.trace.serialization.custom_objs -> weave.trace_server.trace_server_interface",
   "weave.trace.serialization.serialize -> weave.trace_server.interface.builtin_object_classes.builtin_object_registry",
   "weave.trace.serialization.serialize -> weave.trace_server.trace_server_interface",
-  "weave.trace.vals -> weave.trace_server.errors",
   "weave.trace.vals -> weave.trace_server.trace_server_interface",
   "weave.trace.weave_client -> weave.trace_server.common_interface",
-  "weave.trace.weave_client -> weave.trace_server.errors",
   "weave.trace.weave_client -> weave.trace_server.interface.feedback_types",
   "weave.trace.weave_client -> weave.trace_server.trace_server_converter",
   "weave.trace.weave_client -> weave.trace_server.trace_server_interface",
@@ -721,7 +717,6 @@ ignore_imports = [
   "weave.trace_server_bindings.client_interface -> weave.trace_server.trace_server_interface",
   "weave.trace_server_bindings.delegating_trace_server -> weave.trace_server.service_interface",
   "weave.trace_server_bindings.delegating_trace_server -> weave.trace_server.trace_server_interface",
-  "weave.trace_server_bindings.http_utils -> weave.trace_server.errors",
   "weave.trace_server_bindings.http_utils -> weave.trace_server.trace_server_interface",
   "weave.trace_server_bindings.link_asset_to_registry -> weave.trace_server.common_interface",
   "weave.trace_server_bindings.models -> weave.trace_server.trace_server_interface",
