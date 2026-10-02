@@ -1,6 +1,6 @@
 """Order each tool execution directly after the model span that requested it."""
 
-from weave.trace_server.agents.constants import OP_EXECUTE_TOOL, OP_INVOKE_AGENT
+from weave.trace_server.agents.constants import TOOL_EXECUTION_OPS
 from weave.trace_server.agents.model_tool_calls import parse_content_parts
 from weave.trace_server.agents.types import AgentSpanSchema
 
@@ -9,7 +9,7 @@ def causal_span_order(spans: list[AgentSpanSchema]) -> list[int]:
     """Return clock order with each execution moved behind its unique requester."""
     requesters: dict[tuple[str, str], set[int]] = {}
     for index, span in enumerate(spans):
-        if span.operation_name in {OP_EXECUTE_TOOL, OP_INVOKE_AGENT}:
+        if span.operation_name in TOOL_EXECUTION_OPS:
             continue
 
         for call_id in _requested_call_ids(span):
@@ -20,10 +20,7 @@ def causal_span_order(spans: list[AgentSpanSchema]) -> list[int]:
     anchors: list[int] = []
     for index, span in enumerate(spans):
         anchor = index
-        if (
-            span.operation_name in {OP_EXECUTE_TOOL, OP_INVOKE_AGENT}
-            and span.tool_call_id
-        ):
+        if span.operation_name in TOOL_EXECUTION_OPS and span.tool_call_id:
             origins = requesters.get((span.trace_id, span.tool_call_id), set())
             if len(origins) == 1:
                 anchor = next(iter(origins))

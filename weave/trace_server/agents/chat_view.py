@@ -27,6 +27,7 @@ from weave.trace_server.agents.constants import (
     MAX_WALK_DEPTH,
     OP_EXECUTE_TOOL,
     OP_INVOKE_AGENT,
+    TOOL_EXECUTION_OPS,
 )
 from weave.trace_server.agents.model_tool_calls import (
     model_output_segments,
@@ -339,8 +340,7 @@ def build_chat_messages(
         seen_call_ids={
             (span.trace_id, span.tool_call_id)
             for span in spans
-            if span.operation_name in {OP_EXECUTE_TOOL, OP_INVOKE_AGENT}
-            and span.tool_call_id
+            if span.operation_name in TOOL_EXECUTION_OPS and span.tool_call_id
         },
     )
     traversal.walk_roots(tree)

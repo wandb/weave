@@ -128,6 +128,10 @@ MAX_INGEST_ERRORS_REPORTED = 20
 OP_INVOKE_AGENT = "invoke_agent"
 OP_EXECUTE_TOOL = "execute_tool"
 
+# Operations that answer a model's tool call: their `tool_call_id` matches a
+# request in a model span's output. `invoke_agent` covers sub-agents run as tools.
+TOOL_EXECUTION_OPS: frozenset[str] = frozenset({OP_EXECUTE_TOOL, OP_INVOKE_AGENT})
+
 # ---------------------------------------------------------------------------
 # Agent-span monitor op names
 # ---------------------------------------------------------------------------
