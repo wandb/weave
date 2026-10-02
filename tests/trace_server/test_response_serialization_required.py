@@ -1,12 +1,16 @@
-"""Serialization JSON Schema for response *Res models marks defaults required."""
+"""Response *Res models describe themselves well enough for the client generators."""
 
 from __future__ import annotations
 
+import datetime
+import json
 from typing import Any
 
 from pydantic import BaseModel
 
 from weave.trace_server.trace_server_interface import (
+    CallsScoreRes,
+    CallStatsRes,
     CallsUsageReq,
     CallsUsageRes,
     CustomRuntimeApplyReq,
@@ -20,6 +24,8 @@ from weave.trace_server.trace_server_interface import (
     EvaluationStatusRunning,
     FeedbackAggregateBucket,
     FeedbackAggregateRes,
+    FeedbackPurgeRes,
+    FeedbackStatsRes,
     GenAISpanRef,
     ImageGenerationCreateRes,
     LLMAggregatedUsage,
@@ -41,7 +47,19 @@ _RESPONSE_ROOTS = (
     DatasetSourcesQueryRes,
     DatasetSourcesLinkRes,
     ProjectTTLSettingsReadRes,
+    CallStatsRes,
+    FeedbackStatsRes,
 )
+
+_BUCKET_EXTRA_VALUE = {"type": ["integer", "number", "string", "null"]}
+
+_BUCKET_PROPERTIES = {
+    "UsageBucket": {"timestamp": "string", "model": "string", "count": "integer"},
+    "CallBucket": {"timestamp": "string", "count": "integer"},
+    "FeedbackStatsBucket": {"timestamp": "string", "count": "integer"},
+}
+
+_TS = datetime.datetime(2026, 1, 1, tzinfo=datetime.timezone.utc)
 
 
 def _schemas_with_properties(
@@ -132,3 +150,50 @@ def test_response_models_constructor_and_dump_keep_defaults() -> None:
 
     ttl = ProjectTTLSettingsReadRes()
     assert ttl.model_dump()["retention_days"] is None
+
+
+def test_empty_responses_are_marked_empty_objects() -> None:
+    # Without the marker a property-less object carries no type information, and the
+    # generators fall back to an untyped response. The wire is `{}` either way.
+    for model in (CallsScoreRes, FeedbackPurgeRes):
+        schema = model.model_json_schema(mode="serialization")
+        assert schema.get("properties") == {}
+        assert schema["x-stainless-empty-object"] is True
+
+
+def test_stats_buckets_name_their_keys_and_type_their_extras() -> None:
+    for model, bucket_names in (
+        (CallStatsRes, ("UsageBucket", "CallBucket")),
+        (FeedbackStatsRes, ("FeedbackStatsBucket",)),
+    ):
+        defs = model.model_json_schema(mode="serialization")["$defs"]
+        for name in bucket_names:
+            props = {
+                key: sub.get("type") for key, sub in defs[name]["properties"].items()
+            }
+            assert props == _BUCKET_PROPERTIES[name]
+            assert defs[name]["additionalProperties"] == _BUCKET_EXTRA_VALUE
+
+
+def test_stats_bucket_extras_stay_untouched() -> None:
+    # Naming three keys must not turn the bucket into an object or coerce the rest.
+    bucket = {
+        "timestamp": _TS.isoformat(),
+        "model": "gpt-4o",
+        "count": 2,
+        "count_input_tokens": 2,
+        "sum_input_tokens": 1200.0,
+        "max_total_tokens": None,
+        "min_label": "cat",
+    }
+    res = CallStatsRes(
+        start=_TS,
+        end=_TS,
+        granularity=3600,
+        timezone="UTC",
+        usage_buckets=[bucket],
+    )
+    assert res.usage_buckets == [bucket]
+    dumped = json.loads(res.model_dump_json())["usage_buckets"][0]
+    assert dumped == bucket
+    assert isinstance(dumped["count_input_tokens"], int)
