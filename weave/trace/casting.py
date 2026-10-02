@@ -2,8 +2,8 @@ from typing import Annotated, Any
 
 import pydantic
 
+from weave.shared.interface.query import Query
 from weave.trace_server.common_interface import SortBy
-from weave.trace_server.interface.query import Query
 from weave.trace_server.trace_server_interface import CallsFilter
 
 
