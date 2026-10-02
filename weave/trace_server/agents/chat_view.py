@@ -29,13 +29,11 @@ from weave.trace_server.agents.constants import (
     OP_INVOKE_AGENT,
 )
 from weave.trace_server.agents.model_tool_calls import (
-    SeenCalls,
     model_output_segments,
     model_tool_call_messages,
     parse_content_parts,
 )
 from weave.trace_server.agents.schema import NormalizedMessage, StatusCodeLiteral
-from weave.trace_server.agents.tool_history import attach_input_tool_results
 from weave.trace_server.agents.types import (
     AgentChatAgentStart,
     AgentChatAssistantMessage,
@@ -339,7 +337,7 @@ def build_chat_messages(
     traversal = ChatTraversal(
         include_model_tool_calls=include_model_tool_calls,
         seen_call_ids={
-            (span.trace_id, span.tool_call_id): None
+            (span.trace_id, span.tool_call_id)
             for span in spans
             if span.operation_name in {OP_EXECUTE_TOOL, OP_INVOKE_AGENT}
             and span.tool_call_id
@@ -383,7 +381,7 @@ class ChatTraversal:
     """
 
     messages: list[AgentChatMessage] = field(default_factory=list)
-    seen_call_ids: SeenCalls = field(default_factory=dict)
+    seen_call_ids: set[tuple[str, str]] = field(default_factory=set)
     include_model_tool_calls: bool = False
     # True once any per-turn user message has been emitted during the walk;
     # gates the invoke_agent leading-prompt fallback in build_chat_messages.
@@ -596,8 +594,6 @@ class ChatTraversal:
         agent_name = _agent_label(span, nearest_agent)
         self._emit_system_instructions(span, agent_name)
         self._emit_user_turn(span, agent_name)
-        if self.include_model_tool_calls:
-            attach_input_tool_results(span, self.seen_call_ids)
         child_message_start = len(self.messages)
         subtree_emitted_assistant = self._walk_children(
             node, nearest_agent=agent_name, depth=depth
@@ -1401,7 +1397,7 @@ def _ordered_model_output(
     assistant_event: AgentChatMessage,
     *,
     agent_name: str | None,
-    seen_call_ids: SeenCalls,
+    seen_call_ids: set[tuple[str, str]],
 ) -> list[AgentChatMessage]:
     """Interleave assistant content and requests without repeating span usage."""
     segments = list(

@@ -48,50 +48,6 @@ def test_execution_follows_its_request_whatever_the_tool_clock(
     )
 
 
-@pytest.mark.parametrize("response_role", ["tool", "user"])
-def test_later_input_completes_request_recorded_by_earlier_span(
-    response_role: str,
-) -> None:
-    request = _span("request", 1)
-    request.input_messages = [
-        NormalizedMessage(role="user", content="Prepare the report.")
-    ]
-    request.output_messages = [_call("lookup-1", "lookup")]
-    history = [
-        *request.input_messages,
-        _call("lookup-1", "lookup"),
-        _result("lookup-1").model_copy(update={"role": response_role}),
-    ]
-    reply = _span("reply", 2)
-    reply.input_messages = history
-    reply.output_messages = [_call("deliver-1", "deliver")]
-    final = _span("final", 3)
-    final.input_messages = [*history, _call("deliver-1", "deliver")]
-    final.output_messages = [NormalizedMessage(role="assistant", content="Done.")]
-
-    messages = build_chat_messages(
-        [final, reply, request], include_model_tool_calls=True
-    )
-    calls = [message for message in messages if message.tool_call]
-
-    # A response proves the call returned, not that it succeeded: status stays unset.
-    assert [(message.span_id, message.tool_call) for message in calls] == [
-        (
-            "request",
-            AgentChatToolCall(
-                tool_name="lookup", tool_arguments="{}", tool_result="found"
-            ),
-        ),
-        ("reply", AgentChatToolCall(tool_name="deliver", tool_arguments="{}")),
-    ]
-    assert calls[0].started_at == request.ended_at
-    assert [
-        message.tool_call
-        for message in build_chat_messages([final, reply, request])
-        if message.tool_call
-    ] == []
-
-
 def test_unrelated_or_ambiguous_execution_keeps_clock_position() -> None:
     reply = _span("reply", 1)
     reply.input_messages = [_result("same-id")]
