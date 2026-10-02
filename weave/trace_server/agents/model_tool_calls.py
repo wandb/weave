@@ -17,7 +17,7 @@ def model_tool_call_messages(
     span: AgentSpanSchema,
     *,
     agent_name: str | None,
-    seen_call_ids: set[tuple[str, str]],
+    seen_call_ids: set[tuple[str, str, str]],
 ) -> list[AgentChatMessage]:
     """Project observed requests without claiming execution or success."""
     messages: list[AgentChatMessage] = []
@@ -36,7 +36,7 @@ def model_tool_call_messages(
 
             call_id = part.get("id")
             if isinstance(call_id, str) and call_id:
-                key = (span.trace_id, call_id)
+                key = (span.project_id, span.trace_id, call_id)
                 if key in seen_call_ids:
                     continue
 
@@ -67,7 +67,7 @@ def model_output_segments(
     span: AgentSpanSchema,
     *,
     agent_name: str | None,
-    seen_call_ids: set[tuple[str, str]],
+    seen_call_ids: set[tuple[str, str, str]],
 ) -> Iterator[tuple[list[NormalizedMessage], AgentChatMessage | None]]:
     """Split output at unmatched requests while retaining source order."""
     pending: list[NormalizedMessage] = []

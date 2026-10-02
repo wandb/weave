@@ -22,6 +22,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 
 from weave.shared.refs_internal import WEAVE_INTERNAL_SCHEME
+from weave.trace_server.agents.causal_order import causal_span_order
 from weave.trace_server.agents.constants import (
     MAX_WALK_DEPTH,
     OP_EXECUTE_TOOL,
@@ -33,6 +34,7 @@ from weave.trace_server.agents.model_tool_calls import (
     parse_content_parts,
 )
 from weave.trace_server.agents.schema import NormalizedMessage, StatusCodeLiteral
+from weave.trace_server.agents.tool_history import input_tool_history
 from weave.trace_server.agents.types import (
     AgentChatAgentStart,
     AgentChatAssistantMessage,
@@ -330,11 +332,11 @@ def build_chat_messages(
     if not spans:
         return []
 
-    tree = build_span_tree(spans)
+    tree = build_span_tree(spans, causal_order=include_model_tool_calls)
     traversal = ChatTraversal(
         include_model_tool_calls=include_model_tool_calls,
         seen_call_ids={
-            (span.trace_id, span.tool_call_id)
+            (span.project_id, span.trace_id, span.tool_call_id)
             for span in spans
             if span.operation_name in {OP_EXECUTE_TOOL, OP_INVOKE_AGENT}
             and span.tool_call_id
@@ -378,7 +380,7 @@ class ChatTraversal:
     """
 
     messages: list[AgentChatMessage] = field(default_factory=list)
-    seen_call_ids: set[tuple[str, str]] = field(default_factory=set)
+    seen_call_ids: set[tuple[str, str, str]] = field(default_factory=set)
     include_model_tool_calls: bool = False
     # True once any per-turn user message has been emitted during the walk;
     # gates the invoke_agent leading-prompt fallback in build_chat_messages.
@@ -591,6 +593,12 @@ class ChatTraversal:
         agent_name = _agent_label(span, nearest_agent)
         self._emit_system_instructions(span, agent_name)
         self._emit_user_turn(span, agent_name)
+        if self.include_model_tool_calls:
+            self.messages.extend(
+                input_tool_history(
+                    span, agent_name=agent_name, seen_call_ids=self.seen_call_ids
+                )
+            )
         child_message_start = len(self.messages)
         subtree_emitted_assistant = self._walk_children(
             node, nearest_agent=agent_name, depth=depth
@@ -762,7 +770,9 @@ class ChatTraversal:
         return emitted_assistant
 
 
-def build_span_tree(spans: list[AgentSpanSchema]) -> list[SpanNode]:
+def build_span_tree(
+    spans: list[AgentSpanSchema], *, causal_order: bool = False
+) -> list[SpanNode]:
     """Build a parent-child tree from flat spans, sorted by start time."""
     node_map = {s.span_id: SpanNode(span=s) for s in spans}
     roots: list[SpanNode] = []
@@ -783,6 +793,9 @@ def build_span_tree(spans: list[AgentSpanSchema]) -> list[SpanNode]:
 
     def _sort(nodes: list[SpanNode]) -> None:
         nodes.sort(key=_span_node_sort_key)
+        if causal_order:
+            order = causal_span_order([node.span for node in nodes])
+            nodes[:] = [nodes[index] for index in order]
         for n in nodes:
             _sort(n.children)
 
@@ -1389,7 +1402,7 @@ def _ordered_model_output(
     assistant_event: AgentChatMessage,
     *,
     agent_name: str | None,
-    seen_call_ids: set[tuple[str, str]],
+    seen_call_ids: set[tuple[str, str, str]],
 ) -> list[AgentChatMessage]:
     """Interleave assistant content and requests without repeating span usage."""
     segments = list(
