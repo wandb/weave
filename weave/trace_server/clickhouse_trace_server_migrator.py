@@ -42,10 +42,9 @@
   - Skips altering the distributed table
 
 **ALTER TABLE ... MODIFY QUERY (materialized views):**
-  - Uses DROP/CREATE pattern instead of ALTER
-  - Drops `view_name_local` ON CLUSTER
-  - Creates `view_name_local` ON CLUSTER with `TO target_table_local`
-  - All `FROM` clauses and qualified column references renamed to `_local` suffix
+  - Alters the existing view, preserving its destination table.
+  - Atomic databases rewrite view and source names to `_local` and add ON CLUSTER.
+  - Legacy Replicated databases retain their original view and source names.
 
 **CREATE VIEW (non-materialized):**
   - Only adds `ON CLUSTER` clause (regular views are metadata-only, no local/distributed split)
@@ -157,9 +156,6 @@ def _is_transient_ch_error(exc: BaseException) -> bool:
 # self managed clickhouse instances.
 DEFAULT_REPLICATED_PATH = "/clickhouse/tables/{db}"
 DEFAULT_REPLICATED_CLUSTER = "weave_cluster"
-
-# Constants for table naming conventions
-VIEW_SUFFIX = "_view"
 
 # Schema for the migration tracking table (shared across all migrator variants)
 _MIGRATIONS_TABLE_COLUMNS = """
@@ -514,11 +510,6 @@ class BaseClickHouseTraceServerMigrator(ABC):
         is not consulted); a requested downgrade resumes after the flag clears.
         Only the expected next version, and only an idempotent one, is recovered;
         anything else, or a re-run failure, falls back to requiring manual repair.
-
-        Convergence is schema-level: in distributed/replicated mode a re-run of a
-        MODIFY QUERY drops and recreates the `_local` materialized view, so rows
-        inserted in that window are not aggregated into the target until the next
-        write. Data already at rest is unaffected.
         """
         migration = self._get_migrations().get(partial_version)
         if (
@@ -1374,40 +1365,18 @@ class DistributedClickHouseTraceServerMigrator(ReplicatedClickHouseTraceServerMi
 
     def _execute_materialized_view_alter(self, command: str) -> None:
         """Handle ALTER TABLE MODIFY QUERY for materialized views in distributed mode."""
-        view_name = self._extract_alter_table_name(command)
-        if not view_name:
-            raise MigrationError(f"Could not extract view name from: {command}")
+        db = self.ch_client.database
+        if db is None:
+            raise MigrationError("Materialized view alteration requires a database")
 
-        # Extract SELECT query
-        modify_query_match = re.search(
-            r"MODIFY\s+QUERY\s+(SELECT.+)",
-            command,
-            flags=re.IGNORECASE | re.DOTALL,
-        )
-        if not modify_query_match:
-            raise MigrationError(
-                f"Could not extract query from MODIFY QUERY: {command}"
-            )
+        if self._uses_replicated_db_engine(db):
+            self._run_ddl_with_retry(command)
+            return
 
-        select_query = modify_query_match.group(1).strip()
-        select_query_local = self._rename_from_tables_to_local(select_query)
-
-        # Determine local view and target table names
-        view_name_local = self._add_local_suffix(view_name)
-        if view_name.endswith(VIEW_SUFFIX):
-            target_table = (
-                view_name[: -len(VIEW_SUFFIX)] + ch_settings.LOCAL_TABLE_SUFFIX
-            )
-        else:
-            target_table = view_name + ch_settings.LOCAL_TABLE_SUFFIX
-
-        # DROP and CREATE the materialized view
-        on_cluster = self._get_on_cluster_clause(self.ch_client.database)
-        drop_statement = f"DROP TABLE IF EXISTS {view_name_local}{on_cluster}"
-        self._run_ddl_with_retry(drop_statement)
-
-        create_statement = f"CREATE MATERIALIZED VIEW {view_name_local}{on_cluster}\nTO {target_table}\nAS\n{select_query_local}"
-        self._run_ddl_with_retry(create_statement)
+        local_command = self._rename_alter_table_to_local(command)
+        local_command = self._rename_from_tables_to_local(local_command)
+        local_command = self._add_on_cluster_clause(local_command, target_db=db)
+        self._run_ddl_with_retry(local_command)
 
     def _execute_materialized_view_create(self, command: str) -> None:
         """Handle CREATE MATERIALIZED VIEW in distributed mode.
@@ -1600,14 +1569,6 @@ class DistributedClickHouseTraceServerMigrator(ReplicatedClickHouseTraceServerMi
             return f"{match.group(1)}{table_name}{match.group(3)}"
 
         return SQLPatterns.ALTER_TABLE_NAME_PATTERN.sub(add_suffix, sql_query)
-
-    @staticmethod
-    def _extract_alter_table_name(sql_query: str) -> str | None:
-        """Extract table name from ALTER TABLE statement."""
-        match = SQLPatterns.ALTER_TABLE.search(sql_query)
-        if match:
-            return match.group(1)
-        return None
 
     @staticmethod
     def _rename_from_tables_to_local(sql_query: str) -> str:
