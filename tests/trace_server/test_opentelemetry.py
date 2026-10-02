@@ -438,7 +438,7 @@ class TestPythonSpans:
             start_call.op_name == py_span.name
         )  # This should be using the shortened name if necessary
         assert start_call.trace_id == py_span.trace_id
-        assert start_call.started_at == py_span.start_time
+        assert start_call.started_at.timestamp() == py_span.start_time.timestamp()
 
     def test_span_to_call_long_name(self):
         """Test that span names are properly shortened when too long."""
@@ -481,7 +481,7 @@ class TestPythonSpans:
         assert isinstance(end_call, tsi.EndedCallSchemaForInsert)
         assert end_call.project_id == "test_project"
         assert end_call.id == py_span.span_id
-        assert end_call.ended_at == py_span.end_time
+        assert end_call.ended_at.timestamp() == py_span.end_time.timestamp()
         assert end_call.exception is None
 
     def test_span_to_call_with_turn_and_thread(self):
