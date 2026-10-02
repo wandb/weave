@@ -35,7 +35,7 @@ from weave.trace_server.agents.model_tool_calls import (
     parse_content_parts,
 )
 from weave.trace_server.agents.schema import NormalizedMessage, StatusCodeLiteral
-from weave.trace_server.agents.tool_history import input_tool_history
+from weave.trace_server.agents.tool_history import attach_input_tool_results
 from weave.trace_server.agents.types import (
     AgentChatAgentStart,
     AgentChatAssistantMessage,
@@ -597,11 +597,7 @@ class ChatTraversal:
         self._emit_system_instructions(span, agent_name)
         self._emit_user_turn(span, agent_name)
         if self.include_model_tool_calls:
-            self.messages.extend(
-                input_tool_history(
-                    span, agent_name=agent_name, seen_call_ids=self.seen_call_ids
-                )
-            )
+            attach_input_tool_results(span, self.seen_call_ids)
         child_message_start = len(self.messages)
         subtree_emitted_assistant = self._walk_children(
             node, nearest_agent=agent_name, depth=depth

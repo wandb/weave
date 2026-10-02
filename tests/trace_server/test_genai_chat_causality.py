@@ -48,36 +48,10 @@ def test_execution_follows_its_request_whatever_the_tool_clock(
     )
 
 
-@pytest.mark.parametrize("has_result", [False, True])
-def test_continuation_retains_paired_history_without_claiming_success(
-    has_result: bool,
+@pytest.mark.parametrize("response_role", ["tool", "user"])
+def test_later_input_completes_request_recorded_by_earlier_span(
+    response_role: str,
 ) -> None:
-    model = _span("continuation", 3)
-    model.input_messages = [
-        _call("old", "lookup"),
-        _result("old"),
-        NormalizedMessage(role="user", content="Prepare the report."),
-        _call("current", "lookup"),
-    ]
-    if has_result:
-        model.input_messages.append(_result("current"))
-    model.output_messages = [_call("reply", "deliver")]
-
-    messages = build_chat_messages([model], include_model_tool_calls=True)
-    calls = [message.tool_call for message in messages if message.tool_call]
-
-    expected = []
-    if has_result:
-        expected.append(
-            AgentChatToolCall(
-                tool_name="lookup", tool_arguments="{}", tool_result="found"
-            )
-        )
-    expected.append(AgentChatToolCall(tool_name="deliver", tool_arguments="{}"))
-    assert calls == expected
-
-
-def test_later_input_completes_request_recorded_by_earlier_span() -> None:
     request = _span("request", 1)
     request.input_messages = [
         NormalizedMessage(role="user", content="Prepare the report.")
@@ -86,7 +60,7 @@ def test_later_input_completes_request_recorded_by_earlier_span() -> None:
     history = [
         *request.input_messages,
         _call("lookup-1", "lookup"),
-        _result("lookup-1"),
+        _result("lookup-1").model_copy(update={"role": response_role}),
     ]
     reply = _span("reply", 2)
     reply.input_messages = history
