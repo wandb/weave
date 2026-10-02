@@ -5,15 +5,16 @@
 
      async_insert=0: synchronous inserts in CI for read-after-write consistency.
 
-     use_query_condition_cache=0: CH 26.2-26.5 return wrong results when a query
+     use_skip_indexes_on_data_read=0 / use_query_condition_cache=1: mirrors the
+     production ClickHouse profile. CH 26.2 returns wrong results when a query
      combines PREWHERE on a pk-prefix column with WHERE non-pk IN/= on a
-     skip-indexed column (our calls_merged trace_id bloom-filter CTE): the query
-     condition cache is poisoned and later reads under-count / drop rows. See
+     skip-indexed column (our calls_merged trace_id bloom-filter CTE) and skip
+     indexes are applied during data read: the query condition cache is poisoned
+     and later reads under-count / drop rows. See
      https://github.com/ClickHouse/ClickHouse/issues/104781 (fixed by PR #105686,
-     backported to 26.3/26.4/26.5 but not yet in the pinned image). conftest
-     disables it per-query, but only on trace-server reads; setting it
-     server-side also covers the direct clickhouse-connect queries
-     (truncate/migrate/etc.) that would otherwise poison the shared cache.
+     backported to 26.3+). Production avoids it with
+     use_skip_indexes_on_data_read=0 while leaving the cache on, so tests run
+     the same profile rather than disabling the cache.
 
      distributed_foreground_insert=1: by default ClickHouse buffers a
      Distributed INSERT locally and forwards async to the destination shard,
@@ -33,7 +34,8 @@
     <profiles>
         <default>
             <async_insert>0</async_insert>
-            <use_query_condition_cache>0</use_query_condition_cache>
+            <use_skip_indexes_on_data_read>0</use_skip_indexes_on_data_read>
+            <use_query_condition_cache>1</use_query_condition_cache>
             <distributed_foreground_insert>1</distributed_foreground_insert>
             <load_balancing>in_order</load_balancing>
         </default>
