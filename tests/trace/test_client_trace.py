@@ -60,6 +60,9 @@ from weave.trace_server.errors import (
     InvalidRequest,
     ObjectNameTypeCollision,
 )
+from weave.trace_server.external_to_internal_trace_server_adapter import (
+    ExternalTraceServer,
+)
 from weave.trace_server.ids import generate_id
 from weave.trace_server.token_costs import COST_OBJECT_NAME
 from weave.trace_server.validation_util import CHValidationError
@@ -2789,6 +2792,7 @@ def test_call_query_stream_columns_with_costs(client):
             project_id=client.project_id,
             columns=["id", "summary"],
             include_costs=True,
+            limit=1000,
         )
     )
     calls = list(calls)
@@ -2809,6 +2813,7 @@ def test_call_query_stream_columns_with_costs(client):
             project_id=client.project_id,
             columns=["id", "summary"],
             include_costs=True,
+            limit=1000,
         )
     )
     calls = list(calls)
@@ -2828,6 +2833,7 @@ def test_call_query_stream_columns_with_costs(client):
             project_id=client.project_id,
             columns=["id", "summary_dump"],
             include_costs=True,
+            limit=1000,
         )
     )
     calls = list(calls)
@@ -2841,6 +2847,7 @@ def test_call_query_stream_columns_with_costs(client):
             project_id=client.project_id,
             columns=["id"],
             include_costs=True,
+            limit=1000,
         )
     )
 
@@ -2887,6 +2894,7 @@ def test_call_query_stream_trace_name_column_with_costs(client):
                 project_id=client.project_id,
                 columns=["id", "summary.weave.trace_name"],
                 include_costs=True,
+                limit=1000,
             )
         )
     )
@@ -2900,10 +2908,11 @@ def test_call_query_stream_trace_name_column_with_costs(client):
     # summary.weave.trace_name with include_costs on calls_complete failed
     # with UNKNOWN_IDENTIFIER because the computed column wasn't in the
     # all_calls CTE SELECT).
+    adapter = find_server_layer(client.server, ExternalTraceServer)
     calls = list(
-        client.server.calls_query_stream(
+        adapter._internal_trace_server.calls_query_stream(
             tsi.CallsQueryReq(
-                project_id=client.project_id,
+                project_id=adapter._idc.ext_to_int_project_id(client.project_id),
                 columns=["id"],
                 include_costs=True,
                 sort_by=[
@@ -3023,6 +3032,7 @@ def test_call_read_with_unkown_llm(client):
             project_id=client.project_id,
             columns=["id", "summary", "output_dump"],
             include_costs=True,
+            limit=1000,
         )
     )
     calls = list(calls)
@@ -4887,6 +4897,7 @@ def test_call_query_stream_with_costs_and_storage_size(client):
                 project_id=get_client_project_id(client),
                 columns=["id", "summary", "total_storage_size_bytes"],
                 include_costs=True,
+                limit=1000,
                 include_total_storage_size=True,
             )
         )

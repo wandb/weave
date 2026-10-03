@@ -11,7 +11,7 @@ from weave.shared.trace_server_interface_util import extract_refs_from_values
 from weave.trace_server import common_interface
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.common_interface import BaseModelStrict
-from weave.trace_server.errors import NotFoundError
+from weave.trace_server.errors import InvalidRequest, NotFoundError
 from weave.trace_server.external_to_internal_trace_server_adapter import (
     ExternalTraceServer,
     IdConverter,
@@ -310,6 +310,64 @@ def test_adapter_does_not_mutate_req_when_inner_raises(
         getattr(adapter, method_name)(req)
 
     assert req.model_dump() == snapshot
+
+
+def test_external_cost_query_requires_limit_or_call_ids() -> None:
+    inner = MagicMock(spec=tsi.FullTraceServerInterface)
+    idc = MagicMock(spec=_EncodingIdConverter, wraps=_EncodingIdConverter())
+    adapter = ExternalTraceServer(inner, idc)
+    req = tsi.CallsQueryReq(project_id="ent/proj", include_costs=True)
+
+    with pytest.raises(InvalidRequest, match="require a limit"):
+        adapter.calls_query(req)
+
+    inner.calls_query.assert_not_called()
+    idc.ext_to_int_project_id.assert_not_called()
+
+
+def test_external_cost_stream_query_requires_limit_or_call_ids() -> None:
+    inner = MagicMock(spec=tsi.FullTraceServerInterface)
+    idc = MagicMock(spec=_EncodingIdConverter, wraps=_EncodingIdConverter())
+    adapter = ExternalTraceServer(inner, idc)
+    req = tsi.CallsQueryReq(project_id="ent/proj", include_costs=True)
+
+    with pytest.raises(InvalidRequest, match="require a limit"):
+        next(adapter.calls_query_stream(req))
+
+    inner.calls_query_stream.assert_not_called()
+    idc.ext_to_int_project_id.assert_not_called()
+
+
+def test_external_cost_query_rejects_empty_call_ids_without_limit() -> None:
+    inner = MagicMock(spec=tsi.FullTraceServerInterface)
+    adapter = ExternalTraceServer(inner, _EncodingIdConverter())
+
+    with pytest.raises(InvalidRequest, match="require a limit"):
+        adapter.calls_query(
+            tsi.CallsQueryReq(
+                project_id="ent/proj",
+                include_costs=True,
+                filter=tsi.CallsFilter(call_ids=[]),
+            )
+        )
+
+    inner.calls_query.assert_not_called()
+
+
+def test_external_cost_query_allows_bounded_call_ids() -> None:
+    inner = MagicMock(spec=tsi.FullTraceServerInterface)
+    inner.calls_query.return_value = tsi.CallsQueryRes(calls=[])
+    adapter = ExternalTraceServer(inner, _EncodingIdConverter())
+
+    adapter.calls_query(
+        tsi.CallsQueryReq(
+            project_id="ent/proj",
+            include_costs=True,
+            filter=tsi.CallsFilter(call_ids=["call-1"]),
+        )
+    )
+
+    inner.calls_query.assert_called_once()
 
 
 def test_export_adapter_converts_project_id_and_delegates() -> None:
