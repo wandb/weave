@@ -1590,6 +1590,7 @@ class TestSemanticConventionParsing:
             tsi.CallsQueryReq(
                 project_id=project_id,
                 include_costs=True,
+                limit=1000,
             )
         )
 
