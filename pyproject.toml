@@ -55,15 +55,19 @@ dependencies = [
   # Remove once license content filtering is upstreamed
   "polyfile-weave>=0.5.9",
 
+  # Conversation export builds a requests.Session. Exporter 1.45 no longer
+  # depends on requests, so it has to be declared here.
+  "requests>=2.32.0",
+
   # Conversation SDK — uses OTel GenAI semantic conventions for span emission
   "opentelemetry-api>=1.28.0",
   "opentelemetry-sdk>=1.28.0",
-  "opentelemetry-exporter-otlp-proto-http>=1.28.0,<1.45", # 1.45 removed the private _session and _certificate_file used by weave_init.py
+  "opentelemetry-exporter-otlp-proto-http>=1.28.0",
   # NOTE: do not pin opentelemetry-semantic-conventions. It ships transitively
-  # via opentelemetry-sdk, and pinning >=0.63b0 (sdk>=1.42) makes weave +
-  # google-adk (which pins sdk<=1.41.1) an unsatisfiable install. The ADK
-  # integration vendors the GenAI keys it needs in
-  # weave/integrations/google_adk/_semconv.py instead of importing them.
+  # via opentelemetry-sdk. google-adk 2.10.0 pins opentelemetry-sdk<=1.42.1,
+  # and older releases pin a lower sdk. Pinning a newer semconv here would
+  # make those installs unsatisfiable. The ADK integration vendors the GenAI
+  # keys it needs in weave/integrations/google_adk/_semconv.py.
 ]
 
 [project.optional-dependencies]
