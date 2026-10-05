@@ -1,5 +1,5 @@
 /**
- * Weave-specific OTel resource attribute keys attached to every span this
+ * W&B-specific OTel resource attribute keys attached to every span this
  * SDK emits. Not part of the GenAI semconv spec.
  */
 
@@ -10,7 +10,8 @@
 // project into the Resource pins routing to whatever project was first seen, so
 // a later `weave.init('ent/other')` would bleed its agent spans into the first
 // project. See genai/provider.ts and Python PR #7507.
-export const WEAVE_RESOURCE_ATTR = {
-  WEAVE_SDK_VERSION: 'weave.sdk.version',
-  WEAVE_SDK_LANGUAGE: 'weave.sdk.language',
+export const WANDB_RESOURCE_ATTR = {
+  WANDB_SDK_NAME: 'wandb.sdk.name',
+  WANDB_SDK_VERSION: 'wandb.sdk.version',
+  WANDB_SDK_LANGUAGE: 'wandb.sdk.language',
 } as const;

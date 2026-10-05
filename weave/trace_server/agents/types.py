@@ -79,6 +79,11 @@ AgentIntentSentiment = Literal[
     "delighted",
 ]
 AGENT_INTENT_SENTIMENTS = get_args(AgentIntentSentiment)
+# Insight filter fields whose values are stable topic ids rather than taxonomy names.
+TOPIC_INSIGHT_FIELDS = frozenset({"intent_topic_id", "failure_topic_id"})
+# Insight filter fields read from intent_signatures; every other field reads failures.
+INTENT_SIGNATURE_FIELDS = frozenset({"intent_category", "intent_sentiment"})
+AgentSignatureType = Literal["intent", "failure"]
 AgentSpanStatsAggregation = Literal[
     "sum",
     "avg",
@@ -872,7 +877,7 @@ class AgentInsightFilter(BaseModel):
                     f"failure_severity values must be one of: {allowed}; got: "
                     f"{', '.join(invalid)}"
                 )
-        is_topic_filter = self.field in {"intent_topic_id", "failure_topic_id"}
+        is_topic_filter = self.field in TOPIC_INSIGHT_FIELDS
         if is_topic_filter:
             normalized_topic_ids = []
             for value in self.values:
@@ -1214,6 +1219,9 @@ class AgentChatMessage(AgentResponseModel):
     agent_name: str | None = None
     agent_version: str | None = None
     status_code: StatusCodeLiteral | None = None
+    # Set together from the span's own fields when `status_code` is `ERROR`.
+    error_type: str | None = None
+    status_message: str | None = None
     started_at: datetime.datetime | None = None
 
     user_message: AgentChatUserMessage | None = None
@@ -1257,6 +1265,15 @@ class AgentTraceChatReq(BaseModel):
     project_id: str
     trace_id: str
     include_feedback: bool = False
+    include_model_tool_calls: bool = Field(
+        default=False,
+        description=(
+            "Include tool calls requested in model outputs, even when no execution span "
+            "was recorded, and place each execution span after the model span that "
+            "requested it. Requests without execution evidence have no status, duration, "
+            "or result. Defaults to false."
+        ),
+    )
 
 
 class AgentTraceChatRes(AgentResponseModel):
@@ -1317,6 +1334,15 @@ class AgentConversationChatReq(BaseModel):
         ),
     )
     include_feedback: bool = False
+    include_model_tool_calls: bool = Field(
+        default=False,
+        description=(
+            "Include tool calls requested in model outputs, even when no execution span "
+            "was recorded, and place each execution span after the model span that "
+            "requested it. Requests without execution evidence have no status, duration, "
+            "or result. Defaults to false."
+        ),
+    )
 
 
 class AgentConversationChatRes(AgentResponseModel):

@@ -133,6 +133,10 @@ from weave.trace_server.trace_server_interface import (
     TraceServerInterface,
 )
 from weave.trace_server.tracing import traced
+from weave.trace_server.ttl_settings import (
+    compute_expire_at,
+    get_project_retention_days,
+)
 
 if TYPE_CHECKING:
     from clickhouse_connect.driver.client import Client as CHClient
@@ -665,7 +669,9 @@ class AgentQueryHandler:
     def traces_chat(self, req: AgentTraceChatReq) -> AgentTraceChatRes:
         """Build chat trajectory for a single trace."""
         spans = self.trace_detail_spans(req.project_id, req.trace_id)
-        res = build_trace_chat(spans, req.trace_id)
+        res = build_trace_chat(
+            spans, req.trace_id, include_model_tool_calls=req.include_model_tool_calls
+        )
 
         if req.include_feedback:
             span_ids = [m.span_id for m in res.messages if m.span_id]
@@ -717,7 +723,9 @@ class AgentQueryHandler:
             spans_by_trace.setdefault(span.trace_id, []).append(span)
 
         turns = [
-            build_trace_chat(trace_spans, tid)
+            build_trace_chat(
+                trace_spans, tid, include_model_tool_calls=req.include_model_tool_calls
+            )
             for tid, trace_spans in spans_by_trace.items()
             if trace_spans
         ]
@@ -960,6 +968,15 @@ class AgentWriteHandler:
                 span_rows.append(row)
 
         if span_rows:
+            retention_days = get_project_retention_days(req.project_id, self._ch_client)
+
+            for row in span_rows:
+                # OTel parsing produces naive local timestamps; TTL expects UTC.
+                started_at = row.started_at.astimezone(datetime.timezone.utc)
+                expire_at = compute_expire_at(retention_days, started_at)
+                if expire_at is not None:
+                    row.expire_at = expire_at
+
             self.insert_spans(span_rows)
 
         if failure_counts:

@@ -204,6 +204,8 @@ class Message(BaseModel):
     context_compacted: Optional[MessageContextCompacted] = None
     """Payload for a context-window compaction event."""
 
+    error_type: Optional[str] = None
+
     feedback: Optional[List[MessageFeedback]] = None
 
     span_id: Optional[str] = None
@@ -211,6 +213,8 @@ class Message(BaseModel):
     started_at: Optional[datetime] = None
 
     status_code: Optional[Literal["UNSET", "OK", "ERROR"]] = None
+
+    status_message: Optional[str] = None
 
     tool_call: Optional[MessageToolCall] = None
     """Payload for a tool call timeline event."""

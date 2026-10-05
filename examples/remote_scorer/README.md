@@ -231,9 +231,11 @@ Weave treats a non-200 response as a scorer failure and records no feedback
 for that attempt. Weave does not follow redirects, so a redirect is also a
 failure. Retries depend on the request version:
 
-- A V2 agent-turn request that gets a `5xx`, `408`, or `429` response, or
-  times out, is sent again with the same `Idempotency-Key`, up to three
-  attempts within about 30 seconds.
+- A V2 agent-turn request that gets a `5xx`, `408`, or `429` response is sent
+  again with the same `Idempotency-Key`, up to three attempts within 30 seconds
+  of the first attempt. A timeout uses the whole 30 seconds, so a timed-out
+  request is not retried. If your endpoint cannot score a turn in time, return
+  `503` quickly rather than letting the request time out, so Weave retries it.
 - A V1 call request is sent once. No response or timeout is retried.
 
 In both versions, any other `4xx` is not retried, so return `4xx` for requests
