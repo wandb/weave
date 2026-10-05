@@ -13,6 +13,7 @@ from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.common_interface import BaseModelStrict
 from weave.trace_server.errors import InvalidRequest, NotFoundError
 from weave.trace_server.external_to_internal_trace_server_adapter import (
+    MAX_COSTS_QUERY_LIMIT,
     ExternalTraceServer,
     IdConverter,
 )
@@ -352,6 +353,38 @@ def test_external_cost_query_rejects_empty_call_ids_without_limit() -> None:
         )
 
     inner.calls_query.assert_not_called()
+
+
+def test_external_cost_query_rejects_limit_above_max() -> None:
+    inner = MagicMock(spec=tsi.FullTraceServerInterface)
+    adapter = ExternalTraceServer(inner, _EncodingIdConverter())
+
+    with pytest.raises(InvalidRequest, match="require a limit of at most 10,001"):
+        adapter.calls_query(
+            tsi.CallsQueryReq(
+                project_id="ent/proj",
+                include_costs=True,
+                limit=MAX_COSTS_QUERY_LIMIT + 1,
+            )
+        )
+
+    inner.calls_query.assert_not_called()
+
+
+def test_external_cost_query_allows_max_limit() -> None:
+    inner = MagicMock(spec=tsi.FullTraceServerInterface)
+    inner.calls_query.return_value = tsi.CallsQueryRes(calls=[])
+    adapter = ExternalTraceServer(inner, _EncodingIdConverter())
+
+    adapter.calls_query(
+        tsi.CallsQueryReq(
+            project_id="ent/proj",
+            include_costs=True,
+            limit=MAX_COSTS_QUERY_LIMIT,
+        )
+    )
+
+    inner.calls_query.assert_called_once()
 
 
 def test_external_cost_query_allows_bounded_call_ids() -> None:

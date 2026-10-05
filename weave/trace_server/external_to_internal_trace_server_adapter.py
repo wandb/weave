@@ -154,16 +154,20 @@ A = TypeVar("A")
 B = TypeVar("B")
 
 
+# The UI's largest cost page is 10,000 rows plus one overflow probe row.
+MAX_COSTS_QUERY_LIMIT = 10_001
+
+
 def _validate_calls_query_costs_limit(req: tsi.CallsQueryReq) -> None:
-    if (
-        req.include_costs is True
-        and req.limit is None
-        and not (req.filter is not None and req.filter.call_ids)
+    if req.include_costs is not True or (
+        req.filter is not None and req.filter.call_ids
     ):
+        return
+    if req.limit is None or req.limit > MAX_COSTS_QUERY_LIMIT:
         raise InvalidRequest(
-            "Calls queries with include_costs=true require a limit unless non-empty "
-            "call_ids are provided. Read larger result sets in pages; 1000 is the "
-            "recommended page size."
+            "Calls queries with include_costs=true require a limit of at most "
+            f"{MAX_COSTS_QUERY_LIMIT:,} unless non-empty call_ids are provided. "
+            "Read larger result sets in pages; 1000 is the recommended page size."
         )
 
 
