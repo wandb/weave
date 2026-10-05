@@ -1,12 +1,10 @@
 import {ReadableStream} from 'stream/web';
-import {type Api as TraceServerApi} from '../generated/traceServerApi';
 import {StringPrompt} from '../prompt';
 import * as registryLinkBindings from '../traceServerBindings/linkAssetToRegistry';
 import {WeaveClient} from '../weaveClient';
 import {ObjectRef} from '../weaveObject';
+import {stainlessPromise, stainlessReject} from './helpers/stainlessPromise';
 
-// Mock the TraceServerApi and WandbServerApi
-jest.mock('../generated/traceServerApi');
 jest.mock('../wandb/wandbServerApi');
 
 function createStreamFromCalls(calls: any[] = []) {
@@ -22,29 +20,28 @@ function createStreamFromCalls(calls: any[] = []) {
   return stream;
 }
 
-function mockStreamResponse(
-  api: jest.Mocked<TraceServerApi<any>>,
-  calls: any[]
-) {
+function mockStreamResponse(api: MockedTraceServer, calls: any[]) {
   const stream = createStreamFromCalls(calls);
-  (
-    api.calls.callsQueryStreamCallsStreamQueryPost as jest.Mock
-  ).mockResolvedValue({
-    body: stream,
-  } as any);
+  api.calls.streamQuery.mockReturnValue(
+    stainlessPromise(undefined, new Response(stream as any))
+  );
 }
 
-type MockedTraceServer = jest.Mocked<TraceServerApi<any>> & {
-  calls: {callsQueryStreamCallsStreamQueryPost: jest.Mock};
+type MockedTraceServer = {
+  calls: {streamQuery: jest.Mock; upsertBatch: jest.Mock; update: jest.Mock};
+  put: jest.Mock;
+  post: jest.Mock;
   agents: {
-    genaiAgentsQueryAgentsQueryPost: jest.Mock;
-    genaiAgentVersionsQueryAgentsAgentVersionsQueryPost: jest.Mock;
-    genaiCustomAttrsSchemaAgentsSpansCustomAttrsSchemaPost: jest.Mock;
-    genaiSearchAgentsSearchPost: jest.Mock;
-    genaiSpansQueryAgentsSpansQueryPost: jest.Mock;
-    genaiSpansStatsAgentsSpansStatsPost: jest.Mock;
-    genaiTracesChatAgentsTracesChatPost: jest.Mock;
-    genaiConversationChatAgentsConversationsChatPost: jest.Mock;
+    query: jest.Mock;
+    search: jest.Mock;
+    agentVersions: {query: jest.Mock};
+    spans: {
+      query: jest.Mock;
+      stats: jest.Mock;
+      customAttrsSchema: jest.Mock;
+    };
+    traces: {chat: jest.Mock};
+    conversations: {chat: jest.Mock};
   };
 };
 
@@ -55,21 +52,27 @@ describe('WeaveClient', () => {
   beforeEach(() => {
     mockTraceServerApi = {
       calls: {
-        callsQueryStreamCallsStreamQueryPost: jest.fn(),
+        streamQuery: jest.fn(),
+        upsertBatch: jest.fn(),
+        update: jest.fn(),
       },
+      put: jest.fn(),
+      post: jest.fn(),
       agents: {
-        genaiAgentsQueryAgentsQueryPost: jest.fn(),
-        genaiAgentVersionsQueryAgentsAgentVersionsQueryPost: jest.fn(),
-        genaiCustomAttrsSchemaAgentsSpansCustomAttrsSchemaPost: jest.fn(),
-        genaiSearchAgentsSearchPost: jest.fn(),
-        genaiSpansQueryAgentsSpansQueryPost: jest.fn(),
-        genaiSpansStatsAgentsSpansStatsPost: jest.fn(),
-        genaiTracesChatAgentsTracesChatPost: jest.fn(),
-        genaiConversationChatAgentsConversationsChatPost: jest.fn(),
+        query: jest.fn(),
+        search: jest.fn(),
+        agentVersions: {query: jest.fn()},
+        spans: {
+          query: jest.fn(),
+          stats: jest.fn(),
+          customAttrsSchema: jest.fn(),
+        },
+        traces: {chat: jest.fn()},
+        conversations: {chat: jest.fn()},
       },
     } as any;
     client = new WeaveClient({
-      traceServerApi: mockTraceServerApi,
+      traceServerApi: mockTraceServerApi as any,
       projectId: 'test-project',
     });
   });
@@ -79,12 +82,10 @@ describe('WeaveClient', () => {
     let runtimeClient: WeaveClient;
 
     beforeEach(() => {
-      register = jest.fn().mockResolvedValue({data: {name: 'support'}});
+      register = jest.fn().mockReturnValue(stainlessPromise({name: 'support'}));
       runtimeClient = new WeaveClient({
         traceServerApi: {
-          v2: {
-            customRuntimeApplyV2EntityProjectRuntimesRuntimeNamePut: register,
-          },
+          put: register,
         } as any,
         projectId: 'test-entity/test-project',
       });
@@ -100,20 +101,20 @@ describe('WeaveClient', () => {
       });
 
       expect(register).toHaveBeenCalledWith(
-        'test-entity',
-        'test-project',
-        'support/agent',
+        '/v2/test-entity/test-project/runtimes/support%2Fagent',
         {
-          base_url: 'https://agent.example/v1',
-          api_key_secret: 'AGENT_API_KEY',
-          headers: {'X-Tenant-ID': 'customer-1'},
-          runtime_ids: [
-            {id: 'support-v12'},
-            {id: 'support-canary', max_tokens: 8192},
-          ],
+          body: {
+            base_url: 'https://agent.example/v1',
+            api_key_secret: 'AGENT_API_KEY',
+            headers: {'X-Tenant-ID': 'customer-1'},
+            runtime_ids: [
+              {id: 'support-v12'},
+              {id: 'support-canary', max_tokens: 8192},
+            ],
+          },
         }
       );
-      expect(result).toEqual({data: {name: 'support'}});
+      expect(result.data).toEqual({name: 'support'});
     });
 
     it('supports header authentication without an API key secret', async () => {
@@ -125,14 +126,14 @@ describe('WeaveClient', () => {
       });
 
       expect(register).toHaveBeenCalledWith(
-        'test-entity',
-        'test-project',
-        'support',
+        '/v2/test-entity/test-project/runtimes/support',
         {
-          base_url: 'https://agent.example/v1',
-          api_key_secret: undefined,
-          headers: {Authorization: 'Custom token'},
-          runtime_ids: [{id: 'support-v12'}],
+          body: {
+            base_url: 'https://agent.example/v1',
+            api_key_secret: undefined,
+            headers: {Authorization: 'Custom token'},
+            runtime_ids: [{id: 'support-v12'}],
+          },
         }
       );
     });
@@ -152,9 +153,7 @@ describe('WeaveClient', () => {
       const result = await client.getCalls(filter, includeCosts, limit);
 
       expect(result).toEqual(mockCalls);
-      expect(
-        mockTraceServerApi.calls.callsQueryStreamCallsStreamQueryPost
-      ).toHaveBeenCalledWith({
+      expect(mockTraceServerApi.calls.streamQuery).toHaveBeenCalledWith({
         project_id: 'test-project',
         filter,
         query: undefined,
@@ -167,10 +166,7 @@ describe('WeaveClient', () => {
         expand_columns: undefined,
       });
 
-      (
-        mockTraceServerApi.calls
-          .callsQueryStreamCallsStreamQueryPost as jest.Mock
-      ).mockClear();
+      (mockTraceServerApi.calls.streamQuery as jest.Mock).mockClear();
       mockStreamResponse(mockTraceServerApi, mockCalls);
 
       // Test that the parameterless call signature is supported.
@@ -193,9 +189,7 @@ describe('WeaveClient', () => {
       });
 
       expect(result).toEqual(mockCalls);
-      expect(
-        mockTraceServerApi.calls.callsQueryStreamCallsStreamQueryPost
-      ).toHaveBeenCalledWith({
+      expect(mockTraceServerApi.calls.streamQuery).toHaveBeenCalledWith({
         project_id: 'test-project',
         filter: {},
         query: undefined,
@@ -232,9 +226,7 @@ describe('WeaveClient', () => {
       });
 
       expect(result).toEqual(mockCalls);
-      expect(
-        mockTraceServerApi.calls.callsQueryStreamCallsStreamQueryPost
-      ).toHaveBeenCalledWith({
+      expect(mockTraceServerApi.calls.streamQuery).toHaveBeenCalledWith({
         project_id: 'test-project',
         filter: {op_names: ['demo-op']},
         query,
@@ -258,12 +250,9 @@ describe('WeaveClient', () => {
         },
       });
 
-      (
-        mockTraceServerApi.calls
-          .callsQueryStreamCallsStreamQueryPost as jest.Mock
-      ).mockResolvedValue({
-        body: stream,
-      } as any);
+      mockTraceServerApi.calls.streamQuery.mockReturnValue(
+        stainlessPromise(undefined, new Response(stream as any))
+      );
 
       const result = await client.getCalls({});
 
@@ -273,16 +262,16 @@ describe('WeaveClient', () => {
 
   describe('Batch Processing', () => {
     let client: WeaveClient;
-    let mockTraceServerApi: jest.Mocked<TraceServerApi<any>>;
+    let mockTraceServerApi: MockedTraceServer;
 
     beforeEach(() => {
       mockTraceServerApi = {
-        call: {
-          callStartBatchCallUpsertBatchPost: jest.fn().mockResolvedValue({}),
+        calls: {
+          upsertBatch: jest.fn().mockReturnValue(stainlessPromise({})),
         },
       } as any;
       client = new WeaveClient({
-        traceServerApi: mockTraceServerApi,
+        traceServerApi: mockTraceServerApi as any,
         projectId: 'test-project',
         settings: {useCallsComplete: false},
       });
@@ -301,9 +290,7 @@ describe('WeaveClient', () => {
 
       await (client as any).processBatch();
 
-      expect(
-        mockTraceServerApi.call.callStartBatchCallUpsertBatchPost
-      ).toHaveBeenCalledWith({
+      expect(mockTraceServerApi.calls.upsertBatch).toHaveBeenCalledWith({
         batch: [{mode: 'start', req: smallData.data}],
       });
 
@@ -319,9 +306,7 @@ describe('WeaveClient', () => {
 
       await (client as any).processBatch();
 
-      expect(
-        mockTraceServerApi.call.callStartBatchCallUpsertBatchPost
-      ).toHaveBeenCalledWith({
+      expect(mockTraceServerApi.calls.upsertBatch).toHaveBeenCalledWith({
         batch: [
           {mode: 'start', req: {id: '1'}},
           {mode: 'start', req: {id: '2'}},
@@ -337,9 +322,7 @@ describe('WeaveClient', () => {
 
       await (client as any).processBatch();
 
-      expect(
-        mockTraceServerApi.call.callStartBatchCallUpsertBatchPost
-      ).toHaveBeenCalledWith({
+      expect(mockTraceServerApi.calls.upsertBatch).toHaveBeenCalledWith({
         batch: [
           {mode: 'start', req: {id: '3'}},
           {mode: 'start', req: {id: '4'}},
@@ -348,9 +331,7 @@ describe('WeaveClient', () => {
       });
       expect((client as any).callQueue.length).toBe(0);
 
-      expect(
-        mockTraceServerApi.call.callStartBatchCallUpsertBatchPost
-      ).toHaveBeenCalledTimes(2);
+      expect(mockTraceServerApi.calls.upsertBatch).toHaveBeenCalledTimes(2);
     });
 
     it('should handle API errors gracefully', async () => {
@@ -366,9 +347,9 @@ describe('WeaveClient', () => {
       (client as any).callQueue.push(...items);
 
       // First API call fails
-      (
-        mockTraceServerApi.call.callStartBatchCallUpsertBatchPost as jest.Mock
-      ).mockRejectedValueOnce(new Error('API Error'));
+      (mockTraceServerApi.calls.upsertBatch as jest.Mock).mockReturnValueOnce(
+        stainlessReject(new Error('API Error'))
+      );
 
       await (client as any).processBatch();
 
@@ -380,16 +361,14 @@ describe('WeaveClient', () => {
       expect((client as any).callQueue).toEqual(items);
 
       // Second API call succeeds
-      (
-        mockTraceServerApi.call.callStartBatchCallUpsertBatchPost as jest.Mock
-      ).mockResolvedValueOnce({});
+      (mockTraceServerApi.calls.upsertBatch as jest.Mock).mockReturnValueOnce(
+        stainlessPromise({})
+      );
 
       await (client as any).processBatch();
 
       // Verify items were processed in original order
-      expect(
-        mockTraceServerApi.call.callStartBatchCallUpsertBatchPost
-      ).toHaveBeenCalledWith({
+      expect(mockTraceServerApi.calls.upsertBatch).toHaveBeenCalledWith({
         batch: [
           {mode: 'start', req: {id: '1'}},
           {mode: 'start', req: {id: '2'}},
@@ -408,10 +387,8 @@ describe('WeaveClient', () => {
 
     it('should wait for all pending batches', async () => {
       // Simulate slow API
-      (
-        mockTraceServerApi.call.callStartBatchCallUpsertBatchPost as jest.Mock
-      ).mockImplementation(
-        () => new Promise(resolve => setTimeout(resolve, 50))
+      (mockTraceServerApi.calls.upsertBatch as jest.Mock).mockImplementation(
+        () => stainlessPromise({})
       );
 
       (client as any).callQueue.push(
@@ -447,8 +424,8 @@ describe('WeaveClient', () => {
   describe('getAgents', () => {
     it('gets agents from the server', async () => {
       const agents = [{agent_name: 'Assistant', total_input_tokens: 42}];
-      mockTraceServerApi.agents.genaiAgentsQueryAgentsQueryPost.mockResolvedValue(
-        {data: {agents, total_count: 1}} as any
+      mockTraceServerApi.agents.query.mockReturnValue(
+        stainlessPromise({agents, total_count: 1})
       );
 
       const result = await client.getAgents({
@@ -457,43 +434,39 @@ describe('WeaveClient', () => {
         sortBy: [{field: 'last_seen', direction: 'desc'}],
       });
 
-      expect(
-        mockTraceServerApi.agents.genaiAgentsQueryAgentsQueryPost
-      ).toHaveBeenCalledWith({
+      expect(mockTraceServerApi.agents.query).toHaveBeenCalledWith({
         project_id: 'test-project',
         sort_by: [{field: 'last_seen', direction: 'desc'}],
         limit: 50,
         offset: 10,
       });
 
-      expect(result).toEqual({data: {agents, total_count: 1}});
+      expect(result.data).toEqual({agents, total_count: 1});
     });
 
     it('gets agent by name', async () => {
       const agents = [{agent_name: 'Assistant', total_input_tokens: 42}];
-      mockTraceServerApi.agents.genaiAgentsQueryAgentsQueryPost.mockResolvedValue(
-        {data: {agents, total_count: 1}} as any
+      mockTraceServerApi.agents.query.mockReturnValue(
+        stainlessPromise({agents, total_count: 1})
       );
 
       const result = await client.getAgents({
         agentName: 'my-cool-agent',
       });
 
-      expect(
-        mockTraceServerApi.agents.genaiAgentsQueryAgentsQueryPost
-      ).toHaveBeenCalledWith({
+      expect(mockTraceServerApi.agents.query).toHaveBeenCalledWith({
         project_id: 'test-project',
         filters: {
           agent_name: 'my-cool-agent',
         },
       });
 
-      expect(result).toEqual({data: {agents, total_count: 1}});
+      expect(result.data).toEqual({agents, total_count: 1});
     });
 
     it('propagates errors from the underlying API', async () => {
-      mockTraceServerApi.agents.genaiAgentsQueryAgentsQueryPost.mockRejectedValue(
-        new Error('boom')
+      mockTraceServerApi.agents.query.mockReturnValue(
+        stainlessReject(new Error('boom'))
       );
 
       await expect(client.getAgents()).rejects.toThrow('boom');
@@ -506,8 +479,8 @@ describe('WeaveClient', () => {
         {agent_version: 'v1', total_input_tokens: 42},
         {agent_version: 'v2', total_input_tokens: 99},
       ];
-      mockTraceServerApi.agents.genaiAgentVersionsQueryAgentsAgentVersionsQueryPost.mockResolvedValue(
-        {data: {versions, total_count: 2}} as any
+      mockTraceServerApi.agents.agentVersions.query.mockReturnValue(
+        stainlessPromise({versions, total_count: 2})
       );
 
       const result = await client.getAgentVersions({
@@ -518,8 +491,7 @@ describe('WeaveClient', () => {
       });
 
       expect(
-        mockTraceServerApi.agents
-          .genaiAgentVersionsQueryAgentsAgentVersionsQueryPost
+        mockTraceServerApi.agents.agentVersions.query
       ).toHaveBeenCalledWith({
         project_id: 'test-project',
         agent_name: 'Assistant',
@@ -528,12 +500,12 @@ describe('WeaveClient', () => {
         offset: 10,
       });
 
-      expect(result).toEqual({data: {versions, total_count: 2}});
+      expect(result.data).toEqual({versions, total_count: 2});
     });
 
     it('propagates errors from the underlying API', async () => {
-      mockTraceServerApi.agents.genaiAgentVersionsQueryAgentsAgentVersionsQueryPost.mockRejectedValue(
-        new Error('boom')
+      mockTraceServerApi.agents.agentVersions.query.mockReturnValue(
+        stainlessReject(new Error('boom'))
       );
 
       await expect(
@@ -548,8 +520,8 @@ describe('WeaveClient', () => {
         {span_id: 's1', span_name: 'invoke_agent', input_tokens: 42},
         {span_id: 's2', span_name: 'chat_completion', input_tokens: 99},
       ];
-      mockTraceServerApi.agents.genaiSpansQueryAgentsSpansQueryPost.mockResolvedValue(
-        {data: {spans, total_count: 2}} as any
+      mockTraceServerApi.agents.spans.query.mockReturnValue(
+        stainlessPromise({spans, total_count: 2})
       );
 
       const result = await client.getAgentSpans({
@@ -559,9 +531,7 @@ describe('WeaveClient', () => {
         sortBy: [{field: 'started_at', direction: 'desc'}],
       });
 
-      expect(
-        mockTraceServerApi.agents.genaiSpansQueryAgentsSpansQueryPost
-      ).toHaveBeenCalledWith({
+      expect(mockTraceServerApi.agents.spans.query).toHaveBeenCalledWith({
         project_id: 'test-project',
         sort_by: [{field: 'started_at', direction: 'desc'}],
         limit: 50,
@@ -573,19 +543,17 @@ describe('WeaveClient', () => {
         },
       });
 
-      expect(result).toEqual({data: {spans, total_count: 2}});
+      expect(result.data).toEqual({spans, total_count: 2});
     });
 
     it('omits the query when neither agentName nor query is provided', async () => {
-      mockTraceServerApi.agents.genaiSpansQueryAgentsSpansQueryPost.mockResolvedValue(
-        {data: {spans: [], total_count: 0}} as any
+      mockTraceServerApi.agents.spans.query.mockReturnValue(
+        stainlessPromise({spans: [], total_count: 0})
       );
 
       await client.getAgentSpans({limit: 5});
 
-      expect(
-        mockTraceServerApi.agents.genaiSpansQueryAgentsSpansQueryPost
-      ).toHaveBeenCalledWith({
+      expect(mockTraceServerApi.agents.spans.query).toHaveBeenCalledWith({
         project_id: 'test-project',
         query: undefined,
         sort_by: undefined,
@@ -595,8 +563,8 @@ describe('WeaveClient', () => {
     });
 
     it('passes through a caller-supplied query when agentName is not set', async () => {
-      mockTraceServerApi.agents.genaiSpansQueryAgentsSpansQueryPost.mockResolvedValue(
-        {data: {spans: [], total_count: 0}} as any
+      mockTraceServerApi.agents.spans.query.mockReturnValue(
+        stainlessPromise({spans: [], total_count: 0})
       );
 
       const userQuery = {
@@ -604,9 +572,7 @@ describe('WeaveClient', () => {
       };
       await client.getAgentSpans({query: userQuery});
 
-      expect(
-        mockTraceServerApi.agents.genaiSpansQueryAgentsSpansQueryPost
-      ).toHaveBeenCalledWith({
+      expect(mockTraceServerApi.agents.spans.query).toHaveBeenCalledWith({
         project_id: 'test-project',
         query: userQuery,
         sort_by: undefined,
@@ -616,8 +582,8 @@ describe('WeaveClient', () => {
     });
 
     it('combines agentName with caller-supplied query', async () => {
-      mockTraceServerApi.agents.genaiSpansQueryAgentsSpansQueryPost.mockResolvedValue(
-        {data: {spans: [], total_count: 0}} as any
+      mockTraceServerApi.agents.spans.query.mockReturnValue(
+        stainlessPromise({spans: [], total_count: 0})
       );
 
       const userExpr = {
@@ -628,9 +594,7 @@ describe('WeaveClient', () => {
         query: {$expr: userExpr},
       });
 
-      expect(
-        mockTraceServerApi.agents.genaiSpansQueryAgentsSpansQueryPost
-      ).toHaveBeenCalledWith({
+      expect(mockTraceServerApi.agents.spans.query).toHaveBeenCalledWith({
         project_id: 'test-project',
         query: {
           $expr: {
@@ -647,8 +611,8 @@ describe('WeaveClient', () => {
     });
 
     it('defaults spans to an empty array when the server omits them', async () => {
-      mockTraceServerApi.agents.genaiSpansQueryAgentsSpansQueryPost.mockResolvedValue(
-        {data: {total_count: 0}} as any
+      mockTraceServerApi.agents.spans.query.mockReturnValue(
+        stainlessPromise({total_count: 0})
       );
 
       const result = await client.getAgentSpans({});
@@ -657,8 +621,8 @@ describe('WeaveClient', () => {
     });
 
     it('propagates errors from the underlying API', async () => {
-      mockTraceServerApi.agents.genaiSpansQueryAgentsSpansQueryPost.mockRejectedValue(
-        new Error('boom')
+      mockTraceServerApi.agents.spans.query.mockReturnValue(
+        stainlessReject(new Error('boom'))
       );
 
       await expect(client.getAgentSpans({})).rejects.toThrow('boom');
@@ -687,8 +651,8 @@ describe('WeaveClient', () => {
           {started_at_bucket: '2026-06-10T00:00:00Z', total_input_tokens: 450},
         ],
       };
-      mockTraceServerApi.agents.genaiSpansStatsAgentsSpansStatsPost.mockResolvedValue(
-        {data: stats} as any
+      mockTraceServerApi.agents.spans.stats.mockReturnValue(
+        stainlessPromise(stats)
       );
 
       const metrics = [
@@ -716,9 +680,7 @@ describe('WeaveClient', () => {
         timezone: 'America/Los_Angeles',
       });
 
-      expect(
-        mockTraceServerApi.agents.genaiSpansStatsAgentsSpansStatsPost
-      ).toHaveBeenCalledWith({
+      expect(mockTraceServerApi.agents.spans.stats).toHaveBeenCalledWith({
         project_id: 'test-project',
         start: '2026-06-10T00:00:00Z',
         end: '2026-06-23T00:00:00Z',
@@ -729,12 +691,12 @@ describe('WeaveClient', () => {
         timezone: 'America/Los_Angeles',
       });
 
-      expect(result).toEqual({data: stats});
+      expect(result.data).toEqual(stats);
     });
 
     it('fetches without optional fields', async () => {
-      mockTraceServerApi.agents.genaiSpansStatsAgentsSpansStatsPost.mockResolvedValue(
-        {data: {start: '', end: '', timezone: 'UTC'}} as any
+      mockTraceServerApi.agents.spans.stats.mockReturnValue(
+        stainlessPromise({start: '', end: '', timezone: 'UTC'})
       );
 
       await client.getAgentSpanStats({
@@ -742,9 +704,7 @@ describe('WeaveClient', () => {
         metrics: [],
       });
 
-      expect(
-        mockTraceServerApi.agents.genaiSpansStatsAgentsSpansStatsPost
-      ).toHaveBeenCalledWith({
+      expect(mockTraceServerApi.agents.spans.stats).toHaveBeenCalledWith({
         project_id: 'test-project',
         start: '2026-06-10T00:00:00Z',
         metrics: [],
@@ -752,8 +712,8 @@ describe('WeaveClient', () => {
     });
 
     it('propagates errors from the underlying API', async () => {
-      mockTraceServerApi.agents.genaiSpansStatsAgentsSpansStatsPost.mockRejectedValue(
-        new Error('boom')
+      mockTraceServerApi.agents.spans.stats.mockReturnValue(
+        stainlessReject(new Error('boom'))
       );
 
       await expect(
@@ -772,8 +732,8 @@ describe('WeaveClient', () => {
         messages: [],
         feedback: null,
       };
-      mockTraceServerApi.agents.genaiTracesChatAgentsTracesChatPost.mockResolvedValue(
-        {data: chat} as any
+      mockTraceServerApi.agents.traces.chat.mockReturnValue(
+        stainlessPromise(chat)
       );
 
       const result = await client.getAgentTurn({
@@ -781,27 +741,23 @@ describe('WeaveClient', () => {
         includeFeedback: true,
       });
 
-      expect(
-        mockTraceServerApi.agents.genaiTracesChatAgentsTracesChatPost
-      ).toHaveBeenCalledWith({
+      expect(mockTraceServerApi.agents.traces.chat).toHaveBeenCalledWith({
         project_id: 'test-project',
         trace_id: 'trace-1',
         include_feedback: true,
       });
 
-      expect(result).toEqual({data: chat});
+      expect(result.data).toEqual(chat);
     });
 
     it('passes undefined includeFeedback when omitted', async () => {
-      mockTraceServerApi.agents.genaiTracesChatAgentsTracesChatPost.mockResolvedValue(
-        {data: {trace_id: 'trace-1'}} as any
+      mockTraceServerApi.agents.traces.chat.mockReturnValue(
+        stainlessPromise({trace_id: 'trace-1'})
       );
 
       await client.getAgentTurn({traceId: 'trace-1'});
 
-      expect(
-        mockTraceServerApi.agents.genaiTracesChatAgentsTracesChatPost
-      ).toHaveBeenCalledWith({
+      expect(mockTraceServerApi.agents.traces.chat).toHaveBeenCalledWith({
         project_id: 'test-project',
         trace_id: 'trace-1',
         include_feedback: undefined,
@@ -809,8 +765,8 @@ describe('WeaveClient', () => {
     });
 
     it('propagates errors from the underlying API', async () => {
-      mockTraceServerApi.agents.genaiTracesChatAgentsTracesChatPost.mockRejectedValue(
-        new Error('boom')
+      mockTraceServerApi.agents.traces.chat.mockReturnValue(
+        stainlessReject(new Error('boom'))
       );
 
       await expect(client.getAgentTurn({traceId: 'trace-1'})).rejects.toThrow(
@@ -830,8 +786,8 @@ describe('WeaveClient', () => {
         offset: 0,
         feedback: null,
       };
-      mockTraceServerApi.agents.genaiConversationChatAgentsConversationsChatPost.mockResolvedValue(
-        {data: chat} as any
+      mockTraceServerApi.agents.conversations.chat.mockReturnValue(
+        stainlessPromise(chat)
       );
 
       const result = await client.getAgentTurns({
@@ -841,42 +797,40 @@ describe('WeaveClient', () => {
         includeFeedback: true,
       });
 
-      expect(
-        mockTraceServerApi.agents
-          .genaiConversationChatAgentsConversationsChatPost
-      ).toHaveBeenCalledWith({
-        project_id: 'test-project',
-        conversation_id: 'conv-1',
-        limit: 25,
-        offset: 5,
-        include_feedback: true,
-      });
+      expect(mockTraceServerApi.agents.conversations.chat).toHaveBeenCalledWith(
+        {
+          project_id: 'test-project',
+          conversation_id: 'conv-1',
+          limit: 25,
+          offset: 5,
+          include_feedback: true,
+        }
+      );
 
-      expect(result).toEqual({data: chat});
+      expect(result.data).toEqual(chat);
     });
 
     it('passes undefined limit/offset/includeFeedback when omitted', async () => {
-      mockTraceServerApi.agents.genaiConversationChatAgentsConversationsChatPost.mockResolvedValue(
-        {data: {conversation_id: 'conv-1'}} as any
+      mockTraceServerApi.agents.conversations.chat.mockReturnValue(
+        stainlessPromise({conversation_id: 'conv-1'})
       );
 
       await client.getAgentTurns({conversationId: 'conv-1'});
 
-      expect(
-        mockTraceServerApi.agents
-          .genaiConversationChatAgentsConversationsChatPost
-      ).toHaveBeenCalledWith({
-        project_id: 'test-project',
-        conversation_id: 'conv-1',
-        limit: undefined,
-        offset: undefined,
-        include_feedback: undefined,
-      });
+      expect(mockTraceServerApi.agents.conversations.chat).toHaveBeenCalledWith(
+        {
+          project_id: 'test-project',
+          conversation_id: 'conv-1',
+          limit: undefined,
+          offset: undefined,
+          include_feedback: undefined,
+        }
+      );
     });
 
     it('propagates errors from the underlying API', async () => {
-      mockTraceServerApi.agents.genaiConversationChatAgentsConversationsChatPost.mockRejectedValue(
-        new Error('boom')
+      mockTraceServerApi.agents.conversations.chat.mockReturnValue(
+        stainlessReject(new Error('boom'))
       );
 
       await expect(
@@ -905,9 +859,9 @@ describe('WeaveClient', () => {
           last_activity: '2026-06-16T22:10:34.631000',
         },
       ];
-      mockTraceServerApi.agents.genaiSearchAgentsSearchPost.mockResolvedValue({
-        data: {results, total_conversations: 1},
-      } as any);
+      mockTraceServerApi.agents.search.mockReturnValue(
+        stainlessPromise({results, total_conversations: 1})
+      );
 
       const result = await client.searchAgents({
         query: 'Liverpool',
@@ -918,9 +872,7 @@ describe('WeaveClient', () => {
         offset: 5,
       });
 
-      expect(
-        mockTraceServerApi.agents.genaiSearchAgentsSearchPost
-      ).toHaveBeenCalledWith({
+      expect(mockTraceServerApi.agents.search).toHaveBeenCalledWith({
         project_id: 'test-project',
         query: 'Liverpool',
         agent_name: 'Assistant',
@@ -930,27 +882,25 @@ describe('WeaveClient', () => {
         offset: 5,
       });
 
-      expect(result).toEqual({data: {results, total_conversations: 1}});
+      expect(result.data).toEqual({results, total_conversations: 1});
     });
 
     it('searches without optional fields', async () => {
-      mockTraceServerApi.agents.genaiSearchAgentsSearchPost.mockResolvedValue({
-        data: {results: [], total_conversations: 0},
-      } as any);
+      mockTraceServerApi.agents.search.mockReturnValue(
+        stainlessPromise({results: [], total_conversations: 0})
+      );
 
       await client.searchAgents({query: 'Liverpool'});
 
-      expect(
-        mockTraceServerApi.agents.genaiSearchAgentsSearchPost
-      ).toHaveBeenCalledWith({
+      expect(mockTraceServerApi.agents.search).toHaveBeenCalledWith({
         project_id: 'test-project',
         query: 'Liverpool',
       });
     });
 
     it('propagates errors from the underlying API', async () => {
-      mockTraceServerApi.agents.genaiSearchAgentsSearchPost.mockRejectedValue(
-        new Error('boom')
+      mockTraceServerApi.agents.search.mockReturnValue(
+        stainlessReject(new Error('boom'))
       );
 
       await expect(client.searchAgents({query: 'Liverpool'})).rejects.toThrow(
@@ -980,8 +930,8 @@ describe('WeaveClient', () => {
         offset: 5,
         has_more: false,
       };
-      mockTraceServerApi.agents.genaiCustomAttrsSchemaAgentsSpansCustomAttrsSchemaPost.mockResolvedValue(
-        {data: schema} as any
+      mockTraceServerApi.agents.spans.customAttrsSchema.mockReturnValue(
+        stainlessPromise(schema)
       );
 
       const query = {
@@ -1002,8 +952,7 @@ describe('WeaveClient', () => {
       });
 
       expect(
-        mockTraceServerApi.agents
-          .genaiCustomAttrsSchemaAgentsSpansCustomAttrsSchemaPost
+        mockTraceServerApi.agents.spans.customAttrsSchema
       ).toHaveBeenCalledWith({
         project_id: 'test-project',
         query,
@@ -1013,19 +962,18 @@ describe('WeaveClient', () => {
         offset: 5,
       });
 
-      expect(result).toEqual({data: schema});
+      expect(result.data).toEqual(schema);
     });
 
     it('passes undefined for omitted optional fields', async () => {
-      mockTraceServerApi.agents.genaiCustomAttrsSchemaAgentsSpansCustomAttrsSchemaPost.mockResolvedValue(
-        {data: {attributes: []}} as any
+      mockTraceServerApi.agents.spans.customAttrsSchema.mockReturnValue(
+        stainlessPromise({attributes: []})
       );
 
       await client.getAgentCustomAttributes({});
 
       expect(
-        mockTraceServerApi.agents
-          .genaiCustomAttrsSchemaAgentsSpansCustomAttrsSchemaPost
+        mockTraceServerApi.agents.spans.customAttrsSchema
       ).toHaveBeenCalledWith({
         project_id: 'test-project',
         query: undefined,
@@ -1037,8 +985,8 @@ describe('WeaveClient', () => {
     });
 
     it('propagates errors from the underlying API', async () => {
-      mockTraceServerApi.agents.genaiCustomAttrsSchemaAgentsSpansCustomAttrsSchemaPost.mockRejectedValue(
-        new Error('boom')
+      mockTraceServerApi.agents.spans.customAttrsSchema.mockReturnValue(
+        stainlessReject(new Error('boom'))
       );
 
       await expect(client.getAgentCustomAttributes({})).rejects.toThrow('boom');
@@ -1047,15 +995,13 @@ describe('WeaveClient', () => {
 
   describe('linkPromptToRegistry', () => {
     let client: WeaveClient;
-    let mockTraceServerApi: jest.Mocked<TraceServerApi<any>>;
+    let mockTraceServerApi: MockedTraceServer;
     let mockTransport: jest.SpyInstance;
 
     beforeEach(() => {
-      mockTraceServerApi = {
-        request: jest.fn(),
-      } as any;
+      mockTraceServerApi = {} as any;
       client = new WeaveClient({
-        traceServerApi: mockTraceServerApi,
+        traceServerApi: mockTraceServerApi as any,
         projectId: 'current-entity/current-project',
       });
       mockTransport = jest
@@ -1156,7 +1102,7 @@ describe('WeaveClient', () => {
 
     it('rejects projectId without entity scope', async () => {
       const unscopedClient = new WeaveClient({
-        traceServerApi: mockTraceServerApi,
+        traceServerApi: mockTraceServerApi as any,
         projectId: 'project-only',
       });
       const promptRef = new ObjectRef(

@@ -71,7 +71,15 @@ from weave.trace_server.trace_server_interface import (
     TableQueryReq,
     TableSchemaForInsert,
 )
-from weave.trace_server_bindings.http_utils import _ENDPOINT_CACHE
+from weave.trace_server_bindings.call_batch_processor import CallBatchProcessor
+from weave.trace_server_bindings.http_utils import (
+    _ENDPOINT_CACHE,
+    ERROR_CODE_CALLS_COMPLETE_MODE_REQUIRED,
+    ROW_COUNT_CHUNKING_THRESHOLD,
+)
+from weave.trace_server_bindings.stainless_remote_http_trace_server import (
+    StainlessRemoteHTTPTraceServer,
+)
 
 
 @pytest.mark.flaky(reruns=3, reruns_delay=0.2)
@@ -1662,6 +1670,107 @@ def test_table_partitioning(network_proxy_client, use_parallel_table_upload):
             f"Expected 2 obj_create/obj_read calls, got {len(obj_records)}"
         )
         assert len(records) == 6, f"Expected 6 total records, got {len(records)}"
+
+
+def test_parallel_chunk_probe_works_for_the_generated_client(client, monkeypatch):
+    """The probe must work for any client, not just the hand-written one.
+
+    It used to reach for `_post_request_executor`, an attribute only
+    RemoteHTTPTraceServer has, so it always answered "endpoint missing" for the
+    generated client and silently disabled parallel table upload.
+    """
+    probed: list[httpx.Request] = []
+
+    def handle(request: httpx.Request) -> httpx.Response:
+        probed.append(request)
+        return httpx.Response(
+            200, json={"digest": "d", "row_digests": []}, request=request
+        )
+
+    server = StainlessRemoteHTTPTraceServer("http://example.com")
+    server._stainless_client = server._stainless_client.copy(
+        http_client=httpx.Client(transport=httpx.MockTransport(handle))
+    )
+    monkeypatch.setattr(client, "server", server)
+    monkeypatch.setenv("WEAVE_USE_PARALLEL_TABLE_UPLOAD", "true")
+    _ENDPOINT_CACHE.discard("table_create_from_digests")
+
+    rows = [{"a": i} for i in range(ROW_COUNT_CHUNKING_THRESHOLD + 1)]
+    config = client._should_use_chunking(weave_client.Table(rows))
+
+    assert config.use_chunking is True
+    assert config.use_parallel_chunks is True
+    assert [r.url.path for r in probed] == ["/table/create_from_digests"]
+
+
+def test_flush_drains_the_processor_installed_by_a_calls_complete_upgrade(monkeypatch):
+    """One flush() has to send calls that the upgrade moved to a new processor.
+
+    The client used to snapshot the processor in its constructor, so after an
+    upgrade it drained the retired one and reported no outstanding work.
+    """
+    monkeypatch.setenv("WEAVE_USE_CALLS_COMPLETE", "false")
+    requests: list[httpx.Request] = []
+
+    def handle(request: httpx.Request) -> httpx.Response:
+        requests.append(request)
+        if request.url.path == "/call/upsert_batch":
+            return httpx.Response(
+                400,
+                json={
+                    "error_code": ERROR_CODE_CALLS_COMPLETE_MODE_REQUIRED,
+                    "message": "Project requires calls_complete mode",
+                },
+                request=request,
+            )
+        return httpx.Response(200, json={}, request=request)
+
+    server = StainlessRemoteHTTPTraceServer("http://example.com", should_batch=True)
+    server._stainless_client = server._stainless_client.copy(
+        http_client=httpx.Client(transport=httpx.MockTransport(handle))
+    )
+    client = weave_client.WeaveClient(
+        "entity", "project", server, ensure_project_exists=False
+    )
+    now = datetime.datetime.now(tz=datetime.timezone.utc)
+    started = tsi.StartedCallSchemaForInsert(
+        project_id="entity/project",
+        id="call-id",
+        trace_id="trace-id",
+        op_name="op",
+        started_at=now,
+        attributes={},
+        inputs={"a": 1},
+    )
+    ended = tsi.EndedCallSchemaForInsertWithStartedAt(
+        project_id="entity/project",
+        id="call-id",
+        trace_id="trace-id",
+        ended_at=now,
+        started_at=now,
+        summary={"result": "ok"},
+    )
+
+    legacy_processor = server.call_processor
+    try:
+        server.call_start(tsi.CallStartReq(start=started))
+        server.call_end(tsi.CallEndReq(end=ended))
+        client.flush()
+
+        assert isinstance(server.call_processor, CallBatchProcessor)
+        # The retired processor must stay retired and the live one must be usable.
+        assert legacy_processor.is_accepting_new_work() is False
+        assert server.call_processor.is_accepting_new_work() is True
+        complete = [
+            r for r in requests if r.url.path == "/v2/entity/project/calls/complete"
+        ]
+        assert len(complete) == 1
+        assert client.num_outstanding_jobs == 0
+    finally:
+        if server.call_processor and server.call_processor.is_accepting_new_work():
+            server.call_processor.stop_accepting_new_work_and_flush_queue()
+        if server.feedback_processor:
+            server.feedback_processor.stop_accepting_new_work_and_flush_queue()
 
 
 def test_summary_tokens_cost(client):

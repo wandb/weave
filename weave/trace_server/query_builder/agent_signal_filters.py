@@ -27,9 +27,8 @@ def build_signal_filter_clause(
     pb: ParamBuilder,
     project_id: str,
     signal_filters: AgentSignalFilter | None,
-    conversation_col: str = "s.conversation_id",
 ) -> str | None:
-    """Restrict `conversation_col` to conversations carrying the requested signals.
+    """Restrict spans to conversations carrying the requested signals.
 
     Matches conversations with all provided filters across all feedback rows.
     Tags and ratings often live on separate rows, so each requested signal becomes
@@ -61,7 +60,7 @@ def build_signal_filter_clause(
 
     having = " AND ".join(having_terms)
     return (
-        f"{conversation_col} IN (SELECT span_conversation_id FROM feedback "
+        "s.conversation_id IN (SELECT span_conversation_id FROM feedback "
         f"WHERE project_id = {pid_slot} AND {_AGENT_FEEDBACK_TYPES_SQL} "
         f"AND span_conversation_id != '' "
         f"GROUP BY span_conversation_id HAVING {having})"

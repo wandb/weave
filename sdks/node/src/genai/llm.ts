@@ -9,7 +9,12 @@ import {
 import type {ChildSpanContext} from './common';
 import {getGenaiState} from './context';
 import {getWeaveTracer} from './provider';
-import {SpanBase, type SpanEndOptions, type SpanInitBase} from './spanBase';
+import {
+  SpanBase,
+  type SpanEndOptions,
+  type SpanInitBase,
+  spanName,
+} from './spanBase';
 import {
   ATTR_GEN_AI_CONVERSATION_ID,
   ATTR_GEN_AI_INPUT_MESSAGES,
@@ -27,6 +32,7 @@ import {
   ATTR_GEN_AI_USAGE_INPUT_TOKENS,
   ATTR_GEN_AI_USAGE_OUTPUT_TOKENS,
   ATTR_GEN_AI_USAGE_REASONING_OUTPUT_TOKENS,
+  ATTR_GEN_AI_USAGE_TOTAL_TOKENS,
   WEAVE_GENAI_TRACER_NAME,
 } from './semconv';
 import {SubAgent, type SubAgentInit} from './subagent';
@@ -46,7 +52,8 @@ export type AttachMediaOpts =
   | {fileId: string; modality: Modality; mimeType?: string};
 
 /**
- * An LLM call. Emits a `chat` span with `gen_ai.*` attributes.
+ * An LLM call. Emits a `chat <model>` span (`chat` when the model is blank)
+ * with `gen_ai.*` attributes.
  *
  * Created by `weave.startLLM()` (or `turn.startLLM()`) and terminated with
  * `end()`. Only one LLM may be active in an async context at a time; nest
@@ -132,7 +139,7 @@ export class LLM extends SpanBase {
     const tracer = getWeaveTracer(WEAVE_GENAI_TRACER_NAME);
     const attributes: Attributes = {...(opts.attributes ?? {})};
     const span = tracer.startSpan(
-      'chat',
+      spanName('chat', opts.model),
       {kind: SpanKind.CLIENT, attributes, startTime: opts.startTime},
       opts.parentContext
     );
@@ -343,6 +350,9 @@ export class LLM extends SpanBase {
     }
     if (u.outputTokens !== undefined) {
       this.span.setAttribute(ATTR_GEN_AI_USAGE_OUTPUT_TOKENS, u.outputTokens);
+    }
+    if (u.totalTokens !== undefined) {
+      this.span.setAttribute(ATTR_GEN_AI_USAGE_TOTAL_TOKENS, u.totalTokens);
     }
     if (u.reasoningTokens !== undefined) {
       this.span.setAttribute(

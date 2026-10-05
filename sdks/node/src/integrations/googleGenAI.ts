@@ -1,6 +1,10 @@
 import {op} from '../op';
 import {type OpOptions, type StreamReducer} from '../opType';
-import {addCJSInstrumentation, addESMInstrumentation} from './instrumentations';
+import {
+  addCJSInstrumentation,
+  addESMInstrumentation,
+  suppressLoadOrderWarning,
+} from './instrumentations';
 import {asAttributes, libraryIntegration} from './integrationMetadata';
 
 // Integration provenance stamped onto every call this integration produces.
@@ -237,6 +241,11 @@ function wrapGoogleGenAIModels<T extends GoogleGenAIModelsAPI>(models: T): T {
 }
 
 export function wrapGoogleGenAI<T extends GoogleGenAIAPI>(googleGenAI: T): T {
+  suppressLoadOrderWarning('@google/genai');
+  return wrapGoogleGenAIClient(googleGenAI);
+}
+
+function wrapGoogleGenAIClient<T extends GoogleGenAIAPI>(googleGenAI: T): T {
   if (!googleGenAI || !googleGenAI.models) {
     return googleGenAI;
   }
@@ -281,7 +290,7 @@ function commonProxy(exports: any) {
         return instance;
       }
       // The user is using GoogleGenAI directly, not through ADK: wrap it.
-      return wrapGoogleGenAI(instance);
+      return wrapGoogleGenAIClient(instance);
     },
   });
 }

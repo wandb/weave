@@ -2253,6 +2253,81 @@ def test_coreweave_requires_its_inference_api_key():
         chts._setup_completion_model_info(None, req, MagicMock())
 
 
+def test_dedicated_inference_route_uses_personal_secret_and_gateway():
+    secret_fetcher = MagicMock()
+    secret_fetcher.fetch.return_value = {
+        "secrets": {"CW_INF_DEDICATED_API_KEY_cwc38d": "dedicated-api-key"}
+    }
+    token = _secret_fetcher_context.set(secret_fetcher)
+    req = tsi.CompletionsCreateReq(
+        project_id="entity/project",
+        inputs=_completion_inputs(model="OpenPipe/Qwen3-14B-Instruct"),
+        inference_route=tsi.DedicatedInferenceRoute(
+            connection_type="dedicated",
+            connection="dedicated_cwc38d",
+            base_url="https://cw.cwc38d.gw.cwinference.com/v1/",
+        ),
+    )
+
+    try:
+        model_info = chts._setup_completion_model_info(None, req, MagicMock())
+    finally:
+        _secret_fetcher_context.reset(token)
+
+    secret_fetcher.fetch.assert_called_once_with("CW_INF_DEDICATED_API_KEY_cwc38d")
+    assert req.inputs.model == "openai/OpenPipe/Qwen3-14B-Instruct"
+    assert model_info.model_name == "OpenPipe/Qwen3-14B-Instruct"
+    assert model_info.api_key == "dedicated-api-key"
+    assert model_info.provider == "custom"
+    assert model_info.base_url == "https://cw.cwc38d.gw.cwinference.com/v1"
+    assert model_info.return_type == "openai"
+
+
+@pytest.mark.parametrize(
+    "base_url",
+    [
+        # Dedicated gateways must use HTTPS.
+        "http://cw.cwc38d.gw.cwinference.com/v1",
+        # The hostname must belong to the CoreWeave inference gateway domain.
+        "https://example.com/v1",
+        # The OpenAI-compatible API must be rooted at /v1.
+        "https://cw.cwc38d.gw.cwinference.com/admin",
+        # The port must be numeric (and, when present, must be 443).
+        "https://cw.cwc38d.gw.cwinference.com:bad/v1",
+        # Query parameters are not allowed on the configured gateway URL.
+        "https://cw.cwc38d.gw.cwinference.com/v1?redirect=https://example.com",
+    ],
+)
+def test_dedicated_inference_route_rejects_invalid_gateway(base_url):
+    req = tsi.CompletionsCreateReq(
+        project_id="entity/project",
+        inputs=_completion_inputs(model="OpenPipe/Qwen3-14B-Instruct"),
+        inference_route=tsi.DedicatedInferenceRoute(
+            connection_type="dedicated",
+            connection="dedicated_cwc38d",
+            base_url=base_url,
+        ),
+    )
+
+    with pytest.raises(InvalidRequest, match="gateway URL"):
+        chts._setup_completion_model_info(None, req, MagicMock())
+
+
+def test_dedicated_inference_route_rejects_invalid_connection():
+    req = tsi.CompletionsCreateReq(
+        project_id="entity/project",
+        inputs=_completion_inputs(model="OpenPipe/Qwen3-14B-Instruct"),
+        inference_route=tsi.DedicatedInferenceRoute(
+            connection_type="dedicated",
+            connection="dedicated_bad/organization",
+            base_url="https://cw.example.gw.cwinference.com/v1",
+        ),
+    )
+
+    with pytest.raises(InvalidRequest, match="organization ID"):
+        chts._setup_completion_model_info(None, req, MagicMock())
+
+
 def test_custom_provider_name_matching_selector_prefix_is_preserved(monkeypatch):
     req = tsi.CompletionsCreateReq(
         project_id="entity/project",

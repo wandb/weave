@@ -48,6 +48,22 @@ from .trace import (
     TraceResourceWithStreamingResponse,
     AsyncTraceResourceWithStreamingResponse,
 )
+from .agents import (
+    AgentsResource,
+    AsyncAgentsResource,
+    AgentsResourceWithRawResponse,
+    AsyncAgentsResourceWithRawResponse,
+    AgentsResourceWithStreamingResponse,
+    AsyncAgentsResourceWithStreamingResponse,
+)
+from .images import (
+    ImagesResource,
+    AsyncImagesResource,
+    ImagesResourceWithRawResponse,
+    AsyncImagesResourceWithRawResponse,
+    ImagesResourceWithStreamingResponse,
+    AsyncImagesResourceWithStreamingResponse,
+)
 from .tables import (
     TablesResource,
     AsyncTablesResource,
@@ -88,6 +104,14 @@ from .feedback import (
     FeedbackResourceWithStreamingResponse,
     AsyncFeedbackResourceWithStreamingResponse,
 )
+from .projects import (
+    ProjectsResource,
+    AsyncProjectsResource,
+    ProjectsResourceWithRawResponse,
+    AsyncProjectsResourceWithRawResponse,
+    ProjectsResourceWithStreamingResponse,
+    AsyncProjectsResourceWithStreamingResponse,
+)
 from .services import (
     ServicesResource,
     AsyncServicesResource,
@@ -95,6 +119,14 @@ from .services import (
     AsyncServicesResourceWithRawResponse,
     ServicesResourceWithStreamingResponse,
     AsyncServicesResourceWithStreamingResponse,
+)
+from .v2_calls import (
+    V2CallsResource,
+    AsyncV2CallsResource,
+    V2CallsResourceWithRawResponse,
+    AsyncV2CallsResourceWithRawResponse,
+    V2CallsResourceWithStreamingResponse,
+    AsyncV2CallsResourceWithStreamingResponse,
 )
 from .v2_models import (
     V2ModelsResource,
@@ -120,6 +152,22 @@ from .v2_scorers import (
     V2ScorersResourceWithStreamingResponse,
     AsyncV2ScorersResourceWithStreamingResponse,
 )
+from .completions import (
+    CompletionsResource,
+    AsyncCompletionsResource,
+    CompletionsResourceWithRawResponse,
+    AsyncCompletionsResourceWithRawResponse,
+    CompletionsResourceWithStreamingResponse,
+    AsyncCompletionsResourceWithStreamingResponse,
+)
+from .evaluations import (
+    EvaluationsResource,
+    AsyncEvaluationsResource,
+    EvaluationsResourceWithRawResponse,
+    AsyncEvaluationsResourceWithRawResponse,
+    EvaluationsResourceWithStreamingResponse,
+    AsyncEvaluationsResourceWithStreamingResponse,
+)
 from .v2_datasets import (
     V2DatasetsResource,
     AsyncV2DatasetsResource,
@@ -127,6 +175,14 @@ from .v2_datasets import (
     AsyncV2DatasetsResourceWithRawResponse,
     V2DatasetsResourceWithStreamingResponse,
     AsyncV2DatasetsResourceWithStreamingResponse,
+)
+from .v2_runtimes import (
+    V2RuntimesResource,
+    AsyncV2RuntimesResource,
+    V2RuntimesResourceWithRawResponse,
+    AsyncV2RuntimesResourceWithRawResponse,
+    V2RuntimesResourceWithStreamingResponse,
+    AsyncV2RuntimesResourceWithStreamingResponse,
 )
 from .v2_evaluations import (
     V2EvaluationsResource,
@@ -143,6 +199,30 @@ from .v2_predictions import (
     AsyncV2PredictionsResourceWithRawResponse,
     V2PredictionsResourceWithStreamingResponse,
     AsyncV2PredictionsResourceWithStreamingResponse,
+)
+from .dataset_sources import (
+    DatasetSourcesResource,
+    AsyncDatasetSourcesResource,
+    DatasetSourcesResourceWithRawResponse,
+    AsyncDatasetSourcesResourceWithRawResponse,
+    DatasetSourcesResourceWithStreamingResponse,
+    AsyncDatasetSourcesResourceWithStreamingResponse,
+)
+from .v2_eval_results import (
+    V2EvalResultsResource,
+    AsyncV2EvalResultsResource,
+    V2EvalResultsResourceWithRawResponse,
+    AsyncV2EvalResultsResourceWithRawResponse,
+    V2EvalResultsResourceWithStreamingResponse,
+    AsyncV2EvalResultsResourceWithStreamingResponse,
+)
+from .annotation_queues import (
+    AnnotationQueuesResource,
+    AsyncAnnotationQueuesResource,
+    AnnotationQueuesResourceWithRawResponse,
+    AsyncAnnotationQueuesResourceWithRawResponse,
+    AnnotationQueuesResourceWithStreamingResponse,
+    AsyncAnnotationQueuesResourceWithStreamingResponse,
 )
 from .v2_evaluation_runs import (
     V2EvaluationRunsResource,
@@ -214,12 +294,54 @@ __all__ = [
     "AsyncTraceResourceWithRawResponse",
     "TraceResourceWithStreamingResponse",
     "AsyncTraceResourceWithStreamingResponse",
+    "CompletionsResource",
+    "AsyncCompletionsResource",
+    "CompletionsResourceWithRawResponse",
+    "AsyncCompletionsResourceWithRawResponse",
+    "CompletionsResourceWithStreamingResponse",
+    "AsyncCompletionsResourceWithStreamingResponse",
     "ThreadsResource",
     "AsyncThreadsResource",
     "ThreadsResourceWithRawResponse",
     "AsyncThreadsResourceWithRawResponse",
     "ThreadsResourceWithStreamingResponse",
     "AsyncThreadsResourceWithStreamingResponse",
+    "AgentsResource",
+    "AsyncAgentsResource",
+    "AgentsResourceWithRawResponse",
+    "AsyncAgentsResourceWithRawResponse",
+    "AgentsResourceWithStreamingResponse",
+    "AsyncAgentsResourceWithStreamingResponse",
+    "AnnotationQueuesResource",
+    "AsyncAnnotationQueuesResource",
+    "AnnotationQueuesResourceWithRawResponse",
+    "AsyncAnnotationQueuesResourceWithRawResponse",
+    "AnnotationQueuesResourceWithStreamingResponse",
+    "AsyncAnnotationQueuesResourceWithStreamingResponse",
+    "EvaluationsResource",
+    "AsyncEvaluationsResource",
+    "EvaluationsResourceWithRawResponse",
+    "AsyncEvaluationsResourceWithRawResponse",
+    "EvaluationsResourceWithStreamingResponse",
+    "AsyncEvaluationsResourceWithStreamingResponse",
+    "ImagesResource",
+    "AsyncImagesResource",
+    "ImagesResourceWithRawResponse",
+    "AsyncImagesResourceWithRawResponse",
+    "ImagesResourceWithStreamingResponse",
+    "AsyncImagesResourceWithStreamingResponse",
+    "ProjectsResource",
+    "AsyncProjectsResource",
+    "ProjectsResourceWithRawResponse",
+    "AsyncProjectsResourceWithRawResponse",
+    "ProjectsResourceWithStreamingResponse",
+    "AsyncProjectsResourceWithStreamingResponse",
+    "DatasetSourcesResource",
+    "AsyncDatasetSourcesResource",
+    "DatasetSourcesResourceWithRawResponse",
+    "AsyncDatasetSourcesResourceWithRawResponse",
+    "DatasetSourcesResourceWithStreamingResponse",
+    "AsyncDatasetSourcesResourceWithStreamingResponse",
     "V2OpsResource",
     "AsyncV2OpsResource",
     "V2OpsResourceWithRawResponse",
@@ -268,4 +390,22 @@ __all__ = [
     "AsyncV2ScoresResourceWithRawResponse",
     "V2ScoresResourceWithStreamingResponse",
     "AsyncV2ScoresResourceWithStreamingResponse",
+    "V2CallsResource",
+    "AsyncV2CallsResource",
+    "V2CallsResourceWithRawResponse",
+    "AsyncV2CallsResourceWithRawResponse",
+    "V2CallsResourceWithStreamingResponse",
+    "AsyncV2CallsResourceWithStreamingResponse",
+    "V2RuntimesResource",
+    "AsyncV2RuntimesResource",
+    "V2RuntimesResourceWithRawResponse",
+    "AsyncV2RuntimesResourceWithRawResponse",
+    "V2RuntimesResourceWithStreamingResponse",
+    "AsyncV2RuntimesResourceWithStreamingResponse",
+    "V2EvalResultsResource",
+    "AsyncV2EvalResultsResource",
+    "V2EvalResultsResourceWithRawResponse",
+    "AsyncV2EvalResultsResourceWithRawResponse",
+    "V2EvalResultsResourceWithStreamingResponse",
+    "AsyncV2EvalResultsResourceWithStreamingResponse",
 ]

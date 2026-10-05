@@ -2332,6 +2332,7 @@ def test_selecting_storage_size_fields_enables_required_joins() -> None:
                 sum(COALESCE(attributes_size_bytes, 0) + COALESCE(inputs_size_bytes, 0) + COALESCE(output_size_bytes, 0) + COALESCE(summary_size_bytes, 0) + COALESCE(otel_size_bytes, 0)) AS storage_size_bytes
             FROM calls_complete_stats
             WHERE project_id = {pb_1:String}
+                AND id IN filtered_calls
             GROUP BY id
         ) AS storage_size_tbl
         ON calls_complete.id = storage_size_tbl.id
@@ -2396,6 +2397,28 @@ def test_selecting_storage_size_fields_enables_required_joins() -> None:
             "pb_3": SENTINEL_EPOCH,
         },
     )
+
+
+def test_storage_size_join_scopes_to_filtered_calls_for_costs():
+    """Costs force the filtered_calls CTE. The per-call stats rollup must use it.
+
+    A project-wide `GROUP BY id` still runs when the outer query only keeps
+    `filtered_calls`, because that predicate is applied after the join.
+    """
+    # Cost SQL only accepts a base64 ProjectInternalId, or this one fixture id.
+    cq = CallsQuery(
+        project_id="c2hhd24vdGVzdC1wcm9qZWN0",  # shawn/test-project
+        include_storage_size=True,
+        include_costs=True,
+    )
+    cq.add_field("id")
+    cq.add_field("storage_size_bytes")
+    sql = cq.as_sql(ParamBuilder())
+    stats_subquery = sql.split("FROM calls_merged_stats", 1)[1].split("GROUP BY id", 1)[
+        0
+    ]
+    assert "filtered_calls" in sql
+    assert "id IN filtered_calls" in stats_subquery
 
 
 def test_storage_size_includes_otel_dump_bytes():
@@ -3989,15 +4012,7 @@ def test_calls_complete_with_light_filter_and_order() -> None:
 def test_calls_complete_with_hardcoded_filter_and_json_condition_and_summary_order() -> (
     None
 ):
-    """Test calls_complete table with hardcoded filter, JSON condition, and summary field ordering.
-
-    Heavy select fields plus a usable hardcoded filter trigger the two-pass
-    filtered_calls CTE: pass 1 resolves the page's ids (and started_at) on light
-    columns with the order + limit, pass 2 loads the columns for those ids and
-    re-sorts, bounded on the page's started_at range so it PK-prunes.
-    Additionally, it tests ordering by summary.weave.status which uses direct column
-    access without any() aggregation functions (unlike calls_merged).
-    """
+    """Filter a page once and load its payloads using timestamp and ID membership."""
     cq = CallsQuery(project_id="project", read_table=ReadTable.CALLS_COMPLETE)
     cq.add_field("id")
     cq.add_field("started_at")
@@ -4058,9 +4073,7 @@ def test_calls_complete_with_hardcoded_filter_and_json_condition_and_summary_ord
             calls_complete.ended_at AS ended_at
         FROM calls_complete
         PREWHERE calls_complete.project_id = {pb_12:String}
-        WHERE (calls_complete.id IN (SELECT id FROM filtered_calls))
-            AND (calls_complete.started_at >= (SELECT min(started_at) FROM filtered_calls))
-            AND (calls_complete.started_at <= (SELECT max(started_at) FROM filtered_calls))
+        WHERE ((calls_complete.started_at, calls_complete.id) IN (SELECT started_at, id FROM filtered_calls))
         ORDER BY CASE
             WHEN calls_complete.exception != {pb_13:String} THEN {pb_6:String}
             WHEN IFNULL(

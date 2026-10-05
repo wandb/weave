@@ -4,6 +4,7 @@ import dataclasses
 import datetime
 import json
 import logging
+import re
 import threading
 import time
 from collections import defaultdict
@@ -12,6 +13,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from contextlib import contextmanager
 from functools import partial
 from typing import Any, NamedTuple, TypeVar, cast
+from urllib.parse import urlparse
 from zoneinfo import ZoneInfo
 
 import clickhouse_connect
@@ -145,7 +147,9 @@ from weave.trace_server.clickhouse.utilities import (
     maybe_enqueue_minimal_call_end,
     num_bytes,
     process_parameters,
+    record_query_id,
     sanitize_invalid_utf8_surrogates,
+    set_correlation_id,
     started_at_gte_query,
     string_to_int_in_range,
 )
@@ -177,6 +181,7 @@ from weave.trace_server.constants import (
 )
 from weave.trace_server.custom_runtime import apply_custom_runtime
 from weave.trace_server.datadog import (
+    emit_counter,
     record_db_insert,
     set_current_span_dd_tags,
     set_root_span_dd_tags,
@@ -224,7 +229,7 @@ from weave.trace_server.interface.builtin_object_classes.provider import (
 from weave.trace_server.interface.feedback_types import (
     RUNNABLE_FEEDBACK_TYPE_PREFIX,
 )
-from weave.trace_server.kafka import KafkaProducer
+from weave.trace_server.kafka import PRODUCE_DROPPED_METRIC, KafkaProducer
 from weave.trace_server.llm_completion import (
     _build_choices_array,
     _build_completion_response,
@@ -233,6 +238,7 @@ from weave.trace_server.llm_completion import (
     lite_llm_completion_stream,
     resolve_and_apply_prompt,
 )
+from weave.trace_server.methods.calls_usage import calls_usage as calls_usage_handler
 from weave.trace_server.methods.evaluation_status import evaluation_status
 from weave.trace_server.methods.feedback_aggregate import (
     feedback_aggregate as feedback_aggregate_handler,
@@ -456,6 +462,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 self._calls_complete_batch = []
                 self._content_obj_batch = []
                 self._bucket_uploads = BucketUploadBatch()
+                self._after_commit_callbacks = []
                 self._flush_immediately = True
 
         # Always drain remaining kafka messages at shutdown.
@@ -514,6 +521,16 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
     @_calls_complete_batch.setter
     def _calls_complete_batch(self, value: list[list[Any]]) -> None:
         self._thread_local.calls_complete_batch = value
+
+    @property
+    def _after_commit_callbacks(self) -> list[Callable[[], None]]:
+        if not hasattr(self._thread_local, "after_commit_callbacks"):
+            self._thread_local.after_commit_callbacks = []
+        return self._thread_local.after_commit_callbacks
+
+    @_after_commit_callbacks.setter
+    def _after_commit_callbacks(self, value: list[Callable[[], None]]) -> None:
+        self._thread_local.after_commit_callbacks = value
 
     @property
     def _content_obj_batch(self) -> list[tsi.ObjSchemaForInsert]:
@@ -772,9 +789,8 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         else:
             self._insert_call_batch(rows)
 
-        # Run callbacks and flush
-        for cb in event_callbacks:
-            cb()
+        # The insert has committed, so a failed produce must not fail the request.
+        _run_after_commit(event_callbacks)
         self._flush_kafka_producer()
 
         if rejected_spans > 0:
@@ -921,7 +937,28 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             self._calls_complete_batch = []
             self._content_obj_batch = []
             self._bucket_uploads = BucketUploadBatch()
+            self._after_commit_callbacks = []
             self._flush_immediately = True
+
+    def _enqueue_call_end(
+        self, project_id: str, call_id: str, ended_at: datetime.datetime
+    ) -> None:
+        """Produce a call_end now, or after the batch's calls commit inside call_batch()."""
+        if self._flush_immediately:
+            maybe_enqueue_minimal_call_end(
+                self.kafka_producer, project_id, call_id, ended_at, True
+            )
+            return
+        self._after_commit_callbacks.append(
+            partial(
+                maybe_enqueue_minimal_call_end,
+                self.kafka_producer,
+                project_id,
+                call_id,
+                ended_at,
+                False,
+            )
+        )
 
     def _flush_all_batches_in_order(self) -> None:
         """Flush all batches, respecting cross-table write dependencies.
@@ -931,13 +968,15 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         2. File chunks and content objects, inserted concurrently. Both must be
            durable before calls and neither reads the other. If either fails we
            raise, so calls (below) never commit referencing unwritten data.
-        3. Calls, if this fails, we raise so that clients can retry, and so we don't
-           continue and push bad ids to the queue.
-        4. Produce to kafka, if this fails, we don't raise because all of the data
-           is already in the database, we don't want the client to retry.
+        3. Calls. If this fails we raise so that clients can retry.
+        4. Produce the deferred call_end events, skipped if any step above raised.
+           If this fails, we don't raise because all of the data is already in
+           the database, we don't want the client to retry.
            TODO: consider kafka retry logic.
         """
         self._flush_immediately = True
+        after_commit = self._after_commit_callbacks
+        self._after_commit_callbacks = []
 
         # Raises on fail
         try:
@@ -964,7 +1003,8 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             logger.exception("Failed to flush calls")
             raise
 
-        # Catch and continue on fail
+        _run_after_commit(after_commit)
+
         try:
             self._flush_kafka_producer()
         except Exception:
@@ -1163,13 +1203,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         self._insert_call(ch_call)
 
         if publish:
-            maybe_enqueue_minimal_call_end(
-                self.kafka_producer,
-                req.end.project_id,
-                req.end.id,
-                req.end.ended_at,
-                self._flush_immediately,
-            )
+            self._enqueue_call_end(req.end.project_id, req.end.id, req.end.ended_at)
 
         # Returns the id of the newly created call
         return tsi.CallEndRes()
@@ -1233,8 +1267,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 else:
                     self._insert_call_to_v1(ch_call)
 
-                maybe_enqueue_minimal_call_end(
-                    self.kafka_producer,
+                self._enqueue_call_end(
                     processed_complete_call.project_id,
                     processed_complete_call.id,
                     processed_complete_call.ended_at,
@@ -1376,13 +1409,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             if self._flush_immediately:
                 self._flush_calls()
 
-        maybe_enqueue_minimal_call_end(
-            self.kafka_producer,
-            req.end.project_id,
-            req.end.id,
-            req.end.ended_at,
-            self._flush_immediately,
-        )
+        self._enqueue_call_end(req.end.project_id, req.end.id, req.end.ended_at)
 
         return tsi.CallEndV2Res()
 
@@ -1792,67 +1819,10 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
     @traced(name="clickhouse_trace_server_batched.calls_usage")
     def calls_usage(self, req: tsi.CallsUsageReq) -> tsi.CallsUsageRes:
-        """Compute aggregated usage for multiple root calls.
+        """Compute complete descendant usage in bounded trace batches."""
+        result = calls_usage_handler(self.calls_query_stream, req)
 
-        Each root call's usage = its own metrics + sum of all descendants' metrics.
-        """
-        if not req.call_ids:
-            return tsi.CallsUsageRes(call_usage={}, unfinished_call_ids=[])
-
-        # Resolve trace IDs for requested root calls.
-        root_calls = self.calls_query_stream(
-            tsi.CallsQueryReq(
-                project_id=req.project_id,
-                filter=tsi.CallsFilter(call_ids=req.call_ids),
-                columns=["trace_id"],
-                limit=len(req.call_ids),
-            )
-        )
-        trace_ids = {call.trace_id for call in root_calls}
-        if not trace_ids:
-            root_usage: dict[str, dict[str, tsi.LLMAggregatedUsage]] = {
-                call_id: {} for call_id in req.call_ids
-            }
-            return tsi.CallsUsageRes(call_usage=root_usage, unfinished_call_ids=[])
-
-        # Stream all calls in those traces with minimal columns for aggregation.
-        calls = self.calls_query_stream(
-            tsi.CallsQueryReq(
-                project_id=req.project_id,
-                filter=tsi.CallsFilter(trace_ids=list(trace_ids)),
-                columns=["id", "parent_id", "summary"],
-                include_costs=req.include_costs,
-                limit=req.limit,
-            )
-        )
-
-        usage_calls: list[usage_utils.UsageCall] = []
-        unfinished_call_ids: set[str] = set()
-        for call in calls:
-            usage_calls.append(
-                usage_utils.UsageCall(
-                    id=call.id,
-                    parent_id=call.parent_id,
-                    summary=call.summary,
-                )
-            )
-            if call.ended_at is None:
-                unfinished_call_ids.add(call.id)
-
-        # Aggregate usage bottom-up to include descendants.
-        aggregated_usage = usage_utils.aggregate_usage_with_descendants(
-            usage_calls, req.include_costs
-        )
-
-        # Return only the requested root call IDs.
-        root_usage = {
-            call_id: aggregated_usage.get(call_id, {}) for call_id in req.call_ids
-        }
-
-        return tsi.CallsUsageRes(
-            call_usage=root_usage,
-            unfinished_call_ids=sorted(unfinished_call_ids),
-        )
+        return result
 
     @traced_generator(name="clickhouse_trace_server_batched.calls_query_stream")
     def calls_query_stream(self, req: tsi.CallsQueryReq) -> Iterator[tsi.CallSchema]:
@@ -1953,6 +1923,8 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         # CH lazy materialization (see CLICKHOUSE_CALLS_COMPLETE_READ_SETTINGS).
         if read_table == ReadTable.CALLS_COMPLETE:
             settings = ch_settings.update_settings_for_calls_complete_read(settings)
+            if req.latest_only:
+                settings = {**settings, "final": 1}
 
         pb = ParamBuilder()
         raw_res = self._query_stream(cq.as_sql(pb), pb.get_params(), settings=settings)
@@ -7433,26 +7405,36 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         )
 
     @tag_db_insert_path("genai_otel_export")
-    def genai_otel_export(self, req: GenAIOTelExportReq) -> GenAIOTelExportRes:
+    def genai_otel_export(
+        self,
+        req: GenAIOTelExportReq,
+        *,
+        enable_llm_powered_features: bool = True,
+    ) -> GenAIOTelExportRes:
+        """Store spans and gate Insights emission on server-side LLM policy."""
         res, span_rows = AgentWriteHandler(
             self.ch_client, self._async_insert_settings(), self
         ).insert_otel_spans(req)
 
         scoring_enabled = wf_env.wf_enable_agent_scoring()
-        insights_enabled = wf_env.wf_enable_agent_insights()
+        # Agent Insights require org consent to LLM-powered features. Scoring does not:
+        # the user opts in when creating an LLM scorer.
+        insights_enabled = (
+            wf_env.wf_enable_agent_insights() and enable_llm_powered_features
+        )
         if not (scoring_enabled or insights_enabled):
             return res
 
         producer = self.kafka_producer
         for row in span_rows:
             if scoring_enabled and (
-                event := ScoreAgentSpansEvent.from_row(row, req.entity_name)
+                score_event := ScoreAgentSpansEvent.from_row(row, req.entity_name)
             ):
-                event.emit(producer)
+                score_event.emit(producer)
             if insights_enabled and (
-                event := EmbedAgentSpansEvent.from_row(row, req.entity_name)
+                insights_event := EmbedAgentSpansEvent.from_row(row, req.entity_name)
             ):
-                event.emit(producer)
+                insights_event.emit(producer)
 
         # Flush kafka producer
         if span_rows and producer:
@@ -7519,6 +7501,8 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         autogenerate_session_id=False: weave-trace uses no session features,
         and the default collides on overlapping queries with SESSION_IS_LOCKED
         (code 373). See PR #6655.
+        autogenerate_query_id=False: the default collides on a resent request
+        with QUERY_WITH_SAME_ID_IS_ALREADY_RUNNING (code 216). See PR #7787.
         `send_receive_timeout` overrides the HTTP read timeout (migration clients
         need to outlast replicated-DDL propagation); None keeps the library default.
         """
@@ -7533,6 +7517,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             secure=self._port == CLICKHOUSE_SECURE_PORT,
             pool_mgr=_CH_POOL_MANAGER,
             autogenerate_session_id=False,
+            autogenerate_query_id=False,
             **optional_kwargs,
         )
         self._ensure_database(client)
@@ -7647,10 +7632,10 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
     ) -> Iterator[tuple]:
         """Streams the results of a query from the database."""
         merged = ch_settings.merge_default_query_settings(settings)
-        query_id = merged.setdefault("query_id", generate_id())
-        set_current_span_dd_tags({"clickhouse.query_id": query_id})
+        correlation_id = set_correlation_id(merged)
 
         summary = None
+        query_id = None
         parameters = process_parameters(parameters)
         start = time.monotonic()
         try:
@@ -7663,6 +7648,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             ) as stream:
                 if isinstance(stream.source, QueryResult):
                     summary = stream.source.summary
+                    query_id = record_query_id(stream.source)
                 duration_ms = round((time.monotonic() - start) * 1000, 1)
                 logger.info(
                     "clickhouse_stream_query",
@@ -7672,6 +7658,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                         "parameters": parameters,
                         "summary": summary,
                         "query_id": query_id,
+                        "correlation_id": correlation_id,
                     },
                 )
                 yield from stream
@@ -7685,6 +7672,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                     "query": query,
                     "parameters": parameters,
                     "query_id": query_id,
+                    "correlation_id": correlation_id,
                 },
             )
             # always raises, optionally with custom error class
@@ -7700,8 +7688,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
     ) -> QueryResult:
         """Directly queries the database and returns the result."""
         merged = ch_settings.merge_default_query_settings(settings)
-        query_id = merged.setdefault("query_id", generate_id())
-        set_current_span_dd_tags({"clickhouse.query_id": query_id})
+        correlation_id = set_correlation_id(merged)
 
         parameters = process_parameters(parameters)
         start = time.monotonic()
@@ -7722,7 +7709,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                     "error_str": str(e),
                     "query": query,
                     "parameters": parameters,
-                    "query_id": query_id,
+                    "correlation_id": correlation_id,
                 },
             )
             # always raises, optionally with custom error class
@@ -7737,7 +7724,8 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 "query": query,
                 "parameters": parameters,
                 "summary": res.summary,
-                "query_id": query_id,
+                "query_id": record_query_id(res),
+                "correlation_id": correlation_id,
             },
         )
         return res
@@ -7757,13 +7745,12 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             settings: Optional dictionary of ClickHouse settings (overrides defaults).
         """
         merged = ch_settings.merge_default_command_settings(settings)
-        query_id = merged.setdefault("query_id", generate_id())
-        set_current_span_dd_tags({"clickhouse.query_id": query_id})
+        correlation_id = set_correlation_id(merged)
 
         processed_params = process_parameters(parameters) if parameters else None
         start = time.monotonic()
         try:
-            self.ch_client.command(
+            result = self.ch_client.command(
                 command,
                 parameters=processed_params,
                 settings=merged,
@@ -7777,13 +7764,15 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                     "error_str": str(e),
                     "command": command,
                     "parameters": processed_params,
-                    "query_id": query_id,
+                    "correlation_id": correlation_id,
                 },
             )
             handle_clickhouse_query_error(e)
             return
 
         duration_ms = round((time.monotonic() - start) * 1000, 1)
+        # command() also returns scalars, which carry no query_id.
+        query_id = record_query_id(result) if isinstance(result, QuerySummary) else None
         logger.info(
             "clickhouse_command",
             extra={
@@ -7791,6 +7780,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 "command": command,
                 "parameters": processed_params,
                 "query_id": query_id,
+                "correlation_id": correlation_id,
             },
         )
         return
@@ -7836,10 +7826,8 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         # At most two attempts: the original, plus one retry after sanitizing
         # invalid client UTF-8.
         settings = dict(settings or {})
-        # Reused across attempts: the only retry is a client-side encode
-        # failure, so ClickHouse never saw the first one.
-        query_id = settings.setdefault("query_id", generate_id())
-        set_current_span_dd_tags({"clickhouse.query_id": query_id})
+        # One correlation id covers both attempts: it is the same logical write.
+        correlation_id = set_correlation_id(settings)
         for _ in range(2):
             try:
                 result = self.ch_client.insert(
@@ -7849,7 +7837,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             # Invalid client Unicode: sanitize the batch and retry once.
             except UnicodeEncodeError as e:
                 if sanitized_invalid_utf8:
-                    log_and_raise_insert_error(e, table, data, query_id)
+                    log_and_raise_insert_error(e, table, data, correlation_id)
                 sanitized_invalid_utf8 = True
                 data = sanitize_invalid_utf8_surrogates(data)
                 continue
@@ -7857,11 +7845,11 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             # InsertTooLarge: raise immediately, no retry
             except ValueError as e:
                 converted = convert_to_insert_too_large(e)
-                log_and_raise_insert_error(converted, table, data, query_id)
+                log_and_raise_insert_error(converted, table, data, correlation_id)
 
             # All other errors (including exhausted empty-query retries): no retry
             except Exception as e:
-                log_and_raise_insert_error(e, table, data, query_id)
+                log_and_raise_insert_error(e, table, data, correlation_id)
 
             else:
                 duration_ms = round((time.monotonic() - start) * 1000, 1)
@@ -7872,7 +7860,8 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                         "table": table,
                         "row_count": len(data),
                         "async_insert": async_insert,
-                        "query_id": query_id,
+                        "query_id": record_query_id(result),
+                        "correlation_id": correlation_id,
                     },
                 )
                 return result
@@ -8039,6 +8028,28 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             }
         )
         return final_batch
+
+
+def _run_after_commit(callbacks: Sequence[Callable[[], None]]) -> None:
+    """Run post-commit produce callbacks without raising."""
+    failed = 0
+    for callback in callbacks:
+        # Per callback, so one failed produce doesn't drop the rest.
+        try:
+            callback()
+        except Exception:
+            failed += 1
+            if failed == 1:
+                logger.exception("Failed to produce call_end event")
+    if failed:
+        logger.error(
+            "Failed to produce %d of %d call_end events", failed, len(callbacks)
+        )
+        emit_counter(
+            PRODUCE_DROPPED_METRIC,
+            failed,
+            ["reason:produce_error", "message_type:call_end"],
+        )
 
 
 def _update_metadata_from_chunk(
@@ -8397,6 +8408,75 @@ def _setup_completion_model_info(
 
     # Check for explicit custom provider prefix
     is_explicit_custom = model_name.startswith("custom::")
+
+    if req.inference_route is not None:
+        route = req.inference_route
+        dedicated_environments = (
+            ("dedicated_staging_", "CW_INF_DEDICATED_STAGING_API_KEY_"),
+            ("dedicated_", "CW_INF_DEDICATED_API_KEY_"),
+        )
+        environment = next(
+            (
+                (connection_prefix, secret_prefix)
+                for connection_prefix, secret_prefix in dedicated_environments
+                if route.connection.startswith(connection_prefix)
+            ),
+            None,
+        )
+        if environment is None:
+            raise InvalidRequest("Invalid dedicated inference connection ID")
+        connection_prefix, secret_prefix = environment
+        organization_id = route.connection.removeprefix(connection_prefix)
+        if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_-]*", organization_id):
+            raise InvalidRequest("Invalid dedicated inference organization ID")
+
+        try:
+            parsed_base_url = urlparse(route.base_url)
+            invalid_base_url = (
+                parsed_base_url.scheme != "https"
+                or not parsed_base_url.hostname
+                or not parsed_base_url.hostname.endswith(".gw.cwinference.com")
+                or parsed_base_url.username is not None
+                or parsed_base_url.password is not None
+                or parsed_base_url.port not in {None, 443}
+                or parsed_base_url.path.rstrip("/") != "/v1"
+                or bool(parsed_base_url.params)
+                or bool(parsed_base_url.query)
+                or bool(parsed_base_url.fragment)
+            )
+        except ValueError:
+            invalid_base_url = True
+        if invalid_base_url:
+            raise InvalidRequest("Invalid dedicated inference gateway URL")
+
+        dedicated_secret_name = secret_prefix + organization_id
+        # Resolve the stored credential server-side; the client only identifies
+        # which configured connection to use and never receives the key itself.
+        secret_fetcher = _secret_fetcher_context.get()
+        if not secret_fetcher:
+            raise InvalidRequest(f"No secret fetcher found for {route.connection}")
+        api_key = (
+            secret_fetcher.fetch(dedicated_secret_name)
+            .get("secrets", {})
+            .get(dedicated_secret_name)
+        )
+        if not api_key:
+            raise MissingLLMApiKeyError(
+                f"No API key {dedicated_secret_name} found for {route.connection}",
+                api_key_name=dedicated_secret_name,
+            )
+        base_url = route.base_url.rstrip("/")
+
+        req.inputs.model = "openai/" + model_name
+        return CompletionModelInfo(
+            model_name=model_name,
+            api_key=api_key,
+            provider="custom",
+            base_url=base_url,
+            extra_headers=extra_headers,
+            return_type="openai",
+            vertex_credentials=None,
+        )
 
     is_coreweave = (
         model_info and model_info.get("litellm_provider") == "coreweave"

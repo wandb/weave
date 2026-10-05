@@ -1,5 +1,5 @@
-import {Api as TraceServerApi} from '../generated/traceServerApi';
 import {type ImageType} from '../media';
+import {createTraceServerClient} from '../traceServerClient';
 import {WeaveClient} from '../weaveClient';
 import {ObjectRef} from '../weaveObject';
 
@@ -44,9 +44,10 @@ function clientServingObjBody(
   fileContent: () => Promise<Response>
 ) {
   const fileRequests: unknown[] = [];
-  const traceServerApi = new TraceServerApi({
-    baseUrl: 'https://trace.example',
-    customFetch: async (input, init) => {
+  const traceServerApi = createTraceServerClient({
+    apiKey: 'test-key',
+    baseURL: 'https://trace.example',
+    fetch: async (input, init) => {
       const url = input.toString();
       if (url.endsWith('/obj/read')) {
         return new Response(objBody, {

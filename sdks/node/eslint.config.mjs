@@ -4,7 +4,7 @@ import tseslint from 'typescript-eslint';
 
 export default defineConfig([
   {
-    ignores: ['dist/**', 'coverage/**'],
+    ignores: ['dist/**', 'coverage/**', 'src/vendor/**'],
   },
   {
     files: ['**/*.{js,ts}'],

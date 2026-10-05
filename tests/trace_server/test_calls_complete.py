@@ -245,6 +245,76 @@ def _make_completed_call(
     )
 
 
+def test_calls_query_latest_only_deduplicates_before_filter(
+    trace_server, clickhouse_trace_server
+):
+    """latest_only filters the newest logical call, not stale physical rows."""
+    project_id = f"{TEST_ENTITY}/calls_complete_latest_only"
+    internal_project_id = b64(project_id)
+    ch_client = clickhouse_trace_server.ch_client
+    call_id = str(uuid.uuid4())
+    trace_id = str(uuid.uuid4())
+    started_at = datetime.datetime.now(datetime.timezone.utc)
+
+    ch_client.command("SYSTEM STOP MERGES calls_complete")
+    try:
+        trace_server.calls_complete(
+            tsi.CallsUpsertCompleteReq(
+                batch=[
+                    _make_completed_call(
+                        project_id,
+                        call_id,
+                        trace_id,
+                        started_at,
+                        started_at + datetime.timedelta(seconds=1),
+                        output={"monitor_match": True},
+                    )
+                ]
+            )
+        )
+        ch_client.command("SELECT sleep(0.01)")
+        trace_server.calls_complete(
+            tsi.CallsUpsertCompleteReq(
+                batch=[
+                    _make_completed_call(
+                        project_id,
+                        call_id,
+                        trace_id,
+                        started_at,
+                        started_at + datetime.timedelta(seconds=2),
+                        output={"monitor_match": False},
+                    )
+                ]
+            )
+        )
+
+        assert (
+            _count_project_rows(ch_client, "calls_complete", internal_project_id) == 2
+        )
+
+        matching_calls = list(
+            trace_server.calls_query_stream(
+                tsi.CallsQueryReq(
+                    project_id=project_id,
+                    filter=tsi.CallsFilter(call_ids=[call_id]),
+                    query={
+                        "$expr": {
+                            "$eq": [
+                                {"$getField": "output.monitor_match"},
+                                {"$literal": True},
+                            ]
+                        }
+                    },
+                    latest_only=True,
+                )
+            )
+        )
+
+        assert matching_calls == []
+    finally:
+        ch_client.command("SYSTEM START MERGES calls_complete")
+
+
 @pytest.mark.parametrize(
     (
         "project_suffix",

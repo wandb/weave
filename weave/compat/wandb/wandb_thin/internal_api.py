@@ -9,10 +9,10 @@ from typing import Any
 
 import gql
 import graphql
-import httpx
 
 from weave.trace import env
-from weave.wandb_interface.context import get_wandb_api_context
+from weave.wandb_interface.auth import ApiKeyCredentials
+from weave.wandb_interface.context import get_wandb_auth_context
 
 logger = logging.getLogger(__name__)
 
@@ -23,14 +23,16 @@ class Api:
     def query(self, query: graphql.DocumentNode, **kwargs: Any) -> Any:
         from gql.transport.httpx import HTTPXTransport
 
-        auth = None
-        api_key = get_wandb_api_context()
-        if api_key is not None:
-            auth = httpx.BasicAuth("api", api_key)
+        credentials = get_wandb_auth_context()
+        headers = (
+            {"Authorization": credentials.authorization_header()}
+            if credentials is not None
+            else None
+        )
         url_base = env.wandb_base_url()
         transport = HTTPXTransport(
             url=url_base + "/graphql",
-            auth=auth,
+            headers=headers,
             verify=env.ssl_verify(),
         )
         # Warning: we do not use the recommended context manager pattern, because we're
@@ -223,17 +225,22 @@ class ApiAsync:
         )
 
     async def query(self, query: graphql.DocumentNode, **kwargs: Any) -> Any:
-        import aiohttp
         from gql.transport.aiohttp import AIOHTTPTransport
 
-        auth = None
-        api_key = get_wandb_api_context()
-        if api_key is not None:
-            auth = aiohttp.BasicAuth("api", api_key)
+        credentials = get_wandb_auth_context()
+        headers = (
+            {"Authorization": credentials.authorization_header()}
+            if credentials is not None
+            else None
+        )
         # TODO: This is currently used by our FastAPI auth helper, there's probably a better way.
         api_key_override = kwargs.pop("api_key", None)
         if api_key_override:
-            auth = aiohttp.BasicAuth("api", api_key_override)
+            headers = {
+                "Authorization": ApiKeyCredentials(
+                    api_key_override
+                ).authorization_header()
+            }
         url_base = env.wandb_base_url()
         transport = AIOHTTPTransport(
             url=url_base + "/graphql",
@@ -241,7 +248,7 @@ class ApiAsync:
                 "connector": self.connector,
                 "connector_owner": False,
             },
-            auth=auth,
+            headers=headers,
         )
         # Warning: we do not use the recommended context manager pattern, because we're
         # using connector_owner to tell the session not to close our connection pool.

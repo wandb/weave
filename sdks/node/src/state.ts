@@ -21,6 +21,24 @@ type State = {
   client: WeaveClient | null;
   domain: string | null;
 
+  /**
+   * `require.cache` keys as they were when the first CJS `require` hook was
+   * installed. Everything listed here reached the app unpatched, because the
+   * hook only sees `require` calls made after it. A later copy of the SDK keeps
+   * this list, since what loaded in between went through the first hook. Stays
+   * null under ESM, where the hook is never installed.
+   */
+  modulesLoadedBeforeCjsHook: string[] | null;
+
+  /**
+   * For each file in `modulesLoadedBeforeCjsHook`, the package of every file
+   * that had required it by then: the name from its `node_modules` path, or from
+   * the nearest `package.json` for a linked package or the app's own code (`''`
+   * if none). Tells a library the app imported apart from one another package
+   * loaded for its own use. Taken together with the snapshot.
+   */
+  requirerPackagesBeforeCjsHook: Record<string, string[]> | null;
+
   genAi: {
     /**
      * The cached GenAI provider paired with the `projectId` it routes to. Held
@@ -114,6 +132,8 @@ function defaultState(): State {
   return {
     client: null,
     domain: null,
+    modulesLoadedBeforeCjsHook: null,
+    requirerPackagesBeforeCjsHook: null,
 
     genAi: {
       provider: null,

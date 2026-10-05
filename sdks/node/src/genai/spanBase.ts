@@ -5,6 +5,8 @@ import {
   type TimeInput,
 } from '@opentelemetry/api';
 
+import {ATTR_ERROR_TYPE} from './semconv';
+
 /**
  * Init fields shared by every emitter's `create()` factory.
  *
@@ -20,13 +22,26 @@ export interface SpanInitBase {
 /**
  * Options shared by every emitter's `end()`.
  *
- * `error` marks the span failed (records the exception + ERROR status).
- * `endTime` backdates the close so a replayed span carries an accurate
- * duration. Undefined `endTime` → OTel stamps the current time.
+ * `error` marks the span failed before ending it, deriving `error.type` from
+ * `error.name`. `endTime` backdates the close.
  */
 export interface SpanEndOptions {
   error?: Error;
   endTime?: TimeInput;
+}
+
+/**
+ * Name a span after what it acts on: `chat gpt-4o`, `execute_tool search`,
+ * `invoke_agent research-bot`. This is the shape the Python SDK already
+ * emits, and the one the GenAI semantic conventions suggest.
+ *
+ * A blank or missing target falls back to the bare operation, so an unnamed
+ * agent produces `invoke_agent` rather than `invoke_agent undefined` or a
+ * name with a trailing space.
+ */
+export function spanName(operation: string, target?: string): string {
+  const trimmed = target?.trim() ?? '';
+  return trimmed ? `${operation} ${trimmed}` : operation;
 }
 
 /**
@@ -67,6 +82,16 @@ export abstract class SpanBase {
   }
 
   /**
+   * Record a failure without ending the span. Later call `end()` without the
+   * same error; use `end({error})` when failure and close coincide.
+   */
+  recordError(error: Error): this {
+    if (this._warnIfEnded('recordError')) return this;
+    this._recordError(error);
+    return this;
+  }
+
+  /**
    * Add a named event to the span. Useful for marking non-span moments such as
    * context compaction, tool-loop detection, or guardrail trips. Warns and
    * no-ops after `end()`. Mirrors OTel `Span.addEvent`.
@@ -94,13 +119,21 @@ export abstract class SpanBase {
    */
   protected _closeSpan(opts?: SpanEndOptions): void {
     if (opts?.error) {
-      this.span.recordException(opts.error);
-      this.span.setStatus({
-        code: SpanStatusCode.ERROR,
-        message: opts.error.message,
-      });
+      this._recordError(opts.error);
     }
     this.span.end(opts?.endTime);
+  }
+
+  private _recordError(error: Error): void {
+    this.span.setAttribute(
+      ATTR_ERROR_TYPE,
+      error.name || error.constructor?.name || 'Error'
+    );
+    this.span.setStatus({
+      code: SpanStatusCode.ERROR,
+      ...(error.message ? {message: error.message} : {}),
+    });
+    this.span.recordException(error);
   }
 
   /**

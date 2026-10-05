@@ -26,6 +26,7 @@ import {
 import {z} from 'zod';
 
 import {setGlobalClient} from '../../clientApi';
+import {packageVersion} from '../../utils/packageVersion';
 import {clearWeaveTracerProvider} from '../../genai/provider';
 import {
   commonPatchGoogleADK,
@@ -654,12 +655,17 @@ describe('Google ADK integration', () => {
       );
       const [toolSpan] = toolSpans;
 
-      // Every span shares the root's OTel trace and the session id.
+      // Every span shares the root's OTel trace, the session id and the
+      // integration provenance. The run covers all four span kinds the plugin
+      // creates, so this also proves no creation site is left unstamped.
       for (const span of spans) {
         expect(span.spanContext().traceId).toBe(root.spanContext().traceId);
         expect(span.attributes).toMatchObject({
           'gen_ai.conversation.id': session.id,
           'gen_ai.provider.name': 'gemini',
+          'weave.integration.name': 'google_adk',
+          'weave.integration.version': packageVersion,
+          'weave.integration.meta.package_name': '@google/adk',
         });
       }
 

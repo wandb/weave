@@ -1,6 +1,6 @@
 import {requireGlobalClient} from './clientApi';
 import {isOp} from './op';
-import {getGlobalDomain} from './urls';
+import {encodeProjectId, encodeURIPath, getGlobalDomain} from './urls';
 import {parseWeaveUri} from './uriParser';
 
 export interface WeaveObjectParameters {
@@ -58,7 +58,7 @@ export class ObjectRef {
 
   public ui_url() {
     const domain = getGlobalDomain();
-    return `https://${domain}/${this.projectId}/weave/objects/${this.objectId}/versions/${this.digest}`;
+    return `https://${domain}/${encodeProjectId(this.projectId)}/weave/objects/${encodeURIPath(this.objectId)}/versions/${this.digest}`;
   }
 
   public async get() {

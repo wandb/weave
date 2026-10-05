@@ -423,7 +423,7 @@ def _capture_genai_otel_export_req(
     inner = MagicMock(spec=tsi.FullTraceServerInterface)
     inner.genai_otel_export.return_value = tsi.agent_types.GenAIOTelExportRes()
     adapter = ExternalTraceServer(inner, _EncodingIdConverter())
-    adapter.genai_otel_export(req)
+    adapter.genai_otel_export(req, enable_llm_powered_features=True)
     assert inner.genai_otel_export.call_count == 1
     return inner.genai_otel_export.call_args.args[0]
 
@@ -720,7 +720,9 @@ def test_genai_otel_export_caches_project_id_lookup_across_batch() -> None:
     inner = MagicMock(spec=tsi.FullTraceServerInterface)
     inner.genai_otel_export.return_value = tsi.agent_types.GenAIOTelExportRes()
     converter = CountingIdConverter()
-    ExternalTraceServer(inner, converter).genai_otel_export(req)
+    ExternalTraceServer(inner, converter).genai_otel_export(
+        req, enable_llm_powered_features=True
+    )
 
     # One call for `req.project_id` translation + exactly one more for the
     # rewrite cache (not 6 — one per ref).

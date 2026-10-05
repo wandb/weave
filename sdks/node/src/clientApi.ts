@@ -1,14 +1,15 @@
-import {Api as TraceServerApi} from './generated/traceServerApi';
 import {CLIENT_CAPABILITIES, CLIENT_CAPABILITIES_HEADER} from './constants';
+import {createTraceServerClient} from './traceServerClient';
 import {
   getWeaveTracerProviderProjectId,
   shutdownWeaveTracerProvider,
 } from './genai/provider';
 import {makeSettings, type Settings} from './settings';
-import {defaultHost, getUrls, setGlobalDomain} from './urls';
+import {defaultHost, encodeProjectId, getUrls, setGlobalDomain} from './urls';
 import {ConcurrencyLimiter} from './utils/concurrencyLimit';
 import {Netrc} from './utils/netrc';
 import {createFetchWithRetry} from './utils/retry';
+import {warnIfLoadedBeforeWeave} from './utils/warnIfLoadedBeforeWeave';
 import {getWandbConfigs} from './wandb/settings';
 import {WandbServerApi} from './wandb/wandbServerApi';
 import {type CallStackEntry, WeaveClient} from './weaveClient';
@@ -35,18 +36,12 @@ export async function login(apiKey: string, host?: string) {
   }
   const {traceBaseUrl} = getUrls(host);
 
-  // Test the connection to the traceServerApi
-  const testTraceServerApi = new TraceServerApi({
-    baseUrl: traceBaseUrl,
-    baseApiParams: {
-      headers: {
-        'User-Agent': `W&B Weave JS Client ${process.env.VERSION || 'unknown'}`,
-        Authorization: `Basic ${Buffer.from(`api:${apiKey}`).toString('base64')}`,
-      },
-    },
+  const testTraceServerApi = createTraceServerClient({
+    apiKey,
+    baseURL: traceBaseUrl,
   });
   try {
-    await testTraceServerApi.health.readRootHealthGet({});
+    await testTraceServerApi.services.healthCheck();
   } catch (_error) {
     throw new Error(
       'Unable to verify connection to the weave trace server with given API Key'
@@ -120,16 +115,13 @@ export async function init(
       }
     );
 
-    const traceServerApi = new TraceServerApi({
-      baseUrl: traceBaseUrl,
-      baseApiParams: {
-        headers: {
-          'User-Agent': `W&B Weave JS Client ${process.env.VERSION || 'unknown'}`,
-          [CLIENT_CAPABILITIES_HEADER]: CLIENT_CAPABILITIES,
-          Authorization: `Basic ${Buffer.from(`api:${apiKey}`).toString('base64')}`,
-        },
+    const traceServerApi = createTraceServerClient({
+      apiKey,
+      baseURL: traceBaseUrl,
+      fetch: concurrencyLimitedFetch,
+      defaultHeaders: {
+        [CLIENT_CAPABILITIES_HEADER]: CLIENT_CAPABILITIES,
       },
-      customFetch: concurrencyLimitedFetch,
     });
 
     const client = new WeaveClient({
@@ -151,7 +143,12 @@ export async function init(
     setGlobalClient(client);
     setGlobalDomain(domain);
     registerExitFlush();
-    console.log(`View Weave data at https://${domain}/${projectId}/weave`);
+    // A timer, so an integration registered explicitly right after
+    // `await init()` still counts.
+    setTimeout(warnIfLoadedBeforeWeave, 0);
+    console.log(
+      `View Weave data at https://${domain}/${encodeProjectId(projectId)}/weave`
+    );
     return client;
   } catch (error) {
     console.error('Error during initialization:', error);
@@ -179,6 +176,8 @@ function registerExitFlush(): void {
     void getGlobalClient()?.flush();
   });
   process.on('exit', () => {
+    // The init() timer does not run if the app calls process.exit() first.
+    warnIfLoadedBeforeWeave();
     const pending = getGlobalClient()?.pendingCallCount() ?? 0;
     if (pending > 0) {
       console.warn(

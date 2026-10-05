@@ -1,14 +1,13 @@
 # File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
 
-from typing import List, Optional
-from typing_extensions import TypeAlias
+from typing import Optional
 
 from .._models import BaseModel
 
-__all__ = ["V2ScoreListResponse", "V2ScoreListResponseItem"]
+__all__ = ["V2ScoreListResponse"]
 
 
-class V2ScoreListResponseItem(BaseModel):
+class V2ScoreListResponse(BaseModel):
     score_id: str
     """The score ID"""
 
@@ -23,6 +22,3 @@ class V2ScoreListResponseItem(BaseModel):
 
     wb_user_id: Optional[str] = None
     """Do not set directly. Server will automatically populate this field."""
-
-
-V2ScoreListResponse: TypeAlias = List[V2ScoreListResponseItem]
