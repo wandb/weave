@@ -11,7 +11,12 @@ import {
 import {getGenaiState} from './context';
 import {LLM, type LLMInit} from './llm';
 import {getWeaveTracer} from './provider';
-import {SpanBase, type SpanEndOptions, type SpanInitBase} from './spanBase';
+import {
+  SpanBase,
+  type SpanEndOptions,
+  type SpanInitBase,
+  spanName,
+} from './spanBase';
 import {
   ATTR_GEN_AI_AGENT_DESCRIPTION,
   ATTR_GEN_AI_AGENT_ID,
@@ -54,7 +59,8 @@ type Opts = {
 
 /**
  * An agent invocation. Typically wraps the work to respond to a single
- * user message. Emits an `invoke_agent` span and acts as the root of the
+ * user message. Emits an `invoke_agent <agentName>` span (`invoke_agent` when
+ * the name is blank) and acts as the root of the
  * trace for that turn: it is always started under `ROOT_CONTEXT` so it
  * never accidentally inherits a parent from another OTel-instrumented
  * library.
@@ -145,7 +151,7 @@ export class Turn extends SpanBase {
     // ROOT_CONTEXT keeps Turn a root span, never inheriting another OTel
     // library's active span as a parent.
     const span = tracer.startSpan(
-      'invoke_agent',
+      spanName('invoke_agent', opts.agentName),
       {kind: SpanKind.INTERNAL, attributes, startTime: opts.startTime},
       ROOT_CONTEXT
     );
@@ -209,6 +215,10 @@ export class Turn extends SpanBase {
   /**
    * Bulk-set any subset of the mutable fields. Replaces (does not merge).
    * Useful for assigning everything at once after a provider call returns.
+   *
+   * The span is named from `agentName` when it starts, so pass `agentName` to
+   * `startTurn` if the name has to carry it. `record` still updates the field
+   * that `end()` writes to `gen_ai.agent.name`; it does not rename the span.
    */
   record(opts: {
     messages?: Message[];

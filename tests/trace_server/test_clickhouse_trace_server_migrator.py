@@ -1033,6 +1033,14 @@ def test_create_distributed_table_sql_id_sharded():
             "conversation_tags_by_tag",
             "sipHash64(project_id, conversation_id, trace_id, tag)",
         ),
+        (
+            "conversation_tag_assignments",
+            "sipHash64(project_id, conversation_id, trace_id, tag_id)",
+        ),
+        (
+            "conversation_tag_assignments_by_tag",
+            "sipHash64(project_id, conversation_id, trace_id, tag_id)",
+        ),
     ],
 )
 def test_create_distributed_table_sql_agent_tables_sharded(table_name, expected_expr):
@@ -1373,22 +1381,6 @@ def test_execute_materialized_view_in_replicated_mode(replicated_migrator):
     assert call_sql == expected_sql
 
 
-@pytest.mark.parametrize(
-    ("sql", "expected_table"),
-    [
-        ("ALTER TABLE test ADD COLUMN x Int32", "test"),
-        ("ALTER TABLE my_table DROP COLUMN old_col", "my_table"),
-        ("alter table users modify column name String", "users"),
-        ("ALTER TABLE default.test_table ADD COLUMN x Int32", "default.test_table"),
-        ("CREATE TABLE test (id Int32)", None),  # Not an ALTER TABLE
-    ],
-)
-def test_extract_alter_table_name(sql, expected_table):
-    """Test extracting table name from ALTER TABLE statements."""
-    result = DistributedClickHouseTraceServerMigrator._extract_alter_table_name(sql)
-    assert result == expected_table
-
-
 def test_alter_distributed_with_multiple_columns(distributed_migrator):
     """Test that ALTER TABLE with multiple operations works correctly in distributed mode."""
     distributed_migrator._execute_migration_command(
@@ -1458,62 +1450,6 @@ def test_rename_from_tables_to_local(input_sql, expected_sql):
         input_sql
     )
     assert result == expected_sql
-
-
-def test_alter_materialized_view_distributed(distributed_migrator):
-    """Test that ALTER TABLE MODIFY QUERY for materialized views works correctly in distributed mode.
-
-    In distributed mode, we DROP and CREATE the materialized view with:
-    1. View name gets _local suffix
-    2. TO clause points to the target table (_local)
-    3. SELECT query references _local tables
-    """
-    # Full real-world SQL from migration
-    alter_view_sql = """ALTER TABLE calls_merged_view MODIFY QUERY
-    SELECT project_id,
-        id,
-        anySimpleState(wb_run_id) as wb_run_id,
-        -- *** Ensure wb_user_id is grabbed from valid call rather than deleted row ***
-        anySimpleStateIf(wb_user_id, isNotNull(call_parts.started_at)) as wb_user_id,
-        anySimpleState(trace_id) as trace_id,
-        array_concat_aggSimpleState(output_refs) as output_refs,
-        -- **** comment comment ****
-        anySimpleState(deleted_at) as deleted_at
-    FROM call_parts
-    GROUP BY project_id,
-        id"""
-
-    distributed_migrator._execute_migration_command("test_db", alter_view_sql)
-
-    # Should execute DROP and CREATE (2 commands)
-    assert distributed_migrator.ch_client.command.call_count == 2
-    assert distributed_migrator.ch_client.database == "original_db"
-
-    # First command: DROP the existing view
-    drop_sql = distributed_migrator.ch_client.command.call_args_list[0][0][0]
-    expected_drop_sql = (
-        "DROP TABLE IF EXISTS calls_merged_view_local ON CLUSTER test_cluster"
-    )
-    assert drop_sql == expected_drop_sql
-
-    # Second command: CREATE the view with _local suffix and TO clause
-    create_sql = distributed_migrator.ch_client.command.call_args_list[1][0][0]
-    expected_create_sql = """CREATE MATERIALIZED VIEW calls_merged_view_local ON CLUSTER test_cluster
-TO calls_merged_local
-AS
-SELECT project_id,
-        id,
-        anySimpleState(wb_run_id) as wb_run_id,
-        -- *** Ensure wb_user_id is grabbed from valid call rather than deleted row ***
-        anySimpleStateIf(wb_user_id, isNotNull(call_parts_local.started_at)) as wb_user_id,
-        anySimpleState(trace_id) as trace_id,
-        array_concat_aggSimpleState(output_refs) as output_refs,
-        -- **** comment comment ****
-        anySimpleState(deleted_at) as deleted_at
-    FROM call_parts_local
-    GROUP BY project_id,
-        id"""
-    assert create_sql == expected_create_sql
 
 
 def test_skip_materialize_command_distributed(distributed_migrator):

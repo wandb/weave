@@ -5,10 +5,11 @@ import {
   shutdownWeaveTracerProvider,
 } from './genai/provider';
 import {makeSettings, type Settings} from './settings';
-import {defaultHost, getUrls, setGlobalDomain} from './urls';
+import {defaultHost, encodeProjectId, getUrls, setGlobalDomain} from './urls';
 import {ConcurrencyLimiter} from './utils/concurrencyLimit';
 import {Netrc} from './utils/netrc';
 import {createFetchWithRetry} from './utils/retry';
+import {warnIfLoadedBeforeWeave} from './utils/warnIfLoadedBeforeWeave';
 import {getWandbConfigs} from './wandb/settings';
 import {WandbServerApi} from './wandb/wandbServerApi';
 import {type CallStackEntry, WeaveClient} from './weaveClient';
@@ -142,7 +143,12 @@ export async function init(
     setGlobalClient(client);
     setGlobalDomain(domain);
     registerExitFlush();
-    console.log(`View Weave data at https://${domain}/${projectId}/weave`);
+    // A timer, so an integration registered explicitly right after
+    // `await init()` still counts.
+    setTimeout(warnIfLoadedBeforeWeave, 0);
+    console.log(
+      `View Weave data at https://${domain}/${encodeProjectId(projectId)}/weave`
+    );
     return client;
   } catch (error) {
     console.error('Error during initialization:', error);
@@ -170,6 +176,8 @@ function registerExitFlush(): void {
     void getGlobalClient()?.flush();
   });
   process.on('exit', () => {
+    // The init() timer does not run if the app calls process.exit() first.
+    warnIfLoadedBeforeWeave();
     const pending = getGlobalClient()?.pendingCallCount() ?? 0;
     if (pending > 0) {
       console.warn(

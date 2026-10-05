@@ -118,6 +118,17 @@ Never edit it by hand — regenerate it in core, then re-run
 `sdks/node/src/vendor/weave-server-sdk/` and is refreshed the same way with
 `scripts/vendor_node_weave_server_sdk.py`. See `sdks/node/src/vendor/README.md`.
 
+A new field on a trace-server request is not a reason to regenerate or edit
+either vendored client, or its `origin.json`, in that same PR. Core's OpenAPI
+spec does not contain the field until core moves its weave pointer and exports
+the spec. The Stainless bot opens the PR that updates these copies. Until that
+PR lands, a Python binding that passes every dumped field into the generated
+method raises `TypeError` on the new name. Exclude the field from the dump and
+send it with `extra_body`, the same way `insight_filters` does on
+`agent_spans_query` and `agent_spans_stats`. Delete those lines once the bot
+PR has merged. The Node client takes one body object, so it does not need that
+bridge.
+
 Persisted `AgentDashboard` objects intentionally use a closed, discriminated
 schema. Supported panel variants and their configuration fields must be added
 to `builtin_object_classes/agent_dashboard.py`; do not replace panel settings
@@ -134,9 +145,10 @@ those representations are consumed by inference and the current UI.
 Inference caches resolved custom-provider configuration per replica, so updates
 may remain stale for up to 60 seconds.
 
-When trace-server request/response models or route schemas change, regenerate
-the TypeScript client in wandb/core and re-vendor it with
-`scripts/vendor_node_weave_server_sdk.py`. See `sdks/node/src/vendor/README.md`.
+When trace-server request or response models, or route schemas, change, leave
+both vendored clients alone in that PR. The rule is in the vendor paragraph
+above: core has to export the spec before either client can learn the change,
+and the bot does the refresh.
 
 Evaluation result rows merge agent span links from two sources: legacy
 `weave.genai_span_ref` call attributes and OTel spans whose promoted
@@ -484,6 +496,10 @@ deterministic.
   `Tool` and `SubAgent` do not use ambient state.
 - Keep response models on child `chat` spans; use `setAttributes()` for fields
   without typed `record()` methods.
+- TypeScript `Usage.totalTokens` and Python `Usage.total_tokens` preserve an
+  explicit provider-reported total as the Weave extension
+  `gen_ai.usage.total_tokens`; do not derive it from the component counts.
+  Python uses `None` for an absent total and preserves explicit zero.
 - Every TypeScript GenAI span handle supports
   `recordError(error)` to mark a failure without ending the span; terminal
   failures can use `end({error})`. The SDK derives `error.type` from

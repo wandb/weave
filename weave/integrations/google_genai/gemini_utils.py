@@ -164,14 +164,13 @@ def google_genai_gemini_accumulator(
             # Check if this part is thinking content (thought=True)
             value_part_is_thought = getattr(value_part, "thought", False)
 
-            # Find matching part by type (thought vs non-thought), not by index
+            # Stop at structured parts so later text is not moved before them.
             matched = False
-            for acc_part in acc.candidates[i].content.parts:
+            for acc_part in reversed(acc.candidates[i].content.parts):
+                if acc_part.text is None:
+                    break
                 acc_part_is_thought = getattr(acc_part, "thought", False)
-                if (
-                    acc_part.text is not None
-                    and acc_part_is_thought == value_part_is_thought
-                ):
+                if acc_part_is_thought == value_part_is_thought:
                     acc_part.text += value_part.text
                     matched = True
                     break

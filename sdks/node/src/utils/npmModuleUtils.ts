@@ -26,3 +26,34 @@ export function requirePackageJson(baseDir: string, modulePaths: string[]) {
   }
   throw new Error(`could not find ${baseDir}/package.json`);
 }
+
+const nearestPackageNames = new Map<string, string>();
+
+/**
+ * The `name` from the nearest `package.json` at or above `dir` that has one, or
+ * `''`. Names a file outside `node_modules`: a linked package (npm link,
+ * workspaces), whose real path is elsewhere, or the app's own code.
+ */
+export function nearestPackageName(dir: string): string {
+  const known = nearestPackageNames.get(dir);
+  if (known !== undefined) {
+    return known;
+  }
+  let name = '';
+  try {
+    const packageJson = JSON.parse(
+      fs.readFileSync(path.join(dir, 'package.json'), 'utf8')
+    );
+    if (typeof packageJson?.name === 'string') {
+      name = packageJson.name;
+    }
+  } catch {
+    // No readable package.json here; keep walking up.
+  }
+  if (name === '') {
+    const parent = path.dirname(dir);
+    name = parent === dir ? '' : nearestPackageName(parent);
+  }
+  nearestPackageNames.set(dir, name);
+  return name;
+}

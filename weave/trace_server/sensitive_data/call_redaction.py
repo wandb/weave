@@ -14,6 +14,7 @@ from weave.trace_server.sensitive_data.walker import (
     NESTING_LIMIT_MESSAGE,
     redact_pii_value,
 )
+from weave.trace_server.tracing import traced
 
 TModel = TypeVar("TModel", bound=BaseModel)
 # Constrained so v1 and v2 requests keep their exact type for consumers.
@@ -90,6 +91,7 @@ def redact_call_update(
     return _redact_fields(req, ("display_name",))
 
 
+@traced(name="sensitive_data.redact")
 def _redact_fields(model: TModel, field_names: tuple[str, ...]) -> TModel:
     updates: dict[str, Any] = {}
     try:

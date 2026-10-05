@@ -2456,6 +2456,14 @@ def test_build_topic_insight_filter_clause() -> None:
 
     expected = """
         s.conversation_id NOT IN (
+          WITH succeeded_runs AS (
+            SELECT window_start, window_end, inserted_at, id FROM signature_cluster_runs
+            WHERE project_id = {insight_0:String} AND signature_type = 'failure'
+              AND status = 'succeeded'),
+          (
+            SELECT arraySort(run -> tuple(run.2, run.3, run.4), groupArray(tuple(window_start, window_end, inserted_at, id)))
+            FROM succeeded_runs
+          ) AS succeeded_runs_by_recency
           SELECT conversation_id FROM signature_cluster_assignments
           WHERE project_id = {insight_0:String}
             AND conversation_id != ''
@@ -2466,12 +2474,10 @@ def test_build_topic_insight_filter_clause() -> None:
               SELECT cluster_run_id, id FROM signature_clusters
               WHERE project_id = {insight_0:String}
                 AND signature_type = 'failure'
-                AND cluster_run_id IN (
-                  SELECT id FROM signature_cluster_runs
-                  WHERE project_id = {insight_0:String}
-                    AND signature_type = 'failure'
-                    AND status = 'succeeded')
+                AND cluster_run_id IN (SELECT id FROM succeeded_runs)
+                AND topic_id != toUUID('00000000-0000-0000-0000-000000000000')
                 AND toString(topic_id) IN {insight_1:Array(String)})
+            AND cluster_run_id = tupleElement(arrayLast(run -> run.1 <= trace_started_at AND trace_started_at < run.2, succeeded_runs_by_recency), 4)
           GROUP BY conversation_id
         )
     """
