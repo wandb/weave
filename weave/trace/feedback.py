@@ -7,6 +7,11 @@ from collections.abc import Iterable, Iterator
 from typing import Any
 
 from weave.shared import trace_server_interface as tsi
+from weave.shared.interface.feedback_types import (
+    AGENT_USER_FEEDBACK_TYPE,
+    NOTE_FEEDBACK_TYPE,
+    REACTION_FEEDBACK_TYPE,
+)
 from weave.shared.interface.query import Query
 from weave.trace import util
 from weave.trace.context import weave_client_context
@@ -23,12 +28,6 @@ from weave.trace.refs import (
     Ref,
 )
 from weave.utils.project_id import to_project_id
-
-# Mirrors weave.trace_server.interface.feedback_types; the client/server import
-# boundary forbids importing it here.
-AGENT_USER_FEEDBACK_TYPE = "wandb.agent_user_feedback"
-NOTE_FEEDBACK_TYPE = "wandb.note.1"
-REACTION_FEEDBACK_TYPE = "wandb.reaction.1"
 
 # Reason the Agent UI records for human reactions; keep in sync with Reactions.tsx.
 AGENT_REACTION_REASON = "Set by user"

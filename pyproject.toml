@@ -665,6 +665,7 @@ source_modules = [
   "weave.prompt",
   "weave.scorers",
   "weave.session",
+  "weave.shared",
   "weave.telemetry",
   "weave.trace",
   "weave.trace_server_bindings",

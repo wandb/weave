@@ -32,8 +32,7 @@ from pydantic import BaseModel
 from weave.shared import refs_internal as ri
 from weave.shared.errors import InvalidExternalRef, RequestTooLarge
 
-# Keep the pre-move logger name so existing log levels and filters still apply.
-logger = logging.getLogger("weave.trace_server.trace_server_converter")
+logger = logging.getLogger(__name__)
 
 A = TypeVar("A")
 B = TypeVar("B")
