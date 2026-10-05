@@ -1,10 +1,13 @@
 import re
-from typing import Any, Literal
+from typing import TYPE_CHECKING, Any, Literal
 
 from weave.shared import refs_internal
 from weave.trace_server import validation_util
 from weave.trace_server.constants import MAX_DISPLAY_NAME_LENGTH, MAX_OP_NAME_LENGTH
 from weave.trace_server.errors import InvalidFieldError, InvalidRequest
+
+if TYPE_CHECKING:
+    from weave.trace_server import trace_server_interface as tsi
 
 
 def project_id_validator(s: str) -> str:
@@ -201,3 +204,20 @@ def validate_alias_name(name: str) -> None:
         )
     if name in _RESERVED_ALIAS_NAMES:
         raise InvalidRequest(f"alias name '{name}' is reserved")
+
+
+def validate_calls_query_costs_limit(req: "tsi.CallsQueryReq") -> None:
+    """Reject a cost-enriched calls query that has neither a limit nor call_ids.
+
+    Cost enrichment of an unbounded calls query can exhaust ClickHouse memory.
+    """
+    if (
+        req.include_costs is True
+        and req.limit is None
+        and not (req.filter is not None and req.filter.call_ids)
+    ):
+        raise InvalidRequest(
+            "Calls queries with include_costs=true require a limit unless non-empty "
+            "call_ids are provided. Read larger result sets in pages; 1000 is the "
+            "recommended page size."
+        )
