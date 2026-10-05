@@ -1,14 +1,8 @@
-from pydantic import BaseModel
+"""Canonical location is ``weave.shared.interface.builtin_object_classes.leaderboard``. This module is that module."""
 
-from weave.trace_server.interface.builtin_object_classes import base_object_def
+import sys
 
+from weave.shared.interface.builtin_object_classes import leaderboard as _canonical
+from weave.shared.interface.builtin_object_classes.leaderboard import *  # noqa: F403
 
-class LeaderboardColumn(BaseModel):
-    evaluation_object_ref: base_object_def.RefStr
-    scorer_name: str
-    summary_metric_path: str
-    should_minimize: bool | None = None
-
-
-class Leaderboard(base_object_def.BaseObject):
-    columns: list[LeaderboardColumn]
+sys.modules[__name__] = _canonical
