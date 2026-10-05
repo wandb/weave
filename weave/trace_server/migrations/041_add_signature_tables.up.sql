@@ -62,7 +62,8 @@ CREATE TABLE IF NOT EXISTS failure_signatures
     conversation_id String,
     -- The turn the failure was detected in.
     current_trace_id String,
-    -- Turns the failure is attributed to, sorted, deduplicated, always contains the current turn.
+    -- Always [current_trace_id] today: the writer attributes every failure to the turn it was
+    -- detected in. Kept as an array so a later multi-turn writer needs no schema change.
     affected_trace_ids Array(String),
     -- Spans the judge cited as evidence, resolved by the writer from message indices.
     evidence_span_ids Array(String) DEFAULT [],
