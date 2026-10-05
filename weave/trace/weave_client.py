@@ -28,6 +28,7 @@ from weave.shared.digest import (
     compute_row_digest,
     compute_table_digest,
 )
+from weave.shared.errors import DigestMismatchError, InvalidExternalRef
 from weave.shared.ids import generate_id
 from weave.telemetry import trace_sentry
 from weave.trace import settings
@@ -116,7 +117,6 @@ from weave.trace.wandb_run_context import (
 )
 from weave.trace.weave_client_send_file_cache import WeaveClientSendFileCache
 from weave.trace_server.common_interface import AnnotationQueueItemsFilter, SortBy
-from weave.trace_server.errors import DigestMismatchError, InvalidExternalRef
 from weave.trace_server.interface.feedback_types import (
     RUNNABLE_FEEDBACK_TYPE_PREFIX,
     runnable_feedback_output_selector,
