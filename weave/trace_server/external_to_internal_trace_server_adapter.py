@@ -1462,7 +1462,10 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
         )
 
     def genai_otel_export(
-        self, req: tsi.agent_types.GenAIOTelExportReq
+        self,
+        req: tsi.agent_types.GenAIOTelExportReq,
+        *,
+        enable_llm_powered_features: bool = True,
     ) -> tsi.agent_types.GenAIOTelExportRes:
         # Capture the entity before conversion, while `project_id` is still
         # `entity/project`: recovering it downstream costs a gorilla round-trip.
@@ -1475,7 +1478,11 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
         # This path doesn't use `_ref_apply`, so rewrite refs carried in the raw
         # protobuf span attributes here. See `_rewrite_processed_spans_refs_inplace`.
         self._rewrite_processed_spans_refs_inplace(req.processed_spans, req.project_id)
-        return self._internal_trace_server.genai_otel_export(req)
+        res = self._internal_trace_server.genai_otel_export(
+            req, enable_llm_powered_features=enable_llm_powered_features
+        )
+
+        return res
 
     def agent_spans_query(
         self, req: tsi.agent_types.AgentSpansQueryReq

@@ -14,9 +14,41 @@ from weave.trace_server_bindings.http_utils import (
     process_batch_with_retry,
     retry_on_not_found,
 )
+from weave.vendor.weave_server_sdk import APIStatusError
 
 
-def test_413_splits_batch_and_retries():
+def _make_response(status_code: int, body: dict | None) -> httpx.Response:
+    """Build the response the two error builders below hang off."""
+    return httpx.Response(
+        status_code,
+        json=body or {},
+        request=httpx.Request("POST", "http://example.com"),
+    )
+
+
+def _make_httpx_error(
+    status_code: int, body: dict | None = None
+) -> httpx.HTTPStatusError:
+    """Build the error the hand-written client raises for a non-2xx response."""
+    response = _make_response(status_code, body)
+    return httpx.HTTPStatusError(
+        str(status_code), request=response.request, response=response
+    )
+
+
+def _make_stainless_error(status_code: int, body: dict | None = None) -> APIStatusError:
+    """Build the Stainless equivalent: an httpx response on a non-httpx error class."""
+    return APIStatusError(
+        str(status_code), response=_make_response(status_code, body), body=body
+    )
+
+
+@pytest.mark.parametrize(
+    "error",
+    [_make_httpx_error(413), _make_stainless_error(413)],
+    ids=["httpx", "stainless"],
+)
+def test_413_splits_batch_and_retries(error):
     """When server returns 413, split batch in half and retry both halves."""
     sent_batches = []
     first_call = True
@@ -25,9 +57,7 @@ def test_413_splits_batch_and_retries():
         nonlocal first_call
         if first_call:
             first_call = False
-            raise httpx.HTTPStatusError(
-                "413", request=Mock(), response=Mock(status_code=413)
-            )
+            raise error
         sent_batches.append(data)
 
     process_batch_with_retry(
@@ -57,15 +87,6 @@ def test_calls_complete_mode_required_raises():
         handle_response_error(response, "/call/upsert_batch")
 
 
-def _make_404(body: dict) -> httpx.HTTPStatusError:
-    response = httpx.Response(
-        404,
-        json=body,
-        request=httpx.Request("POST", "http://example.com"),
-    )
-    return httpx.HTTPStatusError("404", request=response.request, response=response)
-
-
 def test_retry_on_not_found_behavior(monkeypatch):
     """Retry a non-deleted 404; skip authoritative deletes and non-404s."""
     monkeypatch.setenv("WEAVE_RETRY_MAX_ATTEMPTS", "2")
@@ -76,7 +97,7 @@ def test_retry_on_not_found_behavior(monkeypatch):
     def flaky_http_404():
         calls["http"] += 1
         if calls["http"] == 1:
-            raise _make_404({"reason": "Obj foo:bar not found"})
+            raise _make_httpx_error(404, {"reason": "Obj foo:bar not found"})
         return "ok"
 
     @retry_on_not_found
@@ -89,7 +110,9 @@ def test_retry_on_not_found_behavior(monkeypatch):
     @retry_on_not_found
     def deleted_http():
         calls["deleted_http"] += 1
-        raise _make_404({"reason": "deleted", "deleted_at": "2024-01-01T00:00:00Z"})
+        raise _make_httpx_error(
+            404, {"reason": "deleted", "deleted_at": "2024-01-01T00:00:00Z"}
+        )
 
     @retry_on_not_found
     def deleted_local():
@@ -111,3 +134,45 @@ def test_retry_on_not_found_behavior(monkeypatch):
     with pytest.raises(ObjectDeletedError):
         deleted_local()
     assert calls["deleted_local"] == 1
+
+
+def test_permanent_stainless_error_drops_batch():
+    """A 4xx from the Stainless client is reported dropped, not requeued."""
+    error = _make_stainless_error(400, {"reason": "project is in complete mode"})
+    processor = Mock()
+    processor.is_accepting_new_work.return_value = True
+    dropped = []
+
+    def mock_send(data: bytes) -> None:
+        raise error
+
+    process_batch_with_retry(
+        [1, 2],
+        batch_name="test",
+        remote_request_bytes_limit=100_000,
+        send_batch_fn=mock_send,
+        processor_obj=processor,
+        log_dropped_fn=lambda batch, err: dropped.append((batch, err)),
+        encode_batch_fn=lambda b: str(b).encode(),
+    )
+
+    assert dropped == [([1, 2], error)]
+    processor.enqueue.assert_not_called()
+
+
+def test_retry_on_not_found_retries_stainless_404(monkeypatch):
+    """A 404 from the Stainless client is retried like an httpx 404."""
+    monkeypatch.setenv("WEAVE_RETRY_MAX_ATTEMPTS", "2")
+    monkeypatch.setattr(http_utils, "NOT_FOUND_RETRY_WAIT_SECONDS", 0.0)
+    attempts = 0
+
+    @retry_on_not_found
+    def flaky_read():
+        nonlocal attempts
+        attempts += 1
+        if attempts == 1:
+            raise _make_stainless_error(404, {"reason": "Obj foo:bar not found"})
+        return "ok"
+
+    assert flaky_read() == "ok"
+    assert attempts == 2

@@ -18,6 +18,8 @@ from .._response import (
     async_to_streamed_response_wrapper,
 )
 from .._base_client import make_request_options
+from .._decoders.jsonl import JSONLDecoder, AsyncJSONLDecoder
+from ..types.v2_model_list_response import V2ModelListResponse
 from ..types.v2_model_read_response import V2ModelReadResponse
 from ..types.v2_model_create_response import V2ModelCreateResponse
 from ..types.v2_model_delete_response import V2ModelDeleteResponse
@@ -116,7 +118,7 @@ class V2ModelsResource(SyncAPIResource):
         extra_query: Query | None = None,
         extra_body: Body | None = None,
         timeout: float | httpx.Timeout | None | NotGiven = not_given,
-    ) -> object:
+    ) -> JSONLDecoder[V2ModelListResponse]:
         """
         List model objects.
 
@@ -137,6 +139,7 @@ class V2ModelsResource(SyncAPIResource):
             raise ValueError(f"Expected a non-empty value for `entity` but received {entity!r}")
         if not project:
             raise ValueError(f"Expected a non-empty value for `project` but received {project!r}")
+        extra_headers = {"Accept": "application/x-ndjson", **(extra_headers or {})}
         return self._get(
             path_template("/v2/{entity}/{project}/models", entity=entity, project=project),
             options=make_request_options(
@@ -152,7 +155,8 @@ class V2ModelsResource(SyncAPIResource):
                     v2_model_list_params.V2ModelListParams,
                 ),
             ),
-            cast_to=object,
+            cast_to=JSONLDecoder[V2ModelListResponse],
+            stream=True,
         )
 
     def delete(
@@ -346,7 +350,7 @@ class AsyncV2ModelsResource(AsyncAPIResource):
         extra_query: Query | None = None,
         extra_body: Body | None = None,
         timeout: float | httpx.Timeout | None | NotGiven = not_given,
-    ) -> object:
+    ) -> AsyncJSONLDecoder[V2ModelListResponse]:
         """
         List model objects.
 
@@ -367,6 +371,7 @@ class AsyncV2ModelsResource(AsyncAPIResource):
             raise ValueError(f"Expected a non-empty value for `entity` but received {entity!r}")
         if not project:
             raise ValueError(f"Expected a non-empty value for `project` but received {project!r}")
+        extra_headers = {"Accept": "application/x-ndjson", **(extra_headers or {})}
         return await self._get(
             path_template("/v2/{entity}/{project}/models", entity=entity, project=project),
             options=make_request_options(
@@ -382,7 +387,8 @@ class AsyncV2ModelsResource(AsyncAPIResource):
                     v2_model_list_params.V2ModelListParams,
                 ),
             ),
-            cast_to=object,
+            cast_to=AsyncJSONLDecoder[V2ModelListResponse],
+            stream=True,
         )
 
     async def delete(

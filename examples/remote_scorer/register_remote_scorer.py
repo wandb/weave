@@ -1,4 +1,9 @@
-"""Publish a Weave RemoteScorer and activate a Monitor."""
+"""Publish a Weave RemoteScorer and activate a Monitor.
+
+The monitor targets either a traced op (--op-name) or completed agent turns
+(--agent-turn). Weave sends the op target as a V1 request and the agent-turn
+target as a V2 request; see README.md.
+"""
 
 from __future__ import annotations
 
@@ -17,6 +22,8 @@ from weave.scorers.remote_scorer import (
 AUTH_MODE_STATIC_BEARER = "static_bearer"
 AUTH_MODE_OAUTH_CLIENT_CREDENTIALS = "oauth_client_credentials"
 DEFAULT_OP_NAME = "sample_remote_scorer_target"
+# Monitors score completed agent turns when this event name is in op_names.
+AGENT_TURN_OP_NAME = "weave.genai.turn_ended"
 
 
 def parse_args() -> argparse.Namespace:
@@ -33,13 +40,19 @@ def parse_args() -> argparse.Namespace:
         required=True,
         help="Public HTTPS URL for the scorer POST endpoint.",
     )
-    parser.add_argument(
+    target = parser.add_mutually_exclusive_group()
+    target.add_argument(
         "--op-name",
-        default=DEFAULT_OP_NAME,
+        default=None,
         help=(
             "Operation to monitor. Use a short op name from the same project or "
-            "a full weave:///... op ref."
+            f"a full weave:///... op ref. Default: {DEFAULT_OP_NAME}."
         ),
+    )
+    target.add_argument(
+        "--agent-turn",
+        action="store_true",
+        help="Monitor completed agent turns instead of a traced op.",
     )
     parser.add_argument(
         "--scorer-name",
@@ -156,10 +169,15 @@ def main() -> None:
     )
     weave.publish(scorer, name=args.scorer_name)
 
+    if args.agent_turn:
+        op_name = AGENT_TURN_OP_NAME
+    else:
+        op_name = args.op_name or DEFAULT_OP_NAME
+
     monitor = Monitor(
         name=args.monitor_name,
         scorers=[scorer],
-        op_names=[args.op_name],
+        op_names=[op_name],
         sampling_rate=args.sampling_rate,
     )
     monitor.activate()

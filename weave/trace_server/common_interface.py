@@ -61,6 +61,14 @@ def _warn_ignored_fields_once(model_name: str, extra_fields: set[str]) -> None:
         )
 
 
+# Serialization-only: the constructor keeps its defaults, but the response schema lists
+# the defaulted fields as required. Right for a route that serializes every field; not for
+# one that sets response_model_exclude_none.
+RESPONSE_DEFAULTS_REQUIRED = ConfigDict(
+    json_schema_serialization_defaults_required=True
+)
+
+
 class BaseModelStrict(BaseModel):
     """API model that tolerates and reports unknown additive fields."""
 

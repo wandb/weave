@@ -1279,8 +1279,7 @@ class CallsQuery(BaseModel):
                 read_table=self.read_table,
             )
 
-            # Plain calls_complete two-pass: carry started_at through pass 1 so pass 2
-            # can bound on the page's time range and PK-prune (see _build_where_clause_optimizations).
+            # Carry the sort key through pass 1 so pass 2 can prune by timestamp.
             page_started_at_bound = (
                 self.read_table == ReadTable.CALLS_COMPLETE
                 and not self.include_costs
@@ -1299,8 +1298,7 @@ class CallsQuery(BaseModel):
                 filter_query.query_conditions.append(condition)
 
             filter_query.hardcoded_filter = self.hardcoded_filter
-            # Total-order pass 1 with an id tiebreaker so the min/max started_at
-            # bound and the id set derive from the identical LIMIT cut.
+            # Break timestamp ties consistently when selecting a page.
             if page_started_at_bound:
                 filter_query.order_fields = [
                     *self.order_fields,
@@ -1464,12 +1462,11 @@ class CallsQuery(BaseModel):
         id_subquery = ""
         if id_subquery_name is not None:
             if page_started_at_bound:
-                # Bound pass-2 on the page's started_at range so it prunes on the
-                # (project_id, started_at) PK prefix, not just idx_id (which fails for non-time-ordered ids).
+                # Include started_at for primary-key pruning without expanding
+                # the filtered page separately for IDs and timestamp bounds.
                 id_subquery = (
-                    f"AND ({table_alias}.id IN (SELECT id FROM {id_subquery_name}))\n"
-                    f"        AND ({table_alias}.started_at >= (SELECT min(started_at) FROM {id_subquery_name}))\n"
-                    f"        AND ({table_alias}.started_at <= (SELECT max(started_at) FROM {id_subquery_name}))"
+                    f"AND (({table_alias}.started_at, {table_alias}.id) IN "
+                    f"(SELECT started_at, id FROM {id_subquery_name}))"
                 )
             else:
                 id_subquery = f"AND ({table_alias}.id IN {id_subquery_name})"
@@ -1565,13 +1562,23 @@ class CallsQuery(BaseModel):
         storage_size_join = ""
         config = TableConfig.from_read_table(self.read_table)
         if self.include_storage_size:
+            # Stats primary key is (project_id, id). Without an id predicate
+            # this rollup groups every id in the project, and the outer
+            # `id IN filtered_calls` cannot stop that aggregation.
+            storage_id_predicate = ""
+            if id_subquery_name is not None:
+                storage_id_predicate = f"\n                AND id IN {id_subquery_name}"
+            elif storage_scope_id_cte is not None:
+                storage_id_predicate = (
+                    f"\n                AND id IN {storage_scope_id_cte}"
+                )
             storage_size_join = f"""
             LEFT JOIN (
                 SELECT
                     id,
                     sum({config.storage_size_bytes_sum}) AS storage_size_bytes
                 FROM {config.stats_table_name}
-                WHERE project_id = {param_slot(project_param, "String")}
+                WHERE project_id = {param_slot(project_param, "String")}{storage_id_predicate}
                 GROUP BY id
             ) AS {STORAGE_SIZE_TABLE_NAME}
             ON {table_alias}.id = {STORAGE_SIZE_TABLE_NAME}.id

@@ -16,6 +16,7 @@ These tests should FAIL when the OTel calls_complete write path is disabled
 import datetime
 import uuid
 from binascii import hexlify
+from unittest.mock import MagicMock, patch
 
 import pytest
 from cachetools import TTLCache
@@ -750,3 +751,47 @@ def test_placeholder_file_created_at_most_once_per_project(
     # Verify both calls were still created successfully
     calls = _fetch_calls_stream(trace_server, project_id)
     assert len(calls) == 2
+
+
+@pytest.mark.disable_logging_error_check
+def test_otel_export_failed_produce_does_not_fail_request(
+    trace_server, clickhouse_trace_server, monkeypatch
+):
+    """One failed call_end produce after the insert neither fails the request nor drops the rest."""
+    project_id = f"{TEST_ENTITY}/otel_failed_produce"
+    events: list[tuple[str, object]] = []
+
+    original_insert = clickhouse_trace_server._insert_call_complete_batch
+
+    def recording_insert(rows, *args, **kwargs):
+        events.append(("insert", len(rows)))
+        return original_insert(rows, *args, **kwargs)
+
+    def produce_call_end(end, flush_immediately):
+        if producer.produce_call_end.call_count == 2:
+            raise BufferError("Local: Queue full")
+        events.append(("produce_call_end", end.id))
+
+    producer = MagicMock()
+    producer.produce_call_end.side_effect = produce_call_end
+    monkeypatch.setattr(clickhouse_trace_server, "_kafka_producer", producer)
+    monkeypatch.setattr(
+        "weave.trace_server.environment.wf_enable_online_eval", lambda: True
+    )
+    spans = [_create_otel_span(f"op_{i}") for i in range(3)]
+    # patch.object removes the instance attribute on exit; monkeypatch would leave
+    # the bound method behind on the shared server.
+    with patch.object(
+        clickhouse_trace_server, "_insert_call_complete_batch", recording_insert
+    ):
+        res = trace_server.otel_export(_create_otel_export_req(project_id, spans))
+
+    assert res.partial_success is None
+    call_ids = [c.id for c in _fetch_calls_stream(trace_server, project_id)]
+    assert len(call_ids) == 3
+    assert events[0] == ("insert", 3)
+    produced = [call_id for kind, call_id in events[1:] if kind == "produce_call_end"]
+    assert len(produced) == 2
+    assert set(produced) < set(call_ids)
+    assert producer.produce_call_end.call_count == 3
+    producer.flush.assert_called_once_with(timeout=0)

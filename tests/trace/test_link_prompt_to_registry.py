@@ -17,6 +17,7 @@ from weave.trace_server_bindings.link_asset_to_registry import (
     LinkAssetToRegistryTarget,
     link_asset_to_registry,
 )
+from weave.wandb_interface.auth import ApiKeyCredentials
 
 MOCK_TARGET = "weave.trace.weave_client.link_asset_to_registry"
 _TRANSPORT_MODULE = "weave.trace_server_bindings.link_asset_to_registry"
@@ -89,7 +90,10 @@ def _http_response(status_code: int, json_data: dict) -> httpx.Response:
 def mock_post():
     """Patch API key, server URL, and http_requests.post for the transport."""
     with (
-        patch(f"{_TRANSPORT_MODULE}.get_wandb_api_context", return_value="api-key"),
+        patch(
+            f"{_TRANSPORT_MODULE}.get_wandb_auth_context",
+            return_value=ApiKeyCredentials("api-key"),
+        ),
         patch(
             f"{_TRANSPORT_MODULE}.weave_trace_server_url",
             return_value="http://example.com",
@@ -267,7 +271,9 @@ def test_transport_sends_expected_request(
 
     assert result.version_index == expected_index
     assert mock_post.call_args.args[0] == "http://example.com/link_to_registry"
-    assert mock_post.call_args.kwargs["auth"] == ("api", "api-key")
+    request = httpx.Request("POST", "http://example.com/link_to_registry")
+    auth_request = next(mock_post.call_args.kwargs["auth"].auth_flow(request))
+    assert auth_request.headers["Authorization"] == ("Basic YXBpOmFwaS1rZXk=")
     assert mock_post.call_args.kwargs["json"] == req.model_dump(mode="json")
     assert mock_post.call_args.kwargs["json"]["aliases"] == expected_aliases
 
@@ -282,6 +288,6 @@ def test_transport_surfaces_http_errors(mock_post: MagicMock) -> None:
 
 def test_transport_raises_when_no_api_key() -> None:
     """Raise ValueError when no API key is available."""
-    with patch(f"{_TRANSPORT_MODULE}.get_wandb_api_context", return_value=None):
+    with patch(f"{_TRANSPORT_MODULE}.get_wandb_auth_context", return_value=None):
         with pytest.raises(ValueError, match="No API key found"):
             link_asset_to_registry(DEFAULT_TRANSPORT_REQ)

@@ -2,7 +2,7 @@ import {type Call, InternalCall} from './call';
 import {getGlobalClient} from './clientApi';
 import {TRACE_CALL_EMOJI} from './constants';
 import {type Op, type OpOptions, type OpRef, type CallMethod} from './opType';
-import {getGlobalDomain} from './urls';
+import {encodeProjectId, getGlobalDomain} from './urls';
 import {warnOnce} from './utils/warnOnce';
 
 // Internal registry of ops whose call start should be sent eagerly (immediately
@@ -149,7 +149,7 @@ function createOpWrapper<T extends (...args: any[]) => any>(
     if (client.settings.printCallLink && parentCall == null) {
       const domain = getGlobalDomain();
       console.log(
-        `${TRACE_CALL_EMOJI} https://${domain}/${client.projectId}/r/call/${currentCall.callId}`
+        `${TRACE_CALL_EMOJI} https://${domain}/${encodeProjectId(client.projectId)}/r/call/${currentCall.callId}`
       );
     }
     const displayName = options?.callDisplayName

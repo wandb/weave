@@ -9,7 +9,7 @@ import {
   MAX_OBJECT_NAME_LENGTH,
 } from './constants';
 import {computeDigest} from './digest';
-import {ContentType} from './generated/traceServerApi';
+import {asHttpResponse, throwAsHttpResponse} from './httpResponse';
 import type {
   AgentChatMessage as AgentChatMessageSchema,
   AgentSearchConversationResult,
@@ -18,21 +18,21 @@ import type {
   AgentSpanSchema,
   AgentVersionSchema,
   CallSchema,
-  CallsQueryReq,
   CallsFilter,
   CustomRuntimeApplyRes,
   EndedCallSchemaForInsert,
   Query,
   SortBy,
   StartedCallSchemaForInsert,
-  Api as TraceServerApi,
   HttpResponse,
   HTTPValidationError,
   AgentGroupByRef,
   AgentSpanStatsMetricSpec,
   AgentSpanStatsColumn,
   AgentCustomAttrSchemaItem,
-} from './generated/traceServerApi';
+} from './traceServerTypes';
+import type {WeaveTrace} from './vendor/weave-server-sdk';
+import {encodeURIPath} from './vendor/weave-server-sdk/internal/utils/path';
 import {invokingSpanAttr} from './invokingSpan';
 import {
   type AudioType,
@@ -516,7 +516,7 @@ export class WeaveClient {
   private readonly BATCH_INTERVAL: number = 200;
   private errorCount = 0;
   private readonly MAX_ERRORS = 10;
-  public traceServerApi: TraceServerApi<any>;
+  public traceServerApi: WeaveTrace;
   public projectId: string;
   public settings: Settings;
 
@@ -525,7 +525,7 @@ export class WeaveClient {
     projectId,
     settings = {},
   }: {
-    traceServerApi: TraceServerApi<any>;
+    traceServerApi: WeaveTrace;
     projectId: string;
     settings?: Partial<Settings>;
   }) {
@@ -540,20 +540,22 @@ export class WeaveClient {
     options: RegisterCustomRuntimeOptions
   ): Promise<Response<RegisterCustomRuntimeResult>> {
     const [entity, project] = this.projectId.split('/');
-    return this.traceServerApi.v2.customRuntimeApplyV2EntityProjectRuntimesRuntimeNamePut(
-      entity,
-      project,
-      options.name,
-      {
-        base_url: options.baseUrl,
-        api_key_secret: options.apiKeySecret,
-        headers: {...(options.headers ?? {})},
-        runtime_ids: options.runtimeIds.map(runtimeId =>
-          typeof runtimeId === 'string'
-            ? {id: runtimeId}
-            : {id: runtimeId.id, max_tokens: runtimeId.maxTokens}
-        ),
-      }
+    return asHttpResponse(
+      this.traceServerApi.put<RegisterCustomRuntimeResult>(
+        `/v2/${encodeURIPath(entity)}/${encodeURIPath(project)}/runtimes/${encodeURIPath(options.name)}`,
+        {
+          body: {
+            base_url: options.baseUrl,
+            api_key_secret: options.apiKeySecret,
+            headers: {...(options.headers ?? {})},
+            runtime_ids: options.runtimeIds.map(runtimeId =>
+              typeof runtimeId === 'string'
+                ? {id: runtimeId}
+                : {id: runtimeId.id, max_tokens: runtimeId.maxTokens}
+            ),
+          },
+        }
+      )
     );
   }
 
@@ -588,7 +590,7 @@ export class WeaveClient {
       });
     }
 
-    return this.traceServerApi.agents.genaiAgentsQueryAgentsQueryPost(params);
+    return asHttpResponse(this.traceServerApi.agents.query(params));
   }
 
   /**
@@ -609,14 +611,14 @@ export class WeaveClient {
   public getAgentVersions(
     options: GetAgentVersionsOptions
   ): Promise<Response<GetAgentVersionsResult>> {
-    return this.traceServerApi.agents.genaiAgentVersionsQueryAgentsAgentVersionsQueryPost(
-      {
+    return asHttpResponse(
+      this.traceServerApi.agents.agentVersions.query({
         project_id: this.projectId,
         agent_name: options.agentName,
         sort_by: options.sortBy,
         limit: options.limit,
         offset: options.offset,
-      }
+      })
     );
   }
 
@@ -653,22 +655,21 @@ export class WeaveClient {
   public async getAgentSpans(
     options: GetAgentSpansOptions
   ): Promise<Response<GetAgentSpansResult>> {
-    const resp =
-      await this.traceServerApi.agents.genaiSpansQueryAgentsSpansQueryPost({
+    const resp = await asHttpResponse<GetAgentSpansResult>(
+      this.traceServerApi.agents.spans.query({
         project_id: this.projectId,
         query: agentSpansQueryFilter(options.agentName, options.query),
         sort_by: options.sortBy,
         limit: options.limit,
         offset: options.offset,
-      });
+      })
+    );
 
-    return {
-      ...resp,
-      data: {
-        ...resp.data,
-        spans: resp.data.spans ?? [],
-      },
+    resp.data = {
+      ...resp.data,
+      spans: resp.data.spans ?? [],
     };
+    return resp;
   }
 
   /**
@@ -708,16 +709,18 @@ export class WeaveClient {
   public async getAgentSpanStats(
     options: GetAgentSpanStatsOptions
   ): Promise<Response<GetAgentSpanStatsResult>> {
-    return this.traceServerApi.agents.genaiSpansStatsAgentsSpansStatsPost({
-      project_id: this.projectId,
-      start: options.start,
-      end: options.end,
-      metrics: options.metrics,
-      query: options.query,
-      group_by: options.groupBy,
-      granularity: options.granularity,
-      timezone: options.timezone,
-    });
+    return asHttpResponse(
+      this.traceServerApi.agents.spans.stats({
+        project_id: this.projectId,
+        start: options.start,
+        end: options.end,
+        metrics: options.metrics,
+        query: options.query,
+        group_by: options.groupBy,
+        granularity: options.granularity,
+        timezone: options.timezone,
+      })
+    );
   }
 
   /**
@@ -742,11 +745,13 @@ export class WeaveClient {
   public getAgentTurn(
     options: GetAgentTurnOptions
   ): Promise<Response<GetAgentTurnResult>> {
-    return this.traceServerApi.agents.genaiTracesChatAgentsTracesChatPost({
-      project_id: this.projectId,
-      trace_id: options.traceId,
-      include_feedback: options.includeFeedback,
-    });
+    return asHttpResponse<GetAgentTurnResult>(
+      this.traceServerApi.agents.traces.chat({
+        project_id: this.projectId,
+        trace_id: options.traceId,
+        include_feedback: options.includeFeedback,
+      })
+    );
   }
 
   /**
@@ -775,14 +780,14 @@ export class WeaveClient {
   public getAgentTurns(
     options: GetAgentTurnsOptions
   ): Promise<Response<GetAgentTurnsResult>> {
-    return this.traceServerApi.agents.genaiConversationChatAgentsConversationsChatPost(
-      {
+    return asHttpResponse<GetAgentTurnsResult>(
+      this.traceServerApi.agents.conversations.chat({
         project_id: this.projectId,
         conversation_id: options.conversationId,
         limit: options.limit,
         offset: options.offset,
         include_feedback: options.includeFeedback,
-      }
+      })
     );
   }
 
@@ -817,15 +822,17 @@ export class WeaveClient {
   public searchAgents(
     options: SearchAgentsOptions
   ): Promise<Response<SearchAgentsResult>> {
-    return this.traceServerApi.agents.genaiSearchAgentsSearchPost({
-      project_id: this.projectId,
-      query: options.query,
-      agent_name: options.agentName,
-      conversation_id: options.conversationId,
-      trace_id: options.traceId,
-      limit: options.limit,
-      offset: options.offset,
-    });
+    return asHttpResponse(
+      this.traceServerApi.agents.search({
+        project_id: this.projectId,
+        query: options.query,
+        agent_name: options.agentName,
+        conversation_id: options.conversationId,
+        trace_id: options.traceId,
+        limit: options.limit,
+        offset: options.offset,
+      })
+    );
   }
 
   /**
@@ -859,15 +866,15 @@ export class WeaveClient {
   public getAgentCustomAttributes(
     options: GetAgentCustomAttributesOptions
   ): Promise<Response<GetAgentCustomAttributesResult>> {
-    return this.traceServerApi.agents.genaiCustomAttrsSchemaAgentsSpansCustomAttrsSchemaPost(
-      {
+    return asHttpResponse(
+      this.traceServerApi.agents.spans.customAttrsSchema({
         project_id: this.projectId,
         query: options.query,
         started_after: options.startedAfter,
         started_before: options.startedBefore,
         limit: options.limit,
         offset: options.offset,
-      }
+      })
     );
   }
 
@@ -1059,9 +1066,7 @@ export class WeaveClient {
             : {mode: 'end' as const, req: item.data}
         ),
       };
-      await this.traceServerApi.call.callStartBatchCallUpsertBatchPost(
-        batchReq
-      );
+      await asHttpResponse(this.traceServerApi.calls.upsertBatch(batchReq));
       return false;
     }
 
@@ -1147,21 +1152,15 @@ export class WeaveClient {
     pathSuffix: string,
     body: {start: CallStartParams} | {end: Omit<CallEndParams, 'display_name'>}
   ) {
-    return this.traceServerApi.request({
-      path: `/v2/${this.projectId}/${pathSuffix}`,
-      method: 'POST',
-      body,
-      type: ContentType.Json,
-      format: 'json',
-    });
+    return asHttpResponse(
+      this.traceServerApi.post(`/v2/${this.projectId}/${pathSuffix}`, {body})
+    );
   }
 
   private sendCallsComplete(batch: CompletedCallParams[]) {
     const [entity, project] = this.projectId.split('/');
-    return this.traceServerApi.v2.callsCompleteV2EntityProjectCallsCompletePost(
-      entity,
-      project,
-      {batch}
+    return asHttpResponse(
+      this.traceServerApi.v2Calls.complete(project, {entity, batch})
     );
   }
 
@@ -1282,21 +1281,25 @@ export class WeaveClient {
   private async *getCallsIteratorInternal(
     options: GetCallsOptions = {}
   ): AsyncIterableIterator<CallSchema> {
-    const req: CallsQueryReq = {
-      filter: options.filter,
-      query: options.query,
-      include_costs: options.includeCosts,
-      include_feedback: options.includeFeedback,
-      limit: options.limit ?? DEFAULT_GET_CALLS_LIMIT,
-      offset: options.offset,
-      sort_by: options.sortBy,
-      columns: options.columns,
-      expand_columns: options.expandColumns,
-      project_id: this.projectId,
-    };
-
-    const resp =
-      await this.traceServerApi.calls.callsQueryStreamCallsStreamQueryPost(req);
+    let resp: globalThis.Response;
+    try {
+      resp = await this.traceServerApi.calls
+        .streamQuery({
+          filter: options.filter,
+          query: options.query,
+          include_costs: options.includeCosts,
+          include_feedback: options.includeFeedback,
+          limit: options.limit ?? DEFAULT_GET_CALLS_LIMIT,
+          offset: options.offset,
+          sort_by: options.sortBy,
+          columns: options.columns,
+          expand_columns: options.expandColumns,
+          project_id: this.projectId,
+        })
+        .asResponse();
+    } catch (err) {
+      throwAsHttpResponse(err);
+    }
 
     const reader = resp.body!.getReader();
     const decoder = new TextDecoder();
@@ -1334,11 +1337,13 @@ export class WeaveClient {
     let val: any;
     let dataObj: any;
     try {
-      const res = await this.traceServerApi.obj.objReadObjReadPost({
-        project_id: ref.projectId,
-        object_id: ref.objectId,
-        digest: ref.digest,
-      });
+      const res = await asHttpResponse(
+        this.traceServerApi.objects.read({
+          project_id: ref.projectId,
+          object_id: ref.objectId,
+          digest: ref.digest,
+        })
+      );
       dataObj = res.data.obj;
       val = dataObj.val;
     } catch (error) {
@@ -1439,16 +1444,19 @@ export class WeaveClient {
 
   // Reads from the project the ref points at, not the one this client is on.
   private async downloadFile(ref: ObjectRef, digest: string): Promise<Buffer> {
-    const fileContent =
-      await this.traceServerApi.file.fileContentFileContentPost(
-        {project_id: ref.projectId, digest},
-        // The endpoint streams the file, so the body is not JSON.
-        {format: 'arrayBuffer'}
-      );
-    if (fileContent.data == null) {
+    let resp: globalThis.Response;
+    try {
+      resp = await this.traceServerApi.files
+        .content({project_id: ref.projectId, digest})
+        .asResponse();
+    } catch (err) {
+      throwAsHttpResponse(err);
+    }
+    try {
+      return Buffer.from(await resp.arrayBuffer());
+    } catch {
       throw new Error(`Unable to download file for ref uri: ${ref.uri()}`);
     }
-    return Buffer.from(fileContent.data);
   }
 
   private async resolveRegistryPromptRef(
@@ -1532,13 +1540,15 @@ export class WeaveClient {
       }
 
       const serializedObj = await this.serializedVal(obj);
-      const response = await this.traceServerApi.obj.objCreateObjCreatePost({
-        obj: {
-          project_id: this.projectId,
-          object_id: objId,
-          val: serializedObj,
-        },
-      });
+      const response = await asHttpResponse(
+        this.traceServerApi.objects.create({
+          obj: {
+            project_id: this.projectId,
+            object_id: objId,
+            val: serializedObj,
+          },
+        })
+      );
       return new ObjectRef(this.projectId, objId, response.data.digest);
     })();
 
@@ -1574,13 +1584,15 @@ export class WeaveClient {
         _bases: classChain.slice(1),
         ...saveAttrs,
       };
-      const response = await this.traceServerApi.obj.objCreateObjCreatePost({
-        obj: {
-          project_id: this.projectId,
-          object_id: objId,
-          val: saveValue,
-        },
-      });
+      const response = await asHttpResponse(
+        this.traceServerApi.objects.create({
+          obj: {
+            project_id: this.projectId,
+            object_id: objId,
+            val: saveValue,
+          },
+        })
+      );
       const ref = new ObjectRef(this.projectId, objId, response.data.digest);
       return ref;
     })();
@@ -1598,23 +1610,25 @@ export class WeaveClient {
         return {...row, __savedRef: undefined};
       });
       const rows = await this.serializedVal(rowsWithoutRefs);
-      const response =
-        await this.traceServerApi.table.tableCreateTableCreatePost({
+      const response = await asHttpResponse(
+        this.traceServerApi.tables.create({
           table: {
             project_id: this.projectId,
             rows,
           },
-        });
+        })
+      );
       const ref = new TableRef(this.projectId, response.data.digest);
       return ref;
     })();
     const tableQueryPromise = (async () => {
       const tableRef = await table.__savedRef;
-      const tableQueryRes =
-        await this.traceServerApi.table.tableQueryTableQueryPost({
+      const tableQueryRes = await asHttpResponse(
+        this.traceServerApi.tables.query({
           project_id: this.projectId,
           digest: tableRef?.digest!,
-        });
+        })
+      );
       return {
         tableDigest: tableRef?.digest!,
         tableQueryResult: tableQueryRes.data,
@@ -1702,11 +1716,13 @@ export class WeaveClient {
     };
 
     try {
-      await this.traceServerApi.file.fileCreateFileCreatePost({
-        project_id: this.projectId,
-        // @ts-ignore
-        file: fileContent,
-      });
+      await asHttpResponse(
+        this.traceServerApi.files.create({
+          project_id: this.projectId,
+          file: Object.assign(fileContent, {name: fileName}),
+          expected_digest: digest,
+        })
+      );
     } catch (error) {
       console.error('Error saving file:', error);
     }
@@ -1955,13 +1971,15 @@ export class WeaveClient {
         'obj.py',
         new Blob([opFn.toString()])
       );
-      const response = await this.traceServerApi.obj.objCreateObjCreatePost({
-        obj: {
-          project_id: this.projectId,
-          object_id: resolvedObjId,
-          val: saveValue,
-        },
-      });
+      const response = await asHttpResponse(
+        this.traceServerApi.objects.create({
+          obj: {
+            project_id: this.projectId,
+            object_id: resolvedObjId,
+            val: saveValue,
+          },
+        })
+      );
       const ref = new OpRef(
         this.projectId,
         resolvedObjId,
@@ -2128,11 +2146,13 @@ export class WeaveClient {
   }
 
   public async updateCall(callId: string, displayName: string) {
-    await this.traceServerApi.call.callUpdateCallUpdatePost({
-      project_id: this.projectId,
-      call_id: callId,
-      display_name: displayName,
-    });
+    await asHttpResponse(
+      this.traceServerApi.calls.update({
+        project_id: this.projectId,
+        call_id: callId,
+        display_name: displayName,
+      })
+    );
   }
 
   /**
@@ -2174,15 +2194,16 @@ export class WeaveClient {
       output: serializedOutput,
     };
 
-    const response =
-      await this.traceServerApi.feedback.feedbackCreateFeedbackCreatePost({
+    const response = await asHttpResponse(
+      this.traceServerApi.feedback.create({
         project_id: this.projectId,
         weave_ref: predictCallUri,
         feedback_type: `wandb.runnable.${scorerName}`,
         payload,
         runnable_ref: runnableRefUri,
         call_ref: scorerCallUri,
-      });
+      })
+    );
 
     return response.data.id;
   }

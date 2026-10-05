@@ -3,18 +3,25 @@
 import json
 from unittest.mock import MagicMock
 
+import pytest
+
 from weave.trace import weave_init
 from weave.trace_server_bindings import remote_http_trace_server
 
 
-def test_get_server_info_json_decode_error():
-    """Test that _get_server_info returns None when server info cannot be decoded."""
+def test_get_server_info_reports_the_underlying_error():
+    """Test that _get_server_info surfaces why the server could not be reached."""
     mock_server = MagicMock(spec=remote_http_trace_server.RemoteHTTPTraceServer)
-    mock_server.server_info.side_effect = json.JSONDecodeError("test error", "doc", 0)
+    underlying = json.JSONDecodeError("test error", "doc", 0)
+    mock_server.server_info.side_effect = underlying
 
-    result = weave_init._get_server_info(mock_server)
+    with pytest.raises(
+        RuntimeError, match="Weave is not available on the server"
+    ) as excinfo:
+        weave_init._get_server_info(mock_server)
 
-    assert result is None
+    assert str(underlying) in str(excinfo.value)
+    assert excinfo.value.__cause__ is underlying
     mock_server.server_info.assert_called_once()
 
 

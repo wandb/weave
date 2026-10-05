@@ -75,9 +75,7 @@ describe('OpLinkSpanProcessor', () => {
     // count to move, so after a flush it burns its full 1500ms timeout and logs
     // a warning.
     await requireGlobalClient().flush();
-    const {calls} = await server.calls.callsStreamQueryPost({
-      project_id: TEST_PROJECT,
-    });
+    const calls = server.listCalls(TEST_PROJECT);
     return Object.fromEntries(
       calls.flatMap((c: Call) => {
         const ref = parseWeaveUri(c.op_name);
@@ -112,7 +110,7 @@ describe('OpLinkSpanProcessor', () => {
     const {converse} = await storedCalls();
 
     const spans = exporter.getFinishedSpans();
-    for (const name of ['invoke_agent', 'chat']) {
+    for (const name of ['invoke_agent', 'chat gpt-4o']) {
       const attrs = findSpan(spans, name).attributes;
       expect(attrs[PARENT_CALL_ID_SPAN_ATTR]).toBe(converse.id);
       expect(attrs[PARENT_CALL_TRACE_ID_SPAN_ATTR]).toBe(converse.trace_id);

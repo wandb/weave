@@ -1,9 +1,11 @@
 from __future__ import annotations
 
-import base64
 import logging
 import os
+from collections.abc import Mapping
 from typing import TYPE_CHECKING, Any
+
+import requests
 
 from weave.compat import wandb
 from weave.integrations.patch import (
@@ -30,7 +32,12 @@ from weave.trace_server_bindings.caching_middleware_trace_server import (
 from weave.trace_server_bindings.client_interface import TraceServerClientInterface
 from weave.trace_server_bindings.remote_http_trace_server import RemoteHTTPTraceServer
 from weave.trace_server_version import MIN_TRACE_SERVER_VERSION
-from weave.wandb_interface.context import get_wandb_api_context
+from weave.version import VERSION
+from weave.wandb_interface.auth import (
+    ApiKeyCredentials,
+    WandbCredentials,
+)
+from weave.wandb_interface.context import get_wandb_auth_context
 
 if TYPE_CHECKING:
     from opentelemetry.exporter.otlp.proto.http.trace_exporter import (
@@ -43,12 +50,58 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
+
+def _only_weave_export_headers(
+    headers: Mapping[str, str | bytes],
+) -> dict[str, str | bytes]:
+    """Drop collector headers. Keep routing, content type, and body encoding."""
+    # content-encoding is the exporter's own gzip/deflate header, not a
+    # collector header. Removing it would send a compressed body unlabeled.
+    allowed = {"content-type", "content-encoding", "project_id", "authorization"}
+    return {key: value for key, value in headers.items() if key.lower() in allowed}
+
+
+class _ConversationExportSession(requests.Session):
+    """Session passed to the conversation OTLP exporter.
+
+    ``verify=False`` is forced here when SSL checks are off, because the
+    exporter treats ``certificate_file=False`` as omitted. When the exporter
+    passes no ``verify``, the session value is sent so a CA bundle does not
+    replace an OTel certificate.
+    """
+
+    def __init__(self, *, verify_tls: bool) -> None:
+        super().__init__()
+        self._verify_tls = verify_tls
+
+    # types-requests spells request() with explicit parameters, not **kwargs.
+    def request(  # type: ignore[override]
+        self, method: str | bytes, url: str | bytes, **kwargs: Any
+    ) -> requests.Response:
+        headers = kwargs.get("headers")
+        if headers:
+            # Drop Authorization here. The exporter's copy comes from the
+            # process env and would override the session, including after a
+            # re-init with no credentials. The session owns that header.
+            kwargs["headers"] = {
+                key: value
+                for key, value in _only_weave_export_headers(headers).items()
+                if key.lower() != "authorization"
+            }
+        if not self._verify_tls:
+            kwargs["verify"] = False
+        elif "verify" not in kwargs:
+            kwargs["verify"] = self.verify
+        return super().request(method, url, **kwargs)
+
+
 # The conversation/agent OTel provider is set once (OTel's global provider is
 # set-once and its Resource is immutable). A later weave.init() to a different
-# project reroutes by rewriting the exporter's headers instead of rebuilding,
-# so agent spans (and their creds) follow the active project.
+# project reroutes by rewriting headers on the session weave passed in, instead
+# of rebuilding, so agent spans (and their creds) follow the active project.
 _conversation_tracer_provider: TracerProvider | None = None
 _conversation_span_exporter: OTLPSpanExporter | None = None
+_conversation_export_session: _ConversationExportSession | None = None
 
 # Bound the pre-reroute flush so switching projects can't block weave.init() on a
 # stalled exporter; spans that miss the window export under the new project.
@@ -111,20 +164,21 @@ Args:
 """
 
 
-def _get_server_info(server: TraceServerClientInterface) -> ServerInfoRes | None:
-    """Fetch server_info or return None if the server is unavailable."""
+def _get_server_info(server: TraceServerClientInterface) -> ServerInfoRes:
+    """Fetch server_info, or raise a RuntimeError naming the underlying cause."""
     try:
         return server.server_info()
-    except Exception:
-        logger.warning(
-            "Unexpected error when checking if Weave is available on the server. "
-            "Please contact support.",
-            exc_info=True,
-        )
-        return None
+    except Exception as e:
+        raise RuntimeError(
+            f"Weave is not available on the server: {e}. Please contact support."
+        ) from e
 
 
-def _setup_conversation_tracing(entity: str, project: str, api_key: str | None) -> None:
+def _setup_conversation_tracing(
+    entity: str,
+    project: str,
+    credentials: WandbCredentials | None,
+) -> None:
     """Configure OTel TracerProvider for the Conversation SDK using weave credentials.
 
     Called automatically by init_weave() once version checks have passed.
@@ -137,7 +191,7 @@ def _setup_conversation_tracing(entity: str, project: str, api_key: str | None) 
     a warning and returns early if opentelemetry is unavailable. Other errors
     propagate so misconfiguration is visible to the user.
     """
-    global _conversation_tracer_provider, _conversation_span_exporter  # noqa: PLW0603
+    global _conversation_tracer_provider, _conversation_span_exporter, _conversation_export_session  # noqa: PLW0603
     try:
         from opentelemetry import trace
         from opentelemetry.exporter.otlp.proto.http.trace_exporter import (
@@ -160,20 +214,20 @@ def _setup_conversation_tracing(entity: str, project: str, api_key: str | None) 
         return
 
     project_id = f"{entity}/{project}"
-    headers = _conversation_headers(project_id, api_key)
 
     # Re-init while we own the global provider: it's set-once with an immutable
-    # Resource, so reroute the live exporter's headers instead of rebuilding.
+    # Resource, so reroute the live session's headers instead of rebuilding.
     existing_provider = _conversation_tracer_provider
     existing_exporter = _conversation_span_exporter
+    existing_session = _conversation_export_session
     if (
         existing_provider is not None
         and existing_exporter is not None
+        and existing_session is not None
         and trace.get_tracer_provider() is existing_provider
     ):
-        # TODO: mutating the exporter's private requests.Session couples us to
-        # http-proto internals; a delegating SpanExporter would drop the poke.
-        current = existing_exporter._session.headers
+        headers = _conversation_headers(project_id, credentials)
+        current = existing_session.headers
         if current.get("project_id") == headers["project_id"] and current.get(
             "Authorization"
         ) == headers.get("Authorization"):
@@ -186,11 +240,7 @@ def _setup_conversation_tracing(entity: str, project: str, api_key: str | None) 
                 "some queued spans may export under the new project",
                 _CONVERSATION_REROUTE_FLUSH_TIMEOUT_MS,
             )
-        current["project_id"] = headers["project_id"]
-        if "Authorization" in headers:
-            current["Authorization"] = headers["Authorization"]
-        else:
-            current.pop("Authorization", None)
+        _apply_conversation_routing(existing_session, project_id, credentials)
         return
 
     # A provider we didn't install is active (e.g. the user configured their
@@ -199,15 +249,19 @@ def _setup_conversation_tracing(entity: str, project: str, api_key: str | None) 
         return
 
     endpoint = otel_traces_endpoint(trace_server_url)
-    resource = Resource.create({"service.name": "weave-conversation-sdk"})
-    exporter = OTLPSpanExporter(endpoint=endpoint, headers=headers)
-    # Honor WEAVE_INSECURE_DISABLE_SSL for the OTel exporter too, so
-    # dev environments with self-signed certs can export spans.
-    # OTLPSpanExporter passes _certificate_file to requests.post(verify=...),
-    # but its constructor uses `certificate_file or <env_default>` which
-    # treats False as falsy, so we set it directly after construction.
-    if not env.ssl_verify():
-        exporter._certificate_file = False
+    resource = Resource.create(
+        {
+            "service.name": "weave-conversation-sdk",
+            "wandb.sdk.name": "weave",
+            "wandb.sdk.version": VERSION,
+            "wandb.sdk.language": "python",
+        }
+    )
+    session = _ConversationExportSession(verify_tls=env.ssl_verify())
+    exporter = OTLPSpanExporter(endpoint=endpoint, session=session)
+    # After the constructor: up to 1.44 it copies env headers onto the session,
+    # and those would overwrite a project_id written earlier.
+    _apply_conversation_routing(session, project_id, credentials)
     provider = TracerProvider(resource=resource)
     provider.add_span_processor(BatchSpanProcessor(exporter))
     # Registered ahead of the eval linker so that a span past the attribute
@@ -226,17 +280,43 @@ def _setup_conversation_tracing(entity: str, project: str, api_key: str | None) 
         return
     _conversation_tracer_provider = provider
     _conversation_span_exporter = exporter
+    _conversation_export_session = session
 
 
-def _conversation_headers(project_id: str, api_key: str | None) -> dict[str, str]:
-    """Export headers routing agent spans: project via project_id, creds via Basic auth."""
-    # Auth mirrors the rest of weave (BasicAuth base64("api:<key>")); one source
-    # of truth so setup and reroute never diverge into stale creds.
+def _conversation_headers(
+    project_id: str,
+    credentials: WandbCredentials | None,
+) -> dict[str, str]:
     headers: dict[str, str] = {"project_id": project_id}
-    if api_key:
-        token = base64.b64encode(f"api:{api_key}".encode()).decode()
-        headers["Authorization"] = f"Basic {token}"
+    if credentials is not None:
+        headers["Authorization"] = credentials.authorization_header()
     return headers
+
+
+def _apply_conversation_routing(
+    session: requests.Session,
+    project_id: str,
+    credentials: WandbCredentials | None,
+) -> None:
+    """Point the live session at this project. Called after the exporter exists."""
+    # Copy first. A send may be iterating the live map, and pop or insert on
+    # it raises RuntimeError. The live map is replaced once, at the end.
+    headers: dict[str, str | bytes] = {
+        key: value
+        for key, value in session.headers.items()
+        if key.lower() != "authorization"
+    }
+    headers["project_id"] = project_id
+    if credentials is not None:
+        # session.auth refreshes the token on each send. The header is only the
+        # marker the next init compares.
+        headers["Authorization"] = credentials.authorization_header()
+        session.auth = credentials.requests_auth()
+    else:
+        session.auth = None
+    session.headers = requests.structures.CaseInsensitiveDict(
+        _only_weave_export_headers(headers)
+    )
 
 
 def init_weave(
@@ -263,12 +343,12 @@ def init_weave(
             current_client.finish()
             weave_client_context.set_weave_client_global(None)
 
-    api_key = get_wandb_api_context()
-    if api_key is None:
+    credentials = get_wandb_auth_context()
+    if credentials is None:
         url = wandb.app_url(env.wandb_base_url())
         logger.info("Please login to Weights & Biases (%s) to continue...", url)
         wandb.login(anonymous="never", force=True, referrer="weave")  # type: ignore
-        api_key = get_wandb_api_context()
+        credentials = get_wandb_auth_context()
 
     # Resolve entity name after authentication is ensured
     entity_name, project_name = get_entity_project_from_project_name(project_name)
@@ -277,12 +357,8 @@ def init_weave(
         wandb_run_id = f"{entity_name}/{project_name}/{wb_run_context.run_id}"
         check_wandb_run_matches(wandb_run_id, entity_name, project_name)
 
-    remote_server = init_weave_get_server(api_key)
+    remote_server = init_weave_get_server(credentials)
     server_info = _get_server_info(remote_server)
-    if server_info is None:
-        raise RuntimeError(
-            "Weave is not available on the server.  Please contact support."
-        )
     server: TraceServerClientInterface = remote_server
     if use_server_cache():
         server = CachingMiddlewareTraceServer.from_env(server)
@@ -295,7 +371,7 @@ def init_weave(
         postprocess_inputs=postprocess_inputs,
         postprocess_output=postprocess_output,
         attributes=attributes,
-        api_key=api_key,
+        api_key=credentials.wal_seed() if credentials is not None else None,
     )
 
     # If the project name was formatted by init, update the project name
@@ -333,7 +409,7 @@ def init_weave(
     # Placed after the version checks so a disabled init never installs a
     # global TracerProvider that would keep exporting spans to an
     # incompatible server.
-    _setup_conversation_tracing(entity_name, project_name, api_key)
+    _setup_conversation_tracing(entity_name, project_name, credentials)
 
     init_message.print_init_message(
         username, entity_name, project_name, read_only=not ensure_project_exists
@@ -374,7 +450,7 @@ def init_weave_disabled(
     client = weave_client.WeaveClient(
         "DISABLED",
         "DISABLED",
-        init_weave_get_server("DISABLED", should_batch=False),
+        init_weave_get_server(ApiKeyCredentials("DISABLED"), should_batch=False),
         ensure_project_exists=False,
         postprocess_inputs=postprocess_inputs,
         postprocess_output=postprocess_output,
@@ -386,7 +462,7 @@ def init_weave_disabled(
 
 
 def init_weave_get_server(
-    api_key: str | None = None,
+    credentials: WandbCredentials | None = None,
     should_batch: bool = True,
 ) -> TraceServerClientInterface:
     res: TraceServerClientInterface
@@ -398,8 +474,8 @@ def init_weave_get_server(
         res = StainlessRemoteHTTPTraceServer.from_env(should_batch)
     else:
         res = RemoteHTTPTraceServer.from_env(should_batch)
-    if api_key is not None:
-        res.set_auth(("api", api_key))
+    if credentials is not None:
+        res.set_auth(credentials)
     return res
 
 

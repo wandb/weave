@@ -9,7 +9,12 @@ import {
 import type {ChildSpanContext} from './common';
 import {LLM, type LLMInit} from './llm';
 import {getWeaveTracer} from './provider';
-import {SpanBase, type SpanEndOptions, type SpanInitBase} from './spanBase';
+import {
+  SpanBase,
+  type SpanEndOptions,
+  type SpanInitBase,
+  spanName,
+} from './spanBase';
 import {
   ATTR_GEN_AI_AGENT_DESCRIPTION,
   ATTR_GEN_AI_AGENT_ID,
@@ -38,8 +43,8 @@ export interface SubAgentInit extends SpanInitBase {
 /**
  * A nested agent invocation — used when the current agent hands work to
  * another named agent (e.g. a planner calling a researcher). Emits an
- * `invoke_agent` span tagged with the subagent's name and (optionally)
- * its model.
+ * `invoke_agent <name>` span (`invoke_agent` when the name is blank) tagged
+ * with the subagent's name and (optionally) its model.
  *
  * Created by `weave.startSubagent()` (or `turn.startSubagent()`, or
  * `llm.startSubagent()`) and terminated with `end()`. Children (LLM, Tool,
@@ -119,7 +124,7 @@ export class SubAgent extends SpanBase {
     const tracer = getWeaveTracer(WEAVE_GENAI_TRACER_NAME);
     const attributes: Attributes = {...(opts.attributes ?? {})};
     const span = tracer.startSpan(
-      'invoke_agent',
+      spanName('invoke_agent', opts.name),
       {kind: SpanKind.INTERNAL, attributes, startTime: opts.startTime},
       opts.parentContext
     );
@@ -170,6 +175,11 @@ export class SubAgent extends SpanBase {
   /**
    * Bulk-set any subset of the mutable fields. Replaces (does not merge).
    * Input and output messages are serialized when the span ends.
+   *
+   * The span is named from `name` when it starts, so pass `name` to
+   * `startSubagent` if the name has to carry it. `record` still updates the
+   * field that `end()` writes to `gen_ai.agent.name`; it does not rename the
+   * span.
    */
   record(opts: {
     messages?: Message[];

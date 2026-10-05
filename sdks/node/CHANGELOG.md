@@ -4,6 +4,47 @@ All notable changes to the Weave TypeScript SDK will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.16.9] - 2026-09-24
+
+### Added
+
+- Accept `totalTokens` on GenAI `Usage` and record it as `gen_ai.usage.total_tokens`, including an explicit zero. An omitted total stays unset. ([#7929](https://github.com/wandb/weave/pull/7929))
+
+### Changed
+
+- Name GenAI spans after the model, tool, or agent (`chat gpt-4o`, `execute_tool search`, `invoke_agent research-bot`). A blank or missing target stays the bare operation, and `gen_ai.operation.name` is unchanged. An alert pinned to `span_name = "chat"` no longer matches a TypeScript chat span that has a model. ([#7934](https://github.com/wandb/weave/pull/7934))
+
+### Fixed
+
+- Percent-encode each path segment of entity and project names in SDK-built links, so a project name with a space stays one URL. ([#7922](https://github.com/wandb/weave/pull/7922))
+- Stamp Google ADK spans with `weave.integration.name`, `weave.integration.version`, and `weave.integration.meta.*`, matching the other TypeScript integrations. ([#7931](https://github.com/wandb/weave/pull/7931))
+- Make `wrapOpenAI()` return a client Weave has already wrapped. Wrapping twice made non-streaming Chat Completions and Responses calls fail with `TypeError: Body is unusable`, and logged other calls twice. ([#7941](https://github.com/wandb/weave/pull/7941))
+- Warn from `init()` when CommonJS loaded an instrumented library before `weave`. The warning names the library and says to require `weave` first. It stays quiet for an explicit wrap, and when another package loaded the library. Patching is unchanged. ([#7932](https://github.com/wandb/weave/pull/7932))
+
+
+## [0.16.8] - 2026-09-10
+
+### Changed
+
+- Refresh the vendored trace-server client to the current trace-server API. ([#7838](https://github.com/wandb/weave/pull/7838))
+
+
+## [0.16.7] - 2026-09-03
+
+### Added
+
+- Record the invoking OpenTelemetry span's trace and span ids on `weave.op` calls, so calls made under a user-managed OTel span link back to that span instead of opening a separate trace. ([#7753](https://github.com/wandb/weave/pull/7753))
+- Add `recordError(error)` to GenAI spans for recording failures without ending them, and derive `error.type` from standard `Error` values passed to `recordError()` or `end()`. ([#7738](https://github.com/wandb/weave/pull/7738))
+
+### Changed
+
+- Replace the generated swagger HTTP client with a vendored Stainless client. Public method signatures are unchanged; the request timeout is now five minutes. ([#7785](https://github.com/wandb/weave/pull/7785))
+
+### Fixed
+
+- Count cached-read and cache-creation tokens toward the Anthropic prompt total on plain, streaming, and batch calls, so traces and token-derived costs are correct with prompt caching enabled. ([#7725](https://github.com/wandb/weave/pull/7725))
+
+
 ## [0.16.6] - 2026-08-14
 
 ### Added
@@ -11,7 +52,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Trace nested and background Claude Agent SDK subagents as `invoke_agent` spans, including their prompts, models, child chats, and terminal status. ([#7630](https://github.com/wandb/weave/pull/7630))
 - Accept JSON-compatible tool arguments and results through `Tool`, and export the `JsonObject` and `JsonValue` types. ([#7702](https://github.com/wandb/weave/pull/7702))
 - Link `weave.op` calls to the agent spans they produce, and expose the parent-call identifiers on queried span records. ([#7730](https://github.com/wandb/weave/pull/7730), [#7711](https://github.com/wandb/weave/pull/7711))
-- Add `recordError(error)` to GenAI spans for recording failures without ending them, and derive `error.type` from standard `Error` values passed to `recordError()` or `end()`. ([#7738](https://github.com/wandb/weave/pull/7738))
 
 ### Changed
 

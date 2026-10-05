@@ -5,7 +5,7 @@ import {
 } from '@opentelemetry/sdk-trace-base';
 
 import {setGlobalClient} from '../../clientApi';
-import {type Api as TraceServerApi} from '../../generated/traceServerApi';
+import type {WeaveTrace} from '../../vendor/weave-server-sdk';
 import {makeSettings, type Settings} from '../../settings';
 import {WeaveClient} from '../../weaveClient';
 import state from 'weave/state';
@@ -18,7 +18,7 @@ export function installFakeClient({
   settings = {},
   projectId = TEST_PROJECT,
 }: {settings?: Partial<Settings>; projectId?: string} = {}): WeaveClient {
-  const traceServerApi = {baseUrl: TEST_BASE_URL} as TraceServerApi<any>;
+  const traceServerApi = {baseURL: TEST_BASE_URL} as WeaveTrace;
   const client = new WeaveClient({
     traceServerApi,
     projectId,

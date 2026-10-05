@@ -44,7 +44,12 @@ import {
   setupGenAITestEnvironment,
 } from '../../genai/common';
 
-const INVOKE = 'invoke_agent';
+const INVOKE = 'invoke_agent claude_agent_sdk';
+const ATTR_TASK_STATUS = 'claude_agent_sdk.task.status';
+
+function isOperation(span: {name: string}, operation: string): boolean {
+  return span.name === operation || span.name.startsWith(`${operation} `);
+}
 
 // ---------------------------------------------------------------------------
 // Typed SDK-message fixtures.
@@ -356,10 +361,10 @@ describe('Claude Agent SDK — OTel tracer', () => {
 
     const spans = getExporter().getFinishedSpans();
     expect(spans.map(span => span.name)).toEqual([
-      'chat',
-      'execute_tool',
-      'chat',
-      'invoke_agent',
+      'chat claude-x',
+      'execute_tool Bash',
+      'chat claude-x',
+      'invoke_agent claude_agent_sdk',
     ]);
     for (const span of spans) {
       expect({
@@ -402,7 +407,7 @@ describe('Claude Agent SDK — OTel tracer', () => {
 
     const chatSpans = spans.filter(
       s =>
-        s.name === 'chat' &&
+        isOperation(s, 'chat') &&
         s.attributes[ATTR_GEN_AI_REQUEST_MODEL] === 'claude-x'
     );
     const chat = chatSpans.find(
@@ -454,7 +459,7 @@ describe('Claude Agent SDK — OTel tracer', () => {
     expect(usageChat.attributes[ATTR_GEN_AI_CONVERSATION_ID]).toBe('sess-1');
     expect(usageChat.parentSpanId).toBe(invoke.spanContext().spanId);
 
-    const tool = findSpan(spans, 'execute_tool');
+    const tool = findSpan(spans, 'execute_tool Bash');
     expect(tool.kind).toBe(SpanKind.INTERNAL);
     expect(tool.attributes[ATTR_GEN_AI_TOOL_NAME]).toBe('Bash');
     expect(tool.attributes[ATTR_GEN_AI_TOOL_CALL_ID]).toBe('t1');
@@ -511,7 +516,7 @@ describe('Claude Agent SDK — OTel tracer', () => {
     tracer.finalize();
 
     const spans = getExporter().getFinishedSpans();
-    const roots = spans.filter(span => span.name === INVOKE);
+    const roots = spans.filter(span => isOperation(span, 'invoke_agent'));
     expect(roots).toHaveLength(2);
     expect(
       roots.map(root => ({
@@ -541,7 +546,7 @@ describe('Claude Agent SDK — OTel tracer', () => {
 
     const contentChats = spans.filter(
       span =>
-        span.name === 'chat' &&
+        isOperation(span, 'chat') &&
         span.attributes[ATTR_GEN_AI_OUTPUT_MESSAGES] !== undefined
     );
     expect(contentChats.map(span => span.parentSpanId)).toEqual([
@@ -614,12 +619,12 @@ describe('Claude Agent SDK — OTel tracer', () => {
     const spans = getExporter().getFinishedSpans();
     const root = spans.find(
       span =>
-        span.name === INVOKE &&
+        isOperation(span, 'invoke_agent') &&
         span.attributes[ATTR_GEN_AI_AGENT_NAME] === 'claude_agent_sdk'
     )!;
     const subagent = spans.find(
       span =>
-        span.name === INVOKE &&
+        isOperation(span, 'invoke_agent') &&
         span.attributes[ATTR_GEN_AI_AGENT_NAME] === 'researcher'
     )!;
     expect(subagent.parentSpanId).toBe(root.spanContext().spanId);
@@ -654,7 +659,7 @@ describe('Claude Agent SDK — OTel tracer', () => {
 
     const nestedChat = spans.find(
       span =>
-        span.name === 'chat' &&
+        isOperation(span, 'chat') &&
         span.attributes[ATTR_GEN_AI_REQUEST_MODEL] === 'claude-subagent'
     )!;
     expect(nestedChat.parentSpanId).toBe(subagent.spanContext().spanId);
@@ -678,7 +683,7 @@ describe('Claude Agent SDK — OTel tracer', () => {
 
     const nestedTool = spans.find(
       span =>
-        span.name === 'execute_tool' &&
+        isOperation(span, 'execute_tool') &&
         span.attributes[ATTR_GEN_AI_TOOL_CALL_ID] === 'read-1'
     )!;
     expect(nestedTool.parentSpanId).toBe(subagent.spanContext().spanId);
@@ -688,7 +693,7 @@ describe('Claude Agent SDK — OTel tracer', () => {
     expect(
       spans.some(
         span =>
-          span.name === 'execute_tool' &&
+          isOperation(span, 'execute_tool') &&
           span.attributes[ATTR_GEN_AI_TOOL_CALL_ID] === 'agent-1'
       )
     ).toBe(false);
@@ -772,12 +777,12 @@ describe('Claude Agent SDK — OTel tracer', () => {
     const spans = getExporter().getFinishedSpans();
     const root = spans.find(
       span =>
-        span.name === INVOKE &&
+        isOperation(span, 'invoke_agent') &&
         span.attributes[ATTR_GEN_AI_AGENT_NAME] === 'claude_agent_sdk'
     )!;
     const subagents = spans.filter(
       span =>
-        span.name === INVOKE &&
+        isOperation(span, 'invoke_agent') &&
         span.attributes[ATTR_GEN_AI_AGENT_NAME] !== 'claude_agent_sdk'
     );
     expect(
@@ -876,7 +881,7 @@ describe('Claude Agent SDK — OTel tracer', () => {
         .getFinishedSpans()
         .filter(
           span =>
-            span.name === INVOKE &&
+            isOperation(span, 'invoke_agent') &&
             span.attributes[ATTR_GEN_AI_AGENT_NAME] !== 'claude_agent_sdk'
         )
     ).toEqual([]);
@@ -906,7 +911,7 @@ describe('Claude Agent SDK — OTel tracer', () => {
     const subagents = spans
       .filter(
         span =>
-          span.name === INVOKE &&
+          isOperation(span, 'invoke_agent') &&
           span.attributes[ATTR_GEN_AI_AGENT_NAME] !== 'claude_agent_sdk'
       )
       .sort((a, b) =>
@@ -920,7 +925,7 @@ describe('Claude Agent SDK — OTel tracer', () => {
         childMessages: spans
           .filter(
             child =>
-              child.name === 'chat' &&
+              isOperation(child, 'chat') &&
               child.parentSpanId === span.spanContext().spanId
           )
           .map(child =>
@@ -936,6 +941,7 @@ describe('Claude Agent SDK — OTel tracer', () => {
         outputMessages: span.attributes[ATTR_GEN_AI_OUTPUT_MESSAGES],
         providerName: span.attributes[ATTR_GEN_AI_PROVIDER_NAME],
         statusCode: span.status.code,
+        taskStatus: span.attributes[ATTR_TASK_STATUS],
         toolCallId: span.attributes[ATTR_GEN_AI_TOOL_CALL_ID],
         toolCallResult: span.attributes[ATTR_GEN_AI_TOOL_CALL_RESULT],
       }))
@@ -960,6 +966,7 @@ describe('Claude Agent SDK — OTel tracer', () => {
         outputMessages: outputMessagesJson('Alpha verification finished'),
         providerName: undefined,
         statusCode: SpanStatusCode.UNSET,
+        taskStatus: 'completed',
         toolCallId: undefined,
         toolCallResult: undefined,
       },
@@ -981,6 +988,7 @@ describe('Claude Agent SDK — OTel tracer', () => {
         outputMessages: outputMessagesJson('Beta verification finished'),
         providerName: undefined,
         statusCode: SpanStatusCode.UNSET,
+        taskStatus: 'completed',
         toolCallId: undefined,
         toolCallResult: undefined,
       },
@@ -1040,17 +1048,17 @@ describe('Claude Agent SDK — OTel tracer', () => {
     const spans = getExporter().getFinishedSpans();
     const root = spans.find(
       span =>
-        span.name === INVOKE &&
+        isOperation(span, 'invoke_agent') &&
         span.attributes[ATTR_GEN_AI_AGENT_NAME] === 'claude_agent_sdk'
     )!;
     const subagent = spans.find(
       span =>
-        span.name === INVOKE &&
+        isOperation(span, 'invoke_agent') &&
         span.attributes[ATTR_GEN_AI_AGENT_NAME] === 'late-worker'
     )!;
     expect(
       spans
-        .filter(span => span.name === INVOKE)
+        .filter(span => isOperation(span, 'invoke_agent'))
         .map(span => ({
           agentName: span.attributes[ATTR_GEN_AI_AGENT_NAME],
           inputMessages: JSON.parse(
@@ -1081,7 +1089,7 @@ describe('Claude Agent SDK — OTel tracer', () => {
       spans
         .filter(
           span =>
-            span.name === 'chat' &&
+            isOperation(span, 'chat') &&
             span.attributes[ATTR_GEN_AI_REQUEST_MODEL] === 'claude-worker'
         )
         .map(span => ({
@@ -1147,7 +1155,7 @@ describe('Claude Agent SDK — OTel tracer', () => {
       .getFinishedSpans()
       .filter(
         span =>
-          span.name === INVOKE &&
+          isOperation(span, 'invoke_agent') &&
           span.attributes[ATTR_GEN_AI_AGENT_NAME] === 'failure-checker'
       );
     expect(
@@ -1156,14 +1164,16 @@ describe('Claude Agent SDK — OTel tracer', () => {
         errorType: span.attributes[ATTR_ERROR_TYPE],
         statusCode: span.status.code,
         statusMessage: span.status.message,
+        taskStatus: span.attributes[ATTR_TASK_STATUS],
         toolCallId: span.attributes[ATTR_GEN_AI_TOOL_CALL_ID],
       }))
     ).toEqual([
       {
         agentId: 'task-failed',
-        errorType: 'subagent_error',
+        errorType: 'Error',
         statusCode: SpanStatusCode.ERROR,
         statusMessage: 'Subagent crashed',
+        taskStatus: 'failed',
         toolCallId: undefined,
       },
     ]);
@@ -1207,7 +1217,7 @@ describe('Claude Agent SDK — OTel tracer', () => {
       .getFinishedSpans()
       .filter(
         span =>
-          span.name === INVOKE &&
+          isOperation(span, 'invoke_agent') &&
           span.attributes[ATTR_GEN_AI_AGENT_NAME] === 'unfinished-checker'
       );
     expect(
@@ -1221,7 +1231,7 @@ describe('Claude Agent SDK — OTel tracer', () => {
     ).toEqual([
       {
         agentId: 'task-unfinished',
-        errorType: 'aborted',
+        errorType: 'Error',
         statusCode: SpanStatusCode.ERROR,
         statusMessage: 'Agent ended with open subagent span',
         toolCallId: undefined,
@@ -1269,7 +1279,7 @@ describe('Claude Agent SDK — OTel tracer', () => {
     expect(
       getExporter()
         .getFinishedSpans()
-        .filter(span => span.name === 'execute_tool')
+        .filter(span => isOperation(span, 'execute_tool'))
     ).toEqual([]);
 
     tracer.processMessage(
@@ -1295,12 +1305,12 @@ describe('Claude Agent SDK — OTel tracer', () => {
     const spans = getExporter().getFinishedSpans();
     const subagent = spans.find(
       span =>
-        span.name === INVOKE &&
+        isOperation(span, 'invoke_agent') &&
         span.attributes[ATTR_GEN_AI_AGENT_NAME] === 'inspector'
     )!;
     expect(
       spans
-        .filter(span => span.name === 'execute_tool')
+        .filter(span => isOperation(span, 'execute_tool'))
         .map(span => ({
           errorType: span.attributes[ATTR_ERROR_TYPE],
           parentSpanId: span.parentSpanId,
@@ -1375,7 +1385,9 @@ describe('Claude Agent SDK — OTel tracer', () => {
     expect(
       getExporter()
         .getFinishedSpans()
-        .filter(span => span.name === INVOKE && span.parentSpanId != null)
+        .filter(
+          span => isOperation(span, 'invoke_agent') && span.parentSpanId != null
+        )
     ).toEqual([]);
 
     tracer.processMessage(
@@ -1411,7 +1423,7 @@ describe('Claude Agent SDK — OTel tracer', () => {
     const spans = getExporter().getFinishedSpans();
     const coordinator = spans.find(
       span =>
-        span.name === INVOKE &&
+        isOperation(span, 'invoke_agent') &&
         span.attributes[ATTR_GEN_AI_AGENT_NAME] === 'coordinator'
     )!;
     // Exactly one span per subagent — no duplicate from the lazy-create path.
@@ -1419,7 +1431,7 @@ describe('Claude Agent SDK — OTel tracer', () => {
       spans
         .filter(
           span =>
-            span.name === INVOKE &&
+            isOperation(span, 'invoke_agent') &&
             span.attributes[ATTR_GEN_AI_AGENT_NAME] === 'worker'
         )
         .map(span => ({
@@ -1472,7 +1484,9 @@ describe('Claude Agent SDK — OTel tracer', () => {
     expect(
       getExporter()
         .getFinishedSpans()
-        .filter(span => span.name === INVOKE && span.parentSpanId != null)
+        .filter(
+          span => isOperation(span, 'invoke_agent') && span.parentSpanId != null
+        )
     ).toEqual([]);
 
     tracer.processMessage(
@@ -1490,7 +1504,7 @@ describe('Claude Agent SDK — OTel tracer', () => {
         .getFinishedSpans()
         .filter(
           span =>
-            span.name === INVOKE &&
+            isOperation(span, 'invoke_agent') &&
             span.attributes[ATTR_GEN_AI_AGENT_NAME] === 'remote-worker'
         )
         .map(span => ({
@@ -1498,14 +1512,16 @@ describe('Claude Agent SDK — OTel tracer', () => {
           errorType: span.attributes[ATTR_ERROR_TYPE],
           statusCode: span.status.code,
           statusMessage: span.status.message,
+          taskStatus: span.attributes[ATTR_TASK_STATUS],
         }))
     ).toEqual([
       {
         // No `agentId` in a remote launch payload, so the task handle stands in.
         agentId: 'task-remote',
-        errorType: 'subagent_error',
+        errorType: 'Error',
         statusCode: SpanStatusCode.ERROR,
         statusMessage: 'Remote agent crashed',
+        taskStatus: 'failed',
       },
     ]);
   });
@@ -1546,7 +1562,7 @@ describe('Claude Agent SDK — OTel tracer', () => {
         .getFinishedSpans()
         .filter(
           span =>
-            span.name === INVOKE &&
+            isOperation(span, 'invoke_agent') &&
             span.attributes[ATTR_GEN_AI_AGENT_NAME] === 'answerer'
         )
         .map(span => ({
@@ -1604,19 +1620,21 @@ describe('Claude Agent SDK — OTel tracer', () => {
         .getFinishedSpans()
         .filter(
           span =>
-            span.name === INVOKE &&
+            isOperation(span, 'invoke_agent') &&
             span.attributes[ATTR_GEN_AI_AGENT_NAME] === 'stoppable'
         )
         .map(span => ({
           errorType: span.attributes[ATTR_ERROR_TYPE],
           statusCode: span.status.code,
           statusMessage: span.status.message,
+          taskStatus: span.attributes[ATTR_TASK_STATUS],
         }))
     ).toEqual([
       {
-        errorType: 'aborted',
+        errorType: 'Error',
         statusCode: SpanStatusCode.ERROR,
         statusMessage: 'Stopped by the user',
+        taskStatus: 'stopped',
       },
     ]);
   });
@@ -1652,7 +1670,7 @@ describe('Claude Agent SDK — OTel tracer', () => {
         .getFinishedSpans()
         .filter(
           span =>
-            span.name === INVOKE &&
+            isOperation(span, 'invoke_agent') &&
             span.attributes[ATTR_GEN_AI_AGENT_NAME] === 'failer'
         )
         .map(span => ({
@@ -1663,7 +1681,7 @@ describe('Claude Agent SDK — OTel tracer', () => {
         }))
     ).toEqual([
       {
-        errorType: 'subagent_error',
+        errorType: 'Error',
         outputMessages: outputMessagesJson('subagent blew up'),
         statusCode: SpanStatusCode.ERROR,
         statusMessage: 'subagent blew up',
@@ -1689,12 +1707,12 @@ describe('Claude Agent SDK — OTel tracer', () => {
     const spans = getExporter().getFinishedSpans();
     const orphan = spans.find(
       span =>
-        span.name === INVOKE &&
+        isOperation(span, 'invoke_agent') &&
         span.attributes[ATTR_GEN_AI_AGENT_NAME] === 'orphan'
     )!;
     const root = spans.find(
       span =>
-        span.name === INVOKE &&
+        isOperation(span, 'invoke_agent') &&
         span.attributes[ATTR_GEN_AI_AGENT_NAME] === 'claude_agent_sdk'
     )!;
     expect({
@@ -1707,7 +1725,7 @@ describe('Claude Agent SDK — OTel tracer', () => {
       statusCode: orphan.status.code,
     }).toEqual({
       agentDescription: 'Work started before the tracer attached',
-      errorType: 'aborted',
+      errorType: 'Error',
       model: 'claude-orphan',
       parentSpanId: root.spanContext().spanId,
       statusCode: SpanStatusCode.ERROR,
@@ -1779,7 +1797,7 @@ describe('Claude Agent SDK — OTel tracer', () => {
     const spans = getExporter().getFinishedSpans();
     const subagents = spans.filter(
       span =>
-        span.name === INVOKE &&
+        isOperation(span, 'invoke_agent') &&
         span.attributes[ATTR_GEN_AI_AGENT_NAME] !== 'claude_agent_sdk'
     );
     const coordinator = subagents.find(
@@ -1800,7 +1818,7 @@ describe('Claude Agent SDK — OTel tracer', () => {
         parentSpanId: spans
           .find(
             span =>
-              span.name === INVOKE &&
+              isOperation(span, 'invoke_agent') &&
               span.attributes[ATTR_GEN_AI_AGENT_NAME] === 'claude_agent_sdk'
           )!
           .spanContext().spanId,
@@ -1903,7 +1921,10 @@ describe('Claude Agent SDK — OTel tracer', () => {
       })
     );
 
-    const invoke = findSpan(getExporter().getFinishedSpans(), INVOKE);
+    const invoke = findSpan(
+      getExporter().getFinishedSpans(),
+      'invoke_agent researcher'
+    );
     expect(invoke.attributes[ATTR_GEN_AI_AGENT_NAME]).toBe('researcher');
   });
 
@@ -1926,9 +1947,12 @@ describe('Claude Agent SDK — OTel tracer', () => {
     );
     tracer.finalize(resultSuccess({}));
 
-    const tool = findSpan(getExporter().getFinishedSpans(), 'execute_tool');
+    const tool = findSpan(
+      getExporter().getFinishedSpans(),
+      'execute_tool Bash'
+    );
     expect(tool.status.code).toBe(SpanStatusCode.ERROR);
-    expect(tool.attributes[ATTR_ERROR_TYPE]).toBe('tool_error');
+    expect(tool.attributes[ATTR_ERROR_TYPE]).toBe('Error');
     expect(tool.attributes[ATTR_GEN_AI_TOOL_CALL_RESULT]).toBe(
       'command not found'
     );
@@ -1949,11 +1973,11 @@ describe('Claude Agent SDK — OTel tracer', () => {
     const invoke = findSpan(spans, INVOKE);
     expect(invoke.status.code).toBe(SpanStatusCode.ERROR);
     expect(invoke.status.message).toBe('subprocess crashed');
-    expect(invoke.attributes[ATTR_ERROR_TYPE]).toBe('agent_error');
+    expect(invoke.attributes[ATTR_ERROR_TYPE]).toBe('Error');
 
-    const tool = findSpan(spans, 'execute_tool');
+    const tool = findSpan(spans, 'execute_tool Bash');
     expect(tool.status.code).toBe(SpanStatusCode.ERROR);
-    expect(tool.attributes[ATTR_ERROR_TYPE]).toBe('aborted');
+    expect(tool.attributes[ATTR_ERROR_TYPE]).toBe('Error');
   });
 
   test('a non-success result subtype fails the root span', () => {

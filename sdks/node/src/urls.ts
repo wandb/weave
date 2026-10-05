@@ -1,4 +1,7 @@
 import state from './state';
+import {encodeURIPath} from './vendor/weave-server-sdk/internal/utils/path';
+
+export {encodeURIPath};
 
 export const defaultHost = 'api.wandb.ai';
 export const defaultDomain = 'wandb.ai';
@@ -65,6 +68,19 @@ export function getUrls(hostOrUrl?: string) {
     domain: isDefaultBaseUrl ? defaultDomain : resolvedHost,
     host: isDefaultBaseUrl ? defaultHost : resolvedHost,
   };
+}
+
+/**
+ * Percent-encodes an `entity/project` id for use in a URL path.
+ *
+ * Runs per segment so the separating slash survives; encoding the id in one
+ * piece would escape it and collapse two segments into one.
+ *
+ * @param projectId Project id in `entity/project` form.
+ * @returns The id with each segment percent-encoded.
+ */
+export function encodeProjectId(projectId: string) {
+  return projectId.split('/').map(encodeURIPath).join('/');
 }
 
 export function getGlobalDomain() {

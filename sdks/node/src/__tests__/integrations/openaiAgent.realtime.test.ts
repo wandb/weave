@@ -65,7 +65,7 @@ describe('WeaveRealtimeTracingAdapter', () => {
   });
 
   test('default session root is held pending, visible only after flush', async () => {
-    const requestSpy = jest.spyOn(inMemoryTraceServer, 'request');
+    const postSpy = jest.spyOn(inMemoryTraceServer, 'post');
     const {session} = createAdapter();
     session.emit('transport_event', {
       type: 'session.created',
@@ -73,17 +73,17 @@ describe('WeaveRealtimeTracingAdapter', () => {
     });
 
     // No eager start: nothing reaches the server until the session pairs/flushes.
-    expect(requestSpy).not.toHaveBeenCalled();
+    expect(postSpy).not.toHaveBeenCalled();
     await flush();
     expect(
-      requestSpy.mock.calls.some(([p]) =>
-        (p as {path: string}).path.endsWith('/call/start')
+      postSpy.mock.calls.some(([path]) =>
+        (path as string).endsWith('/call/start')
       )
     ).toBe(true);
   });
 
   test('eagerSessionRoot sends the root start immediately, before close', async () => {
-    const requestSpy = jest.spyOn(inMemoryTraceServer, 'request');
+    const postSpy = jest.spyOn(inMemoryTraceServer, 'post');
     const {session} = createAdapter({eagerSessionRoot: true});
     session.emit('transport_event', {
       type: 'session.created',
@@ -92,8 +92,8 @@ describe('WeaveRealtimeTracingAdapter', () => {
     await getGlobalClient()!.waitForBatchProcessing();
 
     // The root is visible while still open, sent via the eager v2 start endpoint.
-    const startPaths = requestSpy.mock.calls
-      .map(([p]) => (p as {path: string}).path)
+    const startPaths = postSpy.mock.calls
+      .map(([path]) => path as string)
       .filter(path => path.endsWith('/call/start'));
     expect(startPaths).toHaveLength(1);
     const calls = await inMemoryTraceServer.getCalls(testProjectName);

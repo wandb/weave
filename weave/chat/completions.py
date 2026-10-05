@@ -21,7 +21,7 @@ from weave.trace.op import op
 from weave.trace.settings import http_timeout
 from weave.trace_server.constants import COMPLETIONS_CREATE_OP_NAME, INFERENCE_HOST
 from weave.utils.project_id import to_project_id
-from weave.wandb_interface.context import get_wandb_api_context
+from weave.wandb_interface.context import get_wandb_auth_context
 
 if TYPE_CHECKING:
     from weave.trace.weave_client import WeaveClient
@@ -172,8 +172,8 @@ class Completions:
         self,
         **kwargs: Any,
     ) -> ChatCompletion | ChatCompletionChunkStream:
-        api_key = get_wandb_api_context()
-        if not api_key:
+        credentials = get_wandb_auth_context()
+        if credentials is None:
             raise ValueError("No API key found")
 
         messages = kwargs["messages"]
@@ -215,7 +215,7 @@ class Completions:
 
         auth = None
         if endpoint == "playground":
-            auth = ("api", api_key)
+            auth = credentials.httpx_auth()
             api = "create_stream" if stream else "create"
             url = f"{weave_trace_server_url()}/completions/{api}"
             data["model"] = model
@@ -227,7 +227,7 @@ class Completions:
             }
         elif endpoint == "inference":
             url = f"https://{INFERENCE_HOST}/v1/chat/completions"
-            headers["Authorization"] = f"Bearer {api_key}"
+            headers["Authorization"] = f"Bearer {credentials.bearer_token()}"
             headers["OpenAI-Project"] = project_id
             # The inference service itself doesn't allow this prefix but
             # this client does to make it possible to switch between using the

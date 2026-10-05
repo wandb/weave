@@ -1,10 +1,12 @@
-import {Api as TraceServerApi} from '../generated/traceServerApi';
+import {createTraceServerClient} from '../traceServerClient';
+import {WeaveClient} from '../weaveClient';
 
 test('encodes custom runtime names in request paths', async () => {
   let requestedUrl: string | undefined;
-  const api = new TraceServerApi({
-    baseUrl: 'https://trace.example',
-    customFetch: async input => {
+  const traceServerApi = createTraceServerClient({
+    apiKey: 'test-key',
+    baseURL: 'https://trace.example',
+    fetch: async input => {
       requestedUrl = input.toString();
       return new Response('{}', {
         status: 200,
@@ -12,16 +14,16 @@ test('encodes custom runtime names in request paths', async () => {
       });
     },
   });
+  const client = new WeaveClient({
+    traceServerApi,
+    projectId: 'entity/project',
+  });
 
-  await api.v2.customRuntimeApplyV2EntityProjectRuntimesRuntimeNamePut(
-    'entity',
-    'project',
-    'support/agent?canary',
-    {
-      base_url: 'https://runtime.example/v1',
-      runtime_ids: [],
-    }
-  );
+  await client.registerCustomRuntime({
+    name: 'support/agent?canary',
+    baseUrl: 'https://runtime.example/v1',
+    runtimeIds: [],
+  });
 
   expect(requestedUrl).toBe(
     'https://trace.example/v2/entity/project/runtimes/support%2Fagent%3Fcanary'

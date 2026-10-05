@@ -3,16 +3,21 @@
 All types are Pydantic BaseModel subclasses used by both the FastAPI
 endpoints (services/weave-trace) and the ClickHouse query handlers
 (weave/trace_server/clickhouse_trace_server_batched.py).
+
+Response models inherit AgentResponseModel so defaulted fields are required
+in the serialization JSON Schema. Request models stay on BaseModel.
 """
 
 from __future__ import annotations
 
 import datetime
-from typing import TYPE_CHECKING, Annotated, Any, Literal
+from typing import TYPE_CHECKING, Annotated, Any, Literal, get_args
+from uuid import UUID
 
 from pydantic import (
     AwareDatetime,
     BaseModel,
+    ConfigDict,
     Field,
     field_validator,
     model_validator,
@@ -42,6 +47,7 @@ from weave.trace_server.agents.schema import (
 )
 from weave.trace_server.interface.feedback_types import AgentSpanFeedbackType
 from weave.trace_server.interface.query import Query
+from weave.trace_server.sensitive_data.policy import SensitiveDataPolicy
 
 if TYPE_CHECKING:
     from weave.trace_server.trace_server_interface import ProcessedResourceSpans
@@ -61,6 +67,23 @@ SearchMessageRole = Literal[
 AgentSpanStatsValueType = Literal["datetime", "number", "boolean", "string"]
 AgentSpanStatsColumnValueType = Literal["datetime", "number", "boolean", "string"]
 AgentSpanStatsCell = datetime.datetime | str | int | float | bool | None
+# Source: https://github.com/wandb/core/blob/master/services/weave-trace/src/workers/insights/configs/taxonomies/severity.yaml
+AgentFailureSeverity = Literal["info", "major", "minor"]
+AGENT_FAILURE_SEVERITIES = get_args(AgentFailureSeverity)
+# Source: https://github.com/wandb/core/blob/master/services/weave-trace/src/workers/insights/configs/taxonomies/sentiment.yaml
+AgentIntentSentiment = Literal[
+    "frustrated",
+    "dissatisfied",
+    "neutral",
+    "satisfied",
+    "delighted",
+]
+AGENT_INTENT_SENTIMENTS = get_args(AgentIntentSentiment)
+# Insight filter fields whose values are stable topic ids rather than taxonomy names.
+TOPIC_INSIGHT_FIELDS = frozenset({"intent_topic_id", "failure_topic_id"})
+# Insight filter fields read from intent_signatures; every other field reads failures.
+INTENT_SIGNATURE_FIELDS = frozenset({"intent_category", "intent_sentiment"})
+AgentSignatureType = Literal["intent", "failure"]
 AgentSpanStatsAggregation = Literal[
     "sum",
     "avg",
@@ -145,6 +168,16 @@ def _as_utc(dt: datetime.datetime) -> datetime.datetime:
     if dt.tzinfo is None or dt.tzinfo.utcoffset(dt) is None:
         return dt.replace(tzinfo=datetime.timezone.utc)
     return dt.astimezone(datetime.timezone.utc)
+
+
+class AgentResponseModel(BaseModel):
+    """Agent API response models.
+
+    Constructor defaults stay for Python callers. Serialization JSON Schema
+    marks those fields required so OpenAPI matches the JSON FastAPI sends.
+    """
+
+    model_config = ConfigDict(json_schema_serialization_defaults_required=True)
 
 
 class AgentSpanValueRef(BaseModel):
@@ -246,7 +279,7 @@ class AgentSpanStatsMetricSpec(BaseModel):
         return self
 
 
-class AgentSpanStatsColumn(BaseModel):
+class AgentSpanStatsColumn(AgentResponseModel):
     """Metadata describing one column in an agent span stats result row."""
 
     name: str
@@ -369,6 +402,7 @@ class AgentSpanStatsReq(BaseModel):
     # requested signal tags/ratings. Signal timestamps are intentionally not
     # constrained by the stats window; they annotate the conversation.
     signal_filters: AgentSignalFilter | None = None
+    insight_filters: list[AgentInsightFilter] = Field(default_factory=list)
 
     @model_validator(mode="after")
     def validate_stats_request(self) -> AgentSpanStatsReq:
@@ -399,6 +433,7 @@ class AgentSpanStatsReq(BaseModel):
         apply_max_range_days = (
             bool(self.group_by)
             or bool(self.group_filters)
+            or bool(self.insight_filters)
             or numeric_bucket is not None
         )
         max_range = datetime.timedelta(days=MAX_AGENT_STATS_RANGE_DAYS)
@@ -425,7 +460,7 @@ class AgentSpanStatsReq(BaseModel):
         return self
 
 
-class AgentSpanStatsRes(BaseModel):
+class AgentSpanStatsRes(AgentResponseModel):
     """Response containing chart-ready agent span stats rows."""
 
     start: datetime.datetime
@@ -437,7 +472,7 @@ class AgentSpanStatsRes(BaseModel):
     rows: list[dict[str, AgentSpanStatsCell]] = Field(default_factory=list)
 
 
-class AgentSpanSchema(BaseModel):
+class AgentSpanSchema(AgentResponseModel):
     """A normalized agent span returned by query APIs."""
 
     project_id: str
@@ -615,7 +650,7 @@ class AgentSpanGroupDistributionSpec(BaseModel):
         raise ValueError(f"distribution spec source is not custom attr: {source!r}")
 
 
-class AgentSpanGroupDistributionBin(BaseModel):
+class AgentSpanGroupDistributionBin(AgentResponseModel):
     """One numeric histogram bin for a custom attribute in a span group."""
 
     # 0-based bucket position within the histogram; clients render bins in
@@ -626,14 +661,14 @@ class AgentSpanGroupDistributionBin(BaseModel):
     count: int
 
 
-class AgentSpanGroupDistributionValue(BaseModel):
+class AgentSpanGroupDistributionValue(AgentResponseModel):
     """One categorical custom attribute value count in a span group."""
 
     value: str
     count: int
 
 
-class AgentSpanGroupDistributionItem(BaseModel):
+class AgentSpanGroupDistributionItem(AgentResponseModel):
     """Distribution data for one span-group/custom-attribute pair."""
 
     alias: str
@@ -648,7 +683,7 @@ class AgentSpanGroupDistributionItem(BaseModel):
     values: list[AgentSpanGroupDistributionValue] = Field(default_factory=list)
 
 
-class AgentConversationMessagePreview(BaseModel):
+class AgentConversationMessagePreview(AgentResponseModel):
     """A truncated first/last message snippet for a grouped conversation row.
 
     `role` is the chat-timeline message type (e.g. "user_message",
@@ -660,7 +695,7 @@ class AgentConversationMessagePreview(BaseModel):
     text: str = ""
 
 
-class AgentConversationSpan(BaseModel):
+class AgentConversationSpan(AgentResponseModel):
     """One span in a conversation's trace.
 
     Returned by `agent_conversation_spans`, which reads span scalar columns
@@ -677,7 +712,7 @@ class AgentConversationSpan(BaseModel):
     duration_ms: int
 
 
-class AgentConversationSpanRating(BaseModel):
+class AgentConversationSpanRating(AgentResponseModel):
     """One numeric rating (a scorer score) applied to a turn or conversation."""
 
     name: str
@@ -686,7 +721,7 @@ class AgentConversationSpanRating(BaseModel):
     confidence: float | None = None
 
 
-class AgentConversationSpanFeedback(BaseModel):
+class AgentConversationSpanFeedback(AgentResponseModel):
     """Tags and ratings applied to a conversation's turn (or the conversation).
 
     Positioned client-side by matching `trace_id` (turn) against the spans;
@@ -708,7 +743,7 @@ class AgentConversationSpanFeedback(BaseModel):
     )
 
 
-class AgentConversationSpans(BaseModel):
+class AgentConversationSpans(AgentResponseModel):
     """One conversation's span sequence and its feedback markers."""
 
     conversation_id: str
@@ -731,13 +766,13 @@ class AgentConversationSpansReq(BaseModel):
     started_before: AwareDatetime | None = None  # filter started_at < end
 
 
-class AgentConversationSpansRes(BaseModel):
+class AgentConversationSpansRes(AgentResponseModel):
     """Span sequences + feedback markers, one entry per requested conversation."""
 
     conversations: list[AgentConversationSpans] = Field(default_factory=list)
 
 
-class AgentSpanGroupRow(BaseModel):
+class AgentSpanGroupRow(AgentResponseModel):
     """A single row in a grouped spans query response.
 
     `group_keys` maps each group_by ref's alias to its value for this row.
@@ -793,6 +828,67 @@ class AgentSignalFilter(BaseModel):
         return not self.tags and not self.ratings
 
 
+class AgentInsightFilter(BaseModel):
+    """Conversation filter backed by extracted Insights data in ClickHouse.
+
+    Values within one filter are ORed, while multiple filters are ANDed. Topic
+    filters use stable topic IDs that span successful clustering runs.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    field: Literal[
+        "intent_category",
+        "intent_sentiment",
+        "failure_category",
+        "failure_severity",
+        "intent_topic_id",
+        "failure_topic_id",
+    ]
+    values: list[str] = Field(
+        min_length=1,
+        max_length=1000,
+        description=(
+            "Values to match. intent_sentiment accepts only "
+            f"{', '.join(AGENT_INTENT_SENTIMENTS)}; failure_severity "
+            "accepts only info, major, or minor."
+        ),
+    )
+    exclude: bool = Field(
+        default=False,
+        description="Exclude conversations matching any value in this filter.",
+    )
+
+    @model_validator(mode="after")
+    def validate_values(self) -> AgentInsightFilter:
+        if self.field == "intent_sentiment":
+            invalid = sorted(set(self.values) - set(AGENT_INTENT_SENTIMENTS))
+            if invalid:
+                allowed = ", ".join(AGENT_INTENT_SENTIMENTS)
+                raise ValueError(
+                    f"intent_sentiment values must be one of: {allowed}; got: "
+                    f"{', '.join(invalid)}"
+                )
+        if self.field == "failure_severity":
+            invalid = sorted(set(self.values) - set(AGENT_FAILURE_SEVERITIES))
+            if invalid:
+                allowed = ", ".join(AGENT_FAILURE_SEVERITIES)
+                raise ValueError(
+                    f"failure_severity values must be one of: {allowed}; got: "
+                    f"{', '.join(invalid)}"
+                )
+        is_topic_filter = self.field in TOPIC_INSIGHT_FIELDS
+        if is_topic_filter:
+            normalized_topic_ids = []
+            for value in self.values:
+                try:
+                    normalized_topic_ids.append(str(UUID(value)))
+                except ValueError as exc:
+                    raise ValueError(f"invalid topic ID: {value}") from exc
+            self.values = normalized_topic_ids
+        return self
+
+
 class AgentSpansQueryReq(BaseModel):
     """Request to query agent spans for a project.
 
@@ -830,6 +926,7 @@ class AgentSpansQueryReq(BaseModel):
     started_after: datetime.datetime | None = None  # filter started_at >= start
     started_before: datetime.datetime | None = None  # filter started_at < end
     signal_filters: AgentSignalFilter | None = None
+    insight_filters: list[AgentInsightFilter] = Field(default_factory=list)
 
     @model_validator(mode="after")
     def validate_spans_query_request(self) -> AgentSpansQueryReq:
@@ -847,6 +944,8 @@ class AgentSpansQueryReq(BaseModel):
             and not self.group_by
         ):
             raise ValueError("signal_filters require group_by")
+        if self.insight_filters and not self.group_by:
+            raise ValueError("insight_filters require group_by")
         if self.group_distributions and len(self.group_by or []) != 1:
             raise ValueError("group_distributions currently support one group_by ref")
         if self.group_by and self.custom_attr_columns:
@@ -900,7 +999,7 @@ class AgentSpansQueryReq(BaseModel):
         return self
 
 
-class AgentSpansQueryRes(BaseModel):
+class AgentSpansQueryRes(AgentResponseModel):
     """Response from a spans query.
 
     Exactly one of `spans` or `groups` will be populated, based on
@@ -927,7 +1026,7 @@ class AgentCustomAttrsSchemaReq(BaseModel):
     offset: int = Field(default=0, ge=0)
 
 
-class AgentCustomAttrSchemaItem(BaseModel):
+class AgentCustomAttrSchemaItem(AgentResponseModel):
     """One custom attribute key/type observed in the matching spans."""
 
     source: AgentCustomAttrSource
@@ -936,7 +1035,7 @@ class AgentCustomAttrSchemaItem(BaseModel):
     span_count: int
 
 
-class AgentCustomAttrsSchemaRes(BaseModel):
+class AgentCustomAttrsSchemaRes(AgentResponseModel):
     """Typed custom attribute keys available for spans query/group/stats APIs."""
 
     attributes: list[AgentCustomAttrSchemaItem] = Field(default_factory=list)
@@ -981,7 +1080,7 @@ class AgentSearchReq(BaseModel):
     offset: int = Field(default=0, ge=0)
 
 
-class AgentSearchMatchedMessage(BaseModel):
+class AgentSearchMatchedMessage(AgentResponseModel):
     """A single message that matched the search query."""
 
     span_id: str
@@ -994,7 +1093,7 @@ class AgentSearchMatchedMessage(BaseModel):
     started_at: datetime.datetime
 
 
-class AgentSearchConversationResult(BaseModel):
+class AgentSearchConversationResult(AgentResponseModel):
     """A conversation containing messages that matched the search query."""
 
     conversation_id: str
@@ -1004,7 +1103,7 @@ class AgentSearchConversationResult(BaseModel):
     last_activity: datetime.datetime
 
 
-class AgentSearchRes(BaseModel):
+class AgentSearchRes(AgentResponseModel):
     """Response from a full-text search across agent messages."""
 
     results: list[AgentSearchConversationResult]
@@ -1021,14 +1120,14 @@ AgentChatMessageType = Literal[
 ]
 
 
-class AgentChatUserMessage(BaseModel):
+class AgentChatUserMessage(AgentResponseModel):
     """Payload for a user prompt in the chat timeline."""
 
     text: str
     content_refs: list[str] = Field(default_factory=list)
 
 
-class AgentChatAssistantMessage(BaseModel):
+class AgentChatAssistantMessage(AgentResponseModel):
     """Payload for assistant text emitted by an agent or LLM span."""
 
     text: str
@@ -1047,7 +1146,7 @@ class AgentChatAssistantMessage(BaseModel):
     content_refs: list[str] = Field(default_factory=list)
 
 
-class AgentChatToolCall(BaseModel):
+class AgentChatToolCall(AgentResponseModel):
     """Payload for a tool call timeline event."""
 
     tool_name: str | None = None
@@ -1058,7 +1157,7 @@ class AgentChatToolCall(BaseModel):
     content_refs: list[str] = Field(default_factory=list)
 
 
-class AgentChatAgentStart(BaseModel):
+class AgentChatAgentStart(AgentResponseModel):
     """Payload for an agent lifecycle boundary."""
 
     model: str | None = None
@@ -1067,11 +1166,11 @@ class AgentChatAgentStart(BaseModel):
     status: StatusCodeLiteral | None = None
 
 
-class AgentChatAgentHandoff(BaseModel):
+class AgentChatAgentHandoff(AgentResponseModel):
     """Payload for a future agent-to-agent handoff event."""
 
 
-class AgentChatContextCompacted(BaseModel):
+class AgentChatContextCompacted(AgentResponseModel):
     """Payload for a context-window compaction event."""
 
     compaction_summary: str | None = None
@@ -1079,7 +1178,34 @@ class AgentChatContextCompacted(BaseModel):
     compaction_items_after: int | None = None
 
 
-class AgentChatMessage(BaseModel):
+class AgentChatFeedback(AgentResponseModel):
+    """Feedback row from the agent chat `include_feedback` projection.
+
+    Field names match FEEDBACK_QUERY_FIELDS. This is not the feedback
+    table row and not FeedbackCreateReq: project_id and span_* are not
+    selected.
+    """
+
+    id: str
+    feedback_type: str
+    weave_ref: str
+    payload: dict[str, Any]
+    creator: str | None = None
+    created_at: datetime.datetime | None = None
+    wb_user_id: str | None = None
+    runnable_ref: str | None = None
+    call_ref: str | None = None
+    trigger_ref: str | None = None
+    annotation_ref: str | None = None
+    scorer_tags: list[str] = Field(default_factory=list)
+    scorer_tag_reasons: dict[str, str] = Field(default_factory=dict)
+    scorer_tag_confidences: dict[str, float] = Field(default_factory=dict)
+    scorer_ratings: dict[str, float] = Field(default_factory=dict)
+    scorer_rating_reasons: dict[str, str] = Field(default_factory=dict)
+    scorer_rating_confidences: dict[str, float] = Field(default_factory=dict)
+
+
+class AgentChatMessage(AgentResponseModel):
     """A single element in the structured agent trajectory / chat view.
 
     Common event fields live at the top level. Type-specific fields are
@@ -1093,6 +1219,9 @@ class AgentChatMessage(BaseModel):
     agent_name: str | None = None
     agent_version: str | None = None
     status_code: StatusCodeLiteral | None = None
+    # Set together from the span's own fields when `status_code` is `ERROR`.
+    error_type: str | None = None
+    status_message: str | None = None
     started_at: datetime.datetime | None = None
 
     user_message: AgentChatUserMessage | None = None
@@ -1127,7 +1256,7 @@ class AgentChatMessage(BaseModel):
             )
         return self
 
-    feedback: list[dict[str, Any]] | None = None
+    feedback: list[AgentChatFeedback] | None = None
 
 
 class AgentTraceChatReq(BaseModel):
@@ -1136,9 +1265,18 @@ class AgentTraceChatReq(BaseModel):
     project_id: str
     trace_id: str
     include_feedback: bool = False
+    include_model_tool_calls: bool = Field(
+        default=False,
+        description=(
+            "Include tool calls requested in model outputs, even when no execution span "
+            "was recorded, and place each execution span after the model span that "
+            "requested it. Requests without execution evidence have no status, duration, "
+            "or result. Defaults to false."
+        ),
+    )
 
 
-class AgentTraceChatRes(BaseModel):
+class AgentTraceChatRes(AgentResponseModel):
     """Structured chat view: a linear sequence of messages representing
     the agent trajectory for a single trace.
     """
@@ -1173,7 +1311,7 @@ class AgentTraceChatRes(BaseModel):
     total_cache_creation_input_tokens: int = 0
     total_cache_read_input_tokens: int = 0
     messages: list[AgentChatMessage] = Field(default_factory=list)
-    feedback: list[dict[str, Any]] | None = None
+    feedback: list[AgentChatFeedback] | None = None
 
 
 class AgentConversationChatReq(BaseModel):
@@ -1196,9 +1334,18 @@ class AgentConversationChatReq(BaseModel):
         ),
     )
     include_feedback: bool = False
+    include_model_tool_calls: bool = Field(
+        default=False,
+        description=(
+            "Include tool calls requested in model outputs, even when no execution span "
+            "was recorded, and place each execution span after the model span that "
+            "requested it. Requests without execution evidence have no status, duration, "
+            "or result. Defaults to false."
+        ),
+    )
 
 
-class AgentConversationChatRes(BaseModel):
+class AgentConversationChatRes(AgentResponseModel):
     """Multi-turn chat view: an ordered list of per-turn chat responses.
 
     Each entry in `turns` corresponds to one trace_id, which Weave treats as
@@ -1217,10 +1364,10 @@ class AgentConversationChatRes(BaseModel):
     # Summed query-time cost (USD) across the returned turns. None when no turn
     # had a priced span.
     total_cost_usd: float | None = None
-    feedback: list[dict[str, Any]] | None = None
+    feedback: list[AgentChatFeedback] | None = None
 
 
-class AgentSchema(BaseModel):
+class AgentSchema(AgentResponseModel):
     """Aggregated per-agent stats from the agents table."""
 
     project_id: str
@@ -1261,7 +1408,7 @@ class AgentsQueryReq(BaseModel):
     include_costs: bool = False
 
 
-class AgentsQueryRes(BaseModel):
+class AgentsQueryRes(AgentResponseModel):
     """Response containing aggregated agent stats."""
 
     agents: list[AgentSchema]
@@ -1294,7 +1441,7 @@ class AgentVersionsQueryReq(BaseModel):
     include_costs: bool = False
 
 
-class AgentVersionsQueryRes(BaseModel):
+class AgentVersionsQueryRes(AgentResponseModel):
     """Response containing agent version stats."""
 
     versions: list[AgentVersionSchema]
@@ -1321,6 +1468,7 @@ class GenAIOTelExportReq(BaseModel):
     project_id: str
     wb_user_id: str | None = None
     entity_name: str | None = None
+    sensitive_data_policy: SensitiveDataPolicy = SensitiveDataPolicy.OFF
 
 
 class GenAIOTelExportRes(BaseModel):

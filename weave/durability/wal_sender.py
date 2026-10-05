@@ -61,6 +61,7 @@ from weave.trace_server_bindings.client_interface import TraceServerClientInterf
 from weave.trace_server_bindings.remote_http_trace_server import (
     RemoteHTTPTraceServer,
 )
+from weave.wandb_interface.auth import ApiKeyCredentials
 
 logger = logging.getLogger(__name__)
 
@@ -451,7 +452,7 @@ def main(argv: list[str] | None = None) -> None:
     # WAL sender doesn't use.  Suppress via Any intermediate.
     remote_cls: Any = RemoteHTTPTraceServer
     server: TraceServerClientInterface = remote_cls(
-        args.trace_server_url, auth=("api", args.api_key)
+        args.trace_server_url, auth=ApiKeyCredentials(args.api_key)
     )
     sender = create_sender(wal_dir, server, poll_interval=args.poll_interval)
 

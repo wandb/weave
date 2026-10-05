@@ -1,0 +1,38 @@
+# One-time setup (e.g., install system tools, global CLIs).
+initialize: |
+  # The `oxipng` prek hook needs rustc >= 1.85.1; default snapshot ships 1.82.
+  rustup toolchain install 1.86.0 --profile minimal
+  rustup default 1.86.0
+
+  # Global tools used by noxfile.py and bin/codex_setup.sh.
+  uv tool install nox
+  uv tool install prek
+  echo "PATH=$HOME/.local/bin:$PATH" >> $ENVRC
+# Install project dependencies (runs during builds, surfaced to agent at session start).
+maintenance: |
+  uv sync --group dev
+  # Pre-warm prek hooks and the `trace` test shard so future sessions can run
+  # `nox --no-install` without re-installing.
+  nox -e lint -- dry-run
+  nox --install-only -e "tests-3.12(shard='trace')"
+knowledge:
+  - name: lint
+    contents: |
+      # Runs prek hooks (ruff/mypy/pyright/etc.) via the lint nox session.
+      nox --no-install -e lint
+      # Or just ruff via uvx:
+      uvx ruff check .
+  - name: test
+    contents: |
+      # Default trace tests against the in-memory fake backend (Docker-free).
+      nox --no-install -e "tests-3.12(shard='trace')" -- --trace-server=fake
+  - name: notes
+    contents: |
+      # Other test shards (flow, trace_server, trace_server_bindings, etc.) and
+      # ClickHouse-backed tests are not pre-installed by this blueprint. Install
+      # on demand with `nox --install-only -e "tests-3.12(shard='<name>')"`.
+      #
+      # AGENTS.md gotchas:
+      #  - Use `uv run --group test` (NOT `--extra test`) — `test` is a
+      #    dependency-group, not an optional dependency.
+      #  - Use `uvx ruff` to run ruff (not installed in any project group).
