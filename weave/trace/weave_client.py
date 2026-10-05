@@ -18,6 +18,7 @@ from httpx import HTTPStatusError as HTTPError
 from weave.chat.chat import Chat
 from weave.chat.inference_models import InferenceModels
 from weave.durability.wal_manager import WALManager
+from weave.shared.common_interface import AnnotationQueueItemsFilter, SortBy
 from weave.shared.constants import (
     INVOKING_SPAN_ATTR_KEY,
     MAX_OBJECT_NAME_LENGTH,
@@ -30,6 +31,71 @@ from weave.shared.digest import (
 )
 from weave.shared.errors import DigestMismatchError, InvalidExternalRef
 from weave.shared.ids import generate_id
+from weave.shared.interface.feedback_types import (
+    RUNNABLE_FEEDBACK_TYPE_PREFIX,
+    runnable_feedback_output_selector,
+    runnable_feedback_runnable_ref_selector,
+)
+from weave.shared.trace_server_converter import universal_ext_to_int_ref_converter
+from weave.shared.trace_server_interface import (
+    AliasesListReq,
+    AnnotationQueueAddCallsReq,
+    AnnotationQueueAddCallsRes,
+    AnnotationQueueCreateReq,
+    AnnotationQueueDeleteReq,
+    AnnotationQueueItemSchema,
+    AnnotationQueueItemsQueryReq,
+    AnnotationQueueReadReq,
+    AnnotationQueueSchema,
+    AnnotationQueuesQueryReq,
+    AnnotationQueuesStatsReq,
+    AnnotationQueueStatsSchema,
+    AnnotationQueueUpdateReq,
+    CallEndReq,
+    CallsDeleteReq,
+    CallsFilter,
+    CallsQueryReq,
+    CallStartReq,
+    CallUpdateReq,
+    CostCreateInput,
+    CostCreateReq,
+    CostCreateRes,
+    CostPurgeReq,
+    CostQueryOutput,
+    CostQueryReq,
+    CustomRuntimeApplyReq,
+    CustomRuntimeApplyRes,
+    CustomRuntimeID,
+    EndedCallSchemaForInsertWithStartedAt,
+    FeedbackCreateReq,
+    FileCreateReq,
+    FileCreateRes,
+    ObjAddTagsReq,
+    ObjCreateReq,
+    ObjCreateRes,
+    ObjDeleteReq,
+    ObjectVersionFilter,
+    ObjQueryReq,
+    ObjReadReq,
+    ObjRemoveAliasesReq,
+    ObjRemoveTagsReq,
+    ObjSchema,
+    ObjSchemaForInsert,
+    ObjSetAliasesReq,
+    Query,
+    RefsReadBatchReq,
+    StartedCallSchemaForInsert,
+    TableAppendSpec,
+    TableAppendSpecPayload,
+    TableCreateFromDigestsReq,
+    TableCreateReq,
+    TableCreateRes,
+    TableSchemaForInsert,
+    TableUpdateReq,
+    TagsListReq,
+    TraceStatus,
+    agent_types,
+)
 from weave.telemetry import trace_sentry
 from weave.trace import settings
 from weave.trace.call import (
@@ -116,72 +182,6 @@ from weave.trace.wandb_run_context import (
     get_global_wb_run_context,
 )
 from weave.trace.weave_client_send_file_cache import WeaveClientSendFileCache
-from weave.trace_server.common_interface import AnnotationQueueItemsFilter, SortBy
-from weave.trace_server.interface.feedback_types import (
-    RUNNABLE_FEEDBACK_TYPE_PREFIX,
-    runnable_feedback_output_selector,
-    runnable_feedback_runnable_ref_selector,
-)
-from weave.trace_server.trace_server_converter import universal_ext_to_int_ref_converter
-from weave.trace_server.trace_server_interface import (
-    AliasesListReq,
-    AnnotationQueueAddCallsReq,
-    AnnotationQueueAddCallsRes,
-    AnnotationQueueCreateReq,
-    AnnotationQueueDeleteReq,
-    AnnotationQueueItemSchema,
-    AnnotationQueueItemsQueryReq,
-    AnnotationQueueReadReq,
-    AnnotationQueueSchema,
-    AnnotationQueuesQueryReq,
-    AnnotationQueuesStatsReq,
-    AnnotationQueueStatsSchema,
-    AnnotationQueueUpdateReq,
-    CallEndReq,
-    CallsDeleteReq,
-    CallsFilter,
-    CallsQueryReq,
-    CallStartReq,
-    CallUpdateReq,
-    CostCreateInput,
-    CostCreateReq,
-    CostCreateRes,
-    CostPurgeReq,
-    CostQueryOutput,
-    CostQueryReq,
-    CustomRuntimeApplyReq,
-    CustomRuntimeApplyRes,
-    CustomRuntimeID,
-    EndedCallSchemaForInsertWithStartedAt,
-    FeedbackCreateReq,
-    FileCreateReq,
-    FileCreateRes,
-    ObjAddTagsReq,
-    ObjCreateReq,
-    ObjCreateRes,
-    ObjDeleteReq,
-    ObjectVersionFilter,
-    ObjQueryReq,
-    ObjReadReq,
-    ObjRemoveAliasesReq,
-    ObjRemoveTagsReq,
-    ObjSchema,
-    ObjSchemaForInsert,
-    ObjSetAliasesReq,
-    Query,
-    RefsReadBatchReq,
-    StartedCallSchemaForInsert,
-    TableAppendSpec,
-    TableAppendSpecPayload,
-    TableCreateFromDigestsReq,
-    TableCreateReq,
-    TableCreateRes,
-    TableSchemaForInsert,
-    TableUpdateReq,
-    TagsListReq,
-    TraceStatus,
-    agent_types,
-)
 from weave.trace_server_bindings.async_batch_processor import AsyncBatchProcessor
 from weave.trace_server_bindings.call_batch_processor import CallBatchProcessor
 from weave.trace_server_bindings.client_interface import TraceServerClientInterface

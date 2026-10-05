@@ -6,6 +6,8 @@ from typing import Any, Literal, TypedDict
 from pydantic import BaseModel
 from typing_extensions import Self
 
+from weave.shared import trace_server_interface as tsi
+from weave.shared.common_interface import SortBy
 from weave.shared.interface import query as tsi_query
 from weave.shared.interface.builtin_object_classes.saved_view import Column, Pin
 from weave.shared.interface.builtin_object_classes.saved_view import (
@@ -22,8 +24,6 @@ from weave.trace.display.rich import pydantic_util
 from weave.trace.refs import ObjectRef, OpRef
 from weave.trace.traverse import ObjectPath, get_paths
 from weave.trace.vals import WeaveObject
-from weave.trace_server import trace_server_interface as tsi
-from weave.trace_server.common_interface import SortBy
 
 KNOWN_COLUMNS = [
     "id",
