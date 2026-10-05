@@ -546,9 +546,18 @@ class CompletionsCreateRequestInputs(BaseModel):
     )
 
 
+class DedicatedInferenceRoute(BaseModelStrict):
+    """Server-side routing information for a dedicated inference deployment."""
+
+    connection_type: Literal["dedicated"]
+    connection: str
+    base_url: str
+
+
 class CompletionsCreateReq(BaseModelStrict):
     project_id: str
     inputs: CompletionsCreateRequestInputs
+    inference_route: DedicatedInferenceRoute | None = None
     wb_user_id: str | None = Field(None, description=WB_USER_ID_DESCRIPTION)
     track_llm_call: bool | None = Field(
         True, description="Whether to track this LLM call in the trace server"
@@ -4157,15 +4166,7 @@ class TraceUsageRes(BaseModel):
 
 
 class CallsUsageReq(BaseModelStrict):
-    """Request to compute aggregated usage for multiple root calls.
-
-    This endpoint returns usage metrics for each requested root call, where each
-    root's metrics include the sum of its own usage plus all descendants' usage.
-
-    Note: All matching calls are loaded into memory for aggregation. For very large
-    result sets (>10k calls), consider batching root call IDs or using narrower
-    filters at the application layer.
-    """
+    """Request complete descendant usage for calls in bounded trace batches."""
 
     project_id: str
     call_ids: list[str] = Field(
@@ -4177,7 +4178,7 @@ class CallsUsageReq(BaseModelStrict):
     )
     limit: int = Field(
         default=10_000,
-        description="Maximum number of calls to process across all traces. Acts as a safety limit to prevent unbounded memory usage.",
+        description="Maximum calls per aggregation batch. Larger batches are split by trace; a single trace exceeding this limit returns an error, never partial usage.",
     )
 
 

@@ -116,6 +116,17 @@ _TRACER_NAME = "weave.conversation"
 logger = logging.getLogger(__name__)
 
 
+def _span_name(operation: str, target: str) -> str:
+    """Name a span after what it acts on: ``chat gpt-4o``, ``execute_tool search``.
+
+    Every target (tool name, model, sub-agent name, agent name) defaults to
+    ``""``, so a blank one falls back to the bare operation instead of leaving
+    a trailing space in the span name.
+    """
+    target = target.strip()
+    return f"{operation} {target}" if target else operation
+
+
 def _capture_info_attrs() -> dict[str, str]:
     """Build weave.* client / system info attrs, gated by settings.
 
@@ -433,7 +444,9 @@ class Tool(_SpanBase):
         if self.started_at is None:
             self.started_at = datetime.now(timezone.utc)
         start_ns = int(self.started_at.timestamp() * 1_000_000_000)
-        self._start_otel_span(f"execute_tool {self.name}", start_time_ns=start_ns)
+        self._start_otel_span(
+            _span_name("execute_tool", self.name), start_time_ns=start_ns
+        )
         return self
 
     def __exit__(
@@ -750,7 +763,7 @@ class LLM(_SpanBase):
             if self.started_at is not None
             else None
         )
-        self._start_otel_span(f"chat {self.model}", start_time_ns=start_ns)
+        self._start_otel_span(_span_name("chat", self.model), start_time_ns=start_ns)
         return self
 
     def __exit__(
@@ -1003,7 +1016,7 @@ class SubAgent(_SpanBase):
         if self.started_at is None:
             self.started_at = datetime.now(timezone.utc)
         self._start_otel_span(
-            f"invoke_agent {self.name}",
+            _span_name("invoke_agent", self.name),
             start_time_ns=_to_ns(self.started_at),
             set_current=set_current,
         )
@@ -1270,7 +1283,7 @@ class Turn(_SpanBase):
             else None
         )
         self._start_otel_span(
-            f"invoke_agent {self.agent_name}",
+            _span_name("invoke_agent", self.agent_name),
             new_trace=not self.continue_parent_trace,
             start_time_ns=start_ns,
         )
@@ -1647,14 +1660,14 @@ def _attrs_for_span(
     and batch (``log_turn``) produce byte-identical output.
     """
     if isinstance(span, LLM):
-        return f"chat {span.model}", span._build_attrs(
+        return _span_name("chat", span.model), span._build_attrs(
             conversation_id=conversation_id, include_content=include_content
         )
     if isinstance(span, Tool):
-        return f"execute_tool {span.name}", span._build_attrs(
+        return _span_name("execute_tool", span.name), span._build_attrs(
             conversation_id=conversation_id, include_content=include_content
         )
-    return f"invoke_agent {span.name}", span._build_attrs(
+    return _span_name("invoke_agent", span.name), span._build_attrs(
         conversation_id=conversation_id,
         conversation_name=conversation_name,
         include_content=include_content,
@@ -1694,7 +1707,7 @@ def _emit_turn(
 
     parent_ctx = Context() if not turn.continue_parent_trace else None
     turn_span = _emit_span_now(
-        f"invoke_agent {turn.agent_name}",
+        _span_name("invoke_agent", turn.agent_name),
         parent_ctx=parent_ctx,
         start_time_ns=_to_ns(turn_started_at),
         end_time_ns=_to_ns(turn_ended_at),

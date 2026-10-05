@@ -91,14 +91,6 @@ jobs:
       - name: Run nox (Non Trace Server)
         run: |
           nox -e "tests-${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}(shard='${{ matrix.nox-shard }}')" -- -m "not trace_server"
-      - name: Upload coverage reports to Codecov
-        uses: codecov/codecov-action@0fb7174895f61a3b6b78fc075e0cd60383518dac # v5
-        with:
-          files: ./coverage.xml
-          flags: trace-no-server
-          name: trace-no-server-${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}
-          fail_ci_if_error: false
-          token: ${{ secrets.CODECOV_TOKEN }}
 
   trace-tests:
     name: Trace nox tests
@@ -158,8 +150,8 @@ jobs:
             python-version-minor: "10"
             nox-shard: "claude_agent_sdk"
         # Shards that don't support certain Python versions. Excluding here
-        # (vs. skipping inside noxfile) avoids spinning up a runner just to
-        # emit an empty coverage.xml that Codecov then rejects.
+        # (vs. skipping inside noxfile) avoids spinning up a runner for a
+        # no-op job.
         exclude:
           - python-version-minor: "10"
             nox-shard: "notdiamond"
@@ -230,14 +222,6 @@ jobs:
             nox -e "tests-${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}(shard='${{ matrix.nox-shard }}')" -- \
               -m "trace_server"
           fi
-      - name: Upload coverage reports to Codecov
-        uses: codecov/codecov-action@0fb7174895f61a3b6b78fc075e0cd60383518dac # v5
-        with:
-          files: ./coverage.xml
-          flags: trace-tests
-          name: trace-tests-${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}-${{ matrix.nox-shard }}
-          fail_ci_if_error: false
-          token: ${{ secrets.CODECOV_TOKEN }}
   fake-trace-tests:
     name: Fake (in-memory) trace server tests
     timeout-minutes: 15
@@ -276,14 +260,6 @@ jobs:
         run: |
           nox -e "tests-${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}(shard='${{ matrix.nox-shard }}')" -- \
             -m "trace_server" --trace-server=fake
-      - name: Upload coverage reports to Codecov
-        uses: codecov/codecov-action@0fb7174895f61a3b6b78fc075e0cd60383518dac # v5
-        with:
-          files: ./coverage.xml
-          flags: fake-trace-tests
-          name: fake-trace-tests-${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}-${{ matrix.nox-shard }}
-          fail_ci_if_error: false
-          token: ${{ secrets.CODECOV_TOKEN }}
   trace-server-migrator-1s1r:
     name: Trace server migrator tests (1s1r)
     timeout-minutes: 10
@@ -335,14 +311,6 @@ jobs:
           DD_TRACE_ENABLED: false
         run: |
           nox -e "tests-${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}(shard='trace_server_migrator')"
-      - name: Upload coverage reports to Codecov
-        uses: codecov/codecov-action@0fb7174895f61a3b6b78fc075e0cd60383518dac # v5
-        with:
-          files: ./coverage.xml
-          flags: trace-server-migrator-1s1r
-          name: trace-server-migrator-1s1r-${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}
-          fail_ci_if_error: false
-          token: ${{ secrets.CODECOV_TOKEN }}
 
   trace-server-migrator-1s3r:
     name: Trace server migrator tests (1s3r)
@@ -404,14 +372,6 @@ jobs:
           path: tests/trace_server/conftest_lib/topologies/ch-logs-1s3r.txt
           retention-days: 7
           if-no-files-found: ignore
-      - name: Upload coverage reports to Codecov
-        uses: codecov/codecov-action@0fb7174895f61a3b6b78fc075e0cd60383518dac # v5
-        with:
-          files: ./coverage.xml
-          flags: trace-server-migrator-1s3r
-          name: trace-server-migrator-1s3r-${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}
-          fail_ci_if_error: false
-          token: ${{ secrets.CODECOV_TOKEN }}
 
   trace-server-migrator-2s2r:
     name: Trace server migrator tests (2s2r)
@@ -468,14 +428,50 @@ jobs:
           path: tests/trace_server/conftest_lib/topologies/ch-logs-2s2r.txt
           retention-days: 7
           if-no-files-found: ignore
-      - name: Upload coverage reports to Codecov
-        uses: codecov/codecov-action@0fb7174895f61a3b6b78fc075e0cd60383518dac # v5
+
+  # The lock pins one exporter. google-adk still resolves 1.42.1, and a
+  # later release can be newer than the lock. Run the conversation-tracing
+  # tests at both ends.
+  otel-http-exporter-bounds:
+    name: OTLP HTTP exporter bounds
+    timeout-minutes: 20
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+      - name: Set up Python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
         with:
-          files: ./coverage.xml
-          flags: trace-server-migrator-2s2r
-          name: trace-server-migrator-2s2r-${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}
-          fail_ci_if_error: false
-          token: ${{ secrets.CODECOV_TOKEN }}
+          python-version: "3.12"
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install uv
+          uv sync --frozen --group test
+      - name: Conversation tracing on exporter 1.42.1
+        env:
+          DD_TRACE_ENABLED: "false"
+        run: |
+          uv pip install --python .venv/bin/python \
+            "opentelemetry-exporter-otlp-proto-http==1.42.1"
+          .venv/bin/python -c "import importlib.metadata as m; print('exporter', m.version('opentelemetry-exporter-otlp-proto-http'))"
+          .venv/bin/python -m pytest tests/trace/test_conversation_tracing_setup.py \
+            -p no:ddtrace --tb=short
+      - name: Conversation tracing on the newest allowed exporter
+        env:
+          DD_TRACE_ENABLED: "false"
+        run: |
+          uv pip install --python .venv/bin/python \
+            --upgrade-package opentelemetry-exporter-otlp-proto-http \
+            --upgrade-package opentelemetry-exporter-otlp-proto-common \
+            --upgrade-package opentelemetry-sdk \
+            --upgrade-package opentelemetry-api \
+            --upgrade-package opentelemetry-proto \
+            --upgrade-package opentelemetry-semantic-conventions \
+            "opentelemetry-exporter-otlp-proto-http>=1.28.0"
+          .venv/bin/python -c "import importlib.metadata as m; print('exporter', m.version('opentelemetry-exporter-otlp-proto-http'))"
+          .venv/bin/python -m pytest tests/trace/test_conversation_tracing_setup.py \
+            -p no:ddtrace --tb=short
 
   trace-tests-matrix-check: # This job does nothing and is only used for the branch protection
     if: always()
@@ -486,6 +482,7 @@ jobs:
       - trace-server-migrator-1s1r
       - trace-server-migrator-1s3r
       - trace-server-migrator-2s2r
+      - otel-http-exporter-bounds
 
     runs-on: ubuntu-latest
 
@@ -539,14 +536,6 @@ jobs:
           DD_TRACE_ENABLED: "false"
         run: |
           nox -e "tests-${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}(shard='${{ matrix.nox-shard }}')" -- -m "not trace_server"
-      - name: Upload coverage reports to Codecov
-        uses: codecov/codecov-action@0fb7174895f61a3b6b78fc075e0cd60383518dac # v5
-        with:
-          files: ./coverage.xml
-          flags: windows-trace-no-server
-          name: windows-trace-no-server-${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}
-          fail_ci_if_error: false
-          token: ${{ secrets.CODECOV_TOKEN }}
 
   windows-trace-tests-matrix-check: # This job does nothing and is only used for the branch protection
     if: always()

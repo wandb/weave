@@ -27,7 +27,10 @@ describe('Turn', () => {
     });
     turn.end();
 
-    const span = findSpan(getExporter().getFinishedSpans(), 'invoke_agent');
+    const span = findSpan(
+      getExporter().getFinishedSpans(),
+      'invoke_agent weather-bot'
+    );
     expect(span.kind).toBe(SpanKind.INTERNAL);
     expect(spanSnapshot(span)).toMatchInlineSnapshot(`
       {
@@ -110,7 +113,10 @@ describe('Turn', () => {
     });
     turn.end();
 
-    const span = findSpan(getExporter().getFinishedSpans(), 'invoke_agent');
+    const span = findSpan(
+      getExporter().getFinishedSpans(),
+      'invoke_agent weather-bot'
+    );
     expect(spanSnapshot(span)).toMatchInlineSnapshot(`
       {
         "attributes": {
@@ -138,7 +144,10 @@ describe('Turn', () => {
     turn.record({agentVersion: 'v2'});
     turn.end();
 
-    const span = findSpan(getExporter().getFinishedSpans(), 'invoke_agent');
+    const span = findSpan(
+      getExporter().getFinishedSpans(),
+      'invoke_agent weather-bot'
+    );
     expect(spanSnapshot(span)).toMatchInlineSnapshot(`
       {
         "attributes": {

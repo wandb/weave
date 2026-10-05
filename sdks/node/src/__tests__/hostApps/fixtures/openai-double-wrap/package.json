@@ -1,0 +1,13 @@
+{
+  "name": "openai-double-wrap-fixture",
+  "version": "0.0.0",
+  "private": true,
+  "type": "commonjs",
+  "scripts": {
+    "start": "node main.cjs"
+  },
+  "dependencies": {
+    "openai": "file:../../../../../node_modules/openai"
+  },
+  "description": "CJS host app with two copies of weave loaded before openai, so the require hooks and wrapOpenAI() all meet the same client. 'openai' resolves to the copy in the SDK's node_modules, and its fetch is stubbed, so the run needs no network."
+}

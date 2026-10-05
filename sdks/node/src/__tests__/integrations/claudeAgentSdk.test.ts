@@ -23,7 +23,7 @@ import type {
   SDKUserMessage,
 } from '@anthropic-ai/claude-agent-sdk';
 
-const INVOKE = 'invoke_agent';
+const INVOKE = 'invoke_agent claude_agent_sdk';
 
 describe('Claude Agent SDK — toWeaveUsage', () => {
   test('maps the camelCase ModelUsage shape, dropping non-token fields', () => {
@@ -129,7 +129,7 @@ describe('Claude Agent SDK — query() patch', () => {
     expect(
       JSON.parse(invoke.attributes[ATTR_GEN_AI_INPUT_MESSAGES] as string)
     ).toEqual([{role: 'user', content: 'hi there'}]);
-    expect(spans.some(s => s.name === 'chat')).toBe(true);
+    expect(spans.some(s => s.name === 'chat claude-x')).toBe(true);
   });
 
   test('streaming input emits one root per user turn', async () => {
@@ -552,14 +552,14 @@ describe('Claude Agent SDK — query() patch', () => {
           conversationId: sessionId,
           hasOutput: true,
           hasUsage: false,
-          name: 'chat',
+          name: `chat claude-${suffix}`,
           traceId: root.spanContext().traceId,
         },
         {
           conversationId: sessionId,
           hasOutput: false,
           hasUsage: true,
-          name: 'chat',
+          name: `chat claude-${suffix}`,
           traceId: root.spanContext().traceId,
         },
       ]);

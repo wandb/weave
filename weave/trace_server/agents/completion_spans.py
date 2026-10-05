@@ -122,7 +122,9 @@ def build_completion_span(
     else:
         status_code = "OK"
 
-    expire_at = compute_expire_at(retention_days, started_at)
+    # Completion callers supply local naive or timezone-aware start times.
+    retention_start = started_at.astimezone(datetime.timezone.utc)
+    expire_at = compute_expire_at(retention_days, retention_start)
     if expire_at is None:
         expire_at = EXPIRE_AT_NEVER
 
