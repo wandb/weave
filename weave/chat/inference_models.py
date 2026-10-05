@@ -8,8 +8,8 @@ from weave.chat.types.models import (
     ModelsResponseError,
     ModelsResponseSuccess,
 )
+from weave.shared.constants import INFERENCE_HOST
 from weave.trace.settings import http_timeout
-from weave.trace_server.constants import INFERENCE_HOST
 from weave.wandb_interface.context import get_wandb_auth_context
 
 if TYPE_CHECKING:
