@@ -27,7 +27,7 @@ Start here for agents:
 
 - Python 3.10 or higher
 - A [Weights & Biases account](https://wandb.ai/signup) (free tier available)
-- A W&B API key from [https://wandb.ai/authorize](https://wandb.ai/authorize). Set `WANDB_API_KEY`, or run `wandb login`.
+- A W&B API key from [https://wandb.ai/authorize](https://wandb.ai/authorize). Set `WANDB_API_KEY`.
 - An [OpenAI API key](https://platform.openai.com/api-keys) in `OPENAI_API_KEY`, for the example below.
 
 ## Quick start: trace an agent

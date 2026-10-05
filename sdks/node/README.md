@@ -28,7 +28,7 @@ This example uses the OpenAI Agents SDK. Weave autopatches it. Traces land in th
 npm install weave @openai/agents zod
 ```
 
-Put this in a file called `main.mjs`:
+Put this in a file called `main.mts`:
 
 ```typescript
 import { randomUUID } from "node:crypto";
@@ -97,8 +97,10 @@ main();
 and then run
 
 ```
-node --import=weave/instrument main.mjs
+node --import=weave/instrument main.mts
 ```
+
+Use Node.js 22.18 or newer. Type stripping applies to `.mts`, not to `.mjs`.
 
 ESM needs that `--import=weave/instrument` flag. For CommonJS, `require('weave')` before requiring the agent SDK; no preload flag is needed.
 
