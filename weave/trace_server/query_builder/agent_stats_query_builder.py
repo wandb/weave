@@ -62,6 +62,8 @@ from weave.trace_server.query_builder.agent_signal_filters import (
 
 logger = logging.getLogger(__name__)
 
+_SECONDS_PER_DAY = 24 * 60 * 60
+
 _VALUE_TYPE_STRING: AgentSpanStatsValueType = "string"
 _VALUE_TYPE_NUMBER: AgentSpanStatsValueType = "number"
 _VALUE_TYPE_BOOLEAN: AgentSpanStatsValueType = "boolean"
@@ -955,7 +957,7 @@ def _stats_query_sql_parts(
     """Build SQL fragments shared by every stats query shape."""
     bucket_expr = (
         f"toStartOfInterval({_span_col(_COL_STARTED_AT)}, "
-        f"INTERVAL {granularity_seconds} SECOND, "
+        f"{_time_bucket_interval_sql(granularity_seconds)}, "
         f"{param_slot(tz_param, 'String')})"
     )
     return _StatsQuerySQLParts(
@@ -1129,6 +1131,12 @@ def _build_grouped_stats_query(
     """
 
 
+def _time_bucket_interval_sql(granularity_seconds: int) -> str:
+    if granularity_seconds % _SECONDS_PER_DAY == 0:
+        return f"INTERVAL {granularity_seconds // _SECONDS_PER_DAY} DAY"
+    return f"INTERVAL {granularity_seconds} SECOND"
+
+
 def _all_buckets_sql(
     start_param: str,
     end_param: str,
@@ -1137,12 +1145,30 @@ def _all_buckets_sql(
     granularity_seconds: int,
 ) -> str:
     """Render the synthetic bucket table used to fill empty time buckets."""
-    all_buckets_interval = f"INTERVAL {granularity_seconds} SECOND"
+    all_buckets_interval = _time_bucket_interval_sql(granularity_seconds)
     start_slot = param_slot(start_param, "Float64")
     end_slot = param_slot(end_param, "Float64")
     tz_slot = param_slot(tz_param, "String")
     interval_int_slot = param_slot(bucket_interval_param, "Int64")
     interval_float_slot = param_slot(bucket_interval_param, "Float64")
+    if granularity_seconds % _SECONDS_PER_DAY == 0:
+        days = granularity_seconds // _SECONDS_PER_DAY
+        bucket_start = (
+            f"toStartOfInterval(toDateTime({start_slot}, {tz_slot}), "
+            f"{all_buckets_interval}, {tz_slot})"
+        )
+        return f"""
+        SELECT {bucket_start} + toIntervalDay(number * {days}) AS {_BUCKET_COLUMN}
+        FROM numbers(
+          toUInt64(
+            intDiv(
+              dateDiff('day', {bucket_start}, toDateTime({end_slot}, {tz_slot}), {tz_slot}),
+              {days}
+            ) + 1
+          )
+        )
+        WHERE {_BUCKET_COLUMN} < toDateTime({end_slot}, {tz_slot})
+        """
     return f"""
     SELECT toStartOfInterval(
       toDateTime({start_slot}, {tz_slot}),

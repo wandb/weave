@@ -136,6 +136,14 @@ with an untyped dictionary. After changing the model, run
 `make synchronize-base-object-schemas` from the repository root so the Python
 schema and the dependent Core frontend types stay aligned.
 
+### Agent span stats time buckets
+
+Whole-day granularities in `/agents/spans/stats` use calendar days in the
+requested timezone. Keep aggregation and empty-bucket generation on the same
+calendar interval, and advance empty buckets with `toIntervalDay` so they stay
+at local midnight across daylight-saving transitions. `granularity` remains
+expressed in nominal seconds; a calendar day can span 23 or 25 elapsed hours.
+
 ### Trace Server API / Node SDK Schema
 
 Custom Runtime registration is a desired-state facade over the existing
