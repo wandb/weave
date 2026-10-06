@@ -350,6 +350,7 @@ def build_agent_span_stats_query(
             bucket_type="number",
         )
 
+    bucket_unit: str
     if calendar_interval is not None:
         granularity_seconds = _SECONDS_PER_DAY
         if (
