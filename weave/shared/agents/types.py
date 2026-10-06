@@ -321,6 +321,15 @@ class AgentSpanStatsTimeBucketSpec(BaseModel):
     """Bucket stats rows by started_at time intervals."""
 
     type: Literal["time"] = "time"
+    calendar_interval: Literal["day"] | None = Field(
+        default=None,
+        description=(
+            "Opt into calendar-day buckets aligned to midnight in the request timezone. "
+            "Mutually exclusive with granularity. Rows include timestamp and exclusive "
+            "bucket_end boundaries; response granularity is null. The start/end filter "
+            "can still clip the first or last bucket."
+        ),
+    )
 
 
 class AgentSpanStatsNumericBucketSpec(BaseModel):
@@ -411,6 +420,12 @@ class AgentSpanStatsReq(BaseModel):
             if isinstance(self.bucket_by, AgentSpanStatsNumericBucketSpec)
             else None
         )
+        if (
+            isinstance(self.bucket_by, AgentSpanStatsTimeBucketSpec)
+            and self.bucket_by.calendar_interval is not None
+            and self.granularity is not None
+        ):
+            raise ValueError("calendar_interval and granularity are mutually exclusive")
         if not self.metrics and numeric_bucket is None:
             raise ValueError("at least one metric is required")
 
@@ -465,7 +480,10 @@ class AgentSpanStatsRes(AgentResponseModel):
 
     start: datetime.datetime
     end: datetime.datetime
-    granularity: int | None = None
+    granularity: int | None = Field(
+        default=None,
+        description="Fixed bucket duration in seconds; null for calendar or numeric buckets.",
+    )
     timezone: str
     bucket_type: Literal["time", "number"] = "time"
     columns: list[AgentSpanStatsColumn] = Field(default_factory=list)

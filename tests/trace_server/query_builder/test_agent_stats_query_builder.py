@@ -15,6 +15,7 @@ from weave.trace_server.agents.types import (
     AgentSpanStatsMetricSpec,
     AgentSpanStatsNumericBucketSpec,
     AgentSpanStatsReq,
+    AgentSpanStatsTimeBucketSpec,
     AgentSpanValueRef,
 )
 from weave.trace_server.interface.query import Query
@@ -1014,3 +1015,35 @@ def test_request_validation_rejects_large_range_with_insight_filters() -> None:
                 )
             ],
         )
+
+
+@pytest.mark.trace_server
+@pytest.mark.parametrize("granularity", [3600, 86400])
+def test_calendar_interval_rejects_fixed_granularity(granularity: int) -> None:
+    with pytest.raises(
+        ValidationError,
+        match="calendar_interval and granularity are mutually exclusive",
+    ):
+        _req(
+            granularity=granularity,
+            bucket_by=AgentSpanStatsTimeBucketSpec(calendar_interval="day"),
+        )
+
+
+@pytest.mark.trace_server
+def test_calendar_interval_rejects_unsupported_unit() -> None:
+    with pytest.raises(ValidationError, match="Input should be 'day'"):
+        _req(granularity=None, bucket_by={"type": "time", "calendar_interval": "month"})
+
+
+@pytest.mark.trace_server
+def test_calendar_interval_rejects_too_many_buckets() -> None:
+    start = datetime.datetime(1990, 1, 1, tzinfo=datetime.timezone.utc)
+    req = _req(
+        start=start,
+        end=start + datetime.timedelta(days=10001),
+        granularity=None,
+        bucket_by=AgentSpanStatsTimeBucketSpec(calendar_interval="day"),
+    )
+    with pytest.raises(ValueError, match="calendar_interval produces too many buckets"):
+        build_agent_span_stats_query(req, ParamBuilder("genai"))

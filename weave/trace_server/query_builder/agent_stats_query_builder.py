@@ -30,6 +30,7 @@ from weave.trace_server.agents.types import (
     AgentSpanStatsMetricSpec,
     AgentSpanStatsNumericBucketSpec,
     AgentSpanStatsReq,
+    AgentSpanStatsTimeBucketSpec,
     AgentSpanStatsValueType,
     group_by_ref_alias,
 )
@@ -78,6 +79,7 @@ _SOURCE_CUSTOM_ATTRS_BOOL = "custom_attrs_bool"
 _SPANS_TABLE = "spans"
 _SPAN_ALIAS = "s"
 _RESPONSE_TIMESTAMP_COLUMN = "timestamp"
+_RESPONSE_BUCKET_END_COLUMN = "bucket_end"
 _RESPONSE_BUCKET_INDEX_COLUMN = "bucket_index"
 _RESPONSE_BUCKET_MIN_COLUMN = "bucket_min"
 _RESPONSE_BUCKET_MAX_COLUMN = "bucket_max"
@@ -273,6 +275,11 @@ def build_agent_span_stats_query(
     metric_exprs = [expr for plan in metric_plans for expr in plan.expressions]
     metric_outputs = [output for plan in metric_plans for output in plan.outputs]
     bucket_by = req.bucket_by
+    calendar_interval = (
+        bucket_by.calendar_interval
+        if isinstance(bucket_by, AgentSpanStatsTimeBucketSpec)
+        else None
+    )
     numeric_bucket = (
         bucket_by if isinstance(bucket_by, AgentSpanStatsNumericBucketSpec) else None
     )
@@ -293,6 +300,17 @@ def build_agent_span_stats_query(
         else _response_columns(group_refs, metric_outputs)
     )
 
+    if calendar_interval is not None:
+        columns.insert(1 + len(group_refs), _RESPONSE_BUCKET_END_COLUMN)
+        column_metadata.insert(
+            1 + len(group_refs),
+            AgentSpanStatsColumn(
+                name=_RESPONSE_BUCKET_END_COLUMN,
+                role="time",
+                value_type=_VALUE_TYPE_DATETIME,
+            ),
+        )
+
     if not metric_outputs:
         raise ValueError("at least one aggregation or percentile is required")
     if len(set(columns)) != len(columns):
@@ -304,6 +322,12 @@ def build_agent_span_stats_query(
     outer_metric_selects = [
         f"{output.outer_sql} AS {output.name}" for output in metric_outputs
     ]
+
+    if calendar_interval is not None:
+        outer_metric_selects.insert(
+            0,
+            f"{_CTE_ALL_BUCKETS}.{_BUCKET_COLUMN} + toIntervalDay(1) AS {_RESPONSE_BUCKET_END_COLUMN}",
+        )
 
     if numeric_bucket is not None:
         raw_sql = _build_numeric_bucket_stats_query(
@@ -326,10 +350,19 @@ def build_agent_span_stats_query(
             bucket_type="number",
         )
 
-    granularity_seconds = _resolve_granularity(req, start, end)
-    bucket_size, bucket_unit = granularity_seconds, "second"
-    if granularity_seconds % _SECONDS_PER_DAY == 0:
-        bucket_size, bucket_unit = granularity_seconds // _SECONDS_PER_DAY, "day"
+    if calendar_interval is not None:
+        granularity_seconds = _SECONDS_PER_DAY
+        if (
+            ensure_max_buckets(granularity_seconds, (end - start).total_seconds())
+            != granularity_seconds
+        ):
+            raise ValueError(
+                "calendar_interval produces too many buckets; shorten the date range"
+            )
+        bucket_size, bucket_unit = 1, calendar_interval
+    else:
+        granularity_seconds = _resolve_granularity(req, start, end)
+        bucket_size, bucket_unit = granularity_seconds, "second"
     # Whole unix seconds: a fractional float trips ClickHouse Int64 param parsing.
     start_epoch = int(start.replace(tzinfo=datetime.timezone.utc).timestamp())
     end_epoch = int(end.replace(tzinfo=datetime.timezone.utc).timestamp())
@@ -364,7 +397,9 @@ def build_agent_span_stats_query(
         columns=columns,
         column_metadata=column_metadata,
         parameters=pb.get_params(),
-        granularity_seconds=granularity_seconds,
+        granularity_seconds=None
+        if calendar_interval is not None
+        else granularity_seconds,
         start=start,
         end=end,
         bucket_type="time",
