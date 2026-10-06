@@ -1,5 +1,34 @@
 # Message search storage and rollout
 
+## Query contract
+
+The indexed builder uses case-sensitive complete words in any order. Double
+quotes require consecutive tokens, so `warm "acoustic guitar"` requires both
+the word `warm` and the phrase. Tokenizer punctuation is ignored, including
+Markdown emphasis. This does not strip Markdown syntax or render link labels;
+URLs, code, and markup remain searchable. Substrings and case folding are not
+part of this contract. Unclosed quotes and punctuation-only queries are errors.
+
+The request and response shapes are unchanged. An empty query remains structured
+retrieval: it returns each logical span occurrence and honors `truncate_content`.
+Text search collapses identical `(role, content_digest)` matches within a
+conversation, falling back to trace ID and then span ID when untagged. It keeps
+the newest occurrence inside the requested time window. Offsets and limits apply
+to those message hits, not the number of conversation groups in the response.
+
+One SQL statement finds digest candidates using the text index, selects the
+ordered occurrence page, and joins bodies only for that materialized page.
+`GLOBAL IN` and `GLOBAL JOIN` preserve cross-shard matching. Content hydration
+groups digests so unmerged duplicate bodies cannot multiply results.
+
+The default query uses `FINAL` on occurrences before metadata filtering. The
+`stable_metadata` option removes it and uses one ordered collapse, matching the
+fast benchmark query. Enable that option only when an occurrence's conversation
+ID and all filter metadata stay unchanged across exports. Empty-to-known
+conversation IDs violate that condition. Otherwise old versions can return
+stale matches, duplicate a message across conversations, and consume page slots.
+Ingestion currently permits such updates, so the optimization is opt-in.
+
 Migration 048 requires ClickHouse 26.2 or later. Upgrade each deployment before
 applying it. The query implementation requires 26.3 or later for materialized
 CTEs; use the fleet's tested 26.4+ release for rollout.

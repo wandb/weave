@@ -1089,11 +1089,13 @@ def _escape_like_pattern(value: str) -> str:
     return value.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
 
 
-def _search_filter_sql(pb: ParamBuilder, req: AgentSearchReq) -> _FilterSQL:
+def _search_filter_sql(
+    pb: ParamBuilder, req: AgentSearchReq, *, include_content: bool = True
+) -> _FilterSQL:
     """Build WHERE filters for a search against the messages table."""
     pid_slot = pb.add(req.project_id, param_type="String")
     conditions = [_project_filter_sql("project_id", pid_slot)]
-    if req.query:
+    if include_content and req.query:
         content_slot = pb.add(
             f"%{_escape_like_pattern(req.query)}%", param_type="String"
         )
