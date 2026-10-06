@@ -10,7 +10,7 @@ We vendor them as plain string literals instead of importing the package:
    the strings removes that version coupling — the integration runs against
    whatever semconv ADK pulls in.
 2. **Lock-step with the server.** The trace server already vendors these exact
-   strings as its extraction keys (``weave/trace_server/agents/semconv.py``).
+   strings as its extraction keys (``weave/shared/agents/semconv.py``).
    The client emits the attribute; the server looks it up by literal, so the two
    must agree. ``tests/integrations/google_adk/test_google_adk.py`` asserts the
    match to catch drift.

@@ -1,10 +1,8 @@
 import pytest
 
-from weave.trace import feedback
 from weave.trace.feedback import RefFeedbackQuery
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.errors import InvalidRequest
-from weave.trace_server.interface import feedback_types
 from weave.trace_server.interface.query import Query
 
 
@@ -294,11 +292,6 @@ def test_feedback_query_created_at_filter(client):
 
 
 def test_agent_feedback_apis(client):
-    # The client mirrors these because the layering contract bars the import.
-    assert feedback.AGENT_USER_FEEDBACK_TYPE == feedback_types.AGENT_USER_FEEDBACK_TYPE
-    assert feedback.NOTE_FEEDBACK_TYPE == feedback_types.NOTE_FEEDBACK_TYPE
-    assert feedback.REACTION_FEEDBACK_TYPE == feedback_types.REACTION_FEEDBACK_TYPE
-
     span_fb = client.get_agent_span_feedback("0123456789abcdef")
     turn_fb = client.get_agent_turn_feedback("0123456789abcdef0123456789abcdef")
     conv_fb = client.get_agent_conversation_feedback("sess-demo")

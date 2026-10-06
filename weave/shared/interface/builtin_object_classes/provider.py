@@ -5,8 +5,8 @@ from urllib.parse import urlparse
 from pydantic import ConfigDict, Field, field_validator
 
 from weave.shared.errors import InvalidRequest
+from weave.shared.helpers.url_safety import is_publicly_routable_url
 from weave.shared.interface.builtin_object_classes import base_object_def
-from weave.trace_server.helpers.url_safety import is_publicly_routable_url
 
 # Headers that must not appear in user-supplied extra_headers.
 # https://coreweave.atlassian.net/browse/VULNMGMT-770

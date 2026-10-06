@@ -2,9 +2,9 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
+from weave.shared import trace_server_interface as tsi
+from weave.shared.common_interface import SortBy
 from weave.shared.interface.builtin_object_classes import base_object_def
-from weave.trace_server import trace_server_interface as tsi
-from weave.trace_server.common_interface import SortBy
 
 PathElement = str | int
 
