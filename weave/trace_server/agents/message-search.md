@@ -44,3 +44,6 @@ Verify each deployment's migration configuration and ClickHouse version.
 Deploy this storage change before deploying indexed reads. Complete and verify
 historical backfill separately before the hard cutover. Keep the existing
 `messages` table and its five span MVs for capture and rollback.
+
+See [the backfill runbook](message-search-backfill.md) for the resumable command,
+verification, and deployment sequence.
