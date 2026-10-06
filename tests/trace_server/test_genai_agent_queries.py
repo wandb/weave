@@ -2197,7 +2197,11 @@ def test_agent_span_stats_hourly_buckets_across_dst(ch_server, date, hours):
             ],
         )
     )
-    assert res.rows == [
+    # Compare instants in UTC: cross-zone equality is false for ambiguous local times.
+    assert [
+        {**row, "timestamp": row["timestamp"].astimezone(datetime.timezone.utc)}
+        for row in res.rows
+    ] == [
         {"timestamp": start + datetime.timedelta(hours=i), "count_spans": 0}
         for i in range(hours)
     ]
