@@ -12,7 +12,7 @@ from weave.shared import refs_internal
 from weave.shared.refs_internal import CallableProperty
 
 if TYPE_CHECKING:
-    from weave.trace_server.errors import ObjectDeletedError
+    from weave.shared.errors import ObjectDeletedError
 
 DICT_KEY_EDGE_NAME = refs_internal.DICT_KEY_EDGE_NAME
 LIST_INDEX_EDGE_NAME = refs_internal.LIST_INDEX_EDGE_NAME
