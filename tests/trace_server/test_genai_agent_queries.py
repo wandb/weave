@@ -2853,11 +2853,11 @@ def test_conversation_chat_excludes_foreign_conversation_sharing_trace_id(ch_ser
 
 
 def test_message_search(ch_server):
-    """End-to-end search against the `messages` table.
+    """End-to-end search against indexed content and occurrences.
 
     Spans are inserted and the ClickHouse MV populates the search index
-    automatically; no Python-side extraction runs. Verifies that content
-    LIKE + span-level filters return the expected hits.
+    automatically; no Python-side extraction runs. Verifies that complete-word
+    matching and span-level filters return the expected hits.
     """
     project_id = _make_project_id("search")
     now = datetime.datetime.now(tz=datetime.timezone.utc)
@@ -2904,10 +2904,7 @@ def test_message_search(ch_server):
 
 
 def test_message_search_shared_digest_across_spans(ch_server):
-    """Two spans carrying identical output message content should produce
-    two rows in `messages` that share a single content_digest — enabling
-    read-side dedup via GROUP BY content_digest when desired.
-    """
+    """A shared message body retains a match in each of its conversations."""
     project_id = _make_project_id("search_dedup")
     now = datetime.datetime.now(tz=datetime.timezone.utc)
 

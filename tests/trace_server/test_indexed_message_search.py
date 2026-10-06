@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 import pytest
 
@@ -12,7 +12,7 @@ from weave.trace_server.query_builder.message_search_query_builder import (
 )
 
 pytestmark = pytest.mark.trace_server
-START = datetime(2026, 1, 1)
+START = datetime(2026, 1, 1, tzinfo=timezone.utc)
 
 
 @pytest.mark.parametrize(

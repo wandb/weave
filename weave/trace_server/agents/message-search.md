@@ -1,5 +1,18 @@
 # Message search storage and rollout
 
+## Serving cutover
+
+The trace server always uses the indexed query for every project's message
+search. There is no project allowlist or environment-variable switch. The
+serving path resolves occurrence versions with `FINAL`; the builder's
+`stable_metadata` option is available for experiments only.
+
+Complete capture verification and historical backfill for every database served
+by a release before deploying the cutover code. Schema migration alone does not
+copy history. Deploy storage and capture first, run and reconcile the backfill,
+then deploy the query cutover as a separate release. Rollback requires deploying
+the previous server image; retain the old table and its ingestion MVs.
+
 ## Query contract
 
 The indexed builder uses case-sensitive complete words in any order. Double

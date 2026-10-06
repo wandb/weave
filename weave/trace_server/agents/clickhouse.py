@@ -103,7 +103,6 @@ from weave.trace_server.query_builder.agent_query_builder import (
     make_conversation_previews_query,
     make_conversation_spans_query,
     make_custom_attrs_schema_query,
-    make_message_search_query,
     make_span_group_categorical_distributions_query,
     make_span_group_distribution_counts_query,
     make_span_group_numeric_distributions_query,
@@ -117,6 +116,9 @@ from weave.trace_server.query_builder.agent_query_builder import (
 )
 from weave.trace_server.query_builder.agent_stats_query_builder import (
     build_agent_span_stats_query,
+)
+from weave.trace_server.query_builder.message_search_query_builder import (
+    make_indexed_message_search_query,
 )
 from weave.trace_server.sensitive_data.span_redaction import (
     redact_pii_from_resource,
@@ -614,7 +616,7 @@ class AgentQueryHandler:
     # ------------------------------------------------------------------
 
     def search_messages(self, req: AgentSearchReq) -> AgentSearchRes:
-        """Full-text search across message content."""
+        """Full-text search across indexed message content."""
         rows = self._run_message_search_query(req)
 
         convs: dict[str, AgentSearchConversationResult] = {}
@@ -804,9 +806,9 @@ class AgentQueryHandler:
         return total, rows
 
     def _run_message_search_query(self, req: AgentSearchReq) -> list[ClickHouseRow]:
-        """Build and run the message search SQL, returning rows as dicts."""
+        """Build and run indexed message search, returning rows as dicts."""
         pb = ParamBuilder(PARAM_NAMESPACE)
-        sql = make_message_search_query(pb, req)
+        sql = make_indexed_message_search_query(pb, req)
         return _rows_as_dicts(self._query(sql, pb.get_params()))
 
     def _run_trace_detail_query(

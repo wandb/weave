@@ -1050,18 +1050,16 @@ class AgentCustomAttrsSchemaRes(AgentResponseModel):
 
 
 class AgentSearchReq(BaseModel):
-    """Query the `messages` table by content and/or span-level filters.
+    """Search message content with span-level filters.
 
-    Scans the `messages` table (one row per message occurrence, populated by an
-    MV from spans) and returns matching span-level hits. Full-text search sets
-    `query`; structured retrieval (e.g. all messages in a trace) leaves `query`
-    empty and uses the filters below. The caller groups by conversation for the
-    response shape.
+    Matches case-sensitive complete words in any order; double quotes require
+    consecutive tokens. Repeated history is collapsed within a conversation.
+    An empty query retrieves individual span occurrences using the filters
+    below. The response groups the page by conversation.
     """
 
     project_id: str
-    # Substring match on message content. Empty matches all (no content filter),
-    # turning this into structured retrieval over the filters below.
+    # Empty selects structured retrieval without a content predicate.
     query: str = ""
 
     trace_id: str | None = None
