@@ -138,11 +138,12 @@ schema and the dependent Core frontend types stay aligned.
 
 ### Agent span stats time buckets
 
-Whole-day granularities in `/agents/spans/stats` use calendar days in the
-requested timezone. Keep aggregation and empty-bucket generation on the same
-calendar interval, and advance empty buckets with `toIntervalDay` so they stay
-at local midnight across daylight-saving transitions. `granularity` remains
-expressed in nominal seconds; a calendar day can span 23 or 25 elapsed hours.
+`/agents/spans/stats` opts into local calendar days with
+`bucket_by: {"type": "time", "calendar_interval": "day"}`. This is mutually
+exclusive with `granularity`; existing granularity requests use fixed seconds.
+Calendar rows include `timestamp` and exclusive `bucket_end` boundaries, and
+response `granularity` is null. Keep aggregation and empty-bucket generation
+on the same calendar interval so boundaries stay aligned across DST.
 
 ### Trace Server API / Node SDK Schema
 

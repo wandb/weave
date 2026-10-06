@@ -2138,3 +2138,50 @@ def test_list_sends_limit_and_offset(
         expected_path,
     )
     assert dict(mock_server.requests[0].url.params) == {"limit": "10", "offset": "5"}
+
+
+@pytest.mark.trace_server
+def test_agent_spans_stats_calendar_interval_reaches_http() -> None:
+    response = {
+        "start": "2026-03-08T08:00:00Z",
+        "end": "2026-03-09T07:00:00Z",
+        "timezone": "America/Los_Angeles",
+        "granularity": None,
+        "bucket_type": "time",
+        "columns": [
+            {"name": "timestamp", "role": "time", "value_type": "datetime"},
+            {"name": "bucket_end", "role": "time", "value_type": "datetime"},
+            {"name": "count_spans", "role": "metric", "value_type": "number"},
+        ],
+        "rows": [
+            {
+                "timestamp": "2026-03-08T08:00:00Z",
+                "bucket_end": "2026-03-09T07:00:00Z",
+                "count_spans": 2,
+            }
+        ],
+    }
+    mock_server = _mock_server(httpx.Response(200, json=response))
+    req = agent_types.AgentSpanStatsReq(
+        project_id=PROJECT,
+        start=datetime.datetime(2026, 3, 8, 8, tzinfo=datetime.timezone.utc),
+        end=datetime.datetime(2026, 3, 9, 7, tzinfo=datetime.timezone.utc),
+        timezone="America/Los_Angeles",
+        bucket_by=agent_types.AgentSpanStatsTimeBucketSpec(calendar_interval="day"),
+        metrics=[
+            agent_types.AgentSpanStatsMetricSpec(
+                alias="spans",
+                value_type="datetime",
+                value=agent_types.AgentSpanValueRef(source="field", key="started_at"),
+                aggregations=["count"],
+            )
+        ],
+    )
+    result = mock_server.server.agent_spans_stats(req)
+    assert len(mock_server.requests) == 1
+    assert mock_server.requests[0].url.path == "/agents/spans/stats"
+    assert json.loads(mock_server.requests[0].content)["bucket_by"] == {
+        "type": "time",
+        "calendar_interval": "day",
+    }
+    assert result == agent_types.AgentSpanStatsRes.model_validate(response)
