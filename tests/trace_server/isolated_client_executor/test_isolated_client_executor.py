@@ -20,13 +20,17 @@ import weave
 from tests.trace_server.isolated_client_executor.cross_process_trace_server import (
     CrossProcessTraceServerReceiver,
 )
+from weave.trace import isolated_client_executor
 from weave.trace.context.weave_client_context import get_weave_client
-from weave.trace.ref_util import get_ref
-from weave.trace.weave_client import WeaveClient
-from weave.trace_server.isolated_client_executor import (
+from weave.trace.isolated_client_executor import (
     IsolatedClientExecutor,
     IsolatedClientExecutorError,
     IsolatedClientExecutorTimeoutError,
+)
+from weave.trace.ref_util import get_ref
+from weave.trace.weave_client import WeaveClient
+from weave.trace_server import (
+    isolated_client_executor as isolated_client_executor_legacy,
 )
 from weave.trace_server.trace_server_interface import ObjQueryReq, TraceServerInterface
 
@@ -430,3 +434,7 @@ async def test_correct_isolation(client):
     assert len(calls) == 6
 
     assert get_ref(log_to_weave_op) is None
+
+
+def test_trace_server_path_is_the_same_module() -> None:
+    assert isolated_client_executor_legacy is isolated_client_executor
