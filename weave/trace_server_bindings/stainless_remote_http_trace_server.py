@@ -9,6 +9,10 @@ from zoneinfo import ZoneInfo
 from pydantic import BaseModel, validate_call
 from typing_extensions import Self
 
+from weave.shared import trace_server_interface as tsi
+from weave.shared.ids import generate_id
+from weave.shared.service_interface import ServerInfoRes
+from weave.shared.trace_server_interface import agent_types
 from weave.trace.env import ssl_verify, weave_trace_server_url
 from weave.trace.settings import (
     http_timeout,
@@ -16,10 +20,6 @@ from weave.trace.settings import (
     should_enable_disk_fallback,
     should_use_calls_complete,
 )
-from weave.trace_server import trace_server_interface as tsi
-from weave.trace_server.ids import generate_id
-from weave.trace_server.service_interface import ServerInfoRes
-from weave.trace_server.trace_server_interface import agent_types
 from weave.trace_server_bindings.async_batch_processor import AsyncBatchProcessor
 from weave.trace_server_bindings.call_batch_processor import CallBatchProcessor
 from weave.trace_server_bindings.client_interface import TraceServerClientInterface
@@ -570,16 +570,6 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
             req,
             agent_types.AgentSpansQueryRes,
             self._stainless_client.agents.spans.query,
-            # The vendored SDK is generated from core and may lag this server's API.
-            exclude={"insight_filters"},
-            extra_body={
-                "insight_filters": [
-                    insight_filter.model_dump(
-                        mode="json", by_alias=True, exclude_none=True
-                    )
-                    for insight_filter in req.insight_filters
-                ]
-            },
         )
 
     @validate_call
@@ -694,16 +684,6 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
             req,
             agent_types.AgentSpanStatsRes,
             self._stainless_client.agents.spans.stats,
-            # The vendored SDK is generated from core and may lag this server's API.
-            exclude={"insight_filters"},
-            extra_body={
-                "insight_filters": [
-                    insight_filter.model_dump(
-                        mode="json", by_alias=True, exclude_none=True
-                    )
-                    for insight_filter in req.insight_filters
-                ]
-            },
         )
 
     @validate_call

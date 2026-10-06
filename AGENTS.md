@@ -108,7 +108,7 @@ in-process and credential persistence emits one warning per credentials object.
 
 Generate implicit cost `created_at` values in UTC because insertion interprets naive checkpoint timestamps as UTC.
 
-Note: the scripts read `modelsBegin.json`/`modelsFinal.json`, which are symlinks into wandb/core and only resolve when this repo is checked out as the submodule inside wandb/core (`services/weave-trace/weave-python/weave-public`).
+Note: the scripts read `modelsBegin.json`/`modelsFinal.json`, which are symlinks into wandb/core and only resolve when this repo is checked out as the submodule inside wandb/core. During the submodule path migration, check wandb/core's `.gitmodules`: the path may be `services/weave-python/weave-public` or `services/weave-trace/weave-public`.
 
 `weave/vendor/weave_server_sdk/` is the generated Weave Trace API client, copied
 in from wandb/core rather than depended on because it is not published to PyPI.
@@ -123,10 +123,13 @@ either vendored client, or its `origin.json`, in that same PR. Core's OpenAPI
 spec does not contain the field until core moves its weave pointer and exports
 the spec. The Stainless bot opens the PR that updates these copies. Until that
 PR lands, a Python binding that passes every dumped field into the generated
-method raises `TypeError` on the new name. Exclude the field from the dump and
-send it with `extra_body`, the same way `insight_filters` does on
-`agent_spans_query` and `agent_spans_stats`. Delete those lines once the bot
-PR has merged. The Node client takes one body object, so it does not need that
+method raises `TypeError` on the new name. Pass `exclude={"<field>"}` plus
+`extra_body={"<field>": ...}` to `_stainless_request`, under the comment
+`# The vendored SDK is generated from core and may lag this server's API.`, so
+grepping that line finds every live bridge. Dump a nested model yourself: the
+client's encoder serializes a bare `BaseModel` with `exclude_unset=True` and
+drops every default the caller did not set. Delete those lines once the bot PR
+has merged. The Node client takes one body object, so it does not need that
 bridge.
 
 Persisted `AgentDashboard` objects intentionally use a closed, discriminated
@@ -159,7 +162,7 @@ available during rolling deploys.
 `weave.invoking_span` (`{trace_id, span_id}`, hex) points the other way, from a
 call to the OTel span that was current when it started — an agent's
 `execute_tool` span in the case it is built for, but any ambient instrumentation
-qualifies. `create_call` writes it on *every* call started inside that span, not
+qualifies. `create_call` writes it on _every_ call started inside that span, not
 just the outermost one: skipping when the parent call already carries it marks
 every other level, because the check reads the parent's recorded state and the
 parent may itself have skipped. A reader must treat a missing key and a pair
@@ -301,7 +304,7 @@ lives parallel to the ClickHouse implementation. It replicates **ClickHouse**
 (the production backend) at the interface level: JSON_VALUE string typing for
 dynamic fields, `to*OrNull` cast rules, NULLS-LAST ordering, DateTime64
 comparisons, and computed summary fields. Tests that assert ClickHouse
-*internals* (SQL, table routing/residence, insert batching, bucket file
+_internals_ (SQL, table routing/residence, insert batching, bucket file
 storage) are gated with `client_is_clickhouse` and skip on the fake. No
 files, no SQL, no Docker.
 
@@ -460,8 +463,7 @@ deterministic.
   reads whole-minute offsets only, so a timestamp from before its zone adopted
   one comes back as an `Invalid Date` (`Africa/Monrovia` ran on `-00:44:30`
   until 1972).
-- `wave.Wave_read` is what this SDK writes, and what Python wrote until May
-  2025. Both store one `audio.wav` and no metadata file.
+- `wave.Wave_read` is what this SDK writes, and what Python wrote until May 2025. Both store one `audio.wav` and no metadata file.
 - Python now records every `Audio` and `wave.Wave_read` object as
   `weave.type_handlers.Audio.audio.Audio` with an extra `_metadata.json`,
   because `register()` in `weave/type_handlers/Audio/audio.py` puts the `Audio`
@@ -485,7 +487,7 @@ deterministic.
   builds, never the OTel global registry. A processor that must see them belongs
   in that provider's `spanProcessors`, which is built lazily on the first span
   and rebuilt on a project switch — registering once from `init()` misses both.
-- At a span's attribute limit OTel JS drops the *incoming* attribute, where
+- At a span's attribute limit OTel JS drops the _incoming_ attribute, where
   Python's `BoundedAttributes` evicts the oldest, so the two SDKs keep different
   halves of an overflowing set. The eval linker writes the pair eval results
   match on before its display-only attributes for that reason, and the op linker
