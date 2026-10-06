@@ -41,10 +41,12 @@ export type {
   Response,
   WeaveClient,
 } from './weaveClient';
+export type {TypeSafeWrapOptions} from './integrations';
 export {
   wrapOpenAI,
   wrapGoogleGenAI,
   wrapClaudeAgentSdk,
+  wrapTypeSafe,
   WeaveAdkPlugin,
   createOpenAIAgentsTracingProcessor,
   instrumentOpenAIAgents,

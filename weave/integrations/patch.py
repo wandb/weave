@@ -14,6 +14,7 @@ import threading
 from collections.abc import Callable
 from importlib.abc import MetaPathFinder
 
+from weave.integrations.typesafe.typesafe_sdk import set_capture_content
 from weave.trace.autopatch import IntegrationSettings
 from weave.trace.settings import should_use_otel_v2
 
@@ -386,6 +387,32 @@ def patch_autogen(settings: IntegrationSettings | None = None) -> None:
     )
 
 
+def patch_typesafe(
+    settings: IntegrationSettings | None = None, *, capture_content: bool | None = None
+) -> None:
+    """Enable spans for TypeSafe ``system_one`` calls.
+
+    One call becomes one chat span under the current Turn, or under a small
+    synthetic turn when nothing else is active. This does not create a Weave
+    Call. A ``weave.parent_call.*`` link on a surrounding ``@weave.op`` is not
+    an OTel parent. Do not enable this together with another TypeSafe
+    instrumentor; pick one.
+
+    ``capture_content`` sets the process default for state, questions, and
+    answers. When omitted, ``OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT``
+    applies (``false`` turns content off). A conversation with
+    ``include_content=False`` still drops content.
+    """
+    if capture_content is not None:
+        set_capture_content(capture_content)
+    _patch_integration(
+        module_path="weave.integrations.typesafe.typesafe_sdk",
+        patcher_func_getter_name="get_typesafe_patcher",
+        triggering_symbols=["typesafe_sdk"],
+        settings=settings,
+    )
+
+
 def patch_claude_agent_sdk(settings: IntegrationSettings | None = None) -> None:
     """Enable Weave tracing for Claude Agent SDK (calls-based)."""
     _patch_integration(
@@ -498,6 +525,7 @@ INTEGRATION_MODULE_MAPPING: dict[str, Callable[[], None]] = {
     "mcp": patch_fastmcp,
     "langchain_nvidia_ai_endpoints": patch_nvidia,
     "smolagents": patch_smolagents,
+    "typesafe_sdk": patch_typesafe,
     "claude_agent_sdk": _dispatch_claude_agent_sdk,
     "verdict": patch_verdict,
     "verifiers": patch_verifiers,

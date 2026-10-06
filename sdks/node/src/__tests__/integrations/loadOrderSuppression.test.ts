@@ -18,6 +18,7 @@ import instrumentations, {
   isLoadOrderWarningSuppressed,
 } from '../../integrations/instrumentations';
 import {instrumentOpenAI, wrapOpenAI} from '../../integrations/openai';
+import {instrumentTypeSafe} from '../../integrations/typesafe';
 import {
   createOpenAIAgentsTracingProcessor,
   instrumentOpenAIAgent,
@@ -104,6 +105,7 @@ beforeAll(() => {
   instrumentGoogleGenAI();
   instrumentOpenAIAgent();
   instrumentOpenAIRealtimeAgent();
+  instrumentTypeSafe();
 });
 
 beforeEach(() => {
@@ -235,5 +237,6 @@ test('only the hooks whose patch reaches earlier references are flagged', () => 
   expect(flagged).toEqual([
     '@anthropic-ai/sdk@index.js',
     '@google/adk@dist/cjs/index.js',
+    '@typesafe-ai/sdk@dist/index.cjs',
   ]);
 });

@@ -126,6 +126,7 @@ google_genai = [
   "pillow>=11.1.0",
 ]
 groq = ["groq>=0.13.0"]
+typesafe = ["typesafe-sdk>=0.7.0,<0.8.0"]
 huggingface = ["huggingface-hub>=0.28.1"]
 smolagents = [
   "openai>=1.99.9",

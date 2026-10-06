@@ -19,6 +19,7 @@ MODELS_BEGIN_FILE = "../model_providers/modelsBegin.json"
 # litellm and modelsBegin do not cover (or cover incorrectly).
 MANUAL_COSTS_FILE = "manual_costs.json"
 CW_PREFIX = "coreweave/"
+TYPESAFE_PREFIX = "typesafe/"
 # Amount of historical costs to store for each model
 HISTORICAL_COSTS = 3
 HTTP_TIMEOUT = 30.0
@@ -182,6 +183,25 @@ def fetch_models_begin_costs() -> dict[str, CostDetails]:
     return costs
 
 
+def add_typesafe_bare_aliases(costs: dict[str, CostDetails]) -> None:
+    """Copy each ``typesafe/<id>`` price onto the bare id when that id is absent.
+
+    The cost join matches the model string exactly. TypeSafe returns
+    ``jev-1.13.0``, not ``typesafe/jev-1.13.0``. A bare row that is already
+    present stays as it is. ``openrouter/typesafe/...`` is a different prefix
+    and is left alone.
+    """
+    aliases: dict[str, CostDetails] = {}
+    for key, detail in costs.items():
+        if not key.startswith(TYPESAFE_PREFIX):
+            continue
+        bare = key[len(TYPESAFE_PREFIX) :]
+        if not bare or "/" in bare or bare in costs or bare in aliases:
+            continue
+        aliases[bare] = detail
+    costs.update(aliases)
+
+
 def fetch_manual_costs() -> dict[str, CostDetails]:
     """Load manually-curated cost stopgaps for models litellm hasn't published yet.
 
@@ -277,6 +297,8 @@ def main(file_name: str = COST_FILE) -> None:
     # stopgap for models litellm hasn't published yet — once litellm catches up
     # with authoritative numbers, those take over automatically.
     all_new_costs = {**manual_costs, **models_begin_costs, **new_costs}
+    # The SDK reports bare ids (jev-1.13.0). Catalog rows are typesafe/<id>.
+    add_typesafe_bare_aliases(all_new_costs)
     print(
         f"Total costs: {len(all_new_costs)} "
         f"({len(new_costs)} from litellm, {len(models_begin_costs)} from modelsBegin.json, "
