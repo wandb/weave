@@ -2163,6 +2163,36 @@ def test_agent_span_stats_calendar_day_buckets(
     ]
 
 
+@pytest.mark.parametrize(("date", "hours"), [("2026-03-08", 5), ("2026-11-01", 7)])
+def test_agent_span_stats_hourly_buckets_across_dst(ch_server, date, hours):
+    start = datetime.datetime.fromisoformat(date).replace(
+        tzinfo=ZoneInfo("America/Los_Angeles")
+    )
+    end = (start + datetime.timedelta(hours=6)).astimezone(datetime.timezone.utc)
+    start = start.astimezone(datetime.timezone.utc)
+    res = ch_server.agent_spans_stats(
+        AgentSpanStatsReq(
+            project_id=_make_project_id("stats_hourly_dst"),
+            start=start,
+            end=end,
+            granularity=3600,
+            timezone="America/Los_Angeles",
+            metrics=[
+                AgentSpanStatsMetricSpec(
+                    alias="spans",
+                    value_type="datetime",
+                    value=AgentSpanValueRef(source="field", key="started_at"),
+                    aggregations=["count"],
+                )
+            ],
+        )
+    )
+    assert res.rows == [
+        {"timestamp": start + datetime.timedelta(hours=i), "count_spans": 0}
+        for i in range(hours)
+    ]
+
+
 def test_agent_span_stats_ungrouped_all_time(ch_server):
     """Ungrouped >31-day request with the whole range as one bucket returns a
     single row of all-time totals (no range-cap rejection).

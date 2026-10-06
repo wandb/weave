@@ -237,25 +237,16 @@ def test_ungrouped_stats_query_full_sql_shape() -> None:
     src_sql, src_params = _attr_src(4, started_after=start, started_before=end)
     expected_sql = """
         WITH all_buckets AS (
-          SELECT toStartOfInterval(
-            toDateTime({genai_9:Float64}, {genai_11:String}),
-            INTERVAL 3600 SECOND,
-            {genai_11:String}
-          ) + toIntervalSecond(number * {genai_12:Int64}) AS bucket
+          WITH toStartOfInterval(
+            toDateTime({genai_9:Float64}, {genai_11:String}), INTERVAL 3600 SECOND, {genai_11:String}
+          ) AS first_bucket
+          SELECT first_bucket + toIntervalSecond(number * {genai_12:Int64}) AS bucket
           FROM numbers(
             toUInt64(
-              ceil(
-                (
-                  toUnixTimestamp(toDateTime({genai_10:Float64}, {genai_11:String})) -
-                  toUnixTimestamp(
-                    toStartOfInterval(
-                      toDateTime({genai_9:Float64}, {genai_11:String}),
-                      INTERVAL 3600 SECOND,
-                      {genai_11:String}
-                    )
-                  )
-                ) / {genai_12:Float64}
-              )
+              intDiv(
+                dateDiff('second', first_bucket, toDateTime({genai_10:Float64}, {genai_11:String}), {genai_11:String}),
+                {genai_12:Int64}
+              ) + 1
             )
           )
           WHERE bucket < toDateTime({genai_10:Float64}, {genai_11:String})
@@ -347,25 +338,16 @@ def test_grouped_stats_query_full_sql_shape() -> None:
 
     expected_sql = """
         WITH all_buckets AS (
-          SELECT toStartOfInterval(
-            toDateTime({genai_5:Float64}, {genai_7:String}),
-            INTERVAL 3600 SECOND,
-            {genai_7:String}
-          ) + toIntervalSecond(number * {genai_8:Int64}) AS bucket
+          WITH toStartOfInterval(
+            toDateTime({genai_5:Float64}, {genai_7:String}), INTERVAL 3600 SECOND, {genai_7:String}
+          ) AS first_bucket
+          SELECT first_bucket + toIntervalSecond(number * {genai_8:Int64}) AS bucket
           FROM numbers(
             toUInt64(
-              ceil(
-                (
-                  toUnixTimestamp(toDateTime({genai_6:Float64}, {genai_7:String})) -
-                  toUnixTimestamp(
-                    toStartOfInterval(
-                      toDateTime({genai_5:Float64}, {genai_7:String}),
-                      INTERVAL 3600 SECOND,
-                      {genai_7:String}
-                    )
-                  )
-                ) / {genai_8:Float64}
-              )
+              intDiv(
+                dateDiff('second', first_bucket, toDateTime({genai_6:Float64}, {genai_7:String}), {genai_7:String}),
+                {genai_8:Int64}
+              ) + 1
             )
           )
           WHERE bucket < toDateTime({genai_6:Float64}, {genai_7:String})
@@ -466,9 +448,20 @@ def test_basic_stats_query_uses_query_filter_and_bucket() -> None:
     src_sql, src_params = _attr_src(4, started_after=start, started_before=end)
     expected_sql = """
         WITH all_buckets AS
-          (SELECT toStartOfInterval(toDateTime({genai_9:Float64}, {genai_11:String}), INTERVAL 3600 SECOND, {genai_11:String}) + toIntervalSecond(number * {genai_12:Int64}) AS bucket
-           FROM numbers(toUInt64(ceil((toUnixTimestamp(toDateTime({genai_10:Float64}, {genai_11:String})) - toUnixTimestamp(toStartOfInterval(toDateTime({genai_9:Float64}, {genai_11:String}), INTERVAL 3600 SECOND, {genai_11:String}))) / {genai_12:Float64})))
-           WHERE bucket < toDateTime({genai_10:Float64}, {genai_11:String}) ),
+          (
+          WITH toStartOfInterval(
+            toDateTime({genai_9:Float64}, {genai_11:String}), INTERVAL 3600 SECOND, {genai_11:String}
+          ) AS first_bucket
+          SELECT first_bucket + toIntervalSecond(number * {genai_12:Int64}) AS bucket
+          FROM numbers(
+            toUInt64(
+              intDiv(
+                dateDiff('second', first_bucket, toDateTime({genai_10:Float64}, {genai_11:String}), {genai_11:String}),
+                {genai_12:Int64}
+              ) + 1
+            )
+          )
+          WHERE bucket < toDateTime({genai_10:Float64}, {genai_11:String}) ),
              filtered_spans AS
           (SELECT *
            FROM {_ATTR_SRC} s
@@ -744,9 +737,20 @@ def test_group_by_custom_attr_and_metric_custom_attr() -> None:
 
     expected_sql = """
         WITH all_buckets AS
-          (SELECT toStartOfInterval(toDateTime({genai_5:Float64}, {genai_7:String}), INTERVAL 3600 SECOND, {genai_7:String}) + toIntervalSecond(number * {genai_8:Int64}) AS bucket
-           FROM numbers(toUInt64(ceil((toUnixTimestamp(toDateTime({genai_6:Float64}, {genai_7:String})) - toUnixTimestamp(toStartOfInterval(toDateTime({genai_5:Float64}, {genai_7:String}), INTERVAL 3600 SECOND, {genai_7:String}))) / {genai_8:Float64})))
-           WHERE bucket < toDateTime({genai_6:Float64}, {genai_7:String}) ),
+          (
+          WITH toStartOfInterval(
+            toDateTime({genai_5:Float64}, {genai_7:String}), INTERVAL 3600 SECOND, {genai_7:String}
+          ) AS first_bucket
+          SELECT first_bucket + toIntervalSecond(number * {genai_8:Int64}) AS bucket
+          FROM numbers(
+            toUInt64(
+              intDiv(
+                dateDiff('second', first_bucket, toDateTime({genai_6:Float64}, {genai_7:String}), {genai_7:String}),
+                {genai_8:Int64}
+              ) + 1
+            )
+          )
+          WHERE bucket < toDateTime({genai_6:Float64}, {genai_7:String}) ),
              filtered_spans AS
           (SELECT *
            FROM spans s
@@ -832,9 +836,20 @@ def test_time_stats_apply_group_filters() -> None:
     src_sql, src_params = _attr_src(3, started_after=start, started_before=end)
     expected_sql = """
         WITH all_buckets AS
-          (SELECT toStartOfInterval(toDateTime({genai_8:Float64}, {genai_10:String}), INTERVAL 3600 SECOND, {genai_10:String}) + toIntervalSecond(number * {genai_11:Int64}) AS bucket
-           FROM numbers(toUInt64(ceil((toUnixTimestamp(toDateTime({genai_9:Float64}, {genai_10:String})) - toUnixTimestamp(toStartOfInterval(toDateTime({genai_8:Float64}, {genai_10:String}), INTERVAL 3600 SECOND, {genai_10:String}))) / {genai_11:Float64})))
-           WHERE bucket < toDateTime({genai_9:Float64}, {genai_10:String}) ),
+          (
+          WITH toStartOfInterval(
+            toDateTime({genai_8:Float64}, {genai_10:String}), INTERVAL 3600 SECOND, {genai_10:String}
+          ) AS first_bucket
+          SELECT first_bucket + toIntervalSecond(number * {genai_11:Int64}) AS bucket
+          FROM numbers(
+            toUInt64(
+              intDiv(
+                dateDiff('second', first_bucket, toDateTime({genai_9:Float64}, {genai_10:String}), {genai_10:String}),
+                {genai_11:Int64}
+              ) + 1
+            )
+          )
+          WHERE bucket < toDateTime({genai_9:Float64}, {genai_10:String}) ),
              filtered_spans AS
           (SELECT *
            FROM {_ATTR_SRC} s
