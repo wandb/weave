@@ -8,6 +8,7 @@ import base64
 import datetime
 import json
 import uuid
+from zoneinfo import ZoneInfo
 
 import pytest
 from opentelemetry.proto.common.v1.common_pb2 import InstrumentationScope, KeyValue
@@ -2075,6 +2076,91 @@ def test_agent_span_stats_ungrouped_metrics(ch_server):
     assert row["p95_duration_ms"] is not None
     assert row["count_true_errors"] == 1
     assert row["count_true_invocations"] == 1
+
+
+@pytest.mark.parametrize("grouped", [False, True])
+@pytest.mark.parametrize(
+    ("timezone", "first_day", "days", "partial_window"),
+    [
+        ("UTC", "2026-10-03", 1, False),
+        ("America/Los_Angeles", "2026-10-03", 1, False),
+        ("America/Los_Angeles", "2026-03-07", 1, False),
+        ("America/Los_Angeles", "2026-10-31", 1, True),
+        ("Asia/Kathmandu", "2026-10-03", 1, False),
+        ("Australia/Lord_Howe", "2026-10-03", 1, False),
+        ("America/Los_Angeles", "2026-03-07", 2, False),
+    ],
+)
+def test_agent_span_stats_calendar_day_buckets(
+    ch_server, grouped, timezone, first_day, days, partial_window
+):
+    project_id = _make_project_id("stats_calendar_days")
+    zone = ZoneInfo(timezone)
+    date = datetime.date.fromisoformat(first_day)
+    date -= datetime.timedelta(days=(date - datetime.date(1970, 1, 1)).days % days)
+    boundaries = [
+        datetime.datetime.combine(
+            date + datetime.timedelta(days=i * days), datetime.time(), zone
+        ).astimezone(datetime.timezone.utc)
+        for i in range(5)
+    ]
+    start = boundaries[0]
+    end = boundaries[-1]
+    if partial_window:
+        start += datetime.timedelta(hours=6)
+        end = boundaries[-2] + datetime.timedelta(hours=6)
+    timestamps = [
+        start - datetime.timedelta(seconds=1),
+        start,
+        boundaries[1] - datetime.timedelta(seconds=1),
+        boundaries[1],
+        end - datetime.timedelta(seconds=1),
+        end,
+    ]
+    _insert_spans(
+        ch_server.ch_client,
+        [
+            _make_span(
+                project_id,
+                started_at=timestamp,
+                ended_at=timestamp + datetime.timedelta(seconds=1),
+            )
+            for timestamp in timestamps
+        ],
+    )
+    group_by = (
+        [AgentGroupByRef(source="column", key="provider_name")] if grouped else []
+    )
+    res = ch_server.agent_spans_stats(
+        AgentSpanStatsReq(
+            project_id=project_id,
+            start=start,
+            end=end,
+            granularity=days * 86400,
+            timezone=timezone,
+            group_by=group_by,
+            metrics=[
+                AgentSpanStatsMetricSpec(
+                    alias="spans",
+                    value_type="datetime",
+                    value=AgentSpanValueRef(source="field", key="started_at"),
+                    aggregations=["count"],
+                )
+            ],
+        )
+    )
+    assert res.granularity == days * 86400
+    assert res.timezone == timezone
+    assert res.rows == [
+        {
+            "timestamp": timestamp.replace(tzinfo=None)
+            if timezone == "UTC"
+            else timestamp,
+            "count_spans": count,
+            **({"provider_name": "openai"} if grouped else {}),
+        }
+        for timestamp, count in zip(boundaries[:-1], [2, 1, 0, 1], strict=True)
+    ]
 
 
 def test_agent_span_stats_ungrouped_all_time(ch_server):
