@@ -76,6 +76,9 @@ _Important:_ For OpenAI Codex agents (most likely you!), your environment does n
 
 ## Codebase Structure
 
+Message search storage, retention, and migration are documented
+in [`weave/trace_server/agents/message-search.md`](weave/trace_server/agents/message-search.md).
+
 ### Main Components
 
 - `weave/` - Core implementation

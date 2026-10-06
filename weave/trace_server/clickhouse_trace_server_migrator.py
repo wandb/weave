@@ -179,6 +179,8 @@ ID_SHARDED_TABLES: dict[str, str] = {
     "call_parts": "id",
     "spans": "trace_id",
     "messages": "trace_id",
+    "message_occurrences": "trace_id",
+    "message_content": "project_id",
     # All insights APIs are project-scoped. Co-locate a project's vectors so
     # nearest-neighbor search and clustering do not fan out across shards.
     "intent_signatures": "project_id",

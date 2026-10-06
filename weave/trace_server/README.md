@@ -1,5 +1,7 @@
 # Trace Server
 
+- [Message search storage and rollout](agents/message-search.md)
+
 ## Example data flow for starting a call
 
 ```mermaid
