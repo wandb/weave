@@ -638,8 +638,8 @@ allow_indirect_imports = true
 # from weave.shared. Those rows left this list because the source is no longer
 # weave.trace_server. The coupling is real and not enforced here.
 ignore_imports = [
-  "weave.trace_server.isolated_client_executor -> weave.trace.context.weave_client_context",
-  "weave.trace_server.isolated_client_executor -> weave.trace.weave_client",
+  # isolated_client_executor is the alias on the old path; its row goes with it.
+  "weave.trace_server.isolated_client_executor -> weave.trace.isolated_client_executor",
   "weave.trace_server.workers.evaluate_model_worker.evaluate_model_worker -> weave.evaluation.eval",
   "weave.trace_server.workers.evaluate_model_worker.evaluate_model_worker -> weave.scorers.llm_as_a_judge_scorer",
   "weave.trace_server.workers.evaluate_model_worker.evaluate_model_worker -> weave.trace.context.weave_client_context",
