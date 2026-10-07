@@ -11,6 +11,9 @@ from weave.scorers import (
     [
         ("Morgan", "Hello my name is Morgan", True),
         ("Alice", "Hello my name is Bob", False),
+        ("", "Hello my name is Morgan", False),
+        (" ", "Hello my name is Morgan", False),
+        ("", "", False),
     ],
 )
 def test_string_match_scorer(output, target, expected_result):
