@@ -4,6 +4,7 @@ import threading
 from cachetools import LRUCache, TTLCache
 from clickhouse_connect.driver.client import Client as CHClient
 
+from weave.shared.tracing import _tracer
 from weave.trace_server.datadog import (
     set_current_span_dd_tags,
     set_root_span_dd_tags,
@@ -17,7 +18,6 @@ from weave.trace_server.project_version.types import (
     ReadTable,
     WriteTarget,
 )
-from weave.trace_server.tracing import _tracer
 
 logger = logging.getLogger(__name__)
 
