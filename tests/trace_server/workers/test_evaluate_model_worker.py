@@ -1,10 +1,14 @@
 import pytest
 
+from weave.evaluation import evaluate_model_worker
 from weave.trace.serialization.custom_objs import (
     KNOWN_TYPES,
     OP_CUSTOM_WEAVE_TYPE,
     SAFE_CUSTOM_WEAVE_TYPES,
     is_safe_to_decode,
+)
+from weave.trace_server.workers.evaluate_model_worker import (
+    evaluate_model_worker as evaluate_model_worker_legacy,
 )
 
 
@@ -42,3 +46,10 @@ def test_safe_custom_weave_types_in_sync():
     # SAFE_CUSTOM_WEAVE_TYPES, and OP_CUSTOM_WEAVE_TYPE is the lone code-loading type.
     # A newly added KNOWN_TYPE fails here until it is consciously placed on one side.
     assert SAFE_CUSTOM_WEAVE_TYPES | {OP_CUSTOM_WEAVE_TYPE} == set(KNOWN_TYPES)
+
+
+def test_trace_server_path_re_exports_the_same_object() -> None:
+    assert (
+        evaluate_model_worker_legacy.evaluate_model
+        is evaluate_model_worker.evaluate_model
+    )

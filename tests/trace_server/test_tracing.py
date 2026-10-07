@@ -1,4 +1,4 @@
-"""Unit tests for `weave.trace_server.tracing`.
+"""Unit tests for `weave.shared.tracing`.
 
 These tests use an isolated `TracerProvider` with an in-memory exporter so
 they don't depend on (or interfere with) any process-global tracer state.
@@ -18,8 +18,9 @@ from opentelemetry.sdk.trace.export.in_memory_span_exporter import (
 )
 from opentelemetry.trace.status import StatusCode
 
-from weave.trace_server import tracing
-from weave.trace_server.tracing import traced, traced_generator
+from weave.shared import tracing
+from weave.shared.tracing import traced, traced_generator
+from weave.trace_server import tracing as tracing_legacy
 
 
 @pytest.fixture
@@ -268,3 +269,7 @@ def test_nested_traced_calls_produce_parent_child_spans(
     outer_span = next(s for s in spans if s.name == "outer")
     assert inner_span.parent is not None
     assert inner_span.parent.span_id == outer_span.context.span_id
+
+
+def test_shared_tracing_is_the_same_module() -> None:
+    assert tracing_legacy is tracing

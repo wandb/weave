@@ -640,11 +640,9 @@ allow_indirect_imports = true
 ignore_imports = [
   # isolated_client_executor is the alias on the old path; its row goes with it.
   "weave.trace_server.isolated_client_executor -> weave.trace.isolated_client_executor",
-  "weave.trace_server.workers.evaluate_model_worker.evaluate_model_worker -> weave.evaluation.eval",
-  "weave.trace_server.workers.evaluate_model_worker.evaluate_model_worker -> weave.scorers.llm_as_a_judge_scorer",
-  "weave.trace_server.workers.evaluate_model_worker.evaluate_model_worker -> weave.trace.context.weave_client_context",
-  "weave.trace_server.workers.evaluate_model_worker.evaluate_model_worker -> weave.trace.refs",
-  "weave.trace_server.workers.evaluate_model_worker.evaluate_model_worker -> weave.trace.weave_client",
+  # evaluate_model_worker re-exports the body from the client side; its row goes
+  # with that re-export.
+  "weave.trace_server.workers.evaluate_model_worker.evaluate_model_worker -> weave.evaluation.evaluate_model_worker",
 ]
 
 [[tool.importlinter.contracts]]
@@ -709,9 +707,7 @@ allow_indirect_imports = true
 # These also appear in the trace_server -> client contract above (workers are a
 # subpackage of trace_server); both must clear before either ignore is removed.
 ignore_imports = [
-  "weave.trace_server.workers.evaluate_model_worker.evaluate_model_worker -> weave.evaluation.eval",
-  "weave.trace_server.workers.evaluate_model_worker.evaluate_model_worker -> weave.scorers.llm_as_a_judge_scorer",
-  "weave.trace_server.workers.evaluate_model_worker.evaluate_model_worker -> weave.trace.context.weave_client_context",
-  "weave.trace_server.workers.evaluate_model_worker.evaluate_model_worker -> weave.trace.refs",
-  "weave.trace_server.workers.evaluate_model_worker.evaluate_model_worker -> weave.trace.weave_client",
+  # evaluate_model_worker re-exports the body from the client side; its row goes
+  # with that re-export.
+  "weave.trace_server.workers.evaluate_model_worker.evaluate_model_worker -> weave.evaluation.evaluate_model_worker",
 ]
