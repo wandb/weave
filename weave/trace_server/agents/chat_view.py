@@ -599,6 +599,10 @@ class ChatTraversal:
             node, nearest_agent=agent_name, depth=depth
         )
         msg = _emit_assistant_message(span, agent_name)
+        if msg is not None and _repeats_subtree_error(
+            msg, self.messages[child_message_start:]
+        ):
+            msg = None
         if msg is None:
             if self.include_model_tool_calls:
                 self.messages.extend(
@@ -1457,6 +1461,26 @@ def _ordered_model_output(
         messages.append(assistant_event)
 
     return messages
+
+
+def _repeats_subtree_error(
+    msg: AgentChatMessage, subtree_messages: list[AgentChatMessage]
+) -> bool:
+    """Whether ``msg`` is an empty ERROR card for an error its subtree already shows.
+
+    A wrapper span, such as a LangGraph node around a tool that raised, ends
+    in ERROR because the error propagated through it. The failed descendant's
+    message already carries the error, so a second empty card adds nothing.
+    """
+    assistant = msg.assistant_message
+    return (
+        msg.status_code == "ERROR"
+        and assistant is not None
+        and not assistant.text
+        and not assistant.reasoning_content
+        and not assistant.content_refs
+        and any(m.status_code == "ERROR" for m in subtree_messages)
+    )
 
 
 def _emit_assistant_message(

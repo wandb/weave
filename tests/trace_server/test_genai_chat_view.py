@@ -1249,6 +1249,47 @@ def test_contentless_error_span_emits_assistant_message() -> None:
     assert _assistant_payload(error_message).status == "ERROR"
 
 
+def test_wrapper_span_adds_no_error_card_when_its_subtree_shows_the_error() -> None:
+    """A LangGraph `tools` node ends in ERROR because the tool inside it raised."""
+    error = "ValueError('Unknown city: Atlantis')"
+    spans = [
+        _span(
+            span_id="agent",
+            operation_name="invoke_agent",
+            agent_name="LangGraph",
+            input_messages=[{"role": "user", "content": "Weather in Atlantis?"}],
+            status_code="ERROR",
+            status_message=error,
+        ),
+        _span(
+            span_id="node",
+            parent_span_id="agent",
+            operation_name="",
+            span_name="tools",
+            status_code="ERROR",
+            status_message=error,
+        ),
+        _span(
+            span_id="tool",
+            parent_span_id="node",
+            operation_name="execute_tool",
+            tool_name="get_weather",
+            tool_call_arguments="Atlantis",
+            status_code="ERROR",
+            status_message=error,
+        ),
+    ]
+
+    messages = build_chat_messages(spans)
+
+    assert [(m.type, m.span_id, m.status_code) for m in messages] == [
+        ("user_message", None, None),
+        ("agent_start", "agent", "ERROR"),
+        ("tool_call", "tool", "ERROR"),
+        ("assistant_message", "agent", "ERROR"),
+    ]
+
+
 def test_subagent_spans_render_inline_with_agent_label_inheritance() -> None:
     def at(seconds: int) -> datetime.datetime:
         return datetime.datetime(
