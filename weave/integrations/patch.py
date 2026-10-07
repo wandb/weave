@@ -14,7 +14,6 @@ import threading
 from collections.abc import Callable
 from importlib.abc import MetaPathFinder
 
-from weave.integrations.typesafe.typesafe_sdk import set_capture_content
 from weave.trace.autopatch import IntegrationSettings
 from weave.trace.settings import should_use_otel_v2
 
@@ -398,6 +397,8 @@ def patch_typesafe(
     ``include_content=False`` still drops content.
     """
     if capture_content is not None:
+        from weave.integrations.typesafe.typesafe_sdk import set_capture_content
+
         set_capture_content(capture_content)
     _patch_integration(
         module_path="weave.integrations.typesafe.typesafe_sdk",
