@@ -390,13 +390,7 @@ def patch_autogen(settings: IntegrationSettings | None = None) -> None:
 def patch_typesafe(
     settings: IntegrationSettings | None = None, *, capture_content: bool | None = None
 ) -> None:
-    """Enable spans for TypeSafe ``system_one`` calls.
-
-    One call becomes one chat span under the current Turn, or under a small
-    synthetic turn when nothing else is active. This does not create a Weave
-    Call. A ``weave.parent_call.*`` link on a surrounding ``@weave.op`` is not
-    an OTel parent. Do not enable this together with another TypeSafe
-    instrumentor; pick one.
+    """Record each TypeSafe ``system_one`` call as one chat span, not a Weave Call.
 
     ``capture_content`` sets the process default for state, questions, and
     answers. When omitted, ``OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT``

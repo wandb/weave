@@ -262,12 +262,8 @@ without a marker filter so both tracing paths contribute coverage.
 TypeSafe `system_one` tests live in `tests/integrations/typesafe/` and mock
 the SDK's HTTP transport. They do not use the trace server. PR CI runs
 `tests-3.13(shard='typesafe')` once, without `-m trace_server` and without
-starting ClickHouse. The optional extra is `typesafe`
-(`typesafe-sdk>=0.7.0,<0.8.0`). Locally:
-`uv run --extra typesafe --group test python -m pytest tests/integrations/typesafe/`.
-The Node tests are `sdks/node/src/__tests__/integrations/typesafe.test.ts`
-(`pnpm test` in `sdks/node`). `@typesafe-ai/sdk` is a devDependency, so
-importing Weave does not require it.
+starting ClickHouse. Node tests are
+`sdks/node/src/__tests__/integrations/typesafe.test.ts`.
 Calls-based tests must include the integration's intentional text and thinking
 child calls in exact operation-set assertions.
 
