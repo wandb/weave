@@ -720,7 +720,10 @@ deterministic.
   non-error spans remain raw-only.
 - Content spans with `ERROR` status emit a chat message even without text or
   reasoning so the conversation timeline retains the failure. Successful empty
-  tool-calling steps remain omitted.
+  tool-calling steps remain omitted. A wrapper's empty error card is dropped
+  when its subtree already shows the same error: the same type and status
+  message, minus the Python traceback LangChain appends, which grows at each
+  level the error passes through.
 - Use the Trace tree view for parentage comparisons. The default flamegraph
   collapses overlapping siblings into synthetic groups, which can make flat
   and nested traces look deceptively similar; give live-example spans realistic

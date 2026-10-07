@@ -1249,17 +1249,32 @@ def test_contentless_error_span_emits_assistant_message() -> None:
     assert _assistant_payload(error_message).status == "ERROR"
 
 
-def test_wrapper_span_adds_no_error_card_when_its_subtree_shows_the_error() -> None:
-    """A LangGraph `tools` node ends in ERROR because the tool inside it raised."""
-    error = "ValueError('Unknown city: Atlantis')"
-    spans = [
+def _langchain_run_error(*files: str) -> str:
+    """A LangChain run error: `repr(error)`, then a traceback through ``files``."""
+    frames = "".join(f'\n\n  File "{file}", line 1, in run\n' for file in files)
+    return (
+        "ValueError('Unknown city: Atlantis')Traceback (most recent call last):"
+        f"{frames}\n\nValueError: Unknown city: Atlantis"
+    )
+
+
+_TURN_ERROR = ("ValueError", _langchain_run_error("main.py", "tool_node.py", "base.py"))
+_TOOL_ERROR = ("ValueError", _langchain_run_error("base.py"))
+
+
+def _failed_tool_turn(
+    node_error: tuple[str, str], tool_error: tuple[str, str]
+) -> list[AgentSpanSchema]:
+    """A LangGraph turn whose `tools` node ends in ERROR around a tool that raised."""
+    return [
         _span(
             span_id="agent",
             operation_name="invoke_agent",
             agent_name="LangGraph",
             input_messages=[{"role": "user", "content": "Weather in Atlantis?"}],
             status_code="ERROR",
-            status_message=error,
+            error_type=_TURN_ERROR[0],
+            status_message=_TURN_ERROR[1],
         ),
         _span(
             span_id="node",
@@ -1267,7 +1282,8 @@ def test_wrapper_span_adds_no_error_card_when_its_subtree_shows_the_error() -> N
             operation_name="",
             span_name="tools",
             status_code="ERROR",
-            status_message=error,
+            error_type=node_error[0],
+            status_message=node_error[1],
         ),
         _span(
             span_id="tool",
@@ -1276,9 +1292,16 @@ def test_wrapper_span_adds_no_error_card_when_its_subtree_shows_the_error() -> N
             tool_name="get_weather",
             tool_call_arguments="Atlantis",
             status_code="ERROR",
-            status_message=error,
+            error_type=tool_error[0],
+            status_message=tool_error[1],
         ),
     ]
+
+
+def test_wrapper_span_adds_no_error_card_when_its_subtree_shows_the_error() -> None:
+    """The node's error is the tool's, with a traceback one frame longer."""
+    node_error = ("ValueError", _langchain_run_error("tool_node.py", "base.py"))
+    spans = _failed_tool_turn(node_error, _TOOL_ERROR)
 
     messages = build_chat_messages(spans)
 
@@ -1287,6 +1310,31 @@ def test_wrapper_span_adds_no_error_card_when_its_subtree_shows_the_error() -> N
         ("agent_start", "agent", "ERROR"),
         ("tool_call", "tool", "ERROR"),
         ("assistant_message", "agent", "ERROR"),
+    ]
+
+
+@pytest.mark.parametrize(
+    ("node_error", "tool_error"),
+    [
+        (("OutputParserException", "Invalid final JSON"), _TOOL_ERROR),
+        (("ValueError", "ValueError('Invalid final JSON')"), _TOOL_ERROR),
+        (("", ""), ("", "")),
+    ],
+    ids=["other-type", "other-message", "no-details"],
+)
+def test_wrapper_span_keeps_its_error_card_for_another_error(
+    node_error: tuple[str, str], tool_error: tuple[str, str]
+) -> None:
+    spans = _failed_tool_turn(node_error, tool_error)
+
+    messages = build_chat_messages(spans)
+
+    assert [(m.type, m.span_id, m.error_type, m.status_message) for m in messages] == [
+        ("user_message", None, None, None),
+        ("agent_start", "agent", *_TURN_ERROR),
+        ("tool_call", "tool", *tool_error),
+        ("assistant_message", "node", *node_error),
+        ("assistant_message", "agent", *_TURN_ERROR),
     ]
 
 

@@ -71,6 +71,8 @@ _MEDIA_PART_TYPES = {"uri", "blob", "file"}
 _INTERNAL_REF_PREFIX = f"{WEAVE_INTERNAL_SCHEME}:///"
 # Bound recursive decoding of nested JSON strings as well as containers.
 _MAX_REF_SEARCH_DEPTH = 8
+# LangChain run errors are repr(error) plus a traceback that grows at each level.
+_TRACEBACK_HEADER = "Traceback (most recent call last):"
 
 
 # ---------------------------------------------------------------------------
@@ -1471,16 +1473,28 @@ def _repeats_subtree_error(
     A wrapper span, such as a LangGraph node around a tool that raised, ends
     in ERROR because the error propagated through it. The failed descendant's
     message already carries the error, so a second empty card adds nothing.
+    A different error, or one with no type or message, keeps its card.
     """
     assistant = msg.assistant_message
+    error = _error_identity(msg)
     return (
         msg.status_code == "ERROR"
         and assistant is not None
         and not assistant.text
         and not assistant.reasoning_content
         and not assistant.content_refs
-        and any(m.status_code == "ERROR" for m in subtree_messages)
+        and any(error)
+        and any(
+            m.status_code == "ERROR" and _error_identity(m) == error
+            for m in subtree_messages
+        )
     )
+
+
+def _error_identity(msg: AgentChatMessage) -> tuple[str, str]:
+    """A message's error type and status message, without a Python traceback."""
+    status_message = (msg.status_message or "").partition(_TRACEBACK_HEADER)[0]
+    return msg.error_type or "", status_message.strip()
 
 
 def _emit_assistant_message(
