@@ -108,7 +108,9 @@ in-process and credential persistence emits one warning per credentials object.
 
 Generate implicit cost `created_at` values in UTC because insertion interprets naive checkpoint timestamps as UTC.
 
-Note: the scripts read `modelsBegin.json`/`modelsFinal.json`, which are symlinks into wandb/core and only resolve when this repo is checked out as the submodule inside wandb/core. During the submodule path migration, check wandb/core's `.gitmodules`: the path may be `services/weave-python/weave-public` or `services/weave-trace/weave-public`.
+Note: the scripts read `modelsBegin.json`/`modelsFinal.json`, which are symlinks
+into wandb/core and only resolve when this repo is checked out as the submodule
+at `services/weave-trace/weave-public`.
 
 `weave/vendor/weave_server_sdk/` is the generated Weave Trace API client, copied
 in from wandb/core rather than depended on because it is not published to PyPI.

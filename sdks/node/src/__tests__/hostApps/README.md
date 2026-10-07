@@ -63,8 +63,6 @@ The host apps are real, runnable projects. To debug outside Jest:
 
 ```sh
 # in one shell, start the mock on a known port:
-cd services/weave-python/weave-public/trace_server_mock
-# or, after the core submodule path moves:
 cd services/weave-trace/weave-public/trace_server_mock
 uv run python -m trace_server_mock --port=6346
 
