@@ -22,13 +22,9 @@ uv run python -m trace_server_mock --port=0          # ephemeral port; prints UR
 uv run python -m trace_server_mock --port=6346       # fixed port
 ```
 
-Or from the wandb/core repository root using its weave-public submodule. During
-the submodule path migration, use whichever path is present in `.gitmodules`:
+Or from the wandb/core repository root using its weave-public submodule:
 
 ```
-uv run --project services/weave-python/weave-public/trace_server_mock \
-    python -m trace_server_mock --port=0
-
 uv run --project services/weave-trace/weave-public/trace_server_mock \
     python -m trace_server_mock --port=0
 ```
