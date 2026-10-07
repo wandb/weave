@@ -1346,6 +1346,27 @@ def test_signature_cluster_tables_schema_and_retry(ch_client):
     ).result_rows == [(1.2, 0.6)]
 
 
+def test_signature_vectors_collapse_per_wording_and_space(ch_client):
+    """A re-embed of one wording replaces its vector; another space keeps its own."""
+    target_db = _migrate_signatures_db(ch_client, "signature_vectors")
+
+    # Separate inserts, because now64() is evaluated once per block and ties on version.
+    for space, value in (("space-a", 1), ("space-a", 2), ("space-b", 3)):
+        ch_client.command(
+            f"INSERT INTO {target_db}.signature_vectors "
+            "(project_id, signature_type, space, signature, vector) "
+            f"VALUES ('project-1', 'intent', '{space}', 'fix the bug', [{value}])"
+        )
+
+    assert ch_client.query(
+        "SELECT space, argMax(vector, inserted_at), "
+        "round(dateDiff('second', argMax(inserted_at, inserted_at), "
+        "argMax(expire_at, inserted_at)) / 86400) "
+        f"FROM {target_db}.signature_vectors WHERE project_id = 'project-1' "
+        "GROUP BY project_id, signature_type, space, signature ORDER BY space"
+    ).result_rows == [("space-a", [2.0], 30), ("space-b", [3.0], 30)]
+
+
 def test_migration_client_timeout_outlasts_replicated_ddl(ch_keeper_server):
     """A client minted with the production migration timeout runs a full
     replicated migration and carries the incident-fixing HTTP read timeout.
