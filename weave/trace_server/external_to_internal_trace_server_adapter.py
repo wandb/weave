@@ -5,9 +5,9 @@ from typing import Any, TypeVar
 
 from opentelemetry.proto.common.v1.common_pb2 import AnyValue, KeyValue
 
+from weave.shared.validation import validate_calls_query_costs_limit
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.async_clickhouse_trace_server import AsyncClickHouseTraceServer
-from weave.trace_server.errors import InvalidRequest
 from weave.trace_server.trace_server_converter import (
     replace_external_weave_ref,
     universal_ext_to_int_ref_converter,
@@ -152,19 +152,6 @@ class IdConverter:
 
 A = TypeVar("A")
 B = TypeVar("B")
-
-
-def _validate_calls_query_costs_limit(req: tsi.CallsQueryReq) -> None:
-    if (
-        req.include_costs is True
-        and req.limit is None
-        and not (req.filter is not None and req.filter.call_ids)
-    ):
-        raise InvalidRequest(
-            "Calls queries with include_costs=true require a limit unless non-empty "
-            "call_ids are provided. Read larger result sets in pages; 1000 is the "
-            "recommended page size."
-        )
 
 
 class ExternalTraceServer(tsi.FullTraceServerInterface):
@@ -423,7 +410,7 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
         return int_run_ids
 
     def calls_query(self, req: tsi.CallsQueryReq) -> tsi.CallsQueryRes:
-        _validate_calls_query_costs_limit(req)
+        validate_calls_query_costs_limit(req)
         req = req.model_copy(deep=True)
         original_project_id = req.project_id
         req.project_id = self._idc.ext_to_int_project_id(original_project_id)
@@ -462,7 +449,7 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
         return res
 
     def calls_query_stream(self, req: tsi.CallsQueryReq) -> Iterator[tsi.CallSchema]:
-        _validate_calls_query_costs_limit(req)
+        validate_calls_query_costs_limit(req)
         req = req.model_copy(deep=True)
         original_project_id = req.project_id
         req.project_id = self._idc.ext_to_int_project_id(original_project_id)

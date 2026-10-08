@@ -376,18 +376,19 @@ def test_cost_query_rejects_oversized_pages(
     trace_server: tsi.FullTraceServerInterface, stream: bool, limit: int
 ) -> None:
     req = tsi.CallsQueryReq(
-        project_id="test-entity/test-project", include_costs=True, limit=limit
+        project_id="shawn/test-project", include_costs=True, limit=limit
     )
-    with pytest.raises(InvalidRequest, match="10001"):
-        if stream:
+    if stream:
+        with pytest.raises(InvalidRequest, match="10001"):
             list(trace_server.calls_query_stream(req))
-        else:
+    else:
+        with pytest.raises(InvalidRequest, match="10001"):
             trace_server.calls_query(req)
 
 
 @pytest.mark.parametrize("stream", [False, True])
 @pytest.mark.parametrize(
-    "include_costs,limit,call_ids",
+    ("include_costs", "limit", "call_ids"),
     [(True, 10_001, None), (False, 10_002, None), (True, 10_002, ["call-1"])],
 )
 def test_cost_query_accepts_supported_pages(
@@ -398,7 +399,7 @@ def test_cost_query_accepts_supported_pages(
     call_ids: list[str] | None,
 ) -> None:
     req = tsi.CallsQueryReq(
-        project_id="test-entity/test-project",
+        project_id="shawn/test-project",
         include_costs=include_costs,
         limit=limit,
         filter=tsi.CallsFilter(call_ids=call_ids),
