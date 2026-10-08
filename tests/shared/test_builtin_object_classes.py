@@ -9,7 +9,7 @@ from weave.shared.interface.builtin_object_classes import (
     saved_view,
     test_only_example,
 )
-from weave.trace.object_record import class_all_bases_names
+from weave.trace.object_record import class_all_bases_names, pydantic_object_record
 from weave.trace_server.interface.builtin_object_classes import (
     annotation_spec as annotation_spec_legacy,
 )
@@ -63,6 +63,9 @@ def test_llm_structured_model_schema_matches_the_sdk_model() -> None:
         llm_structured_model.LLMStructuredCompletionModel.model_json_schema()
         == llm_structured_model_sdk.LLMStructuredCompletionModel.model_json_schema()
     )
-    assert list(
-        llm_structured_model.LLMStructuredCompletionModel._weave_serialized_bases
-    ) == class_all_bases_names(llm_structured_model_sdk.LLMStructuredCompletionModel)
+    record = pydantic_object_record(
+        llm_structured_model.LLMStructuredCompletionModel(llm_model_id="gpt-4o")
+    )
+    assert record._bases == class_all_bases_names(
+        llm_structured_model_sdk.LLMStructuredCompletionModel
+    )
