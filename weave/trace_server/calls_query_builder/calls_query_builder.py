@@ -3084,7 +3084,9 @@ def build_calls_stats_query(
     #     req = req.model_copy(update={"limit": DEFAULT_STATS_MAX_LIMIT})
     if req.limit is not None:
         aggregated_columns["has_more"] = f"toUInt8(count() >= {req.limit})"
-        settings["optimize_aggregation_in_order"] = 1
+
+    # Stream grouped counts in table order even when every call must be counted.
+    settings["optimize_aggregation_in_order"] = 1
 
     cq = _build_stats_calls_query(req, read_table)
     inner_query = cq.as_sql(param_builder)

@@ -5065,7 +5065,9 @@ def test_stats_query_calls_merged_with_expand_columns_falls_back_to_group_by() -
     )
 
 
-@pytest.mark.parametrize("read_table", [ReadTable.CALLS_MERGED, ReadTable.CALLS_COMPLETE])
+@pytest.mark.parametrize(
+    "read_table", [ReadTable.CALLS_MERGED, ReadTable.CALLS_COMPLETE]
+)
 @pytest.mark.parametrize("limit", [None, 5])
 @pytest.mark.parametrize("include_total_storage_size", [False, True])
 def test_stats_query_aggregation_settings(
@@ -5077,7 +5079,9 @@ def test_stats_query_aggregation_settings(
         include_total_storage_size=include_total_storage_size,
         filter=tsi.CallsFilter(op_names=["my_op"]),
     )
-    _query, columns, settings = build_calls_stats_query(req, ParamBuilder("pb"), read_table)
+    _query, columns, settings = build_calls_stats_query(
+        req, ParamBuilder("pb"), read_table
+    )
     assert settings == (
         {"optimize_aggregation_in_order": 1}
         if read_table == ReadTable.CALLS_MERGED

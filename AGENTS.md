@@ -201,6 +201,9 @@ If `sdks/node/node_modules` is missing, run `pnpm install --frozen-lockfile` in 
 
 ### Current logical calls
 
+- Grouped `calls_merged` stats queries must enable `optimize_aggregation_in_order`
+  even without a caller limit. Keep their exact count, deletion, orphan, and
+  storage semantics; the flat optimized and `calls_complete` paths are separate.
 - `calls_complete` uses `ReplacingMergeTree(created_at)`, so more than one
   physical version of a call can remain visible until background merges run.
 - Set `CallsQueryReq.latest_only=True` when correctness requires filtering the
