@@ -11,7 +11,7 @@ import {
 import {computeDigest} from './digest';
 import {asHttpResponse, throwAsHttpResponse} from './httpResponse';
 import type {
-  AgentChatMessage as AgentChatMessageSchema,
+  AgentChatMessage,
   AgentSearchConversationResult,
   AgentTraceChatRes,
   AgentSchema,
@@ -128,7 +128,7 @@ export interface GetCallsOptions {
 
 export type Agent = AgentSchema;
 export type AgentConversationSearchResult = AgentSearchConversationResult;
-export type AgentMessage = AgentChatMessageSchema;
+export type AgentMessage = AgentChatMessage;
 export type AgentSpan = AgentSpanSchema;
 export type AgentTurn = AgentTraceChatRes;
 export type AgentVersion = AgentVersionSchema;
