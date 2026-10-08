@@ -16,7 +16,7 @@ def make_project_stats_query(
     Args:
         project_id: The project ID to query stats for.
         pb: ParamBuilder instance for parameterized query construction.
-        include_trace_storage_size: Include trace storage size in results.
+        include_trace_storage_size: Include call and agent span storage size in results.
         include_objects_storage_size: Include objects storage size in results.
         include_tables_storage_size: Include tables storage size in results.
         include_files_storage_size: Include files storage size in results.
@@ -46,10 +46,14 @@ def make_project_stats_query(
     sub_sqls = []
     if include_trace_storage_size:
         columns.append("trace_storage_size_bytes")
+        # Agent span bytes live in `spans_stats`, which no calls stats table counts.
         sub_sqls.append(
             f"""
             (SELECT sum({table_config.storage_size_bytes_sum})
                 FROM {calls_stats_table}
+                WHERE project_id = {{{project_id_param}: String}}
+            ) + (SELECT sum(size_bytes)
+                FROM spans_stats
                 WHERE project_id = {{{project_id_param}: String}}
             ) AS {columns[-1]}
             """

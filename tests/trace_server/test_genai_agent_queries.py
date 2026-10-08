@@ -2513,6 +2513,25 @@ def test_agents_mv_aggregation(ch_server):
     assert agent.total_output_tokens == 190
 
 
+def test_project_stats_trace_storage_counts_agent_spans(ch_server):
+    """Agent span bytes add to trace storage for their own project only."""
+    project_id = _make_project_id("span_storage")
+    other_project_id = _make_project_id("span_storage_other")
+    stats_req = tsi.ProjectStatsReq(project_id=project_id)
+    assert ch_server.project_stats(stats_req).trace_storage_size_bytes == 0
+
+    _insert_spans(
+        ch_server.ch_client,
+        [
+            _make_span(project_id, raw_span_dump="a" * 1200),
+            _make_span(project_id, raw_span_dump="b" * 3400),
+            _make_span(other_project_id, raw_span_dump="c" * 9000),
+        ],
+    )
+
+    assert ch_server.project_stats(stats_req).trace_storage_size_bytes == 4600
+
+
 def test_agents_mv_zero_duration_when_ended_at_unset(ch_server):
     """A span inserted without ended_at (defaults to epoch) must contribute
     0 to total_duration_ms rather than wrapping via UInt64 cast to ~2^64.

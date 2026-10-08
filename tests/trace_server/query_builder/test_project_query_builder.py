@@ -53,6 +53,9 @@ class TestMakeProjectStatsQuery:
                     )
                     FROM calls_merged_stats
                     WHERE project_id = {pb_0: String}
+                ) + (SELECT sum(size_bytes)
+                    FROM spans_stats
+                    WHERE project_id = {pb_0: String}
                 ) AS trace_storage_size_bytes
         """
         assert_sql(query, expected_sql, pb.get_params(), {"pb_0": "test_project"})
@@ -81,6 +84,9 @@ class TestMakeProjectStatsQuery:
                     COALESCE(otel_size_bytes, 0)
                     )
                     FROM calls_complete_stats
+                    WHERE project_id = {pb_0: String}
+                ) + (SELECT sum(size_bytes)
+                    FROM spans_stats
                     WHERE project_id = {pb_0: String}
                 ) AS trace_storage_size_bytes
         """
@@ -177,6 +183,9 @@ class TestMakeProjectStatsQuery:
                     )
                     FROM calls_merged_stats
                     WHERE project_id = {pb_0: String}
+                ) + (SELECT sum(size_bytes)
+                    FROM spans_stats
+                    WHERE project_id = {pb_0: String}
                 ) AS trace_storage_size_bytes,
                 (SELECT sum(size_bytes)
                     FROM object_versions_stats
@@ -222,6 +231,9 @@ class TestMakeProjectStatsQuery:
                     COALESCE(otel_size_bytes, 0)
                     )
                     FROM calls_complete_stats
+                    WHERE project_id = {pb_0: String}
+                ) + (SELECT sum(size_bytes)
+                    FROM spans_stats
                     WHERE project_id = {pb_0: String}
                 ) AS trace_storage_size_bytes,
                 (SELECT sum(size_bytes)
@@ -280,6 +292,9 @@ class TestMakeProjectStatsQuery:
                     COALESCE(otel_dump_size_bytes, 0)
                     )
                     FROM calls_merged_stats
+                    WHERE project_id = {pb_0: String}
+                ) + (SELECT sum(size_bytes)
+                    FROM spans_stats
                     WHERE project_id = {pb_0: String}
                 ) AS trace_storage_size_bytes
         """
