@@ -14,6 +14,8 @@ from typing import Any
 from unittest.mock import MagicMock
 
 import pytest
+from opentelemetry.proto.common.v1.common_pb2 import AnyValue, KeyValue
+from opentelemetry.proto.trace.v1.trace_pb2 import Span as PbSpan
 
 from weave.trace_server.agents import semconv
 from weave.trace_server.credential_redaction import REDACTED_VALUE
@@ -451,6 +453,35 @@ def test_extract_custom_attrs_truncates_large_json_values() -> None:
     stored = result.custom_attrs_string["lorem.big_list"]
     assert len(stored) <= MAX_CUSTOM_ATTR_VALUE_CHARS
     assert "truncated from" in stored
+
+
+def test_extract_custom_attrs_skips_json_values_of_known_keys() -> None:
+    """Parsing decodes JSON strings into dicts. A known key's decoded value
+    stays out of custom attrs; flattening tool-call payloads would add one
+    custom attribute per payload field. Unknown keys still flatten.
+    """
+    pb_span = PbSpan(
+        trace_id=bytes(range(1, 17)),
+        span_id=bytes(range(1, 9)),
+        name="execute_tool edit_settings",
+        attributes=[
+            KeyValue(key=key, value=AnyValue(string_value=value))
+            for key, value in {
+                "gen_ai.operation.name": "execute_tool",
+                "gen_ai.tool.call.arguments": '{"controls": {"tone": 0.5}}',
+                "gen_ai.tool.call.result": '{"files": {"a.json": {"ok": true}}}',
+                "app.payload": '{"region": "us"}',
+            }.items()
+        ],
+    )
+    result = extract_genai_span(Span.from_proto(pb_span), project_id="p1")
+
+    assert result.tool_call_arguments == '{"controls": {"tone": 0.5}}'
+    assert result.tool_call_result == '{"files": {"a.json": {"ok": true}}}'
+    assert result.custom_attrs_string == {"app.payload.region": "us"}
+    assert result.custom_attrs_int == {}
+    assert result.custom_attrs_float == {}
+    assert result.custom_attrs_bool == {}
 
 
 def test_extract_custom_attrs_routes_bool_to_bool_map() -> None:

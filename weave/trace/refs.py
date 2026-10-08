@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING, Any, cast
 
 from typing_extensions import Self
 
-from weave.shared import refs_internal
+from weave.shared import refs, refs_internal
 from weave.shared.refs_internal import CallableProperty
 
 if TYPE_CHECKING:
@@ -181,13 +181,7 @@ class RefWithExtra(Ref):
 
 
 @dataclass(frozen=True)
-class ObjectRef(RefWithExtra):
-    entity: str
-    project: str
-    name: str
-    _digest: str | Future[str]
-    _extra: tuple[str | Future[str], ...] = ()
-
+class ObjectRef(RefWithExtra, refs.ObjectRef):
     def as_param_dict(self) -> dict:
         return {
             "entity": self.entity,
@@ -224,14 +218,6 @@ class ObjectRef(RefWithExtra):
     @property
     def is_digest_resolved(self) -> bool:
         return not isinstance(self._digest, Future)
-
-    def __post_init__(self) -> None:
-        if isinstance(self._digest, str):
-            refs_internal.validate_no_slashes(self._digest, "digest")
-            refs_internal.validate_no_colons(self._digest, "digest")
-
-        refs_internal.validate_no_slashes(self.name, "name")
-        refs_internal.validate_no_colons(self.name, "name")
 
     @CallableProperty
     def uri(self) -> str:
