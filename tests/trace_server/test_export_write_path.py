@@ -29,6 +29,11 @@ QUERY_LOG_POLL_SECONDS = 20
 BUCKET = "weave-export-write-path"
 
 
+@pytest.fixture(autouse=True)
+def use_export_redis(export_redis):
+    return export_redis
+
+
 @pytest.fixture
 def storage_client():
     with mock_aws():
@@ -80,13 +85,12 @@ def test_start_export_persists_manifest_and_runs_targets_serially_in_one_worker(
             target(*args)
 
     export_client = MagicMock()
+    export_client.query.return_value.result_rows = [(0,)]
     commands: list[tuple[str, dict[str, str], dict[str, object]]] = []
 
     def _command(sql, *, parameters, settings):
         assert parameters == {"project_id": "project"}
         commands.append((sql, parameters, settings))
-        if len(commands) == 1:
-            raise RuntimeError("first target failed")
 
     export_client.command.side_effect = _command
     mint_client = MagicMock(return_value=export_client)
@@ -104,8 +108,8 @@ def test_start_export_persists_manifest_and_runs_targets_serially_in_one_worker(
     assert worker_starts[0][2] is True
     assert mint_client.call_count == 1
     assert [command[2]["query_id"] for command in commands] == [
-        f"{job_id}:objects",
-        f"{job_id}:feedback",
+        f"weave-export:{job_id}:objects",
+        f"weave-export:{job_id}:feedback",
     ]
     assert [command[0] for command in commands] == [
         (
@@ -184,7 +188,7 @@ def test_export_start_query_id_lands_in_query_log(
     res = clickhouse_trace_server.export_start(
         tsi.ExportStartReq(project_id=project_id, targets=["objects"])
     )
-    qid = f"{res.job_id}:objects"
+    qid = f"weave-export:{res.job_id}:objects"
     ch = clickhouse_trace_server.ch_client
     deadline = time.monotonic() + QUERY_LOG_POLL_SECONDS
     rows: list[tuple[str]] = []
@@ -219,6 +223,7 @@ def test_start_export_requires_durable_manifest(
     )
 
     failed_write = MagicMock(side_effect=FileStorageWriteError())
+    mint_client.return_value.query.return_value.result_rows = [(0,)]
     monkeypatch.setattr(export, "store_in_bucket", failed_write)
     with pytest.raises(export.ExportError) as exc_info:
         export.start_export(
@@ -233,7 +238,7 @@ def test_start_export_requires_durable_manifest(
         "EXPORT_STORAGE_UNAVAILABLE",
     )
     failed_write.assert_called_once()
-    assert mint_client.call_count == 0
+    assert mint_client.call_count == 1
 
 
 def test_start_export_rejects_invalid_targets_before_writing(

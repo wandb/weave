@@ -7461,6 +7461,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             req.project_id,
             req.targets,
             calls_read_table,
+            wf_env.wf_clickhouse_query_log_cluster(),
         )
         return tsi.ExportStartRes(job_id=job_id)
 
