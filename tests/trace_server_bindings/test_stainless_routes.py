@@ -125,6 +125,7 @@ V1_RESPONSE = {
     "rows": [],
     "runtime_ids": [],
     "spans": [],
+    "spans_storage_size_bytes": 0,
     "start": "2026-08-20T00:00:00Z",
     "stats": [],
     "status": {"code": "not_found"},
