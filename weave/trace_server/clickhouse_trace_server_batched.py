@@ -1568,7 +1568,10 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             req.project_id, self.ch_client
         )
         pb = ParamBuilder()
-        query, columns, settings = build_calls_stats_query(req, pb, read_table)
+        in_order = wf_env.wf_clickhouse_uncapped_stats_aggregation_in_order()
+        query, columns, settings = build_calls_stats_query(
+            req, pb, read_table, uncapped_aggregation_in_order=in_order
+        )
         raw_res = self._query(query, pb.get_params(), settings=settings or None)
 
         res_dict = (

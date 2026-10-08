@@ -5070,23 +5070,36 @@ def test_stats_query_calls_merged_with_expand_columns_falls_back_to_group_by() -
 )
 @pytest.mark.parametrize("limit", [None, 5])
 @pytest.mark.parametrize("include_total_storage_size", [False, True])
+@pytest.mark.parametrize("uncapped_aggregation_in_order", [False, True])
 def test_stats_query_aggregation_settings(
-    read_table: ReadTable, limit: int | None, include_total_storage_size: bool
+    read_table: ReadTable,
+    limit: int | None,
+    include_total_storage_size: bool,
+    uncapped_aggregation_in_order: bool,
 ) -> None:
+    """Grouped calls_merged counts aggregate in order when limited or opted in."""
     req = tsi.CallsQueryStatsReq(
         project_id="project",
         limit=limit,
         include_total_storage_size=include_total_storage_size,
         filter=tsi.CallsFilter(op_names=["my_op"]),
     )
-    _query, columns, settings = build_calls_stats_query(
-        req, ParamBuilder("pb"), read_table
+    pb = ParamBuilder("pb")
+    query, columns, settings = build_calls_stats_query(
+        req,
+        pb,
+        read_table,
+        uncapped_aggregation_in_order=uncapped_aggregation_in_order,
     )
-    assert settings == (
-        {"optimize_aggregation_in_order": 1}
-        if read_table == ReadTable.CALLS_MERGED
-        else {}
+    default_pb = ParamBuilder("pb")
+    default_query, _columns, _settings = build_calls_stats_query(
+        req, default_pb, read_table
     )
+    assert (query, pb.get_params()) == (default_query, default_pb.get_params())
+    in_order = read_table == ReadTable.CALLS_MERGED and (
+        limit is not None or uncapped_aggregation_in_order
+    )
+    assert settings == ({"optimize_aggregation_in_order": 1} if in_order else {})
     assert list(columns) == (
         ["count", "has_more", "total_storage_size_bytes"]
         if include_total_storage_size
@@ -5094,7 +5107,43 @@ def test_stats_query_aggregation_settings(
     )
 
 
-def test_stats_query_calls_merged_negated_time_bound_uses_ordered_aggregation() -> None:
+@pytest.mark.parametrize(
+    "req",
+    [
+        tsi.CallsQueryStatsReq(project_id="project", limit=1),
+        tsi.CallsQueryStatsReq(project_id="project"),
+        tsi.CallsQueryStatsReq(
+            project_id="project",
+            query=_started_at_query(
+                {"$gte": [{"$getField": "started_at"}, {"$literal": 1709251200}]}
+            ),
+        ),
+        tsi.CallsQueryStatsReq(project_id="project", include_total_storage_size=True),
+    ],
+    ids=["existence", "unfiltered", "started_at_window", "unfiltered_storage"],
+)
+def test_stats_query_aggregation_opt_in_skips_flat_queries(
+    req: tsi.CallsQueryStatsReq,
+) -> None:
+    """The opt-in only reaches the grouped fallback; flat early returns are unchanged."""
+    default_query, default_columns, default_settings = build_calls_stats_query(
+        req, ParamBuilder("pb"), ReadTable.CALLS_MERGED
+    )
+    query, columns, settings = build_calls_stats_query(
+        req,
+        ParamBuilder("pb"),
+        ReadTable.CALLS_MERGED,
+        uncapped_aggregation_in_order=True,
+    )
+    assert (query, list(columns)) == (default_query, list(default_columns))
+    assert settings == default_settings == {}
+
+
+def test_stats_query_calls_merged_negated_time_bound_aggregation_is_opt_in() -> None:
+    """A negated upper bound misses Pattern 4, so it takes the grouped fallback.
+
+    That uncapped fallback keeps hash aggregation unless the deployment opts in.
+    """
     req = tsi.CallsQueryStatsReq(
         project_id="project",
         query=_started_at_query(
@@ -5115,7 +5164,7 @@ def test_stats_query_calls_merged_negated_time_bound_uses_ordered_aggregation() 
             }
         ),
     )
-    _query, columns, settings = build_calls_stats_query(
+    default_query, columns, settings = build_calls_stats_query(
         req, ParamBuilder("pb"), ReadTable.CALLS_MERGED
     )
     assert_stats_sql(
@@ -5141,8 +5190,17 @@ def test_stats_query_calls_merged_negated_time_bound_uses_ordered_aggregation() 
         },
         read_table=ReadTable.CALLS_MERGED,
     )
-    assert settings == {"optimize_aggregation_in_order": 1}
+    assert settings == {}
     assert list(columns) == ["count", "has_more"]
+
+    query, _columns, settings = build_calls_stats_query(
+        req,
+        ParamBuilder("pb"),
+        ReadTable.CALLS_MERGED,
+        uncapped_aggregation_in_order=True,
+    )
+    assert query == default_query
+    assert settings == {"optimize_aggregation_in_order": 1}
 
 
 def test_stats_query_calls_merged_caller_limit_keeps_setting() -> None:

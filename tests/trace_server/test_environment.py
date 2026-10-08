@@ -13,6 +13,7 @@ from weave.trace_server.environment import (
     kafka_producer_max_buffer_size,
     wf_clickhouse_calls_shard_key,
     wf_clickhouse_query_log_cluster,
+    wf_clickhouse_uncapped_stats_aggregation_in_order,
     wf_kafka_project_id_bucket_count,
     wf_scoring_worker_check_cancellation,
     wf_scoring_worker_debounced_scoring_max_call_history,
@@ -148,6 +149,29 @@ def test_wf_clickhouse_calls_shard_key(env_value, expected, raises, monkeypatch)
     else:
         with pytest.raises(raises, match="Invalid WF_CLICKHOUSE_CALLS_SHARD_KEY"):
             wf_clickhouse_calls_shard_key()
+
+
+@pytest.mark.parametrize(
+    ("env_value", "expected"),
+    [
+        (None, False),
+        ("", False),
+        ("false", False),
+        ("1", False),
+        ("true", True),
+        ("TRUE", True),
+    ],
+)
+def test_wf_clickhouse_uncapped_stats_aggregation_in_order(
+    env_value, expected, monkeypatch
+):
+    """Uncapped stats keep hash aggregation unless the deployment sets true."""
+    key = "WF_CLICKHOUSE_UNCAPPED_STATS_AGGREGATION_IN_ORDER"
+    if env_value is None:
+        monkeypatch.delenv(key, raising=False)
+    else:
+        monkeypatch.setenv(key, env_value)
+    assert wf_clickhouse_uncapped_stats_aggregation_in_order() is expected
 
 
 @pytest.mark.disable_logging_error_check

@@ -187,6 +187,79 @@ def test_clickhouse_calls_query_stream_empty_thread_ids_against_real_clickhouse(
     assert result == []
 
 
+@pytest.mark.parametrize(
+    ("flag", "limit", "in_order_setting", "has_more"),
+    [
+        (None, None, "", False),
+        ("false", None, "", False),
+        ("true", None, "1", False),
+        (None, 3, "1", True),
+        ("true", 3, "1", True),
+    ],
+)
+def test_calls_query_stats_uncapped_aggregation_in_order_is_opt_in(
+    ch_server, monkeypatch, flag, limit, in_order_setting, has_more
+):
+    """Uncapped grouped calls_merged counts aggregate in order only when opted in.
+
+    Limited counts keep ordered aggregation either way, and the count is unchanged.
+    """
+    key = "WF_CLICKHOUSE_UNCAPPED_STATS_AGGREGATION_IN_ORDER"
+    if flag is None:
+        monkeypatch.delenv(key, raising=False)
+    else:
+        monkeypatch.setenv(key, flag)
+    project_id = make_project_id("uncapped-stats-in-order")
+    started_at = datetime(2025, 1, 1, tzinfo=timezone.utc)
+    for _ in range(3):
+        call_id = str(uuid.uuid4())
+        ch_server.call_start(
+            tsi.CallStartReq(
+                start=tsi.StartedCallSchemaForInsert(
+                    project_id=project_id,
+                    id=call_id,
+                    trace_id=call_id,
+                    op_name="stats_op",
+                    started_at=started_at,
+                    attributes={},
+                    inputs={},
+                )
+            )
+        )
+        ch_server.call_end(
+            tsi.CallEndReq(
+                end=tsi.EndedCallSchemaForInsert(
+                    project_id=project_id,
+                    id=call_id,
+                    ended_at=started_at,
+                    summary={},
+                )
+            )
+        )
+    ch = ch_server.ch_client
+    since = ch.query("SELECT toUnixTimestamp64Micro(now64(6))").result_rows[0][0]
+
+    res = ch_server.calls_query_stats(
+        tsi.CallsQueryStatsReq(
+            project_id=project_id,
+            filter=tsi.CallsFilter(op_names=["stats_op"]),
+            limit=limit,
+        )
+    )
+
+    assert res == tsi.CallsQueryStatsRes(count=3, has_more=has_more)
+    ch.command("SYSTEM FLUSH LOGS")
+    rows = ch.query(
+        "SELECT Settings['optimize_aggregation_in_order'] FROM system.query_log "
+        "WHERE type = 'QueryFinish' AND current_database = currentDatabase() "
+        "AND toUnixTimestamp64Micro(event_time_microseconds) >= {since:Int64} "
+        "AND startsWith(query, 'SELECT count() AS count') "
+        "ORDER BY event_time_microseconds DESC LIMIT 1",
+        parameters={"since": since},
+    ).result_rows
+    assert rows == [(in_order_setting,)]
+
+
 def test_clickhouse_storage_size_schema_conversion():
     """Test that storage size fields are correctly converted in ClickHouse schema."""
     # Test data with proper datetime structures

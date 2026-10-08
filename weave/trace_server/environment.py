@@ -446,6 +446,20 @@ def wf_clickhouse_disable_query_failure_prediction() -> bool:
     )
 
 
+def wf_clickhouse_uncapped_stats_aggregation_in_order() -> bool:
+    """Opt uncapped grouped calls_merged stats queries into in-order aggregation.
+
+    Off by default. It can shrink GROUP BY memory, but ordered merging can limit
+    parallelism and increase latency. Limited grouped stats keep the setting.
+    """
+    return (
+        os.environ.get(
+            "WF_CLICKHOUSE_UNCAPPED_STATS_AGGREGATION_IN_ORDER", "false"
+        ).lower()
+        == "true"
+    )
+
+
 def wf_clickhouse_async_insert_busy_timeout_min_ms() -> int:
     """The minimum async insert busy timeout in milliseconds for ClickHouse.
 

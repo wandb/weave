@@ -3033,6 +3033,7 @@ def build_calls_stats_query(
     req: tsi.CallsQueryStatsReq,
     param_builder: ParamBuilder,
     read_table: ReadTable = ReadTable.CALLS_MERGED,
+    uncapped_aggregation_in_order: bool = False,
 ) -> tuple[str, KeysView[str], dict[str, int | str]]:
     """Build a stats query for calls, automatically using optimized queries when possible.
 
@@ -3042,6 +3043,9 @@ def build_calls_stats_query(
         req: The stats query request
         param_builder: Parameter builder for query parameterization
         read_table: Which calls table to read from
+        uncapped_aggregation_in_order: Also aggregate grouped calls_merged
+            counts in order when the request has no limit. Limited grouped counts
+            always do.
 
     Returns:
         Tuple of (SQL query string, column names in the result, ClickHouse
@@ -3086,7 +3090,8 @@ def build_calls_stats_query(
         aggregated_columns["has_more"] = f"toUInt8(count() >= {req.limit})"
 
     # Ordered merging can reduce grouping memory but limit parallelism.
-    settings["optimize_aggregation_in_order"] = 1
+    if req.limit is not None or uncapped_aggregation_in_order:
+        settings["optimize_aggregation_in_order"] = 1
 
     cq = _build_stats_calls_query(req, read_table)
     inner_query = cq.as_sql(param_builder)

@@ -202,12 +202,14 @@ If `sdks/node/node_modules` is missing, run `pnpm install --frozen-lockfile` in 
 ### Current logical calls
 
 - The grouped `calls_merged` stats fallback enables `optimize_aggregation_in_order`
-  with or without a caller limit. It can reduce large grouping hash tables, but
-  its ordered merge can reduce parallelism and increase latency. Selective
-  filters can use more memory, and joined plans may not use in-order aggregation.
-  Verify memory and latency on the target ClickHouse deployment. Preserve exact
-  count, deletion, orphan, and storage semantics; flat optimized and
-  `calls_complete` paths are separate.
+  for counts with a caller limit. Uncapped counts get it only when
+  `WF_CLICKHOUSE_UNCAPPED_STATS_AGGREGATION_IN_ORDER=true`. It can shrink large
+  grouping hash tables, but its ordered merge can slow counts that already
+  fit in memory, selective filters can use more memory, and joined plans may not
+  aggregate in order. Measure latency and memory with it off and on at the
+  deployment's `max_threads` and memory limits before enabling; unset it to roll
+  back. Preserve exact count, deletion, orphan, and storage semantics; flat
+  optimized and `calls_complete` paths are separate.
 - `calls_complete` uses `ReplacingMergeTree(created_at)`, so more than one
   physical version of a call can remain visible until background merges run.
 - Set `CallsQueryReq.latest_only=True` when correctness requires filtering the
