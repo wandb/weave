@@ -13,7 +13,11 @@ import json
 from typing import Any
 
 from weave.trace_server.agents.constants import OP_EXECUTE_TOOL, OP_INVOKE_AGENT
-from weave.trace_server.opentelemetry.helpers import get_attribute
+from weave.trace_server.base64_content_conversion import DATA_URI_PATTERN
+from weave.trace_server.opentelemetry.helpers import (
+    get_attribute,
+    to_json_serializable,
+)
 
 PROVIDER_KEYS = ("llm.provider", "llm.system")
 # OpenInference usually sends one `llm.model_name`; the Agents UI groups and
@@ -33,6 +37,8 @@ TOOL_DESCRIPTION_KEYS = ("tool.description",)
 TOOL_CALL_ID_KEYS = ("tool.id",)
 
 _SPAN_KIND_KEY = "openinference.span.kind"
+_INPUT_MESSAGES_KEY = "llm.input_messages"
+_OUTPUT_MESSAGES_KEY = "llm.output_messages"
 _TOOLS_KEY = "llm.tools"
 _INPUT_VALUE_KEY = "input.value"
 _OUTPUT_VALUE_KEY = "output.value"
@@ -47,7 +53,9 @@ _KIND_TO_OPERATION = {
     "EMBEDDING": "embeddings",
     "RETRIEVER": "retrieval",
 }
+_SYSTEM_ROLE = "system"
 _TOOL_ROLE = "tool"
+_TEXT_CONTENT_TYPE = "text"
 _FUNCTION_TOOL_TYPE = "function"
 
 
@@ -62,6 +70,32 @@ def operation_name(attrs: dict[str, Any], *, is_root: bool) -> str:
     if kind == _CHAIN_KIND and is_root:
         return OP_INVOKE_AGENT
     return _KIND_TO_OPERATION.get(kind, "")
+
+
+def input_messages(attrs: dict[str, Any]) -> list[dict[str, Any]]:
+    """An LLM span's non-system input messages as GenAI messages."""
+    return [m for m in _input_messages(attrs) if m["role"] != _SYSTEM_ROLE]
+
+
+def output_messages(attrs: dict[str, Any]) -> list[dict[str, Any]]:
+    """An LLM span's output as GenAI messages.
+
+    Reads `llm.output_messages`. Other span kinds yield none, as for input.
+    """
+    if _span_kind(attrs) != _LLM_KIND:
+        return []
+    return _llm_messages(attrs, _OUTPUT_MESSAGES_KEY)
+
+
+def system_instructions(attrs: dict[str, Any]) -> list[dict[str, Any]]:
+    """The text parts of an LLM span's system-role input messages."""
+    return [
+        part
+        for message in _input_messages(attrs)
+        if message["role"] == _SYSTEM_ROLE
+        for part in message["parts"]
+        if part["type"] == _TEXT_CONTENT_TYPE
+    ]
 
 
 def tool_definitions(attrs: dict[str, Any]) -> list[dict[str, Any]]:
@@ -164,6 +198,104 @@ def _json_value(value: Any) -> Any:
         return value
 
 
+def _input_messages(attrs: dict[str, Any]) -> list[dict[str, Any]]:
+    """An LLM span's input as GenAI messages, system messages included.
+
+    Reads `llm.input_messages`. Only LLM spans qualify: the LangChain
+    instrumentor also writes partial `llm.input_messages` onto CHAIN spans from
+    their graph state.
+    """
+    if _span_kind(attrs) != _LLM_KIND:
+        return []
+    return _llm_messages(attrs, _INPUT_MESSAGES_KEY)
+
+
+def _llm_messages(attrs: dict[str, Any], key: str) -> list[dict[str, Any]]:
+    """Rebuild GenAI messages from flattened `<key>.<i>.message.*` attributes."""
+    messages = []
+    for item in _indexed(get_attribute(attrs, key)):
+        message = item.get("message") if isinstance(item, dict) else None
+        if isinstance(message, dict):
+            messages.append(_genai_message(message))
+    return messages
+
+
+def _genai_message(message: dict[str, Any]) -> dict[str, Any]:
+    """A GenAI message from flattened OpenInference `message.*` attributes."""
+    role = str(message.get("role") or "")
+    content = message.get("content")
+    if role == _TOOL_ROLE:
+        return _tool_response_message(message.get("tool_call_id"), content)
+
+    parts: list[dict[str, Any]] = []
+    if content is not None and content != "":
+        parts.append(_text_part(content))
+    for item in _indexed(message.get("contents")):
+        message_content = (
+            item.get("message_content") if isinstance(item, dict) else None
+        )
+        if not isinstance(message_content, dict):
+            continue
+        content_type = message_content.get("type")
+        text = message_content.get("text")
+        image = message_content.get("image")
+        if content_type == _TEXT_CONTENT_TYPE and text:
+            parts.append(_text_part(text))
+        elif content_type == "image" and isinstance(image, dict):
+            image_url = image.get("image")
+            if isinstance(image_url, dict) and (part := _image_part(image_url)):
+                parts.append(part)
+    for item in _indexed(message.get("tool_calls")):
+        tool_call = item.get("tool_call") if isinstance(item, dict) else None
+        if isinstance(tool_call, dict):
+            parts.append(_tool_call_part(tool_call))
+    return {"role": role, "parts": parts}
+
+
+def _text_part(value: Any) -> dict[str, Any]:
+    return {"type": _TEXT_CONTENT_TYPE, "content": _text(value)}
+
+
+def _image_part(image: dict[str, Any]) -> dict[str, Any] | None:
+    """A GenAI image part from `{"url": ...}`; a base64 data URL becomes a blob part.
+
+    Ingest has already replaced a data URL over 8 KiB with a content ref,
+    which stays a `uri` part.
+    """
+    url = image.get("url")
+    if not isinstance(url, str) or not url:
+        return None
+    if data_url := DATA_URI_PATTERN.match(url):
+        return {
+            "type": "blob",
+            "modality": "image",
+            "mime_type": data_url.group(1),
+            "content": data_url.group(2),
+        }
+    return {"type": "uri", "modality": "image", "uri": url}
+
+
+def _tool_call_part(tool_call: dict[str, Any]) -> dict[str, Any]:
+    function = tool_call.get("function")
+    if not isinstance(function, dict):
+        function = {}
+    return {
+        "type": "tool_call",
+        "id": tool_call.get("id"),
+        "name": function.get("name"),
+        "arguments": function.get("arguments"),
+    }
+
+
+def _tool_response_message(tool_call_id: Any, response: Any) -> dict[str, Any]:
+    return {
+        "role": _TOOL_ROLE,
+        "parts": [
+            {"type": "tool_call_response", "id": tool_call_id, "response": response}
+        ],
+    }
+
+
 def _indexed(value: Any) -> list[Any]:
     """Items of an expanded OpenInference list: a dict keyed "0", "1", ... or a list.
 
@@ -175,3 +307,10 @@ def _indexed(value: Any) -> list[Any]:
     if isinstance(value, dict):
         return [value[key] for key in sorted(filter(str.isdecimal, value), key=int)]
     return []
+
+
+def _text(value: Any) -> str:
+    """Return message text; ingest JSON-decodes strings that start with `{` or `[`."""
+    if isinstance(value, str):
+        return value
+    return json.dumps(to_json_serializable(value), ensure_ascii=False)

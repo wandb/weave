@@ -841,13 +841,21 @@ deterministic.
   span: LangGraph's unnamed root graph span is a CHAIN called `LangGraph`. The
   span name becomes the agent name only when the resolved operation is
   `invoke_agent`, so an explicit `gen_ai.operation.name` such as `chat` wins.
-- `llm.tools` becomes `tool_definitions` in the flat `{type, name,
+- Messages come only from LLM spans, because the LangChain instrumentor also
+  writes partial `llm.input_messages` from graph state onto CHAIN spans.
+  System-role messages go to `system_instructions`, as on the completions path.
+- Image parts become GenAI `blob` parts for data URLs and `uri` parts
+  otherwise. The ingest blob strip runs first and replaces a data URL over
+  8 KiB with a content ref, which the chat view shows on the message.
+  `llm.tools` becomes `tool_definitions` in the flat `{type, name,
   description, parameters}` shape the Agents UI reads.
 - LangChain TOOL spans record the returned `ToolMessage` JSON in
   `output.value`; its `content` is the tool result and its `tool_call_id` the
   call id. Only a value with the message's own `type`, `content` and
   `tool_call_id` is unwrapped. A tool that raises returns no message, so its
-  `tool_call_id` stays empty.
+  `tool_call_id` stays empty, and the `include_model_tool_calls` chat
+  projection, which matches a model's tool request to its execution by that
+  id, lists that call twice.
 
 ### Documentation
 

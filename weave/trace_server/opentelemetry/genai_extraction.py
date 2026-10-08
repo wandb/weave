@@ -415,14 +415,15 @@ def _extract_raw_input(attrs: dict[str, Any]) -> Any:
     turns that back into a message list, matching how the non-agents path
     normalizes inputs in ``parse_weave_values``.
     """
-    return try_convert_numeric_keys_to_list(
-        _get(
-            attrs,
-            *semconv.INPUT_MESSAGES.lookup_keys,
-            "weave.prompt",
-            "gen_ai.prompt",
-        )
+    val = _get(
+        attrs,
+        *semconv.INPUT_MESSAGES.lookup_keys,
+        "weave.prompt",
+        "gen_ai.prompt",
     )
+    if val is None:
+        return openinference.input_messages(attrs)
+    return try_convert_numeric_keys_to_list(val)
 
 
 def _extract_raw_output(attrs: dict[str, Any], events: list[dict[str, Any]]) -> Any:
@@ -441,7 +442,16 @@ def _extract_raw_output(attrs: dict[str, Any], events: list[dict[str, Any]]) -> 
                 val = get_attribute(event_attrs, "gen_ai.completion")
                 if val is not None:
                     break
+    if val is None:
+        return openinference.output_messages(attrs)
     return try_convert_numeric_keys_to_list(val)
+
+
+def _extract_system_instructions(attrs: dict[str, Any]) -> list[str]:
+    val = _get(attrs, *semconv.SYSTEM_INSTRUCTIONS.lookup_keys)
+    if val is None:
+        val = openinference.system_instructions(attrs)
+    return _normalize_system_instructions(val)
 
 
 def _extract_tool_definitions(attrs: dict[str, Any]) -> str:
@@ -810,9 +820,7 @@ def extract_genai_span(
         output_type=_get_str(attrs, *semconv.OUTPUT_TYPE.lookup_keys),
         input_messages=_normalize_raw_messages(raw_input, default_role="user"),
         output_messages=output_msgs,
-        system_instructions=_normalize_system_instructions(
-            _get(attrs, *semconv.SYSTEM_INSTRUCTIONS.lookup_keys)
-        ),
+        system_instructions=_extract_system_instructions(attrs),
         tool_call_arguments=extract_tool_call_arguments(attrs, events_dicts),
         tool_call_result=extract_tool_call_result(attrs, events_dicts),
         compaction_summary=_get_str(attrs, *semconv.COMPACTION_SUMMARY.lookup_keys),
