@@ -1050,8 +1050,8 @@ export interface CallUsageParams {
   include_costs?: boolean;
 
   /**
-   * Maximum number of calls to process across all traces. Acts as a safety limit to
-   * prevent unbounded memory usage.
+   * Maximum calls per aggregation batch. Larger batches are split by trace; a single
+   * trace exceeding this limit returns an error, never partial usage.
    */
   limit?: number;
 }
