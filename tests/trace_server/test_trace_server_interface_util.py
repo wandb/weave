@@ -370,6 +370,47 @@ def test_external_cost_query_allows_bounded_call_ids() -> None:
     inner.calls_query.assert_called_once()
 
 
+@pytest.mark.parametrize("stream", [False, True])
+@pytest.mark.parametrize("limit", [10_002, 10_000_000])
+def test_cost_query_rejects_oversized_pages(
+    trace_server: tsi.FullTraceServerInterface, stream: bool, limit: int
+) -> None:
+    req = tsi.CallsQueryReq(
+        project_id="test-entity/test-project", include_costs=True, limit=limit
+    )
+    with pytest.raises(InvalidRequest, match="10001"):
+        if stream:
+            list(trace_server.calls_query_stream(req))
+        else:
+            trace_server.calls_query(req)
+
+
+@pytest.mark.parametrize("stream", [False, True])
+@pytest.mark.parametrize(
+    "include_costs,limit,call_ids",
+    [(True, 10_001, None), (False, 10_002, None), (True, 10_002, ["call-1"])],
+)
+def test_cost_query_accepts_supported_pages(
+    trace_server: tsi.FullTraceServerInterface,
+    stream: bool,
+    include_costs: bool,
+    limit: int,
+    call_ids: list[str] | None,
+) -> None:
+    req = tsi.CallsQueryReq(
+        project_id="test-entity/test-project",
+        include_costs=include_costs,
+        limit=limit,
+        filter=tsi.CallsFilter(call_ids=call_ids),
+    )
+    calls = (
+        list(trace_server.calls_query_stream(req))
+        if stream
+        else trace_server.calls_query(req).calls
+    )
+    assert calls == []
+
+
 def test_export_adapter_converts_project_id_and_delegates() -> None:
     """The export endpoints must convert the external entity/project id to the
     internal (base64) form before delegating, leaving the caller's req intact.
