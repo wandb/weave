@@ -468,7 +468,7 @@ def wf_clickhouse_async_insert_busy_timeout_min_ms() -> int:
 
 
 def wf_clickhouse_compact_cost_queries_enabled() -> bool:
-    """Enable cost pricing without carrying call payloads through price ranking."""
+    """Opt into compact cost pricing; disabled by default pending rollout checks."""
     return (
         os.environ.get("WF_CLICKHOUSE_COMPACT_COST_QUERIES", "false").lower() == "true"
     )

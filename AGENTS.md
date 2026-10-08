@@ -201,13 +201,9 @@ If `sdks/node/node_modules` is missing, run `pnpm install --frozen-lockfile` in 
 
 ### Current logical calls
 
-- Compact cost enrichment joins priced summaries back by call key. Enable
-  `CallsQuery.costs_have_unique_call_keys` only for aggregated `calls_merged` or
-  `calls_complete` reads with `FINAL` (keyed by `id, started_at`). The server
-  requires the opt-in `WF_CLICKHOUSE_COMPACT_COST_QUERIES=true` setting and
-  shared storage snapshots; physical-version reads, unordered pages,
-  object expansion, feedback sorts and distributed mode retain the existing
-  cost query. See `weave/trace_server/calls_query_builder/README.md`.
+- Compact cost hydration requires unique call keys: `id` for `calls_merged`,
+  `(id, started_at)` for `calls_complete FINAL`. The server requires shared
+  snapshots and the default-off `WF_CLICKHOUSE_COMPACT_COST_QUERIES` flag.
 
 - `calls_complete` uses `ReplacingMergeTree(created_at)`, so more than one
   physical version of a call can remain visible until background merges run.
