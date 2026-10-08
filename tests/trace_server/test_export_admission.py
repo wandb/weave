@@ -48,9 +48,15 @@ def test_only_one_replica_can_claim_global_slot(export_redis):
 
     with ThreadPoolExecutor(max_workers=8) as pool:
         guards = list(pool.map(acquire, range(8)))
-    winners = [guard for guard in guards if isinstance(guard, admission.ExportAdmission)]
-    failures = [guard for guard in guards if isinstance(guard, admission.AdmissionError)]
-    assert [(exc.http_status, exc.code) for exc in failures] == [(409, "EXPORT_BUSY")] * 7
+    winners = [
+        guard for guard in guards if isinstance(guard, admission.ExportAdmission)
+    ]
+    failures = [
+        guard for guard in guards if isinstance(guard, admission.AdmissionError)
+    ]
+    assert [(exc.http_status, exc.code) for exc in failures] == [
+        (409, "EXPORT_BUSY")
+    ] * 7
     assert len(winners) == 1
     winners[0].close(completed=True)
     assert export_redis.mget(admission.LEASE_KEY, admission.ACTIVE_KEY) == [None, None]
@@ -121,6 +127,46 @@ def test_missing_redis_fails_closed(monkeypatch):
     with pytest.raises(admission.AdmissionError) as exc:
         admission.acquire_export_admission(query_client(), "job", None)
     assert exc.value.code == "EXPORT_ADMISSION_UNAVAILABLE"
+
+
+def test_renewal_keeps_live_owner_and_detects_replacement(export_redis, monkeypatch):
+    monkeypatch.setattr(admission, "LEASE_SECONDS", 1)
+    monkeypatch.setattr(admission, "RENEW_SECONDS", 0.02)
+    guard = admission.acquire_export_admission(query_client(), "old", None)
+    try:
+        time.sleep(1.1)
+        assert export_redis.get(admission.LEASE_KEY) == "old"
+        export_redis.set(admission.LEASE_KEY, "replacement", ex=1)
+        assert guard._lost.wait(1)
+        with pytest.raises(admission.AdmissionError) as exc:
+            guard.prepare_query(admission.export_query_id("old", "calls"))
+        assert exc.value.code == "EXPORT_LEASE_LOST"
+        guard.close(completed=True)
+        assert export_redis.get(admission.LEASE_KEY) == "replacement"
+    finally:
+        guard.close(completed=False)
+
+
+def test_busy_other_project_never_counts_writes_or_submits(export_redis, monkeypatch):
+    guard = admission.acquire_export_admission(query_client(), "first", None)
+    store = MagicMock()
+    monkeypatch.setattr(export, "store_in_bucket", store)
+    ch = query_client()
+    try:
+        with pytest.raises(export.ExportError) as exc:
+            export.start_export(
+                lambda: ch,
+                MagicMock(),
+                "other-project",
+                ["calls"],
+                ReadTable.CALLS_COMPLETE,
+            )
+        assert (exc.value.http_status, exc.value.code) == (409, "EXPORT_BUSY")
+        ch.query.assert_not_called()
+        ch.command.assert_not_called()
+        store.assert_not_called()
+    finally:
+        guard.close(completed=True)
 
 
 def test_redis_failure_does_not_submit_export(monkeypatch):
