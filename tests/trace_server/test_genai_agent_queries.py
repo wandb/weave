@@ -2513,12 +2513,12 @@ def test_agents_mv_aggregation(ch_server):
     assert agent.total_output_tokens == 190
 
 
-def test_project_stats_trace_storage_counts_agent_spans(ch_server):
-    """Agent span bytes add to trace storage for their own project only."""
+def test_project_stats_spans_storage_counts_agent_spans(ch_server):
+    """Agent span bytes report as spans storage for their own project only."""
     project_id = _make_project_id("span_storage")
     other_project_id = _make_project_id("span_storage_other")
     stats_req = tsi.ProjectStatsReq(project_id=project_id)
-    assert ch_server.project_stats(stats_req).trace_storage_size_bytes == 0
+    assert ch_server.project_stats(stats_req).spans_storage_size_bytes == 0
 
     _insert_spans(
         ch_server.ch_client,
@@ -2529,7 +2529,9 @@ def test_project_stats_trace_storage_counts_agent_spans(ch_server):
         ],
     )
 
-    assert ch_server.project_stats(stats_req).trace_storage_size_bytes == 4600
+    stats = ch_server.project_stats(stats_req)
+    assert stats.spans_storage_size_bytes == 4600
+    assert stats.trace_storage_size_bytes == 0
 
 
 def test_agents_mv_zero_duration_when_ended_at_unset(ch_server):

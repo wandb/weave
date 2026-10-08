@@ -4650,6 +4650,8 @@ class InMemoryTraceServer(tsi.FullTraceServerInterface):
                     for rec in self._calls.values()
                     if rec.project_id == req.project_id
                 )
+                # This backend stores no agent spans.
+                kwargs["spans_storage_size_bytes"] = 0
             if include_objects:
                 kwargs["objects_storage_size_bytes"] = sum(
                     rec.val_dump_len
