@@ -167,7 +167,11 @@ def get_optional_join_field_columns() -> list[Column]:
 """
 
 
-def get_llm_usage(param_builder: ParamBuilder, table_alias: str) -> PreparedSelect:
+def get_llm_usage(
+    param_builder: ParamBuilder,
+    table_alias: str,
+    compact: bool = False,
+) -> PreparedSelect:
     cols = [
         *get_calls_merged_columns(),
         # Derived cols that we will select
@@ -210,7 +214,7 @@ def get_llm_usage(param_builder: ParamBuilder, table_alias: str) -> PreparedSele
 
     select_query = (
         all_calls_table.select()
-        .fields(["*"])
+        .fields(["id", "started_at"] if compact else ["*"])
         .raw_sql_fields(
             [
                 usage_raw,
@@ -384,7 +388,7 @@ def get_ranked_prices(
 """
 
 
-def _build_cost_summary_dump_snippet() -> str:
+def _build_cost_summary_dump_snippet(compact: bool = False) -> str:
     """Build the SQL snippet for adding costs to summary_dump.
 
     Returns:
@@ -454,6 +458,10 @@ def _build_cost_summary_dump_snippet() -> str:
             '}} }}'
         )
     """
+
+    if compact:
+        return f"""if(any(llm_id) = '{DUMMY_LLM_ID}' or any(llm_token_prices.id) == '',
+        '', concat({cost_snippet})) AS cost_fragment"""
 
     # If no cost was found dont add a costs object
     return f"""
@@ -549,6 +557,7 @@ def build_cost_ctes(
     pb: ParamBuilder,
     call_table_alias: str,
     project_id: str,
+    compact: bool = False,
 ) -> list[CTE]:
     """Build CTEs for cost calculations.
 
@@ -568,7 +577,7 @@ def build_cost_ctes(
         CTE(
             name="llm_usage",
             sql=f"""-- From the all_calls we get the usage data for LLMs
-                {get_llm_usage(pb, call_table_alias).sql}""",
+                {get_llm_usage(pb, call_table_alias, compact=compact).sql}""",
         ),
         CTE(
             name="ranked_prices",
@@ -605,6 +614,7 @@ def get_cost_final_select(
     select_fields: list[str],
     order_fields: list["OrderField"],
     project_id: str,
+    compact: bool = False,
 ) -> str:
     """Build the final SELECT statement that adds costs to the results.
 
@@ -627,7 +637,7 @@ def get_cost_final_select(
     fields_str = ", ".join(safe_fields)
 
     # Build SELECT clause with cost calculation
-    summary_dump = _build_cost_summary_dump_snippet()
+    summary_dump = _build_cost_summary_dump_snippet(compact=compact)
     select_clause = f"SELECT {fields_str},\n{summary_dump}"
 
     from_clause = "FROM ranked_prices"
@@ -686,6 +696,50 @@ def get_cost_final_select(
         "Final Select, which just selects the correct fields, and adds a costs object"
     )
     return f"-- {comment}\n" + "\n".join(parts)
+
+
+def get_compact_cost_final_select(
+    pb: ParamBuilder,
+    call_table_alias: str,
+    select_fields: list[str],
+    order_fields: list["OrderField"],
+    call_key_fields: tuple[str, ...] = ("id",),
+) -> str:
+    """Hydrate a unique-call cost result after the price window and aggregation.
+
+    The caller must guarantee one row per call key and no feedback ordering.
+    Both relations are scoped to one project before this key join.
+    """
+    # Circular import avoidance: calls_query_builder imports token_costs.
+    from weave.trace_server.calls_query_builder.calls_query_builder import (
+        CallsMergedSummaryField,
+    )
+
+    final_fields = _prepare_final_select_fields(select_fields, order_fields)
+    fields = [
+        f"{call_table_alias}.{safe_alias(f)} AS {safe_alias(f)}" for f in final_fields
+    ]
+    fields.append(
+        f"if(call_costs.cost_fragment = '', {call_table_alias}.summary_dump, "
+        f"concat(left({call_table_alias}.summary_dump, "
+        f"length({call_table_alias}.summary_dump) - 1), "
+        "call_costs.cost_fragment, '}')) AS summary_dump"
+    )
+    join_condition = " AND ".join(
+        f"{call_table_alias}.{key} = call_costs.{key}" for key in call_key_fields
+    )
+    hydrated = (
+        f"SELECT {', '.join(fields)} FROM {call_table_alias} "
+        f"GLOBAL INNER JOIN call_costs ON {join_condition}"
+    )
+    order_parts = [
+        f"{safe_alias(of.field.field)} {of.direction}"
+        if isinstance(of.field, CallsMergedSummaryField)
+        else of.as_sql(pb, "cost_enriched_calls", use_agg_fn=False)
+        for of in order_fields
+    ]
+    order_by = f"ORDER BY {', '.join(order_parts)}" if order_parts else ""
+    return f"SELECT * FROM ({hydrated}) AS cost_enriched_calls {order_by}"
 
 
 def cost_query(

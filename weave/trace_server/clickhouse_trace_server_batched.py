@@ -1831,10 +1831,24 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             req.project_id, self.ch_client
         )
         settings = None
+        shared_snapshot = self.ch_client.server_settings.get(
+            "enable_shared_storage_snapshot_in_query"
+        )
+        compact_costs = bool(
+            req.include_costs
+            and wf_env.wf_clickhouse_compact_cost_queries_enabled()
+            and not self.use_distributed_mode
+            and shared_snapshot is not None
+            and (not shared_snapshot.readonly or shared_snapshot.value == "1")
+        )
         cq = CallsQuery(
             project_id=req.project_id,
             read_table=read_table,
             include_costs=req.include_costs or False,
+            costs_have_unique_call_keys=(
+                compact_costs
+                and (read_table == ReadTable.CALLS_MERGED or bool(req.latest_only))
+            ),
             include_storage_size=req.include_storage_size or False,
             include_total_storage_size=req.include_total_storage_size or False,
         )
@@ -1927,6 +1941,11 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 settings = {**settings, "final": 1}
 
         pb = ParamBuilder()
+        if compact_costs:
+            settings = {
+                **(settings or {}),
+                "enable_shared_storage_snapshot_in_query": 1,
+            }
         raw_res = self._query_stream(cq.as_sql(pb), pb.get_params(), settings=settings)
 
         if req.include_costs:
