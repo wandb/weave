@@ -34,6 +34,7 @@ from weave.shared.common_interface import (
 )
 from weave.shared.constants import (
     DEFAULT_CUSTOM_RUNTIME_MAX_TOKENS,
+    MAX_COST_QUERY_LIMIT,
     MAX_OBJECT_NAME_LENGTH,
 )
 from weave.shared.errors import InvalidRequest
@@ -632,7 +633,14 @@ class CallsFilter(BaseModelStrict):
 class CallsQueryReq(BaseModelStrict):
     project_id: str
     filter: CallsFilter | None = None
-    limit: int | None = None
+    limit: int | None = Field(
+        default=None,
+        description=(
+            "Maximum number of calls to return. When include_costs is true, "
+            f"a limit of at most {MAX_COST_QUERY_LIMIT} is required unless "
+            "filter.call_ids is non-empty. Page larger result sets using offset."
+        ),
+    )
     offset: int | None = None
     latest_only: bool = Field(
         default=False,
