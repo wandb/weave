@@ -3,7 +3,8 @@
 Extracts standard `gen_ai.*` attributes into dedicated columns for efficient
 querying.  Weave-specific `weave.*` attributes are also extracted.  All other
 attributes are preserved in typed custom attribute maps and in the lossless
-raw span dump.
+raw span dump.  OpenInference keys fill the columns the `weave.*` and
+`gen_ai.*` keys leave empty (see `openinference.py`).
 
 The main entry point is `extract_genai_span()` which takes a parsed OTel
 `Span` and returns an `AgentSpanCHInsertable` ready for ClickHouse insert.
@@ -14,11 +15,14 @@ import math
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
+from opentelemetry.proto.trace.v1.trace_pb2 import SpanFlags
+
 from weave.trace_server.agents import semconv
 from weave.trace_server.agents.constants import (
     CUSTOM_ATTR_TRUNCATION_MARKER,
     MAX_CUSTOM_ATTR_VALUE_CHARS,
     MAX_CUSTOM_ATTRS_PER_SPAN,
+    OP_INVOKE_AGENT,
 )
 from weave.trace_server.agents.error_details import exception_event_details
 from weave.trace_server.agents.schema import (
@@ -30,6 +34,7 @@ from weave.trace_server.base64_content_conversion import (
     replace_base64_with_content_objects,
 )
 from weave.trace_server.credential_redaction import redact_sensitive_keys
+from weave.trace_server.opentelemetry import openinference
 from weave.trace_server.opentelemetry.helpers import (
     _set_value_in_nested_dict,
     get_attribute,
@@ -44,6 +49,12 @@ from weave.trace_server.query_builder.agent_query_builder import (
 
 if TYPE_CHECKING:
     from weave.trace_server.trace_server_interface import TraceServerInterface
+
+# OTLP span flags marking the parent as remote, i.e. in another process.
+_REMOTE_PARENT_FLAGS = (
+    SpanFlags.SPAN_FLAGS_CONTEXT_HAS_IS_REMOTE_MASK
+    | SpanFlags.SPAN_FLAGS_CONTEXT_IS_REMOTE_MASK
+)
 
 # Known operation name prefixes for span-name inference.
 _KNOWN_OP_PREFIXES = (
@@ -132,14 +143,20 @@ def extract_provider(attrs: dict[str, Any]) -> str:
         attrs,
         *semconv.PROVIDER_NAME.lookup_keys,
         *semconv.SYSTEM.lookup_keys,
+        *openinference.PROVIDER_KEYS,
     )
     return str(val).lower() if val else ""
 
 
-def extract_operation_name(attrs: dict[str, Any], span_name: str) -> str:
+def extract_operation_name(
+    attrs: dict[str, Any], span_name: str, *, is_root: bool = False
+) -> str:
     val = _get(attrs, *semconv.OPERATION_NAME.lookup_keys)
     if val:
         return str(val)
+
+    if op := openinference.operation_name(attrs, is_root=is_root):
+        return op
 
     name_lower = span_name.lower()
     for prefix in _KNOWN_OP_PREFIXES:
@@ -149,18 +166,33 @@ def extract_operation_name(attrs: dict[str, Any], span_name: str) -> str:
     return ""
 
 
-def extract_agent_name(attrs: dict[str, Any], span_name: str) -> str:
-    val = _get(attrs, *semconv.AGENT_NAME.lookup_keys)
+def extract_agent_name(
+    attrs: dict[str, Any],
+    span_name: str,
+    operation_name: str,
+    *,
+    is_root: bool = False,
+) -> str:
+    val = _get(attrs, *semconv.AGENT_NAME.lookup_keys, *openinference.AGENT_NAME_KEYS)
     if val:
         return str(val)
     prefix = "invoke_agent "
     if span_name.lower().startswith(prefix):
         return span_name[len(prefix) :].strip()
+    if (
+        operation_name == OP_INVOKE_AGENT
+        and openinference.operation_name(attrs, is_root=is_root) == OP_INVOKE_AGENT
+    ):
+        return span_name
     return ""
 
 
 def extract_conversation_id(attrs: dict[str, Any]) -> str:
-    val = _get(attrs, *semconv.CONVERSATION_ID.lookup_keys)
+    val = _get(
+        attrs,
+        *semconv.CONVERSATION_ID.lookup_keys,
+        *openinference.CONVERSATION_ID_KEYS,
+    )
     return str(val) if val else ""
 
 
@@ -170,15 +202,33 @@ def extract_conversation_name(attrs: dict[str, Any]) -> str:
 
 
 def extract_input_tokens(attrs: dict[str, Any]) -> int:
-    return safe_int(_get(attrs, *semconv.USAGE_INPUT_TOKENS.lookup_keys))
+    return safe_int(
+        _get(
+            attrs,
+            *semconv.USAGE_INPUT_TOKENS.lookup_keys,
+            *openinference.INPUT_TOKENS_KEYS,
+        )
+    )
 
 
 def extract_output_tokens(attrs: dict[str, Any]) -> int:
-    return safe_int(_get(attrs, *semconv.USAGE_OUTPUT_TOKENS.lookup_keys))
+    return safe_int(
+        _get(
+            attrs,
+            *semconv.USAGE_OUTPUT_TOKENS.lookup_keys,
+            *openinference.OUTPUT_TOKENS_KEYS,
+        )
+    )
 
 
 def extract_reasoning_tokens(attrs: dict[str, Any]) -> int:
-    return safe_int(_get(attrs, *semconv.USAGE_REASONING_TOKENS.lookup_keys))
+    return safe_int(
+        _get(
+            attrs,
+            *semconv.USAGE_REASONING_TOKENS.lookup_keys,
+            *openinference.REASONING_TOKENS_KEYS,
+        )
+    )
 
 
 def extract_reasoning_content(raw_output: Any) -> str:
@@ -209,7 +259,11 @@ def extract_reasoning_content(raw_output: Any) -> str:
 
 
 def extract_finish_reasons(attrs: dict[str, Any]) -> list[str]:
-    val = _get(attrs, *semconv.RESPONSE_FINISH_REASONS.lookup_keys)
+    val = _get(
+        attrs,
+        *semconv.RESPONSE_FINISH_REASONS.lookup_keys,
+        *openinference.FINISH_REASON_KEYS,
+    )
     if isinstance(val, list):
         return [str(v) for v in val]
     if isinstance(val, str):
@@ -231,7 +285,7 @@ def extract_tool_call_arguments(
             if val:
                 return _json_str(val)
 
-    return ""
+    return _json_str(openinference.tool_call_arguments(attrs))
 
 
 def extract_tool_call_result(
@@ -248,7 +302,7 @@ def extract_tool_call_result(
             if val:
                 return _json_str(val)
 
-    return ""
+    return _json_str(openinference.tool_call_result(attrs))
 
 
 # ---------------------------------------------------------------------------
@@ -380,6 +434,13 @@ def _extract_raw_output(attrs: dict[str, Any], events: list[dict[str, Any]]) -> 
                 if val is not None:
                     break
     return try_convert_numeric_keys_to_list(val)
+
+
+def _extract_tool_definitions(attrs: dict[str, Any]) -> str:
+    val = _get(attrs, *semconv.TOOL_DEFINITIONS.lookup_keys)
+    if val is None:
+        val = openinference.tool_definitions(attrs) or None
+    return _json_str(val)
 
 
 # ---------------------------------------------------------------------------
@@ -611,6 +672,11 @@ def extract_genai_span(
     """
     attrs = span.attributes
     events_dicts = [e.as_dict() for e in span.events]
+    is_root = (
+        not span.parent_id
+        or (span.flags & _REMOTE_PARENT_FLAGS) == _REMOTE_PARENT_FLAGS
+    )
+    operation_name = extract_operation_name(attrs, span.name, is_root=is_root)
 
     input_t = extract_input_tokens(attrs)
     output_t = extract_output_tokens(attrs)
@@ -639,9 +705,11 @@ def extract_genai_span(
         ended_at=span.end_time,
         status_code=status_code,
         status_message=span.status.message or event_status_message,
-        operation_name=extract_operation_name(attrs, span.name),
+        operation_name=operation_name,
         provider_name=extract_provider(attrs),
-        agent_name=extract_agent_name(attrs, span.name),
+        agent_name=extract_agent_name(
+            attrs, span.name, operation_name, is_root=is_root
+        ),
         agent_id=_get_str(attrs, *semconv.AGENT_ID.lookup_keys),
         agent_description=_get_str(attrs, *semconv.AGENT_DESCRIPTION.lookup_keys),
         agent_version=_get_str(attrs, *semconv.AGENT_VERSION.lookup_keys),
@@ -658,26 +726,55 @@ def extract_genai_span(
         eval_evaluation_name=_get_str(attrs, *semconv.EVAL_EVALUATION_NAME.lookup_keys),
         parent_call_id=_get_str(attrs, *semconv.PARENT_CALL_ID.lookup_keys),
         parent_call_trace_id=_get_str(attrs, *semconv.PARENT_CALL_TRACE_ID.lookup_keys),
-        request_model=_get_str(attrs, *semconv.REQUEST_MODEL.lookup_keys),
-        response_model=_get_str(attrs, *semconv.RESPONSE_MODEL.lookup_keys),
+        request_model=_get_str(
+            attrs,
+            *semconv.REQUEST_MODEL.lookup_keys,
+            *openinference.REQUEST_MODEL_KEYS,
+        ),
+        response_model=_get_str(
+            attrs,
+            *semconv.RESPONSE_MODEL.lookup_keys,
+            *openinference.RESPONSE_MODEL_KEYS,
+        ),
         response_id=_get_str(attrs, *semconv.RESPONSE_ID.lookup_keys),
         input_tokens=input_t,
         output_tokens=output_t,
         reasoning_tokens=reasoning_t,
         cache_creation_input_tokens=safe_int(
-            _get(attrs, *semconv.USAGE_CACHE_CREATION_INPUT_TOKENS.lookup_keys)
+            _get(
+                attrs,
+                *semconv.USAGE_CACHE_CREATION_INPUT_TOKENS.lookup_keys,
+                *openinference.CACHE_CREATION_INPUT_TOKENS_KEYS,
+            )
         ),
         cache_read_input_tokens=safe_int(
-            _get(attrs, *semconv.USAGE_CACHE_READ_INPUT_TOKENS.lookup_keys)
+            _get(
+                attrs,
+                *semconv.USAGE_CACHE_READ_INPUT_TOKENS.lookup_keys,
+                *openinference.CACHE_READ_INPUT_TOKENS_KEYS,
+            )
         ),
         reasoning_content=reasoning_content,
         conversation_id=extract_conversation_id(attrs),
         conversation_name=extract_conversation_name(attrs),
-        tool_name=_get_str(attrs, *semconv.TOOL_NAME.lookup_keys),
+        tool_name=_get_str(
+            attrs, *semconv.TOOL_NAME.lookup_keys, *openinference.TOOL_NAME_KEYS
+        ),
         tool_type=_get_str(attrs, *semconv.TOOL_TYPE.lookup_keys),
-        tool_call_id=_get_str(attrs, *semconv.TOOL_CALL_ID.lookup_keys),
-        tool_description=_get_str(attrs, *semconv.TOOL_DESCRIPTION.lookup_keys),
-        tool_definitions=_json_str(_get(attrs, *semconv.TOOL_DEFINITIONS.lookup_keys)),
+        tool_call_id=(
+            _get_str(
+                attrs,
+                *semconv.TOOL_CALL_ID.lookup_keys,
+                *openinference.TOOL_CALL_ID_KEYS,
+            )
+            or openinference.tool_call_id(attrs)
+        ),
+        tool_description=_get_str(
+            attrs,
+            *semconv.TOOL_DESCRIPTION.lookup_keys,
+            *openinference.TOOL_DESCRIPTION_KEYS,
+        ),
+        tool_definitions=_extract_tool_definitions(attrs),
         finish_reasons=extract_finish_reasons(attrs),
         error_type=(
             _get_str(attrs, *semconv.ERROR_TYPE.lookup_keys) or event_error_type
