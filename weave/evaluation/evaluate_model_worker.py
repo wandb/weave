@@ -2,10 +2,8 @@ import asyncio
 
 import weave
 from weave.evaluation.eval import Evaluation
+from weave.flow.llm_structured_model import LLMStructuredCompletionModel
 from weave.scorers.llm_as_a_judge_scorer import LLMAsAJudgeScorer
-from weave.shared.interface.builtin_object_classes.llm_structured_model import (
-    LLMStructuredCompletionModel,
-)
 from weave.shared.trace_server_interface import EvaluateModelArgs
 from weave.shared.tracing import traced
 from weave.trace.context.weave_client_context import require_secure_weave_client

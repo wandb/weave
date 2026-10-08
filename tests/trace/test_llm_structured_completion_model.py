@@ -5,21 +5,23 @@ import pytest
 from pydantic import ValidationError
 
 from weave import publish
-from weave.prompt.prompt import MessagesPrompt
-from weave.trace import object_record, vals
-from weave.trace.weave_client import WeaveClient
-from weave.trace_server import trace_server_interface as tsi
-from weave.trace_server.interface.builtin_object_classes.llm_structured_model import (
+from weave.flow.llm_structured_model import (
     LLMStructuredCompletionModel,
+    cast_to_llm_structured_model_params,
+)
+from weave.prompt.prompt import MessagesPrompt
+from weave.shared.interface.builtin_object_classes.llm_structured_model import (
     LLMStructuredCompletionModelDefaultParams,
     Message,
     _prepare_llm_messages,
-    cast_to_llm_structured_model_params,
     cast_to_message,
     cast_to_message_list,
     parse_params_to_litellm_params,
     parse_response,
 )
+from weave.trace import object_record, vals
+from weave.trace.weave_client import WeaveClient
+from weave.trace_server import trace_server_interface as tsi
 
 
 def test_llm_structured_completion_model_creation_and_class_assignment(
@@ -114,6 +116,79 @@ def test_llm_structured_completion_model_creation_and_class_assignment(
     assert reconstructed_model.llm_model_id == "gpt-4"
 
 
+def test_server_stores_the_sdk_model_payload_and_digest(client: WeaveClient):
+    """The server validates against the shared schema but stores the SDK model's shape."""
+    res = client.server.obj_create(
+        tsi.ObjCreateReq.model_validate(
+            {
+                "obj": {
+                    "project_id": client.project_id,
+                    "object_id": "llm_model_payload",
+                    "val": {
+                        "_type": "LLMStructuredCompletionModel",
+                        "_class_name": "LLMStructuredCompletionModel",
+                        "llm_model_id": "gpt-4o",
+                        "default_params": {
+                            "messages_template": [
+                                {"role": "system", "content": "Be brief."}
+                            ],
+                            "temperature": 0.2,
+                            "response_format": "text",
+                        },
+                    },
+                    "builtin_object_class": "LLMStructuredCompletionModel",
+                }
+            }
+        )
+    )
+    read_res = client.server.obj_read(
+        tsi.ObjReadReq(
+            project_id=client.project_id,
+            object_id="llm_model_payload",
+            digest=res.digest,
+        )
+    )
+
+    assert res.digest == "b9QLkYCtFVomxOagmu9OHL6LemZqHPV9zKOXLuYCUUw"
+    assert read_res.obj.base_object_class == "Model"
+    assert read_res.obj.val == {
+        "_type": "LLMStructuredCompletionModel",
+        "name": None,
+        "description": None,
+        "ref": None,
+        "llm_model_id": "gpt-4o",
+        "default_params": {
+            "_type": "LLMStructuredCompletionModelDefaultParams",
+            "messages_template": [
+                {
+                    "_type": "Message",
+                    "role": "system",
+                    "content": "Be brief.",
+                    "name": None,
+                    "function_call": None,
+                    "tool_call_id": None,
+                    "_class_name": "Message",
+                    "_bases": ["BaseModel"],
+                }
+            ],
+            "prompt": None,
+            "temperature": 0.2,
+            "top_p": None,
+            "max_tokens": None,
+            "presence_penalty": None,
+            "frequency_penalty": None,
+            "stop": None,
+            "n_times": None,
+            "functions": None,
+            "response_format": "text",
+            "_class_name": "LLMStructuredCompletionModelDefaultParams",
+            "_bases": ["BaseModel"],
+        },
+        "_class_name": "LLMStructuredCompletionModel",
+        "_bases": ["Model", "Object", "BaseModel"],
+    }
+
+
 def test_llm_structured_completion_model_filtering(client: WeaveClient):
     """Test querying LLMStructuredCompletionModel objects by leaf/base object classes."""
     # Create multiple models
@@ -192,9 +267,7 @@ def test_llm_structured_completion_model_filtering(client: WeaveClient):
     assert len(combined_filter_res.objs) == 2
 
 
-@patch(
-    "weave.trace_server.interface.builtin_object_classes.llm_structured_model.get_weave_client"
-)
+@patch("weave.flow.llm_structured_model.get_weave_client")
 def test_llm_structured_completion_model_predict_text_response(mock_get_client):
     """Test the predict function with mocked LLM API response for text format."""
     # Setup mock client
@@ -244,9 +317,7 @@ def test_llm_structured_completion_model_predict_text_response(mock_get_client):
     assert call_args.inputs.messages == [{"role": "user", "content": "Hello"}]
 
 
-@patch(
-    "weave.trace_server.interface.builtin_object_classes.llm_structured_model.get_weave_client"
-)
+@patch("weave.flow.llm_structured_model.get_weave_client")
 def test_llm_structured_completion_model_predict_json_response(mock_get_client):
     """Test the predict function with mocked LLM API response for JSON format."""
     # Setup mock client
@@ -283,9 +354,7 @@ def test_llm_structured_completion_model_predict_json_response(mock_get_client):
     assert result["result"] == "success"
 
 
-@patch(
-    "weave.trace_server.interface.builtin_object_classes.llm_structured_model.get_weave_client"
-)
+@patch("weave.flow.llm_structured_model.get_weave_client")
 def test_llm_structured_completion_model_predict_with_template(mock_get_client):
     """Test the predict function with message templates and template variables."""
     # Setup mock client
@@ -342,9 +411,7 @@ def test_llm_structured_completion_model_predict_with_template(mock_get_client):
     assert call_args.inputs.messages == expected_messages
 
 
-@patch(
-    "weave.trace_server.interface.builtin_object_classes.llm_structured_model.get_weave_client"
-)
+@patch("weave.flow.llm_structured_model.get_weave_client")
 def test_llm_structured_completion_model_predict_with_config_override(mock_get_client):
     """Test the predict function with config parameter overriding defaults."""
     # Setup mock client
@@ -394,9 +461,7 @@ def test_llm_structured_completion_model_predict_with_config_override(mock_get_c
     assert call_args.inputs.max_tokens == 200  # Overridden
 
 
-@patch(
-    "weave.trace_server.interface.builtin_object_classes.llm_structured_model.get_weave_client"
-)
+@patch("weave.flow.llm_structured_model.get_weave_client")
 def test_llm_structured_completion_model_predict_error_handling(mock_get_client):
     """Test the predict function error handling."""
     # Setup mock client
@@ -655,9 +720,7 @@ def test_cast_to_message():
         cast_to_message(123)
 
 
-@patch(
-    "weave.trace_server.interface.builtin_object_classes.llm_structured_model.get_weave_client"
-)
+@patch("weave.flow.llm_structured_model.get_weave_client")
 def test_llm_structured_completion_model_predict_with_prompt(
     mock_get_client, client: WeaveClient
 ):
@@ -732,9 +795,7 @@ def test_llm_structured_completion_model_predict_with_prompt(
     assert call_args.inputs.messages == expected_messages
 
 
-@patch(
-    "weave.trace_server.interface.builtin_object_classes.llm_structured_model.get_weave_client"
-)
+@patch("weave.flow.llm_structured_model.get_weave_client")
 def test_llm_structured_completion_model_prompt_takes_precedence(
     mock_get_client, client: WeaveClient
 ):

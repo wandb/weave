@@ -586,7 +586,7 @@ not-iterable = "ignore"
 # Goal: the trace server (`weave.trace_server`) and the Weave client SDK
 # (everything else under `weave`) must not import each other, and workers must
 # additionally not reach into the client SDK. `weave.shared` is the intentional
-# neutral zone that both sides may import.
+# neutral zone that both sides may import, and it imports neither.
 #
 # The repo is currently entangled, so every existing cross-boundary import is
 # listed under each contract's `ignore_imports` as a TEMPORARY allowance. Those
@@ -597,6 +597,8 @@ not-iterable = "ignore"
 #
 # `allow_indirect_imports = true` keeps each contract focused on *direct*
 # imports, so every ignored entry maps to a concrete `import` statement to fix.
+# The `weave.shared` contract sets it to `false`: both sides import that
+# package, so an indirect path out of it couples them just the same.
 # ---------------------------------------------------------------------------
 [tool.importlinter]
 root_package = "weave"
@@ -634,13 +636,12 @@ allow_indirect_imports = true
 # listed here because the root cannot be a forbidden module without also
 # forbidding trace_server's internal imports; every file that does so also
 # leaks via a client subpackage below, so none escape the contract.
-# After the builtin move, llm_structured_model still imports the client SDK
-# from weave.shared. Those rows left this list because the source is no longer
-# weave.trace_server. The coupling is real and not enforced here.
 ignore_imports = [
   # evaluate_model_worker re-exports the body from the client side; its row goes
   # with that re-export.
   "weave.trace_server.workers.evaluate_model_worker.evaluate_model_worker -> weave.evaluation.evaluate_model_worker",
+  # llm_structured_model is the alias on the old path; its row goes with it.
+  "weave.trace_server.interface.builtin_object_classes.llm_structured_model -> weave.flow.llm_structured_model",
 ]
 
 [[tool.importlinter.contracts]]
@@ -709,3 +710,33 @@ ignore_imports = [
   # with that re-export.
   "weave.trace_server.workers.evaluate_model_worker.evaluate_model_worker -> weave.evaluation.evaluate_model_worker",
 ]
+
+[[tool.importlinter.contracts]]
+name = "Shared code must not import the Weave client SDK or the trace server"
+type = "forbidden"
+source_modules = ["weave.shared"]
+forbidden_modules = [
+  "weave.agent",
+  "weave.chat",
+  "weave.compat",
+  "weave.conversation",
+  "weave.dataset",
+  "weave.durability",
+  "weave.evaluation",
+  "weave.flow",
+  "weave.initialization",
+  "weave.integrations",
+  "weave.object",
+  "weave.prompt",
+  "weave.scorers",
+  "weave.session",
+  "weave.telemetry",
+  "weave.trace",
+  "weave.trace_server",
+  "weave.trace_server_bindings",
+  "weave.type_handlers",
+  "weave.type_wrappers",
+  "weave.utils",
+  "weave.wandb_interface",
+]
+allow_indirect_imports = false

@@ -2,11 +2,9 @@ from typing import Any, ClassVar
 
 from pydantic import AliasChoices, ConfigDict, Field, field_validator
 
+from weave.flow.llm_structured_model import LLMStructuredCompletionModel
 from weave.flow.scorer import Scorer
 from weave.prompt.prompt import MessagesPrompt
-from weave.shared.interface.builtin_object_classes.llm_structured_model import (
-    LLMStructuredCompletionModel,
-)
 from weave.trace.context.weave_client_context import get_weave_client
 from weave.trace.objectify import maybe_objectify, register_object
 from weave.trace.op import op
