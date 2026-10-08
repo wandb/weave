@@ -200,10 +200,7 @@ def test_clickhouse_calls_query_stream_empty_thread_ids_against_real_clickhouse(
 def test_calls_query_stats_uncapped_aggregation_in_order_is_opt_in(
     ch_server, monkeypatch, flag, limit, in_order_setting, has_more
 ):
-    """Uncapped grouped calls_merged counts aggregate in order only when opted in.
-
-    Limited counts keep ordered aggregation either way, and the count is unchanged.
-    """
+    """Check the executed setting, not just the builder's output."""
     key = "WF_CLICKHOUSE_UNCAPPED_STATS_AGGREGATION_IN_ORDER"
     if flag is None:
         monkeypatch.delenv(key, raising=False)

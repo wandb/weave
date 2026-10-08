@@ -165,7 +165,6 @@ def test_wf_clickhouse_calls_shard_key(env_value, expected, raises, monkeypatch)
 def test_wf_clickhouse_uncapped_stats_aggregation_in_order(
     env_value, expected, monkeypatch
 ):
-    """Uncapped stats keep hash aggregation unless the deployment sets true."""
     key = "WF_CLICKHOUSE_UNCAPPED_STATS_AGGREGATION_IN_ORDER"
     if env_value is None:
         monkeypatch.delenv(key, raising=False)

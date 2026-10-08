@@ -447,11 +447,7 @@ def wf_clickhouse_disable_query_failure_prediction() -> bool:
 
 
 def wf_clickhouse_uncapped_stats_aggregation_in_order() -> bool:
-    """Opt uncapped grouped calls_merged stats queries into in-order aggregation.
-
-    Off by default. It can shrink GROUP BY memory, but ordered merging can limit
-    parallelism and increase latency. Limited grouped stats keep the setting.
-    """
+    """Enable ordered aggregation for uncapped calls_merged stats (default off)."""
     return (
         os.environ.get(
             "WF_CLICKHOUSE_UNCAPPED_STATS_AGGREGATION_IN_ORDER", "false"

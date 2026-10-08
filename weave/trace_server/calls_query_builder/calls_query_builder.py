@@ -3043,9 +3043,8 @@ def build_calls_stats_query(
         req: The stats query request
         param_builder: Parameter builder for query parameterization
         read_table: Which calls table to read from
-        uncapped_aggregation_in_order: Also aggregate grouped calls_merged
-            counts in order when the request has no limit. Limited grouped counts
-            always do.
+        uncapped_aggregation_in_order: Enable ordered aggregation for uncapped
+            grouped calls_merged counts.
 
     Returns:
         Tuple of (SQL query string, column names in the result, ClickHouse

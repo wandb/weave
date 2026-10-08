@@ -5068,16 +5068,18 @@ def test_stats_query_calls_merged_with_expand_columns_falls_back_to_group_by() -
 @pytest.mark.parametrize(
     "read_table", [ReadTable.CALLS_MERGED, ReadTable.CALLS_COMPLETE]
 )
-@pytest.mark.parametrize("limit", [None, 5])
 @pytest.mark.parametrize("include_total_storage_size", [False, True])
-@pytest.mark.parametrize("uncapped_aggregation_in_order", [False, True])
+@pytest.mark.parametrize(
+    ("limit", "uncapped_aggregation_in_order", "expected_in_order"),
+    [(None, False, False), (None, True, True), (5, False, True), (5, True, True)],
+)
 def test_stats_query_aggregation_settings(
     read_table: ReadTable,
     limit: int | None,
     include_total_storage_size: bool,
     uncapped_aggregation_in_order: bool,
+    expected_in_order: bool,
 ) -> None:
-    """Grouped calls_merged counts aggregate in order when limited or opted in."""
     req = tsi.CallsQueryStatsReq(
         project_id="project",
         limit=limit,
@@ -5096,9 +5098,7 @@ def test_stats_query_aggregation_settings(
         req, default_pb, read_table
     )
     assert (query, pb.get_params()) == (default_query, default_pb.get_params())
-    in_order = read_table == ReadTable.CALLS_MERGED and (
-        limit is not None or uncapped_aggregation_in_order
-    )
+    in_order = read_table == ReadTable.CALLS_MERGED and expected_in_order
     assert settings == ({"optimize_aggregation_in_order": 1} if in_order else {})
     assert list(columns) == (
         ["count", "has_more", "total_storage_size_bytes"]
@@ -5125,7 +5125,6 @@ def test_stats_query_aggregation_settings(
 def test_stats_query_aggregation_opt_in_skips_flat_queries(
     req: tsi.CallsQueryStatsReq,
 ) -> None:
-    """The opt-in only reaches the grouped fallback; flat early returns are unchanged."""
     default_query, default_columns, default_settings = build_calls_stats_query(
         req, ParamBuilder("pb"), ReadTable.CALLS_MERGED
     )
@@ -5140,10 +5139,7 @@ def test_stats_query_aggregation_opt_in_skips_flat_queries(
 
 
 def test_stats_query_calls_merged_negated_time_bound_aggregation_is_opt_in() -> None:
-    """A negated upper bound misses Pattern 4, so it takes the grouped fallback.
-
-    That uncapped fallback keeps hash aggregation unless the deployment opts in.
-    """
+    """A negated upper bound bypasses the flat date-range optimization."""
     req = tsi.CallsQueryStatsReq(
         project_id="project",
         query=_started_at_query(
@@ -5204,10 +5200,7 @@ def test_stats_query_calls_merged_negated_time_bound_aggregation_is_opt_in() -> 
 
 
 def test_stats_query_calls_merged_caller_limit_keeps_setting() -> None:
-    """Limited grouped counts retain ordered aggregation and the has_more threshold.
-
-    The op-name filter exercises GROUP BY rather than the flat optimized path.
-    """
+    """The op-name filter exercises grouping rather than the flat path."""
     req = tsi.CallsQueryStatsReq(
         project_id="project",
         limit=5,
