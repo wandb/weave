@@ -844,6 +844,12 @@ deterministic.
 - Messages come only from LLM spans, because the LangChain instrumentor also
   writes partial `llm.input_messages` from graph state onto CHAIN spans.
   System-role messages go to `system_instructions`, as on the completions path.
+  Without `llm.input_messages`/`llm.output_messages`, messages come from
+  `llm.prompts`/`llm.choices`, else from `input.value`/`output.value` when it
+  is plain text, OpenAI messages or a response, a LangChain `LLMResult`, or an
+  object with one string value (`@tracer.llm` on a one-argument function).
+  A `text/plain` value is always text. Ingest decodes JSON-looking strings
+  before redaction, so such text comes back re-serialized.
 - Image parts become GenAI `blob` parts for data URLs and `uri` parts
   otherwise. The ingest blob strip runs first and replaces a data URL over
   8 KiB with a content ref, which the chat view shows on the message.

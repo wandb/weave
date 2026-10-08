@@ -637,6 +637,13 @@ def _parts(*parts: dict[str, Any]) -> str:
     return json.dumps(list(parts))
 
 
+def _text_messages(role: str, *texts: str) -> list[NormalizedMessage]:
+    return [
+        NormalizedMessage(role=role, content=_parts({"type": "text", "content": text}))
+        for text in texts
+    ]
+
+
 def test_openinference_llm_span_fills_chat_columns() -> None:
     span = _openinference_span(_OPENINFERENCE_LLM_ATTRS, "ChatOpenAI")
     result = extract_genai_span(span, project_id="p1")
@@ -1175,6 +1182,154 @@ def test_openinference_message_contents_without_a_type_are_text() -> None:
         ],
         ["Be brief."],
     )
+
+
+@pytest.mark.parametrize(
+    ("value_attrs", "expected"),
+    [
+        pytest.param(
+            {
+                "llm.prompts": ["Question: Weather in Paris?\nAnswer:"],
+                "input.value": json.dumps(
+                    {"prompts": ["Question: Weather in Paris?\nAnswer:"]}
+                ),
+                "output.value": json.dumps(
+                    {
+                        "generations": [
+                            [
+                                {
+                                    "text": "Sunny and 21C.",
+                                    "generation_info": {"finish_reason": "stop"},
+                                    "type": "Generation",
+                                }
+                            ]
+                        ],
+                        "type": "LLMResult",
+                    }
+                ),
+            },
+            (
+                _text_messages("user", "Question: Weather in Paris?\nAnswer:"),
+                _text_messages("assistant", "Sunny and 21C."),
+                [],
+            ),
+            id="langchain-completion-model",
+        ),
+        pytest.param(
+            {
+                "llm.prompts.0.prompt.text": "Say hello.",
+                "llm.choices.0.completion.text": "Hello!",
+            },
+            (
+                _text_messages("user", "Say hello."),
+                _text_messages("assistant", "Hello!"),
+                [],
+            ),
+            id="openai-completions-api",
+        ),
+        pytest.param(
+            {
+                "input.value": json.dumps({"prompt": "Question: Weather in Paris?"}),
+                "output.value": "It is sunny in Paris.",
+            },
+            (
+                _text_messages("user", "Question: Weather in Paris?"),
+                _text_messages("assistant", "It is sunny in Paris."),
+                [],
+            ),
+            id="one-argument-llm-decorator",
+        ),
+        pytest.param(
+            {
+                "input.value": json.dumps(
+                    {
+                        "messages": [
+                            {
+                                "role": "system",
+                                "content": "You are a weather assistant.",
+                            },
+                            {"role": "user", "content": "Weather in Paris?"},
+                        ]
+                    }
+                ),
+                "output.value": json.dumps(
+                    {
+                        "id": "chatcmpl-40",
+                        "object": "chat.completion",
+                        "choices": [
+                            {
+                                "index": 0,
+                                "finish_reason": "stop",
+                                "message": {
+                                    "role": "assistant",
+                                    "content": "Sunny, 21C.",
+                                    "tool_calls": None,
+                                },
+                            }
+                        ],
+                    }
+                ),
+            },
+            (
+                _text_messages("user", "Weather in Paris?"),
+                _text_messages("assistant", "Sunny, 21C."),
+                ["You are a weather assistant."],
+            ),
+            id="openai-messages-and-chat-completion",
+        ),
+        pytest.param(
+            {
+                "input.value": json.dumps(
+                    {"question": "Weather in Paris?", "top_k": 3}
+                ),
+                "output.value": json.dumps({"documents": []}),
+            },
+            ([], [], []),
+            id="other-json-values",
+        ),
+        pytest.param(
+            {
+                "input.value": json.dumps({"prompt": "Answer as JSON."}),
+                "input.mime_type": "application/json",
+                "output.value": '{"answer": "Paris"}',
+                "output.mime_type": "text/plain",
+            },
+            (
+                _text_messages("user", "Answer as JSON."),
+                _text_messages("assistant", '{"answer": "Paris"}'),
+                [],
+            ),
+            id="plain-text-json-object",
+        ),
+        pytest.param(
+            {
+                "input.value": "Name two cities.",
+                "input.mime_type": "text/plain",
+                "output.value": '["Paris", "London"]',
+                "output.mime_type": "text/plain",
+            },
+            (
+                _text_messages("user", "Name two cities."),
+                _text_messages("assistant", '["Paris", "London"]'),
+                [],
+            ),
+            id="plain-text-json-list",
+        ),
+    ],
+)
+def test_openinference_llm_span_without_messages_reads_prompts_and_values(
+    value_attrs: dict[str, Any],
+    expected: tuple[list[NormalizedMessage], list[NormalizedMessage], list[str]],
+) -> None:
+    span = _openinference_span(
+        {"openinference.span.kind": "LLM", **value_attrs}, "manual_llm"
+    )
+    result = extract_genai_span(span, project_id="p1")
+    assert (
+        result.input_messages,
+        result.output_messages,
+        result.system_instructions,
+    ) == expected
 
 
 def test_openinference_image_parts_map_to_blob_and_uri_parts() -> None:
