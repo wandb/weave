@@ -1,16 +1,15 @@
 import pytest
 
-from weave.flow import llm_structured_model
+from weave.flow import llm_structured_model as llm_structured_model_sdk
 from weave.shared.interface.builtin_object_classes import (
     annotation_spec,
     builtin_object_registry,
     leaderboard,
+    llm_structured_model,
     saved_view,
     test_only_example,
 )
-from weave.shared.interface.builtin_object_classes import (
-    llm_structured_model as llm_structured_model_schema,
-)
+from weave.trace.object_record import class_all_bases_names
 from weave.trace_server.interface.builtin_object_classes import (
     annotation_spec as annotation_spec_legacy,
 )
@@ -47,14 +46,23 @@ def test_trace_server_builtin_object_classes_reexport_the_same_objects() -> None
         builtin_object_registry.BUILTIN_OBJECT_REGISTRY
         is builtin_object_registry_legacy.BUILTIN_OBJECT_REGISTRY
     )
+    assert llm_structured_model_legacy is llm_structured_model_sdk
+    assert llm_structured_model_legacy.Message is llm_structured_model.Message
     assert (
-        llm_structured_model.LLMStructuredCompletionModel
-        is llm_structured_model_legacy.LLMStructuredCompletionModel
+        llm_structured_model_legacy.LLMStructuredCompletionModelDefaultParams
+        is llm_structured_model.LLMStructuredCompletionModelDefaultParams
+    )
+    assert (
+        llm_structured_model_legacy.parse_response
+        is llm_structured_model.parse_response
     )
 
 
 def test_llm_structured_model_schema_matches_the_sdk_model() -> None:
     assert (
-        llm_structured_model_schema.LLMStructuredCompletionModel.model_json_schema()
-        == llm_structured_model.LLMStructuredCompletionModel.model_json_schema()
+        llm_structured_model.LLMStructuredCompletionModel.model_json_schema()
+        == llm_structured_model_sdk.LLMStructuredCompletionModel.model_json_schema()
     )
+    assert list(
+        llm_structured_model.LLMStructuredCompletionModel._weave_serialized_bases
+    ) == class_all_bases_names(llm_structured_model_sdk.LLMStructuredCompletionModel)

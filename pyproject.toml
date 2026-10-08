@@ -586,7 +586,7 @@ not-iterable = "ignore"
 # Goal: the trace server (`weave.trace_server`) and the Weave client SDK
 # (everything else under `weave`) must not import each other, and workers must
 # additionally not reach into the client SDK. `weave.shared` is the intentional
-# neutral zone that both sides may import.
+# neutral zone that both sides may import, and it imports neither.
 #
 # The repo is currently entangled, so every existing cross-boundary import is
 # listed under each contract's `ignore_imports` as a TEMPORARY allowance. Those
@@ -597,6 +597,8 @@ not-iterable = "ignore"
 #
 # `allow_indirect_imports = true` keeps each contract focused on *direct*
 # imports, so every ignored entry maps to a concrete `import` statement to fix.
+# The `weave.shared` contract sets it to `false`: both sides import that
+# package, so an indirect path out of it couples them just the same.
 # ---------------------------------------------------------------------------
 [tool.importlinter]
 root_package = "weave"
@@ -638,8 +640,7 @@ ignore_imports = [
   # evaluate_model_worker re-exports the body from the client side; its row goes
   # with that re-export.
   "weave.trace_server.workers.evaluate_model_worker.evaluate_model_worker -> weave.evaluation.evaluate_model_worker",
-  # llm_structured_model re-exports the executable model from the client side;
-  # its row goes with that re-export.
+  # llm_structured_model is the alias on the old path; its row goes with it.
   "weave.trace_server.interface.builtin_object_classes.llm_structured_model -> weave.flow.llm_structured_model",
 ]
 
@@ -738,6 +739,4 @@ forbidden_modules = [
   "weave.utils",
   "weave.wandb_interface",
 ]
-# Indirect chains count too: both sides import weave.shared, so a path out of
-# it through any other module would couple them again.
 allow_indirect_imports = false

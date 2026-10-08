@@ -112,8 +112,7 @@ LLMStructuredModelParamsLike = Annotated[
 class LLMStructuredCompletionModel(base_object_def.BaseObject):
     model_config = ConfigDict(arbitrary_types_allowed=True, extra="forbid")
 
-    # Stored as the SDK model in weave.flow, so the server writes the same _bases
-    # and digest for it.
+    # Keeps the _bases, and so the digest, of the SDK model in weave.flow.
     _weave_serialized_bases: ClassVar[tuple[str, ...]] = (
         "Model",
         "Object",

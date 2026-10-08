@@ -15,7 +15,6 @@ from weave.shared.interface.builtin_object_classes.builtin_object_registry impor
     TestOnlyExample,
     TestOnlyInheritedBaseObject,
     TestOnlyNestedBaseObject,
-    register_base_object,
 )
 
 __all__ = [
@@ -36,9 +35,12 @@ __all__ = [
     "register_base_object",
 ]
 
-# The server validates against the passive schema in weave.shared; the SDK
-# decodes stored objects into the executable model.
 BUILTIN_OBJECT_REGISTRY: dict[str, type[BaseModel]] = {
     **builtin_object_registry.BUILTIN_OBJECT_REGISTRY,
     LLMStructuredCompletionModel.__name__: LLMStructuredCompletionModel,
 }
+
+
+def register_base_object(cls: type[BaseObject]) -> None:
+    builtin_object_registry.register_base_object(cls)
+    BUILTIN_OBJECT_REGISTRY[cls.__name__] = cls

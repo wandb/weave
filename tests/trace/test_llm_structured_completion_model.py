@@ -125,6 +125,8 @@ def test_server_stores_the_sdk_model_payload_and_digest(client: WeaveClient):
                     "project_id": client.project_id,
                     "object_id": "llm_model_payload",
                     "val": {
+                        "_type": "LLMStructuredCompletionModel",
+                        "_class_name": "LLMStructuredCompletionModel",
                         "llm_model_id": "gpt-4o",
                         "default_params": {
                             "messages_template": [
