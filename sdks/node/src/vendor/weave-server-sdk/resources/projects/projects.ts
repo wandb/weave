@@ -47,6 +47,8 @@ export interface ProjectStatsResponse {
   tables_storage_size_bytes: number;
 
   trace_storage_size_bytes: number;
+
+  spans_storage_size_bytes?: number;
 }
 
 export interface ProjectStatsParams {
