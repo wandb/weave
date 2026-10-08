@@ -37,6 +37,7 @@ TOOL_DESCRIPTION_KEYS = ("tool.description",)
 TOOL_CALL_ID_KEYS = ("tool.id",)
 
 _SPAN_KIND_KEY = "openinference.span.kind"
+_METADATA_KEY = "metadata"
 _INPUT_MESSAGES_KEY = "llm.input_messages"
 _OUTPUT_MESSAGES_KEY = "llm.output_messages"
 _PROMPTS_KEY = "llm.prompts"
@@ -58,6 +59,10 @@ _KIND_TO_OPERATION = {
     "EMBEDDING": "embeddings",
     "RETRIEVER": "retrieval",
 }
+# The `ls_integration` run metadata LangGraph and LangChain's `create_agent` set.
+_LANGGRAPH_INTEGRATIONS = ("langgraph", "langchain_create_agent")
+# The nodes `create_agent` adds to its graph, besides middleware hooks.
+_CREATE_AGENT_NODES = ("model", "tools")
 _SYSTEM_ROLE = "system"
 _USER_ROLE = "user"
 _ASSISTANT_ROLE = "assistant"
@@ -66,14 +71,26 @@ _TEXT_CONTENT_TYPE = "text"
 _FUNCTION_TOOL_TYPE = "function"
 
 
-def operation_name(attrs: dict[str, Any], *, is_root: bool) -> str:
+def operation_name(attrs: dict[str, Any], span_name: str, *, is_root: bool) -> str:
     """Map `openinference.span.kind` to a GenAI operation name, or "".
 
-    A CHAIN span with no parent in its process is the turn, so it maps to
-    `invoke_agent`, the shape GenAI agent SDKs emit. LangGraph reports its root
-    graph span as CHAIN unless the graph's name contains "agent".
+    The LangChain instrumentor labels a run AGENT when its name contains
+    "agent", which makes `create_react_agent`'s `agent` model node look like an
+    agent. LangGraph spans take agent identity from LangGraph run metadata
+    instead: the outermost graph run (no `langgraph_node`) is the turn, and a
+    named `create_agent` graph is a subagent (see `_is_named_agent_run`). Any
+    other root CHAIN span is the turn, the shape GenAI agent SDKs emit.
     """
     kind = _span_kind(attrs)
+    metadata = _metadata(attrs)
+    if (
+        kind in {_CHAIN_KIND, _AGENT_KIND}
+        and metadata.get("ls_integration") in _LANGGRAPH_INTEGRATIONS
+    ):
+        is_agent = "langgraph_node" not in metadata or _is_named_agent_run(
+            span_name, metadata
+        )
+        return OP_INVOKE_AGENT if is_agent else ""
     if kind == _CHAIN_KIND and is_root:
         return OP_INVOKE_AGENT
     return _KIND_TO_OPERATION.get(kind, "")
@@ -167,6 +184,31 @@ def tool_call_id(attrs: dict[str, Any]) -> str:
 
 def _span_kind(attrs: dict[str, Any]) -> str:
     return str(get_attribute(attrs, _SPAN_KIND_KEY) or "").upper()
+
+
+def _metadata(attrs: dict[str, Any]) -> dict[str, Any]:
+    """The LangChain instrumentor's run `metadata`, a JSON object ingest decodes."""
+    value = get_attribute(attrs, _METADATA_KEY)
+    return value if isinstance(value, dict) else {}
+
+
+def _is_named_agent_run(span_name: str, metadata: dict[str, Any]) -> bool:
+    """Whether a LangGraph span is the run of the `create_agent` graph it names.
+
+    The graph's own nodes inherit `lc_agent_name`. An agent named after one of
+    them (`model` or `tools`) therefore counts only as a graph run under a
+    top-level node, where `checkpoint_ns` equals `langgraph_checkpoint_ns`.
+    LangChain sets `checkpoint_ns` once, at the first nested level, so deeper
+    runs of such an agent cannot be told from its nodes.
+    """
+    if span_name != metadata.get("lc_agent_name"):
+        return False
+    if span_name not in _CREATE_AGENT_NODES:
+        return True
+    checkpoint_ns = metadata.get("checkpoint_ns")
+    return bool(checkpoint_ns) and checkpoint_ns == metadata.get(
+        "langgraph_checkpoint_ns"
+    )
 
 
 def _tool_message(value: Any) -> dict[str, Any] | None:

@@ -841,6 +841,19 @@ deterministic.
   span: LangGraph's unnamed root graph span is a CHAIN called `LangGraph`. The
   span name becomes the agent name only when the resolved operation is
   `invoke_agent`, so an explicit `gen_ai.operation.name` such as `chat` wins.
+- The LangChain instrumentor labels any run whose name contains "agent" as
+  AGENT, which makes `create_react_agent`'s `agent` model node look like an
+  agent. LangGraph CHAIN and AGENT spans (`metadata.ls_integration` is
+  `langgraph` or `langchain_create_agent`) therefore take agent identity from
+  LangGraph run metadata: the outermost graph run (no `langgraph_node`) is the
+  turn, also under an HTTP server span, and a named `create_agent` graph (span
+  name equals `lc_agent_name`) is a subagent. Other LangGraph spans are not
+  agents, including `create_react_agent` subgraphs, which carry no
+  `lc_agent_name`. The graph's `model` and `tools` nodes inherit
+  `lc_agent_name`, so an agent with one of those names counts only as a graph
+  run under a top-level node, whose `checkpoint_ns` equals its
+  `langgraph_checkpoint_ns`; LangChain sets `checkpoint_ns` once, at the first
+  nested level.
 - Messages come only from LLM spans, because the LangChain instrumentor also
   writes partial `llm.input_messages` from graph state onto CHAIN spans.
   System-role messages go to `system_instructions`, as on the completions path.
