@@ -5065,6 +5065,82 @@ def test_stats_query_calls_merged_with_expand_columns_falls_back_to_group_by() -
     )
 
 
+@pytest.mark.parametrize("read_table", [ReadTable.CALLS_MERGED, ReadTable.CALLS_COMPLETE])
+@pytest.mark.parametrize("limit", [None, 5])
+@pytest.mark.parametrize("include_total_storage_size", [False, True])
+def test_stats_query_aggregation_settings(
+    read_table: ReadTable, limit: int | None, include_total_storage_size: bool
+) -> None:
+    req = tsi.CallsQueryStatsReq(
+        project_id="project",
+        limit=limit,
+        include_total_storage_size=include_total_storage_size,
+        filter=tsi.CallsFilter(op_names=["my_op"]),
+    )
+    _query, columns, settings = build_calls_stats_query(req, ParamBuilder("pb"), read_table)
+    assert settings == (
+        {"optimize_aggregation_in_order": 1}
+        if read_table == ReadTable.CALLS_MERGED
+        else {}
+    )
+    assert list(columns) == (
+        ["count", "has_more", "total_storage_size_bytes"]
+        if include_total_storage_size
+        else ["count", "has_more"]
+    )
+
+
+def test_stats_query_calls_merged_negated_time_bound_uses_ordered_aggregation() -> None:
+    req = tsi.CallsQueryStatsReq(
+        project_id="project",
+        query=_started_at_query(
+            {
+                "$and": [
+                    {"$gte": [{"$getField": "started_at"}, {"$literal": 1709251200}]},
+                    {
+                        "$not": [
+                            {
+                                "$gte": [
+                                    {"$getField": "started_at"},
+                                    {"$literal": 1709337600},
+                                ]
+                            }
+                        ]
+                    },
+                ]
+            }
+        ),
+    )
+    _query, columns, settings = build_calls_stats_query(
+        req, ParamBuilder("pb"), ReadTable.CALLS_MERGED
+    )
+    assert_stats_sql(
+        req,
+        """
+        SELECT count() AS count, toUInt8(0) AS has_more FROM (
+            SELECT calls_merged.id AS id
+            FROM calls_merged PREWHERE calls_merged.project_id = {pb_4:String}
+            WHERE (calls_merged.sortable_datetime >= {pb_2:String}
+                   AND NOT (calls_merged.sortable_datetime >= {pb_3:String}))
+            GROUP BY (calls_merged.project_id, calls_merged.id)
+            HAVING (((any(calls_merged.started_at) >= {pb_0:String}))
+                    AND ((NOT ((any(calls_merged.started_at) >= {pb_1:String}))))
+                    AND ((any(calls_merged.deleted_at) IS NULL))
+                    AND ((NOT ((any(calls_merged.op_name) IS NULL))))))
+        """,
+        {
+            "pb_0": "2024-03-01 00:00:00.000000",
+            "pb_1": "2024-03-02 00:00:00.000000",
+            "pb_2": "2024-02-29 23:55:00.000000",
+            "pb_3": "2024-03-02 00:05:00.000000",
+            "pb_4": "project",
+        },
+        read_table=ReadTable.CALLS_MERGED,
+    )
+    assert settings == {"optimize_aggregation_in_order": 1}
+    assert list(columns) == ["count", "has_more"]
+
+
 def test_stats_query_calls_merged_caller_limit_keeps_setting() -> None:
     """Caller-supplied limit also triggers the streaming-aggregate setting and
     `has_more` reflects saturation against the caller's limit. A filter is
