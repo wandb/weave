@@ -53,10 +53,14 @@ class TestMakeProjectStatsQuery:
                     )
                     FROM calls_merged_stats
                     WHERE project_id = {pb_0: String}
-                ) AS trace_storage_size_bytes
+                ) AS trace_storage_size_bytes,
+                (SELECT sum(size_bytes)
+                    FROM spans_stats
+                    WHERE project_id = {pb_0: String}
+                ) AS spans_storage_size_bytes
         """
         assert_sql(query, expected_sql, pb.get_params(), {"pb_0": "test_project"})
-        assert columns == ["trace_storage_size_bytes"]
+        assert columns == ["trace_storage_size_bytes", "spans_storage_size_bytes"]
 
     def test_trace_storage_only_calls_complete(self) -> None:
         """Verify SQL when only trace storage is requested with calls_complete."""
@@ -82,10 +86,14 @@ class TestMakeProjectStatsQuery:
                     )
                     FROM calls_complete_stats
                     WHERE project_id = {pb_0: String}
-                ) AS trace_storage_size_bytes
+                ) AS trace_storage_size_bytes,
+                (SELECT sum(size_bytes)
+                    FROM spans_stats
+                    WHERE project_id = {pb_0: String}
+                ) AS spans_storage_size_bytes
         """
         assert_sql(query, expected_sql, pb.get_params(), {"pb_0": "test_project"})
-        assert columns == ["trace_storage_size_bytes"]
+        assert columns == ["trace_storage_size_bytes", "spans_storage_size_bytes"]
 
     def test_objects_storage_only(self) -> None:
         """Verify SQL when only objects storage is requested."""
@@ -179,6 +187,10 @@ class TestMakeProjectStatsQuery:
                     WHERE project_id = {pb_0: String}
                 ) AS trace_storage_size_bytes,
                 (SELECT sum(size_bytes)
+                    FROM spans_stats
+                    WHERE project_id = {pb_0: String}
+                ) AS spans_storage_size_bytes,
+                (SELECT sum(size_bytes)
                     FROM object_versions_stats
                     WHERE project_id = {pb_0: String}
                 ) AS objects_storage_size_bytes,
@@ -194,6 +206,7 @@ class TestMakeProjectStatsQuery:
         assert_sql(query, expected_sql, pb.get_params(), {"pb_0": "test_project"})
         assert columns == [
             "trace_storage_size_bytes",
+            "spans_storage_size_bytes",
             "objects_storage_size_bytes",
             "tables_storage_size_bytes",
             "files_storage_size_bytes",
@@ -225,6 +238,10 @@ class TestMakeProjectStatsQuery:
                     WHERE project_id = {pb_0: String}
                 ) AS trace_storage_size_bytes,
                 (SELECT sum(size_bytes)
+                    FROM spans_stats
+                    WHERE project_id = {pb_0: String}
+                ) AS spans_storage_size_bytes,
+                (SELECT sum(size_bytes)
                     FROM object_versions_stats
                     WHERE project_id = {pb_0: String}
                 ) AS objects_storage_size_bytes,
@@ -240,6 +257,7 @@ class TestMakeProjectStatsQuery:
         assert_sql(query, expected_sql, pb.get_params(), {"pb_0": "test_project"})
         assert columns == [
             "trace_storage_size_bytes",
+            "spans_storage_size_bytes",
             "objects_storage_size_bytes",
             "tables_storage_size_bytes",
             "files_storage_size_bytes",
@@ -281,7 +299,11 @@ class TestMakeProjectStatsQuery:
                     )
                     FROM calls_merged_stats
                     WHERE project_id = {pb_0: String}
-                ) AS trace_storage_size_bytes
+                ) AS trace_storage_size_bytes,
+                (SELECT sum(size_bytes)
+                    FROM spans_stats
+                    WHERE project_id = {pb_0: String}
+                ) AS spans_storage_size_bytes
         """
         assert_sql(
             query, expected_sql, pb.get_params(), {"pb_0": "malicious'--project"}
