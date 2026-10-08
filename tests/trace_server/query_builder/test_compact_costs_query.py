@@ -330,3 +330,101 @@ def test_complete_page_without_full_call_key_order_keeps_existing_path(sort):
         pb = ParamBuilder("pb")
         queries.append((query.as_sql(pb), pb.get_params()))
     assert queries[0] == queries[1]
+
+
+@pytest.mark.parametrize("seeded_calls", list(ReadTable), indirect=True)
+def test_compact_costs_read_call_relation_once(seeded_calls):
+    server, read_table = seeded_calls
+    query = make_query(read_table, True, "started_at", limit=3)
+    pb = ParamBuilder("pb")
+    rows = server.ch_client.query(
+        "EXPLAIN indexes=1 " + query.as_sql(pb),
+        parameters=pb.get_params(),
+    ).result_rows
+    plan = "\n".join(row[0] for row in rows)
+    assert (
+        sum(
+            "ReadFromMergeTree" in line and read_table.value in line
+            for line in plan.splitlines()
+        )
+        == 1
+    ), plan
+
+
+@pytest.mark.parametrize("seeded_calls", list(ReadTable), indirect=True)
+def test_price_history_preserves_time_and_scope_precedence(seeded_calls):
+    server, read_table = seeded_calls
+    prefix = str(uuid.uuid4())
+    prices = [
+        (f"{prefix}-past-default", "project", PROJECT, 2026, 9.0),
+        (f"{prefix}-past-default", "default", "default", 2024, 1.0),
+        (f"{prefix}-past-project", "project", PROJECT, 2023, 2.0),
+        (f"{prefix}-past-project", "default", "default", 2024, 1.0),
+        (f"{prefix}-all-future", "project", PROJECT, 2026, 9.0),
+        (f"{prefix}-all-future", "project", PROJECT, 2028, 3.0),
+        (f"{prefix}-all-future", "default", "default", 2029, 1.0),
+    ]
+    for model, level, level_id, year, rate in prices:
+        server.ch_client.command(
+            "INSERT INTO llm_token_prices "
+            "(id, llm_id, pricing_level, pricing_level_id, effective_date, "
+            "prompt_token_cost, completion_token_cost) VALUES "
+            "({id:String}, {model:String}, {level:String}, {level_id:String}, "
+            "{effective:DateTime64(3)}, {rate:Float64}, {rate:Float64})",
+            parameters={
+                "id": str(uuid.uuid4()),
+                "model": model,
+                "level": level,
+                "level_id": level_id,
+                "effective": START.replace(year=year),
+                "rate": rate,
+            },
+        )
+    call_id = str(uuid.uuid4())
+    start = tsi.CallStartReq(
+        start=tsi.StartedCallSchemaForInsert(
+            project_id=PROJECT,
+            id=call_id,
+            trace_id=str(uuid.uuid4()),
+            op_name="pricing-precedence",
+            started_at=START,
+            attributes={},
+            inputs={},
+        )
+    )
+    end = tsi.CallEndReq(
+        end=tsi.EndedCallSchemaForInsert(
+            project_id=PROJECT,
+            id=call_id,
+            started_at=START,
+            ended_at=START + datetime.timedelta(seconds=1),
+            output={},
+            summary={
+                "usage": {
+                    model: {"input_tokens": 10}
+                    for model in [
+                        f"{prefix}-past-default",
+                        f"{prefix}-past-project",
+                        f"{prefix}-all-future",
+                    ]
+                }
+            },
+        )
+    )
+    if read_table == ReadTable.CALLS_MERGED:
+        server.call_start(start)
+        server.call_end(end)
+    else:
+        server.call_start_v2(start)
+        server.call_end_v2(end)
+    baseline = execute(server, make_query(read_table, False, "started_at"), read_table)
+    candidate = execute(server, make_query(read_table, True, "started_at"), read_table)
+    assert candidate == baseline
+    costs = next(row for row in candidate if row["id"] == call_id)["summary_dump"][
+        "weave"
+    ]["costs"]
+    assert {model: cost["prompt_token_cost"] for model, cost in costs.items()} == {
+        f"{prefix}-past-default": 1.0,
+        f"{prefix}-past-project": 2.0,
+        f"{prefix}-all-future": 3.0,
+    }

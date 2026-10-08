@@ -30,8 +30,7 @@ WITH filtered_calls AS
    ORDER BY any(calls_merged.started_at) DESC, calls_merged.id ASC),
      llm_usage AS
   (-- From the all_calls we get the usage data for LLMs
- SELECT id,
-        started_at,
+ SELECT *,
         ifNull(JSONExtractRaw(summary_dump, 'usage'), '{}') AS usage_raw,
         arrayJoin(if(usage_raw != ''
                      and usage_raw != '{}', JSONExtractKeysAndValuesRaw(usage_raw), [('weave_dummy_llm_id', '{\"requests\": 0, \"prompt_tokens\": 0, \"completion_tokens\": 0, \"total_tokens\": 0, \"cache_read_input_tokens\": 0, \"cache_creation_input_tokens\": 0}')])) AS kv,
@@ -45,65 +44,65 @@ WITH filtered_calls AS
    FROM all_calls),
      ranked_prices AS
   (-- based on the llm_ids in the usage data we get all the prices and rank them according to specificity and effective date
- SELECT *,
-        llm_token_prices.id,
-        llm_token_prices.pricing_level,
-        llm_token_prices.pricing_level_id,
-        llm_token_prices.provider_id,
-        llm_token_prices.llm_id,
-        llm_token_prices.effective_date,
-        llm_token_prices.prompt_token_cost,
-        llm_token_prices.completion_token_cost,
-        llm_token_prices.cache_read_input_token_cost,
-        llm_token_prices.cache_creation_input_token_cost,
-        llm_token_prices.prompt_token_cost_unit,
-        llm_token_prices.completion_token_cost_unit,
-        llm_token_prices.created_by,
-        llm_token_prices.created_at,
+ SELECT llm_usage.*,
+        best_price.1 AS `llm_token_prices.id`,
+        best_price.2 AS pricing_level,
+        best_price.3 AS pricing_level_id,
+        best_price.4 AS provider_id,
+        best_price.5 AS `llm_token_prices.llm_id`,
+        best_price.6 AS effective_date,
+        best_price.7 AS prompt_token_cost,
+        best_price.8 AS completion_token_cost,
+        best_price.9 AS cache_read_input_token_cost,
+        best_price.10 AS cache_creation_input_token_cost,
+        best_price.11 AS prompt_token_cost_unit,
+        best_price.12 AS completion_token_cost_unit,
+        best_price.13 AS created_by,
+        best_price.14 AS created_at,
         ROW_NUMBER() OVER (PARTITION BY llm_usage.id, llm_usage.llm_id
-                           ORDER BY CASE -- Order by effective_date
-
-                                        WHEN llm_usage.started_at >= llm_token_prices.effective_date THEN 1
-                                        ELSE 2
-                                    END, CASE -- Order by pricing level then by effective_date
- -- WHEN llm_token_prices.pricing_level = 'org' AND llm_token_prices.pricing_level_id = ORG_PARAM THEN 1
-
-                                             WHEN llm_token_prices.pricing_level = 'project'
-                                                  AND llm_token_prices.pricing_level_id = 'UHJvamVjdEludGVybmFsSWQ6NDI3Mjk1MTc=' THEN 2
-                                             WHEN llm_token_prices.pricing_level = 'default'
-                                                  AND llm_token_prices.pricing_level_id = 'default' THEN 3
-                                             ELSE 4
-                                         END, llm_token_prices.effective_date DESC) AS rank
+                           ORDER BY if(llm_usage.started_at >= best_price.6, 1, 2), multiIf(best_price.2 = 'project'
+                                                                                            AND best_price.3 = {pb_0:String}, 2, best_price.2 = 'default'
+                                                                                            AND best_price.3 = {pb_1:String}, 3, 4), best_price.6 DESC) AS rank
    FROM llm_usage GLOBAL
-   LEFT JOIN llm_token_prices ON ((llm_usage.llm_id = llm_token_prices.llm_id)
-                                  AND ((llm_token_prices.pricing_level_id = {pb_1:String})
-                                       OR (llm_token_prices.pricing_level_id = {pb_2:String})
-                                       OR (llm_token_prices.pricing_level_id = {pb_3:String})))),
-     call_costs AS
-  (-- Final Select, which just selects the correct fields, and adds a costs object
+   LEFT JOIN
+     (SELECT llm_id,
+             arraySort(price -> tuple(multiIf(price.2 = 'project'
+                                              AND price.3 = {pb_0:String}, 2, price.2 = 'default'
+                                              AND price.3 = {pb_1:String}, 3, 4), -toUnixTimestamp64Micro(toDateTime64(price.6, 6))), groupArray(tuple(id, pricing_level, pricing_level_id, provider_id, llm_id, effective_date, prompt_token_cost, completion_token_cost, cache_read_input_token_cost, cache_creation_input_token_cost, prompt_token_cost_unit, completion_token_cost_unit, created_by, created_at))) AS price_history
+      FROM llm_token_prices
+      WHERE pricing_level_id IN ({pb_0:String}, {pb_1:String}, {pb_2:String})
+      GROUP BY llm_id) AS model_prices ON llm_usage.llm_id = model_prices.llm_id LEFT ARRAY
+   JOIN [arrayElement(price_history, greatest(arrayFirstIndex(
+    price -> llm_usage.started_at >= price.6, price_history
+), 1))] AS best_price) -- Final Select, which just selects the correct fields, and adds a costs object
+
 SELECT id,
+       project_id,
+       trace_id,
+       parent_id,
+       op_name,
+       started_at,
+       ended_at,
+exception,
+       display_name,
+       inputs_dump,
+       output_dump,
+       attributes_dump,
        if(any(llm_id) = 'weave_dummy_llm_id'
-          or any(llm_token_prices.id) == '', '', concat(',"weave":{', '"costs":', concat('{', arrayStringConcat(groupUniqArray(concat('"', toString(llm_id), '":{', '"prompt_tokens":', toString(prompt_tokens), ',', '"completion_tokens":', toString(completion_tokens), ',', '"requests":', toString(requests), ',', '"total_tokens":', toString(total_tokens), ',', '"cache_read_input_tokens":', toString(cache_read_input_tokens), ',', '"cache_creation_input_tokens":', toString(cache_creation_input_tokens), ',', '"prompt_token_cost":', toString(prompt_token_cost), ',', '"completion_token_cost":', toString(completion_token_cost), ',', '"cache_read_input_token_cost":', toString(cache_read_input_token_cost), ',', '"cache_creation_input_token_cost":', toString(cache_creation_input_token_cost), ',', '"prompt_tokens_total_cost":', toString((prompt_tokens - cache_read_input_tokens - cache_creation_input_tokens) * prompt_token_cost), ',', '"completion_tokens_total_cost":', toString(completion_tokens * completion_token_cost), ',', '"cache_read_input_tokens_total_cost":', toString(cache_read_input_tokens * cache_read_input_token_cost), ',', '"cache_creation_input_tokens_total_cost":', toString(cache_creation_input_tokens * cache_creation_input_token_cost), ',', '"prompt_token_cost_unit":"', toString(prompt_token_cost_unit), '",', '"completion_token_cost_unit":"', toString(completion_token_cost_unit), '",', '"effective_date":"', toString(effective_date), '",', '"provider_id":"', toString(provider_id), '",', '"pricing_level":"', toString(pricing_level), '",', '"pricing_level_id":"', toString(pricing_level_id), '",', '"created_by":"', toString(created_by), '",', '"created_at":"', toString(created_at), '"}')), ','), '} }'))) AS cost_fragment
-   FROM ranked_prices
-   WHERE (rank = {pb_4:UInt64})
-   GROUP BY id)
-SELECT *
-FROM
-  (SELECT all_calls.id AS id,
-          all_calls.project_id AS project_id,
-          all_calls.trace_id AS trace_id,
-          all_calls.parent_id AS parent_id,
-          all_calls.op_name AS op_name,
-          all_calls.started_at AS started_at,
-          all_calls.ended_at AS ended_at,
-          all_calls.exception AS
-   exception,
-          all_calls.display_name AS display_name,
-          all_calls.inputs_dump AS inputs_dump,
-          all_calls.output_dump AS output_dump,
-          all_calls.attributes_dump AS attributes_dump,
-          if(call_costs.cost_fragment = '', all_calls.summary_dump, concat(left(all_calls.summary_dump, length(all_calls.summary_dump) - 1), call_costs.cost_fragment, '}')) AS summary_dump
-   FROM all_calls GLOBAL
-   INNER JOIN call_costs ON all_calls.id = call_costs.id) AS cost_enriched_calls
-ORDER BY cost_enriched_calls.started_at DESC,
-         cost_enriched_calls.id ASC
+          or any(llm_token_prices.id) == '', any(summary_dump), concat(left(any(summary_dump), length(any(summary_dump)) - 1), ',"weave":{', '"costs":', concat('{', arrayStringConcat(groupUniqArray(concat('"', toString(llm_id), '":{', '"prompt_tokens":', toString(prompt_tokens), ',', '"completion_tokens":', toString(completion_tokens), ',', '"requests":', toString(requests), ',', '"total_tokens":', toString(total_tokens), ',', '"cache_read_input_tokens":', toString(cache_read_input_tokens), ',', '"cache_creation_input_tokens":', toString(cache_creation_input_tokens), ',', '"prompt_token_cost":', toString(prompt_token_cost), ',', '"completion_token_cost":', toString(completion_token_cost), ',', '"cache_read_input_token_cost":', toString(cache_read_input_token_cost), ',', '"cache_creation_input_token_cost":', toString(cache_creation_input_token_cost), ',', '"prompt_tokens_total_cost":', toString((prompt_tokens - cache_read_input_tokens - cache_creation_input_tokens) * prompt_token_cost), ',', '"completion_tokens_total_cost":', toString(completion_tokens * completion_token_cost), ',', '"cache_read_input_tokens_total_cost":', toString(cache_read_input_tokens * cache_read_input_token_cost), ',', '"cache_creation_input_tokens_total_cost":', toString(cache_creation_input_tokens * cache_creation_input_token_cost), ',', '"prompt_token_cost_unit":"', toString(prompt_token_cost_unit), '",', '"completion_token_cost_unit":"', toString(completion_token_cost_unit), '",', '"effective_date":"', toString(effective_date), '",', '"provider_id":"', toString(provider_id), '",', '"pricing_level":"', toString(pricing_level), '",', '"pricing_level_id":"', toString(pricing_level_id), '",', '"created_by":"', toString(created_by), '",', '"created_at":"', toString(created_at), '"}')), ','), '} }') , '}')) AS summary_dump
+FROM ranked_prices
+WHERE (rank = {pb_3:UInt64})
+GROUP BY id,
+         project_id,
+         trace_id,
+         parent_id,
+         op_name,
+         started_at,
+         ended_at,
+exception,
+         display_name,
+         inputs_dump,
+         output_dump,
+         attributes_dump
+ORDER BY ranked_prices.started_at DESC,
+         ranked_prices.id ASC

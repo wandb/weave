@@ -170,7 +170,6 @@ def get_optional_join_field_columns() -> list[Column]:
 def get_llm_usage(
     param_builder: ParamBuilder,
     table_alias: str,
-    compact: bool = False,
 ) -> PreparedSelect:
     cols = [
         *get_calls_merged_columns(),
@@ -214,7 +213,7 @@ def get_llm_usage(
 
     select_query = (
         all_calls_table.select()
-        .fields(["id", "started_at"] if compact else ["*"])
+        .fields(["*"])
         .raw_sql_fields(
             [
                 usage_raw,
@@ -369,6 +368,60 @@ def get_ranked_prices(
     return prepared_query
 
 
+def get_best_prices(
+    pb: ParamBuilder, llm_usage_table_alias: str, project_id: str
+) -> str:
+    """Join one price per usage row instead of expanding by price history.
+
+    Histories are sorted by scope and descending date. The first price at or
+    before the call wins; when all prices are future-dated, use the first price.
+    Retain the call/model window for IDs shared by multiple complete-call rows.
+    """
+    project = f"{{{pb.add_param(project_id)}:String}}"
+    default = f"{{{pb.add_param(DEFAULT_PRICING_LEVEL_ID)}:String}}"
+    empty = f"{{{pb.add_param('')}:String}}"
+    columns = [column.name for column in LLM_TOKEN_PRICES_COLUMNS]
+    indices = {name: index for index, name in enumerate(columns, 1)}
+    effective = f"price.{indices['effective_date']}"
+    level = f"price.{indices['pricing_level']}"
+    level_id = f"price.{indices['pricing_level_id']}"
+    priority = (
+        f"multiIf({level} = 'project' AND {level_id} = {project}, 2, "
+        f"{level} = 'default' AND {level_id} = {default}, 3, 4)"
+    )
+    fields = [
+        f"best_price.{index} AS `{LLM_TOKEN_PRICES_TABLE_NAME}.{name}`"
+        if name in {"id", "llm_id"}
+        else f"best_price.{index} AS {name}"
+        for index, name in enumerate(columns, 1)
+    ]
+    return f"""
+SELECT {llm_usage_table_alias}.*, {", ".join(fields)},
+    ROW_NUMBER() OVER (
+        PARTITION BY {llm_usage_table_alias}.id, {llm_usage_table_alias}.llm_id
+        ORDER BY
+            if({llm_usage_table_alias}.started_at >= best_price.{indices["effective_date"]}, 1, 2),
+            multiIf(best_price.{indices["pricing_level"]} = 'project'
+                AND best_price.{indices["pricing_level_id"]} = {project}, 2,
+                best_price.{indices["pricing_level"]} = 'default'
+                AND best_price.{indices["pricing_level_id"]} = {default}, 3, 4),
+            best_price.{indices["effective_date"]} DESC
+    ) AS rank
+FROM {llm_usage_table_alias}
+GLOBAL LEFT JOIN (
+    SELECT llm_id, arraySort(price -> tuple(
+        {priority}, -toUnixTimestamp64Micro(toDateTime64({effective}, 6))
+    ), groupArray(tuple({", ".join(columns)}))) AS price_history
+    FROM {LLM_TOKEN_PRICES_TABLE_NAME}
+    WHERE pricing_level_id IN ({project}, {default}, {empty})
+    GROUP BY llm_id
+) AS model_prices ON {llm_usage_table_alias}.llm_id = model_prices.llm_id
+LEFT ARRAY JOIN [arrayElement(price_history, greatest(arrayFirstIndex(
+    price -> {llm_usage_table_alias}.started_at >= {effective}, price_history
+), 1))] AS best_price
+"""
+
+
 """
     Takes in something like the following:
     4 rows
@@ -388,7 +441,7 @@ def get_ranked_prices(
 """
 
 
-def _build_cost_summary_dump_snippet(compact: bool = False) -> str:
+def _build_cost_summary_dump_snippet() -> str:
     """Build the SQL snippet for adding costs to summary_dump.
 
     Returns:
@@ -458,10 +511,6 @@ def _build_cost_summary_dump_snippet(compact: bool = False) -> str:
             '}} }}'
         )
     """
-
-    if compact:
-        return f"""if(any(llm_id) = '{DUMMY_LLM_ID}' or any(llm_token_prices.id) == '',
-        '', concat({cost_snippet})) AS cost_fragment"""
 
     # If no cost was found dont add a costs object
     return f"""
@@ -557,7 +606,7 @@ def build_cost_ctes(
     pb: ParamBuilder,
     call_table_alias: str,
     project_id: str,
-    compact: bool = False,
+    preselect_prices: bool = False,
 ) -> list[CTE]:
     """Build CTEs for cost calculations.
 
@@ -569,6 +618,7 @@ def build_cost_ctes(
         pb: Parameter builder for SQL parameters
         call_table_alias: Alias of the table containing call data
         project_id: Project ID for filtering prices
+        preselect_prices: Select from model histories before the call/model window
 
     Returns:
         List of CTE objects
@@ -577,12 +627,12 @@ def build_cost_ctes(
         CTE(
             name="llm_usage",
             sql=f"""-- From the all_calls we get the usage data for LLMs
-                {get_llm_usage(pb, call_table_alias, compact=compact).sql}""",
+                {get_llm_usage(pb, call_table_alias).sql}""",
         ),
         CTE(
             name="ranked_prices",
             sql=f"""-- based on the llm_ids in the usage data we get all the prices and rank them according to specificity and effective date
-                {get_ranked_prices(pb, "llm_usage", project_id).sql}""",
+                {get_best_prices(pb, "llm_usage", project_id) if preselect_prices else get_ranked_prices(pb, "llm_usage", project_id).sql}""",
         ),
     ]
 
@@ -614,7 +664,6 @@ def get_cost_final_select(
     select_fields: list[str],
     order_fields: list["OrderField"],
     project_id: str,
-    compact: bool = False,
 ) -> str:
     """Build the final SELECT statement that adds costs to the results.
 
@@ -637,7 +686,7 @@ def get_cost_final_select(
     fields_str = ", ".join(safe_fields)
 
     # Build SELECT clause with cost calculation
-    summary_dump = _build_cost_summary_dump_snippet(compact=compact)
+    summary_dump = _build_cost_summary_dump_snippet()
     select_clause = f"SELECT {fields_str},\n{summary_dump}"
 
     from_clause = "FROM ranked_prices"
@@ -696,50 +745,6 @@ def get_cost_final_select(
         "Final Select, which just selects the correct fields, and adds a costs object"
     )
     return f"-- {comment}\n" + "\n".join(parts)
-
-
-def get_compact_cost_final_select(
-    pb: ParamBuilder,
-    call_table_alias: str,
-    select_fields: list[str],
-    order_fields: list["OrderField"],
-    call_key_fields: tuple[str, ...] = ("id",),
-) -> str:
-    """Hydrate a unique-call cost result after the price window and aggregation.
-
-    The caller must guarantee one row per call key and no feedback ordering.
-    Both relations are scoped to one project before this key join.
-    """
-    # Circular import avoidance: calls_query_builder imports token_costs.
-    from weave.trace_server.calls_query_builder.calls_query_builder import (
-        CallsMergedSummaryField,
-    )
-
-    final_fields = _prepare_final_select_fields(select_fields, order_fields)
-    fields = [
-        f"{call_table_alias}.{safe_alias(f)} AS {safe_alias(f)}" for f in final_fields
-    ]
-    fields.append(
-        f"if(call_costs.cost_fragment = '', {call_table_alias}.summary_dump, "
-        f"concat(left({call_table_alias}.summary_dump, "
-        f"length({call_table_alias}.summary_dump) - 1), "
-        "call_costs.cost_fragment, '}')) AS summary_dump"
-    )
-    join_condition = " AND ".join(
-        f"{call_table_alias}.{key} = call_costs.{key}" for key in call_key_fields
-    )
-    hydrated = (
-        f"SELECT {', '.join(fields)} FROM {call_table_alias} "
-        f"GLOBAL INNER JOIN call_costs ON {join_condition}"
-    )
-    order_parts = [
-        f"{safe_alias(of.field.field)} {of.direction}"
-        if isinstance(of.field, CallsMergedSummaryField)
-        else of.as_sql(pb, "cost_enriched_calls", use_agg_fn=False)
-        for of in order_fields
-    ]
-    order_by = f"ORDER BY {', '.join(order_parts)}" if order_parts else ""
-    return f"SELECT * FROM ({hydrated}) AS cost_enriched_calls {order_by}"
 
 
 def cost_query(
