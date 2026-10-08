@@ -1904,7 +1904,7 @@ class ProjectStatsReq(BaseModelStrict):
 
 class ProjectStatsRes(BaseModel):
     trace_storage_size_bytes: int
-    spans_storage_size_bytes: int
+    spans_storage_size_bytes: int = 0
     objects_storage_size_bytes: int
     tables_storage_size_bytes: int
     files_storage_size_bytes: int
