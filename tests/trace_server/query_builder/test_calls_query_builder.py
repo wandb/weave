@@ -5146,10 +5146,9 @@ def test_stats_query_calls_merged_negated_time_bound_uses_ordered_aggregation() 
 
 
 def test_stats_query_calls_merged_caller_limit_keeps_setting() -> None:
-    """Caller-supplied limit also triggers the streaming-aggregate setting and
-    `has_more` reflects saturation against the caller's limit. A filter is
-    included so we exercise the GROUP BY path (Pattern 3 short-circuits
-    unfiltered requests).
+    """Limited grouped counts retain ordered aggregation and the has_more threshold.
+
+    The op-name filter exercises GROUP BY rather than the flat optimized path.
     """
     req = tsi.CallsQueryStatsReq(
         project_id="project",
@@ -5184,7 +5183,7 @@ def test_stats_query_calls_merged_caller_limit_keeps_setting() -> None:
 
 
 def test_stats_query_calls_merged_no_cap_when_summing_storage() -> None:
-    """include_total_storage_size needs every row, so no cap and no setting."""
+    """Unfiltered storage stats take the flat path, with no cap or ordered setting."""
     req = tsi.CallsQueryStatsReq(
         project_id="project",
         include_total_storage_size=True,

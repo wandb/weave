@@ -3085,7 +3085,7 @@ def build_calls_stats_query(
     if req.limit is not None:
         aggregated_columns["has_more"] = f"toUInt8(count() >= {req.limit})"
 
-    # Stream grouped counts in table order even when every call must be counted.
+    # Ordered merging can reduce grouping memory but limit parallelism.
     settings["optimize_aggregation_in_order"] = 1
 
     cq = _build_stats_calls_query(req, read_table)
