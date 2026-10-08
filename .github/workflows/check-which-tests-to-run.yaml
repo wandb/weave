@@ -17,7 +17,7 @@ on:
         value: ${{ jobs.check.outputs.trace_server_distributed_tests }}
 
 env:
-  TRACE_SERVER_PATHS: "weave/trace_server/ weave/shared/ weave/trace/isolated_client_executor.py weave/evaluation/evaluate_model_worker.py"
+  TRACE_SERVER_PATHS: "weave/trace_server/ weave/shared/ weave/trace/isolated_client_executor.py weave/evaluation/evaluate_model_worker.py weave/flow/llm_structured_model.py"
   WEAVE_TS_SDK_PATHS: "sdks/node/"
   # Paths that warrant running migrator tests against multi-replica
   # topology (1s3r, 2s2r). Derived from the last 22 replication/migration

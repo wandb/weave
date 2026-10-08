@@ -1,18 +1,11 @@
 import json
 from typing import Annotated, Any, ClassVar, Literal
 
-from pydantic import BaseModel, BeforeValidator, Field
+from pydantic import BaseModel, BeforeValidator, ConfigDict, Field, model_validator
 
-from weave import Model, op
-from weave.prompt.prompt import format_message_with_template_vars
+from weave.shared import serialization_metadata
 from weave.shared.interface.builtin_object_classes import base_object_def
-from weave.shared.trace_server_interface import (
-    CompletionsCreateReq,
-    CompletionsCreateRequestInputs,
-)
-from weave.trace import vals
-from weave.trace.context.weave_client_context import WeaveInitError, get_weave_client
-from weave.utils.project_id import to_project_id
+from weave.shared.refs import ObjectRef
 
 ResponseFormat = Literal["json_object", "json_schema", "text"]
 
@@ -104,10 +97,6 @@ def cast_to_llm_structured_model_params(
         return obj
     elif isinstance(obj, dict):
         return LLMStructuredCompletionModelDefaultParams.model_validate(obj)
-    elif isinstance(obj, vals.Traceable):
-        return LLMStructuredCompletionModelDefaultParams.model_validate(
-            vals.unwrap(obj)  # Recursively "unwrap" to a dict with plain python types
-        )
 
     raise TypeError("Unable to cast to LLMStructuredCompletionModelDefaultParams")
 
@@ -120,12 +109,18 @@ LLMStructuredModelParamsLike = Annotated[
 ]
 
 
-class LLMStructuredCompletionModel(Model):
-    # Don't serialize predict() as an op ref on publish: nested inside a
-    # published LLMAsAJudgeScorer it embeds a CustomWeaveType(Op) payload the
-    # scoring worker's safety guard rejects, and nothing reads the ref (the @op
-    # still wraps the live method). See WB-35184.
-    _weave_exclude_ops_from_record: ClassVar[bool] = True
+class LLMStructuredCompletionModel(base_object_def.BaseObject):
+    model_config = ConfigDict(arbitrary_types_allowed=True, extra="forbid")
+
+    # Stored as the SDK model in weave.flow, so the server writes the same _bases
+    # and digest for it.
+    _weave_serialized_bases: ClassVar[tuple[str, ...]] = (
+        "Model",
+        "Object",
+        "BaseModel",
+    )
+
+    ref: ObjectRef | None = None
 
     # <provider>/<model> or ref to a provider model
     llm_model_id: str | base_object_def.RefStr
@@ -134,140 +129,10 @@ class LLMStructuredCompletionModel(Model):
         default_factory=LLMStructuredCompletionModelDefaultParams
     )
 
-    @op
-    def predict(
-        self,
-        user_input: MessageListLike | None = None,
-        config: LLMStructuredModelParamsLike | None = None,
-        **template_vars: Any,
-    ) -> Message | str | dict[str, Any]:
-        """Generates a prediction by preparing messages (template + user_input)
-        and calling the LLM completions endpoint with overridden config, using the provided client.
-
-        Messages are prepared in one of two ways:
-        1. If default_params.prompt is set, the referenced MessagesPrompt object is
-           loaded and its format() method is called with template_vars to generate messages.
-        2. If default_params.messages_template is set (and prompt is not), the template
-           messages are used with template variable substitution.
-
-        Note: If both prompt and messages_template are provided, prompt takes precedence.
-
-        Args:
-            user_input: The user input messages to append after template messages
-            config: Optional configuration to override default parameters
-            **template_vars: Variables to substitute in the messages template using {variable_name} syntax
-        """
-        if user_input is None:
-            user_input = []
-
-        current_client = get_weave_client()
-        if current_client is None:
-            raise WeaveInitError(
-                "You must call `weave.init(<project_name>)` first, to predict with a LLMStructuredCompletionModel"
-            )
-
-        req = self.prepare_completion_request(
-            project_id=to_project_id(current_client.entity, current_client.project),
-            user_input=user_input,
-            config=config,
-            **template_vars,
-        )
-
-        # 5. Call the LLM API
-        try:
-            api_response = current_client.server.completions_create(req=req)
-        except Exception as e:
-            raise RuntimeError("Failed to call LLM completions endpoint.") from e
-
-        # 6. Extract the message from the API response
-        try:
-            # The 'response' attribute of CompletionsCreateRes is a dict
-            response_payload = api_response.response
-            response_format = (
-                req.inputs.response_format.get("type")
-                if req.inputs.response_format is not None
-                else None
-            )
-            return parse_response(response_payload, response_format)
-        except (
-            KeyError,
-            IndexError,
-            TypeError,
-            AttributeError,
-            ValueError,
-            json.JSONDecodeError,
-        ) as e:
-            raise RuntimeError(
-                f"Failed to extract message from LLM response payload. Response: {api_response.response}"
-            ) from e
-
-    def prepare_completion_request(
-        self,
-        project_id: str,
-        user_input: MessageListLike,
-        config: LLMStructuredModelParamsLike | None,
-        **template_vars: Any,
-    ) -> CompletionsCreateReq:
-        # Ensure user_input is properly converted to a list of Message objects
-        # This is needed because the @op decorator might interfere with Pydantic validation
-        if not isinstance(user_input, list) or (
-            user_input and not isinstance(user_input[0], Message)
-        ):
-            user_input = cast_to_message_list(user_input)
-
-        # 1. Prepare messages from messages_template (if no prompt is set)
-        # Note: If prompt is set, we don't prepare messages here - we pass the prompt
-        # reference to the completions endpoint which will resolve and substitute it
-        template_msgs = None
-
-        # Only use messages_template if prompt is NOT set
-        if (
-            self.default_params
-            and self.default_params.messages_template
-            and not self.default_params.prompt
-        ):
-            template_msgs = self.default_params.messages_template
-            if template_vars:
-                # Convert Message objects to dicts, apply template vars, convert back
-                formatted_dicts = [
-                    format_message_with_template_vars(
-                        msg.model_dump(exclude_none=True), **template_vars
-                    )
-                    for msg in template_msgs
-                ]
-                template_msgs = [Message.model_validate(d) for d in formatted_dicts]
-
-        prepared_messages_dicts = _prepare_llm_messages(template_msgs, user_input)
-
-        # 2. Prepare completion parameters, starting with defaults from LLMStructuredCompletionModel
-        completion_params: dict[str, Any] = {}
-        default_p_model = self.default_params
-        if default_p_model:
-            completion_params = parse_params_to_litellm_params(default_p_model)
-
-        # 3. Override parameters with the provided config dictionary
-        if config:
-            completion_params = {
-                **completion_params,
-                **parse_params_to_litellm_params(config),
-            }
-
-        # 4. Create the completion inputs
-        model_id_str = str(self.llm_model_id)
-
-        # Include template_vars if they exist
-        if template_vars:
-            completion_params["template_vars"] = template_vars
-
-        completion_inputs = CompletionsCreateRequestInputs(
-            model=model_id_str, messages=prepared_messages_dicts, **completion_params
-        )
-        req = CompletionsCreateReq(
-            project_id=project_id,
-            inputs=completion_inputs,
-        )
-
-        return req
+    @model_validator(mode="before")
+    @classmethod
+    def strip_weave_serialization_metadata(cls, data: Any) -> Any:
+        return serialization_metadata.strip_weave_serialization_metadata(data)
 
 
 def parse_response(
