@@ -425,8 +425,6 @@ def _extract_custom_attrs(attrs: dict[str, Any]) -> CustomAttrs:
     bool_map: dict[str, bool] = {}
 
     for key, val in _flatten_attrs(attrs):
-        if key in semconv.KNOWN_KEYS:
-            continue
         if val is None or val == "":
             continue
         total = len(string_map) + len(int_map) + len(float_map) + len(bool_map)
@@ -454,10 +452,16 @@ def _extract_custom_attrs(attrs: dict[str, Any]) -> CustomAttrs:
 
 
 def _flatten_attrs(attrs: dict[str, Any], prefix: str = "") -> list[tuple[str, Any]]:
-    """Flatten a nested attribute dict into dot-separated key-value pairs."""
+    """Flatten a nested attribute dict into dot-separated key-value pairs.
+
+    Known semconv keys are skipped with their whole subtree, so a decoded
+    JSON value such as tool-call arguments never becomes per-field keys.
+    """
     result: list[tuple[str, Any]] = []
     for key, val in attrs.items():
         full_key = key if not prefix else f"{prefix}.{key}"
+        if full_key in semconv.KNOWN_KEYS:
+            continue
         if isinstance(val, dict):
             result.extend(_flatten_attrs(val, full_key))
         else:
