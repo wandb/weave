@@ -25,6 +25,11 @@ from weave.trace_server.secret_fetcher_context import _secret_fetcher_context
 
 NOVA_MODELS = ("nova-pro-v1", "nova-lite-v1", "nova-micro-v1")
 
+# AWS region first-segment → Bedrock cross-region inference geography prefix.
+# "ap-*" regions use "apac" in Bedrock inference profile IDs; "us" and "eu"
+# already match their first segment so they are not listed here.
+_BEDROCK_NOVA_REGION_PREFIX_MAP: dict[str, str] = {"ap": "apac"}
+
 # Per-replica TTL cache for resolved custom provider info. Avoids hammering
 # ClickHouse (two obj_read calls) and the secret fetcher on every completion
 # request. Cross-thread safe via the lock; entries expire after the TTL with
@@ -556,6 +561,9 @@ def _setup_provider_credentials_and_model(
         # Nova models need the region in the model name
         if any(x in inputs.model for x in NOVA_MODELS) and aws_region_name:
             aws_inference_region = aws_region_name.split("-")[0]
+            aws_inference_region = _BEDROCK_NOVA_REGION_PREFIX_MAP.get(
+                aws_inference_region, aws_inference_region
+            )
             inputs.model = "bedrock/" + aws_inference_region + "." + inputs.model
     # XAI models don't support response_format
     elif provider == "xai":
