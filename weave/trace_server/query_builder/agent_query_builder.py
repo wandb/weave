@@ -216,6 +216,11 @@ _CUSTOM_ATTR_VALUE_TYPES: dict[str, AgentSpanStatsValueType] = {
 _CUSTOM_ATTR_SCHEMA_SOURCES: tuple[tuple[str, str], ...] = tuple(
     AGENT_CUSTOM_ATTR_SOURCE_VALUE_TYPES.items()
 )
+_SEMCONV_CUSTOM_ATTR_KEY_PATTERN = (
+    r"^(?:"
+    + "|".join(re.escape(key) for key in sorted(semconv.KNOWN_KEYS))
+    + r")(?:\.|$)"
+)
 
 SpanGroupKeyValue: TypeAlias = str | int | float | bool | None
 
@@ -1439,6 +1444,7 @@ def make_custom_attrs_schema_query(
     filter/group/stats requests.
     """
     span_filters = _spans_filter_sql(pb, req)
+    semconv_pattern_slot = pb.add(_SEMCONV_CUSTOM_ATTR_KEY_PATTERN, param_type="String")
     limit_slot = pb.add(req.limit + 1, param_type="UInt64")
     offset_slot = pb.add(req.offset, param_type="UInt64")
     # Per-source UNION ALL: a scalar ARRAY JOIN + GROUP BY on the bare key is far
@@ -1449,7 +1455,10 @@ def make_custom_attrs_schema_query(
                    key,
                    count() AS span_count
             FROM spans s
-            ARRAY JOIN s.{source}.keys AS key
+            ARRAY JOIN arrayFilter(
+                attr_key -> NOT match(attr_key, {semconv_pattern_slot}),
+                s.{source}.keys
+            ) AS key
             WHERE {span_filters.where}
             GROUP BY key"""
         for source, value_type in _CUSTOM_ATTR_SCHEMA_SOURCES
