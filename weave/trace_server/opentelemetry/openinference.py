@@ -39,9 +39,14 @@ TOOL_CALL_ID_KEYS = ("tool.id",)
 _SPAN_KIND_KEY = "openinference.span.kind"
 _INPUT_MESSAGES_KEY = "llm.input_messages"
 _OUTPUT_MESSAGES_KEY = "llm.output_messages"
+_PROMPTS_KEY = "llm.prompts"
+_CHOICES_KEY = "llm.choices"
 _TOOLS_KEY = "llm.tools"
 _INPUT_VALUE_KEY = "input.value"
 _OUTPUT_VALUE_KEY = "output.value"
+_INPUT_MIME_TYPE_KEY = "input.mime_type"
+_OUTPUT_MIME_TYPE_KEY = "output.mime_type"
+_TEXT_MIME_TYPE = "text/plain"
 _LLM_KIND = "LLM"
 _TOOL_KIND = "TOOL"
 _CHAIN_KIND = "CHAIN"
@@ -54,6 +59,8 @@ _KIND_TO_OPERATION = {
     "RETRIEVER": "retrieval",
 }
 _SYSTEM_ROLE = "system"
+_USER_ROLE = "user"
+_ASSISTANT_ROLE = "assistant"
 _TOOL_ROLE = "tool"
 _TEXT_CONTENT_TYPE = "text"
 _FUNCTION_TOOL_TYPE = "function"
@@ -80,11 +87,23 @@ def input_messages(attrs: dict[str, Any]) -> list[dict[str, Any]]:
 def output_messages(attrs: dict[str, Any]) -> list[dict[str, Any]]:
     """An LLM span's output as GenAI messages.
 
-    Reads `llm.output_messages`. Other span kinds yield none, as for input.
+    Reads `llm.output_messages`, else the completion texts in `llm.choices`,
+    else `output.value` (see `_value_messages`). Other span kinds yield none,
+    as for input.
     """
     if _span_kind(attrs) != _LLM_KIND:
         return []
-    return _llm_messages(attrs, _OUTPUT_MESSAGES_KEY)
+    return (
+        _llm_messages(attrs, _OUTPUT_MESSAGES_KEY)
+        or _text_messages(
+            _ASSISTANT_ROLE, get_attribute(attrs, _CHOICES_KEY), "completion"
+        )
+        or _value_messages(
+            get_attribute(attrs, _OUTPUT_VALUE_KEY),
+            get_attribute(attrs, _OUTPUT_MIME_TYPE_KEY),
+            _ASSISTANT_ROLE,
+        )
+    )
 
 
 def system_instructions(attrs: dict[str, Any]) -> list[dict[str, Any]]:
@@ -201,13 +220,22 @@ def _json_value(value: Any) -> Any:
 def _input_messages(attrs: dict[str, Any]) -> list[dict[str, Any]]:
     """An LLM span's input as GenAI messages, system messages included.
 
-    Reads `llm.input_messages`. Only LLM spans qualify: the LangChain
-    instrumentor also writes partial `llm.input_messages` onto CHAIN spans from
-    their graph state.
+    Reads `llm.input_messages`, else the prompt texts in `llm.prompts`, else
+    `input.value` (see `_value_messages`). Only LLM spans qualify: the
+    LangChain instrumentor also writes partial `llm.input_messages` onto CHAIN
+    spans from their graph state, and every span kind carries `input.value`.
     """
     if _span_kind(attrs) != _LLM_KIND:
         return []
-    return _llm_messages(attrs, _INPUT_MESSAGES_KEY)
+    return (
+        _llm_messages(attrs, _INPUT_MESSAGES_KEY)
+        or _text_messages(_USER_ROLE, get_attribute(attrs, _PROMPTS_KEY), "prompt")
+        or _value_messages(
+            get_attribute(attrs, _INPUT_VALUE_KEY),
+            get_attribute(attrs, _INPUT_MIME_TYPE_KEY),
+            _USER_ROLE,
+        )
+    )
 
 
 def _llm_messages(attrs: dict[str, Any], key: str) -> list[dict[str, Any]]:
@@ -218,6 +246,80 @@ def _llm_messages(attrs: dict[str, Any], key: str) -> list[dict[str, Any]]:
         if isinstance(message, dict):
             messages.append(_genai_message(message))
     return messages
+
+
+def _text_messages(role: str, value: Any, item_key: str) -> list[dict[str, Any]]:
+    """Messages from `llm.prompts` or `llm.choices`.
+
+    The LangChain instrumentor sends a list of strings; the OpenAI instrumentor
+    sends `<key>.<i>.prompt.text` or `<key>.<i>.completion.text`.
+    """
+    messages = []
+    for item in _indexed(value):
+        text = item
+        if isinstance(item, dict) and item_key in item:
+            entry = item[item_key]
+            text = entry.get("text") if isinstance(entry, dict) else None
+        if isinstance(text, (dict, list)) or (isinstance(text, str) and text):
+            messages.append(_text_message(role, _text(text)))
+    return messages
+
+
+def _value_messages(value: Any, mime_type: Any, role: str) -> list[dict[str, Any]]:
+    """Messages from an LLM span's `input.value` or `output.value`.
+
+    A `text/plain` value is one text message, re-serialized if ingest decoded
+    it as JSON. Otherwise this reads plain text, an OpenAI message list (or a
+    JSON object holding one in `messages`), an OpenAI chat or completions
+    response (`choices`), a LangChain `LLMResult` (`generations`), and a JSON
+    object with one string value, the shape `@tracer.llm` records for a
+    one-argument function. Other values yield no messages.
+    """
+    if mime_type == _TEXT_MIME_TYPE:
+        text = "" if value is None else _text(value)
+        return [_text_message(role, text)] if text else []
+    if isinstance(value, dict):
+        if isinstance(value.get("messages"), list):
+            value = value["messages"]
+        elif isinstance(value.get("choices"), list):
+            return _choice_messages(value["choices"])
+        elif isinstance(value.get("generations"), list):
+            return _generation_messages(value["generations"])
+        elif len(value) == 1 and isinstance(text := next(iter(value.values())), str):
+            value = text
+    if isinstance(value, str):
+        return [_text_message(role, value)] if value else []
+    if isinstance(value, list):
+        return [
+            _openai_message(item)
+            for item in value
+            if isinstance(item, dict) and "role" in item
+        ]
+    return []
+
+
+def _choice_messages(choices: list[Any]) -> list[dict[str, Any]]:
+    messages = []
+    for choice in choices:
+        if not isinstance(choice, dict):
+            continue
+        if isinstance(choice.get("message"), dict):
+            messages.append(_openai_message(choice["message"]))
+        elif isinstance(choice.get("text"), str) and choice["text"]:
+            messages.append(_text_message(_ASSISTANT_ROLE, choice["text"]))
+    return messages
+
+
+def _generation_messages(generations: list[Any]) -> list[dict[str, Any]]:
+    """Messages from the first prompt's generations, as `llm.output_messages` reads them."""
+    first = generations[0] if generations and isinstance(generations[0], list) else []
+    return [
+        _text_message(_ASSISTANT_ROLE, generation["text"])
+        for generation in first
+        if isinstance(generation, dict)
+        and isinstance(generation.get("text"), str)
+        and generation["text"]
+    ]
 
 
 def _genai_message(message: dict[str, Any]) -> dict[str, Any]:
@@ -259,6 +361,36 @@ def _tool_response(content: Any, parts: list[dict[str, Any]]) -> Any:
         return content
     texts = [part["content"] for part in parts if part["type"] == _TEXT_CONTENT_TYPE]
     return "".join(texts) if len(texts) == len(parts) else parts
+
+
+def _openai_message(message: dict[str, Any]) -> dict[str, Any]:
+    """A GenAI message from an OpenAI chat message dict."""
+    role = str(message.get("role") or "")
+    content = message.get("content")
+    if role == _TOOL_ROLE:
+        return _tool_response_message(message.get("tool_call_id"), content)
+
+    parts: list[dict[str, Any]] = []
+    if isinstance(content, list):
+        for item in content:
+            if not isinstance(item, dict):
+                continue
+            text = item.get("text")
+            image_url = item.get("image_url")
+            if item.get("type") == _TEXT_CONTENT_TYPE and text:
+                parts.append(_text_part(text))
+            elif isinstance(image_url, dict) and (part := _image_part(image_url)):
+                parts.append(part)
+    elif content is not None and content != "":
+        parts.append(_text_part(content))
+    for tool_call in _indexed(message.get("tool_calls")):
+        if isinstance(tool_call, dict):
+            parts.append(_tool_call_part(tool_call))
+    return {"role": role, "parts": parts}
+
+
+def _text_message(role: str, text: str) -> dict[str, Any]:
+    return {"role": role, "parts": [_text_part(text)]}
 
 
 def _text_part(value: Any) -> dict[str, Any]:
