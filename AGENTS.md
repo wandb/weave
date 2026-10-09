@@ -201,6 +201,12 @@ If `sdks/node/node_modules` is missing, run `pnpm install --frozen-lockfile` in 
 
 ### Current logical calls
 
+- Compact cost queries retain the existing call-key eligibility: `id` for `calls_merged`,
+  `(id, started_at)` for `calls_complete FINAL`. The server requires shared
+  snapshots and the default-off `WF_CLICKHOUSE_COMPACT_COST_QUERIES` flag.
+  Rank price-history arrays before the call window; never hydrate costs by
+  reading the selected call relation a second time.
+
 - `calls_complete` uses `ReplacingMergeTree(created_at)`, so more than one
   physical version of a call can remain visible until background merges run.
 - Set `CallsQueryReq.latest_only=True` when correctness requires filtering the
