@@ -40,6 +40,11 @@ BLOCKED_HOSTNAME_RE = re.compile(
 )
 
 
+# Shared address space (RFC 6598). Python counts it as neither private nor
+# global, and clouds use it internally (Alibaba metadata is 100.100.100.200).
+SHARED_ADDRESS_SPACE = ipaddress.ip_network("100.64.0.0/10")
+
+
 def is_publicly_routable_url(url: str) -> bool:
     """Return True if `url` is safe to fetch from a server context.
 
@@ -48,9 +53,10 @@ def is_publicly_routable_url(url: str) -> bool:
     metadata hostname, and (if the host is an IP literal in any common
     encoding) resolves to a globally routable address.
 
-    Non-IP hostnames are accepted on the assumption that DNS resolution
-    and further egress filtering happen downstream. DNS-rebinding attacks
-    against hostnames are the egress policy's job, not this function's.
+    Non-IP hostnames are accepted without resolving them, so this check
+    alone does not stop a hostname whose DNS answer is a private address.
+    Requests to a user-configured host must also check the resolved address
+    when connecting.
     """
     try:
         parsed = urlparse(url)
@@ -80,6 +86,15 @@ def is_publicly_routable_url(url: str) -> bool:
             return True
         addr = ipaddress.ip_address(packed)
 
+    return is_publicly_routable_ip(addr)
+
+
+def is_publicly_routable_ip(
+    addr: ipaddress.IPv4Address | ipaddress.IPv6Address,
+) -> bool:
+    """Return True if `addr` is not loopback, link-local, private, reserved,
+    multicast, unspecified, or in the shared address space.
+    """
     # `is_global` alone is too permissive: it returns True for IPv4/IPv6
     # multicast (e.g. 224.0.0.1, ff00::/8). Enumerate the disallowed
     # categories explicitly.
@@ -90,4 +105,5 @@ def is_publicly_routable_url(url: str) -> bool:
         or addr.is_reserved
         or addr.is_multicast
         or addr.is_unspecified
+        or addr in SHARED_ADDRESS_SPACE
     )

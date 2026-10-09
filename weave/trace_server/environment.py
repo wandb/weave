@@ -258,6 +258,23 @@ def wf_scoring_worker_remote_scorer_allowed_private_cidrs() -> list[str]:
     return [entry.strip() for entry in raw.split(",") if entry.strip()]
 
 
+CUSTOM_RUNTIME_ALLOWED_PRIVATE_CIDRS_ENV = "WF_CUSTOM_RUNTIME_ALLOWED_PRIVATE_CIDRS"
+
+
+def wf_custom_runtime_allowed_private_cidrs() -> list[str]:
+    """Networks custom runtime requests may reach despite being non-public.
+
+    Values are comma-separated CIDR networks, for example "10.0.0.0/8", for
+    deployments whose model servers run on a private network. Empty and
+    whitespace-only entries are ignored, and the default empty list keeps every
+    non-public address denied. Link-local addresses stay denied regardless.
+    """
+    raw = os.environ.get(CUSTOM_RUNTIME_ALLOWED_PRIVATE_CIDRS_ENV)
+    if raw is None:
+        return []
+    return [entry.strip() for entry in raw.split(",") if entry.strip()]
+
+
 def wf_scoring_worker_remote_scorer_require_structured_result_schema() -> bool:
     """Whether remote scorer results must match the structured scorer schema.
 

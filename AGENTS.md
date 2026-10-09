@@ -620,9 +620,19 @@ deterministic.
 
 ### LLM Completion Routing
 
-- Built-in and API-key-authenticated custom providers use LiteLLM.
-- Custom runtimes without an API key use the OpenAI client directly so configured
-  headers and unauthenticated endpoints do not receive a bearer header.
+- Built-in providers and server-configured custom endpoints (CoreWeave
+  Inference, dedicated gateways) use LiteLLM.
+- Custom runtimes are user-configured, so every non-Ollama runtime, with or
+  without an API key, uses the OpenAI client directly. Keyless runtimes send no
+  bearer header, and LiteLLM never routes a user-chosen model name (for example
+  to its Responses API bridge, which builds its own HTTP client). Ollama
+  runtimes stay on LiteLLM with an injected `HTTPHandler`.
+- Custom runtime clients use `public_network_transport.py`: redirects are not
+  followed, and every connection must resolve to a publicly routable address.
+  Only the `custom::` branch sets `CompletionModelInfo.public_network_only`.
+  `WF_CUSTOM_RUNTIME_ALLOWED_PRIVATE_CIDRS` exempts operator networks for
+  deployments whose model servers are private; cloud metadata addresses stay
+  denied even inside exempted networks.
 - OpenAI Responses and Chat Completions report `cache_write_tokens` under
   `usage.input_tokens_details` and `usage.prompt_tokens_details`, respectively.
   Normalize either field when present instead of parsing model names. The
