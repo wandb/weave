@@ -950,6 +950,181 @@ def test_openinference_llm_tools_map_to_tool_definitions() -> None:
             {"gen_ai.operation.name": "invoke_agent"},
             ("invoke_agent", "planner"),
         ),
+        pytest.param(
+            "AGENT",
+            "agent",
+            "graph-span",
+            {
+                "metadata": json.dumps(
+                    {"ls_integration": "langgraph", "langgraph_node": "agent"}
+                )
+            },
+            ("", ""),
+            id="create-react-agent-model-node",
+        ),
+        pytest.param(
+            "CHAIN",
+            "LangGraph",
+            "http-span",
+            {"metadata": json.dumps({"ls_integration": "langchain_create_agent"})},
+            ("invoke_agent", "LangGraph"),
+            id="outermost-graph-run-under-another-span",
+        ),
+        pytest.param(
+            "CHAIN",
+            "math_expert",
+            "node-span",
+            {
+                "metadata": json.dumps(
+                    {
+                        "ls_integration": "langchain_create_agent",
+                        "lc_agent_name": "math_expert",
+                        "langgraph_node": "math_expert",
+                    }
+                )
+            },
+            ("invoke_agent", "math_expert"),
+            id="named-create-agent-subagent",
+        ),
+        pytest.param(
+            "CHAIN",
+            "model",
+            "subagent-span",
+            {
+                "metadata": json.dumps(
+                    {
+                        "ls_integration": "langchain_create_agent",
+                        "lc_agent_name": "math_expert",
+                        "langgraph_node": "model",
+                    }
+                )
+            },
+            ("", ""),
+            id="subagent-node",
+        ),
+        pytest.param(
+            "CHAIN",
+            "model",
+            "graph-span",
+            {
+                "metadata": json.dumps(
+                    {
+                        "ls_integration": "langchain_create_agent",
+                        "lc_agent_name": "model",
+                        "langgraph_node": "model",
+                        "langgraph_checkpoint_ns": "model:t1",
+                    }
+                )
+            },
+            ("", ""),
+            id="model-node-of-an-agent-named-model",
+        ),
+        pytest.param(
+            "CHAIN",
+            "tools",
+            "graph-span",
+            {
+                "metadata": json.dumps(
+                    {
+                        "ls_integration": "langchain_create_agent",
+                        "lc_agent_name": "tools",
+                        "langgraph_node": "tools",
+                        "langgraph_checkpoint_ns": "tools:t1",
+                    }
+                )
+            },
+            ("", ""),
+            id="tools-node-of-an-agent-named-tools",
+        ),
+        pytest.param(
+            "CHAIN",
+            "Audit.before_model",
+            "graph-span",
+            {
+                "metadata": json.dumps(
+                    {
+                        "ls_integration": "langchain_create_agent",
+                        "lc_agent_name": "Audit.before_model",
+                        "langgraph_node": "Audit.before_model",
+                        "langgraph_checkpoint_ns": "Audit.before_model:t1",
+                    }
+                )
+            },
+            ("", ""),
+            id="middleware-node-of-an-agent-named-after-it",
+        ),
+        pytest.param(
+            "CHAIN",
+            "model",
+            "graph-span",
+            {
+                "metadata": json.dumps(
+                    {
+                        "ls_integration": "langchain_create_agent",
+                        "lc_agent_name": "model",
+                        "langgraph_node": "model",
+                        "checkpoint_ns": 1,
+                        "langgraph_checkpoint_ns": True,
+                    }
+                )
+            },
+            ("", ""),
+            id="model-node-with-non-string-namespaces",
+        ),
+        pytest.param(
+            "CHAIN",
+            "model",
+            "node-span",
+            {
+                "metadata": json.dumps(
+                    {
+                        "ls_integration": "langchain_create_agent",
+                        "lc_agent_name": "model",
+                        "langgraph_node": "model",
+                        "checkpoint_ns": "model:t1",
+                        "langgraph_checkpoint_ns": "model:t1",
+                    }
+                )
+            },
+            ("invoke_agent", "model"),
+            id="subagent-named-model",
+        ),
+        pytest.param(
+            "CHAIN",
+            "model",
+            "subagent-span",
+            {
+                "metadata": json.dumps(
+                    {
+                        "ls_integration": "langchain_create_agent",
+                        "lc_agent_name": "model",
+                        "langgraph_node": "model",
+                        "checkpoint_ns": "model:t1",
+                        "langgraph_checkpoint_ns": "model:t1|model:t2",
+                    }
+                )
+            },
+            ("", ""),
+            id="model-node-of-a-subagent-named-model",
+        ),
+        pytest.param(
+            "CHAIN",
+            "calculator",
+            "node-span",
+            {
+                "metadata": json.dumps(
+                    {
+                        "ls_integration": "langchain_create_agent",
+                        "lc_agent_name": "calculator",
+                        "langgraph_node": "calculator",
+                        "checkpoint_ns": "team:t1",
+                        "langgraph_checkpoint_ns": "team:t1|calculator:t2",
+                    }
+                )
+            },
+            ("invoke_agent", "calculator"),
+            id="subagent-two-graphs-deep",
+        ),
     ],
 )
 def test_openinference_span_kind_maps_operation_and_agent(

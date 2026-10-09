@@ -155,7 +155,7 @@ def extract_operation_name(
     if val:
         return str(val)
 
-    if op := openinference.operation_name(attrs, is_root=is_root):
+    if op := openinference.operation_name(attrs, span_name, is_root=is_root):
         return op
 
     name_lower = span_name.lower()
@@ -181,7 +181,8 @@ def extract_agent_name(
         return span_name[len(prefix) :].strip()
     if (
         operation_name == OP_INVOKE_AGENT
-        and openinference.operation_name(attrs, is_root=is_root) == OP_INVOKE_AGENT
+        and openinference.operation_name(attrs, span_name, is_root=is_root)
+        == OP_INVOKE_AGENT
     ):
         return span_name
     return ""
