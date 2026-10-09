@@ -144,6 +144,8 @@ _COMMAND_PREVIEW_LENGTH = 100
 # fails that test until it is added here.
 _NON_RECOVERABLE_MIGRATION_VERSIONS = frozenset({6, 24})
 
+_MINIMUM_CLICKHOUSE_VERSIONS = {"048_message_search_v2.up.sql": (26, 2)}
+
 
 def _is_transient_ch_error(exc: BaseException) -> bool:
     """Check if a ClickHouse error is a known transient replication error."""
@@ -179,6 +181,8 @@ ID_SHARDED_TABLES: dict[str, str] = {
     "call_parts": "id",
     "spans": "trace_id",
     "messages": "trace_id",
+    "message_occurrences": "trace_id",
+    # message_content stays unprunable: capture writes on each source trace's shard.
     # All insights APIs are project-scoped. Co-locate a project's vectors so
     # nearest-neighbor search and clustering do not fan out across shards.
     "intent_signatures": "project_id",
@@ -707,6 +711,20 @@ class BaseClickHouseTraceServerMigrator(ABC):
         with open(migration_file_path, encoding="utf-8") as f:
             migration_sql = f.read()
 
+        minimum_version = _MINIMUM_CLICKHOUSE_VERSIONS.get(migration_file)
+        if minimum_version is not None:
+            for host, version in self._server_versions():
+                if (
+                    tuple(int(part) for part in version.split(".")[:2])
+                    < minimum_version
+                ):
+                    required = ".".join(map(str, minimum_version))
+                    raise MigrationError(
+                        f"{migration_file} requires ClickHouse {required}+; "
+                        f"{host} runs {version}. Upgrade all nodes before retrying. "
+                        "No migration statements were executed by this attempt."
+                    )
+
         # Mark migration as partially applied
         self._update_migration_status(target_db, target_version, is_start=True)
 
@@ -721,6 +739,9 @@ class BaseClickHouseTraceServerMigrator(ABC):
         self._update_migration_status(target_db, target_version, is_start=False)
 
         logger.info("Migration %s applied to `%s`", migration_file, target_db)
+
+    def _server_versions(self) -> list[tuple[str, str]]:
+        return self.ch_client.query("SELECT hostName(), version()").result_rows
 
     def _update_migration_status(
         self, target_db: str, target_version: int, is_start: bool = True
@@ -866,6 +887,14 @@ class ReplicatedClickHouseTraceServerMigrator(BaseClickHouseTraceServerMigrator)
 
     def _uses_replicated_db_engine(self, db_name: str) -> bool:
         return self._replicated_db_engine_cache.get(db_name, False)
+
+    def _server_versions(self) -> list[tuple[str, str]]:
+        return self.ch_client.query(
+            "SELECT hostName(), version() "
+            "FROM clusterAllReplicas({cluster:String}, system.one)",
+            parameters={"cluster": self.replicated_cluster},
+            settings={"skip_unavailable_shards": 0},
+        ).result_rows
 
     def _ensure_database(self, db_name: str) -> None:
         """Create the database and discover its engine for the DDL cache.
