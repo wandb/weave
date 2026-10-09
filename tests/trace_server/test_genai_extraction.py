@@ -822,6 +822,19 @@ def test_openinference_json_with_leading_whitespace_is_decoded() -> None:
     ) == ("call_1", "Sunny", '[{"type": "function", "name": "search"}]')
 
 
+@pytest.mark.parametrize(
+    "output",
+    ["4" * 5000, " " + "[" * 100_000 + "]" * 100_000, ' {"type": "tool"'],
+    ids=["long-number", "deeply-nested", "malformed-json"],
+)
+def test_openinference_tool_results_that_are_not_json_are_kept(output: str) -> None:
+    span = _openinference_span(
+        {"openinference.span.kind": "TOOL", "output.value": output}, "get_weather"
+    )
+    result = extract_genai_span(span, project_id="p1")
+    assert (result.tool_call_id, result.tool_call_result) == ("", output)
+
+
 def test_openinference_llm_tools_map_to_tool_definitions() -> None:
     weather_parameters = {
         "type": "object",

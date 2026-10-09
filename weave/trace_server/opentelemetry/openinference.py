@@ -156,11 +156,11 @@ def _tool_definition(tool: dict[str, Any]) -> dict[str, Any] | None:
 
 def _json_value(value: Any) -> Any:
     """Decode a JSON string that ingest left as text, such as one with leading whitespace."""
-    if not isinstance(value, str):
+    if not isinstance(value, str) or not value.lstrip().startswith(("{", "[")):
         return value
     try:
         return json.loads(value)
-    except json.JSONDecodeError:
+    except (ValueError, RecursionError):
         return value
 
 
