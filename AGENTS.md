@@ -828,6 +828,27 @@ deterministic.
   column that can carry a client string reads that copy; the provider response is
   left as the provider sent it, because a response is generated content.
 
+### OpenInference keys in agent span columns
+
+- `opentelemetry/openinference.py` fills an agent span column from
+  OpenInference keys only after every `weave.*` and `gen_ai.*` key for that
+  column misses, so a span carrying both keeps its GenAI values. The keys also
+  stay in the custom attribute maps, so filters on them keep matching.
+- `openinference.span.kind` maps LLM to `chat`, TOOL to `execute_tool`, AGENT to
+  `invoke_agent`, EMBEDDING to `embeddings`, and RETRIEVER to `retrieval`. A
+  CHAIN span with no parent in its process (no parent, or one the OTLP span
+  flags mark remote) is the turn and maps to `invoke_agent`, named after the
+  span: LangGraph's unnamed root graph span is a CHAIN called `LangGraph`. The
+  span name becomes the agent name only when the resolved operation is
+  `invoke_agent`, so an explicit `gen_ai.operation.name` such as `chat` wins.
+- `llm.tools` becomes `tool_definitions` in the flat `{type, name,
+  description, parameters}` shape the Agents UI reads.
+- LangChain TOOL spans record the returned `ToolMessage` JSON in
+  `output.value`; its `content` is the tool result and its `tool_call_id` the
+  call id. Only a value with the message's own `type`, `content` and
+  `tool_call_id` is unwrapped. A tool that raises returns no message, so its
+  `tool_call_id` stays empty.
+
 ### Documentation
 
 - Update relevant docstrings for Python code

@@ -16,6 +16,7 @@ from unittest.mock import MagicMock
 import pytest
 from opentelemetry.proto.common.v1.common_pb2 import AnyValue, KeyValue
 from opentelemetry.proto.trace.v1.trace_pb2 import Span as PbSpan
+from opentelemetry.proto.trace.v1.trace_pb2 import SpanFlags
 
 from weave.trace_server.agents import semconv
 from weave.trace_server.credential_redaction import REDACTED_VALUE
@@ -24,6 +25,7 @@ from weave.trace_server.opentelemetry.genai_extraction import (
     redact_credentials_from_span,
     strip_inline_blobs_from_span,
 )
+from weave.trace_server.opentelemetry.helpers import expand_attributes
 from weave.trace_server.opentelemetry.python_spans import (
     Event,
     Link,
@@ -43,6 +45,7 @@ def _make_span(
     status: Status | None = None,
     resource_attrs: dict[str, Any] | None = None,
     links: list | None = None,
+    parent_id: str | None = None,
 ) -> Span:
     """Build a minimal Span for testing."""
     now_ns = int(datetime.datetime.now().timestamp() * 1_000_000_000)
@@ -51,6 +54,7 @@ def _make_span(
         name=name,
         trace_id="abc123",
         span_id="def456",
+        parent_id=parent_id,
         start_time_unix_nano=now_ns,
         end_time_unix_nano=now_ns + 100_000_000,
         attributes=attrs or {},
@@ -585,6 +589,397 @@ def test_anthropic_style_cache_read_wins_over_openai_shaped() -> None:
     )
     result = extract_genai_span(span, project_id="p1")
     assert result.cache_read_input_tokens == 99
+
+
+# Wire attributes openinference-instrumentation-langchain 0.1.78 emits for the
+# second model call of a LangGraph `create_agent` turn.
+_OPENINFERENCE_LLM_ATTRS: dict[str, Any] = {
+    "openinference.span.kind": "LLM",
+    "session.id": "session-paris",
+    "llm.provider": "openai",
+    "llm.system": "openai",
+    "llm.model_name": "gpt-4o-mini-2024-07-18",
+    "llm.finish_reason": "stop",
+    "llm.token_count.prompt": 118,
+    "llm.token_count.completion": 11,
+    "llm.token_count.total": 129,
+    "llm.token_count.prompt_details.cache_read": 64,
+    "llm.input_messages.0.message.role": "system",
+    "llm.input_messages.0.message.content": "You are a weather assistant.",
+    "llm.input_messages.1.message.role": "user",
+    "llm.input_messages.1.message.content": "Weather in Paris?",
+    "llm.input_messages.2.message.role": "assistant",
+    "llm.input_messages.2.message.tool_calls.0.tool_call.id": "call_1",
+    "llm.input_messages.2.message.tool_calls.0.tool_call.function.name": "get_weather",
+    "llm.input_messages.2.message.tool_calls.0.tool_call.function.arguments": (
+        '{"city": "Paris"}'
+    ),
+    "llm.input_messages.3.message.role": "tool",
+    "llm.input_messages.3.message.name": "get_weather",
+    "llm.input_messages.3.message.tool_call_id": "call_1",
+    "llm.input_messages.3.message.content": "Sunny, 21C in Paris",
+    "llm.output_messages.0.message.role": "assistant",
+    "llm.output_messages.0.message.content": "It is sunny and 21C in Paris.",
+}
+
+
+def _openinference_span(
+    wire_attrs: dict[str, Any], name: str, parent_id: str | None = "parent-span"
+) -> Span:
+    """Expand flattened wire attributes the way OTLP ingest does."""
+    return _make_span(
+        attrs=expand_attributes(wire_attrs.items()), name=name, parent_id=parent_id
+    )
+
+
+def test_openinference_llm_span_fills_chat_columns() -> None:
+    span = _openinference_span(_OPENINFERENCE_LLM_ATTRS, "ChatOpenAI")
+    result = extract_genai_span(span, project_id="p1")
+    assert (
+        result.operation_name,
+        result.provider_name,
+        result.request_model,
+        result.response_model,
+        result.input_tokens,
+        result.output_tokens,
+        result.cache_read_input_tokens,
+        result.finish_reasons,
+        result.conversation_id,
+        result.agent_name,
+    ) == (
+        "chat",
+        "openai",
+        "gpt-4o-mini-2024-07-18",
+        "gpt-4o-mini-2024-07-18",
+        118,
+        11,
+        64,
+        ["stop"],
+        "session-paris",
+        "",
+    )
+
+
+def test_openinference_token_details_map_to_cache_and_reasoning() -> None:
+    span = _openinference_span(
+        {
+            "openinference.span.kind": "LLM",
+            "llm.token_count.prompt": 1000,
+            "llm.token_count.completion": 300,
+            "llm.token_count.prompt_details.cache_read": 640,
+            "llm.token_count.prompt_details.cache_write": 200,
+            "llm.token_count.completion_details.reasoning": 120,
+        },
+        "ChatAnthropic",
+    )
+    result = extract_genai_span(span, project_id="p1")
+    assert (
+        result.input_tokens,
+        result.output_tokens,
+        result.cache_read_input_tokens,
+        result.cache_creation_input_tokens,
+        result.reasoning_tokens,
+    ) == (1000, 300, 640, 200, 120)
+
+
+def test_openinference_tool_span_fills_tool_columns() -> None:
+    span = _openinference_span(
+        {
+            "openinference.span.kind": "TOOL",
+            "tool.name": "get_weather",
+            "tool.description": "Return the current weather for a city.",
+            "tool.id": "call_1",
+            "input.value": '{"city": "Paris"}',
+            "output.value": "Sunny, 21C in Paris",
+        },
+        "get_weather",
+    )
+    result = extract_genai_span(span, project_id="p1")
+    assert (
+        result.operation_name,
+        result.tool_name,
+        result.tool_description,
+        result.tool_call_id,
+        result.tool_call_arguments,
+        result.tool_call_result,
+    ) == (
+        "execute_tool",
+        "get_weather",
+        "Return the current weather for a city.",
+        "call_1",
+        '{"city": "Paris"}',
+        "Sunny, 21C in Paris",
+    )
+
+
+def test_openinference_tool_span_unwraps_langchain_tool_message() -> None:
+    """The LangChain instrumentor records the `ToolMessage` the tool returned."""
+    tool_message = {
+        "type": "tool",
+        "data": {
+            "content": "Sunny, 21C in Paris",
+            "additional_kwargs": {},
+            "response_metadata": {},
+            "type": "tool",
+            "name": "get_weather",
+            "id": None,
+            "tool_call_id": "call_paris",
+            "artifact": None,
+            "status": "success",
+        },
+    }
+    span = _openinference_span(
+        {
+            "openinference.span.kind": "TOOL",
+            "tool.name": "get_weather",
+            "input.value": "Paris",
+            "output.value": json.dumps(tool_message),
+            "output.mime_type": "application/json",
+        },
+        "get_weather",
+    )
+    result = extract_genai_span(span, project_id="p1")
+    assert (
+        result.tool_call_id,
+        result.tool_call_arguments,
+        result.tool_call_result,
+    ) == ("call_paris", "Paris", "Sunny, 21C in Paris")
+
+
+def test_openinference_tool_result_shaped_like_a_tool_message_is_kept() -> None:
+    """Only a `ToolMessage`, with its own type, content and call id, is unwrapped."""
+    tool_result = {"type": "tool", "data": {"name": "hammer", "price": 19}}
+    span = _openinference_span(
+        {
+            "openinference.span.kind": "TOOL",
+            "tool.name": "lookup_inventory",
+            "output.value": json.dumps(tool_result),
+            "output.mime_type": "application/json",
+        },
+        "lookup_inventory",
+    )
+    result = extract_genai_span(span, project_id="p1")
+    assert (result.tool_call_id, result.tool_call_result) == (
+        "",
+        json.dumps(tool_result),
+    )
+
+
+@pytest.mark.parametrize(
+    ("arguments", "result"),
+    [("", ""), ("{}", "[]")],
+    ids=["empty-strings", "empty-json"],
+)
+def test_empty_gen_ai_tool_values_win_over_openinference_fallbacks(
+    arguments: str, result: str
+) -> None:
+    span = _openinference_span(
+        {
+            "openinference.span.kind": "TOOL",
+            "gen_ai.tool.call.arguments": arguments,
+            "gen_ai.tool.call.result": result,
+            "input.value": "Paris",
+            "output.value": "Sunny, 21C in Paris",
+        },
+        "get_weather",
+    )
+    extracted = extract_genai_span(span, project_id="p1")
+    assert (extracted.tool_call_arguments, extracted.tool_call_result) == ("", "")
+
+
+def test_openinference_json_with_leading_whitespace_is_decoded() -> None:
+    """Ingest decodes only strings that start with `{` or `[`."""
+    tool_span = _openinference_span(
+        {
+            "openinference.span.kind": "TOOL",
+            "output.value": " "
+            + json.dumps(
+                {
+                    "type": "tool",
+                    "data": {
+                        "type": "tool",
+                        "content": "Sunny",
+                        "tool_call_id": "call_1",
+                    },
+                }
+            ),
+        },
+        "get_weather",
+    )
+    llm_span = _openinference_span(
+        {
+            "openinference.span.kind": "LLM",
+            "llm.tools.0.tool.json_schema": ' {"name": "search"}',
+        },
+        "ChatOpenAI",
+    )
+    tool_result = extract_genai_span(tool_span, project_id="p1")
+    llm_result = extract_genai_span(llm_span, project_id="p1")
+    assert (
+        tool_result.tool_call_id,
+        tool_result.tool_call_result,
+        llm_result.tool_definitions,
+    ) == ("call_1", "Sunny", '[{"type": "function", "name": "search"}]')
+
+
+@pytest.mark.parametrize(
+    "output",
+    ["4" * 5000, " " + "[" * 100_000 + "]" * 100_000, ' {"type": "tool"'],
+    ids=["long-number", "deeply-nested", "malformed-json"],
+)
+def test_openinference_tool_results_that_are_not_json_are_kept(output: str) -> None:
+    span = _openinference_span(
+        {"openinference.span.kind": "TOOL", "output.value": output}, "get_weather"
+    )
+    result = extract_genai_span(span, project_id="p1")
+    assert (result.tool_call_id, result.tool_call_result) == ("", output)
+
+
+def test_openinference_llm_tools_map_to_tool_definitions() -> None:
+    weather_parameters = {
+        "type": "object",
+        "properties": {"city": {"type": "string"}},
+        "required": ["city"],
+    }
+    search_parameters = {"type": "object", "properties": {"query": {"type": "string"}}}
+    span = _openinference_span(
+        {
+            "openinference.span.kind": "LLM",
+            "llm.tools.0.tool.json_schema": json.dumps(
+                {
+                    "type": "function",
+                    "function": {
+                        "name": "get_weather",
+                        "description": "Return the current weather for a city.",
+                        "parameters": weather_parameters,
+                    },
+                }
+            ),
+            "llm.tools.1.tool.json_schema": json.dumps(
+                {
+                    "name": "search",
+                    "description": "Search the web.",
+                    "input_schema": search_parameters,
+                }
+            ),
+        },
+        "ChatOpenAI",
+    )
+    result = extract_genai_span(span, project_id="p1")
+    assert json.loads(result.tool_definitions) == [
+        {
+            "type": "function",
+            "name": "get_weather",
+            "description": "Return the current weather for a city.",
+            "parameters": weather_parameters,
+        },
+        {
+            "type": "function",
+            "name": "search",
+            "description": "Search the web.",
+            "parameters": search_parameters,
+        },
+    ]
+
+
+@pytest.mark.parametrize(
+    ("kind", "name", "parent_id", "extra_attrs", "expected"),
+    [
+        ("CHAIN", "LangGraph", None, {}, ("invoke_agent", "LangGraph")),
+        ("CHAIN", "model", "root-span", {}, ("", "")),
+        ("AGENT", "weather_agent", "root-span", {}, ("invoke_agent", "weather_agent")),
+        ("AGENT", "run", None, {"agent.name": "planner"}, ("invoke_agent", "planner")),
+        ("LLM", "AzureChatOpenAI", None, {}, ("chat", "")),
+        ("EMBEDDING", "OpenAIEmbeddings", "root-span", {}, ("embeddings", "")),
+        ("RETRIEVER", "VectorStoreRetriever", "root-span", {}, ("retrieval", "")),
+        ("RERANKER", "CohereRerank", None, {}, ("", "")),
+        ("CHAIN", "graph", None, {"gen_ai.operation.name": "chat"}, ("chat", "")),
+        (
+            "AGENT",
+            "planner",
+            "root-span",
+            {"gen_ai.operation.name": "invoke_agent"},
+            ("invoke_agent", "planner"),
+        ),
+    ],
+)
+def test_openinference_span_kind_maps_operation_and_agent(
+    kind: str,
+    name: str,
+    parent_id: str | None,
+    extra_attrs: dict[str, Any],
+    expected: tuple[str, str],
+) -> None:
+    span = _openinference_span(
+        {"openinference.span.kind": kind, **extra_attrs}, name, parent_id
+    )
+    result = extract_genai_span(span, project_id="p1")
+    assert (result.operation_name, result.agent_name) == expected
+
+
+@pytest.mark.parametrize(
+    ("flags", "expected"),
+    [
+        (
+            SpanFlags.SPAN_FLAGS_CONTEXT_HAS_IS_REMOTE_MASK
+            | SpanFlags.SPAN_FLAGS_CONTEXT_IS_REMOTE_MASK,
+            ("invoke_agent", "handle_request"),
+        ),
+        (SpanFlags.SPAN_FLAGS_CONTEXT_HAS_IS_REMOTE_MASK, ("", "")),
+        (0, ("", "")),
+    ],
+    ids=["remote-parent", "local-parent", "unknown"],
+)
+def test_openinference_chain_with_remote_parent_is_the_turn(
+    flags: int, expected: tuple[str, str]
+) -> None:
+    span = _openinference_span(
+        {"openinference.span.kind": "CHAIN"}, "handle_request", "upstream-span"
+    )
+    span.flags = flags
+    result = extract_genai_span(span, project_id="p1")
+    assert (result.operation_name, result.agent_name) == expected
+
+
+def test_gen_ai_keys_win_over_openinference_fallbacks() -> None:
+    span = _openinference_span(
+        {
+            **_OPENINFERENCE_LLM_ATTRS,
+            "gen_ai.operation.name": "generate_content",
+            "gen_ai.provider.name": "gcp.gemini",
+            "gen_ai.request.model": "gemini-2.5-flash",
+            "gen_ai.response.model": "gemini-2.5-flash-001",
+            "gen_ai.usage.input_tokens": 5,
+            "gen_ai.usage.output_tokens": 2,
+            "gen_ai.response.finish_reasons": '["length"]',
+            "gen_ai.conversation.id": "conversation-1",
+            "gen_ai.tool.definitions": '[{"type": "function", "name": "lookup"}]',
+            "llm.tools.0.tool.json_schema": '{"name": "search"}',
+        },
+        "ChatOpenAI",
+    )
+    result = extract_genai_span(span, project_id="p1")
+    assert (
+        result.operation_name,
+        result.provider_name,
+        result.request_model,
+        result.response_model,
+        result.input_tokens,
+        result.output_tokens,
+        result.finish_reasons,
+        result.conversation_id,
+        result.tool_definitions,
+    ) == (
+        "generate_content",
+        "gcp.gemini",
+        "gemini-2.5-flash",
+        "gemini-2.5-flash-001",
+        5,
+        2,
+        ["length"],
+        "conversation-1",
+        '[{"type": "function", "name": "lookup"}]',
+    )
 
 
 def test_extract_custom_attrs_skips_non_finite_floats() -> None:
