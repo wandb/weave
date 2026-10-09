@@ -992,6 +992,8 @@ def test_openinference_messages_are_read_only_from_llm_spans() -> None:
             "llm.input_messages.0.message.content": "You are a weather assistant.",
             "llm.input_messages.1.message.role": "user",
             "llm.input_messages.1.message.content": "Weather in Paris?",
+            "llm.output_messages.0.message.role": "assistant",
+            "llm.output_messages.0.message.content": "Sunny, 21C.",
             "input.value": '{"messages": [{"role": "user", "content": "hi"}]}',
             "output.value": '{"messages": []}',
         },
@@ -1088,6 +1090,77 @@ def test_openinference_messages_tolerate_odd_shapes(
     )
     result = extract_genai_span(span, project_id="p1")
     assert result.input_messages == expected
+
+
+def test_openinference_message_contents_without_a_type_are_text() -> None:
+    """LangChain writes a string item of list content as `message_content.text` alone."""
+    prefix = "llm.input_messages"
+    span = _openinference_span(
+        {
+            "openinference.span.kind": "LLM",
+            f"{prefix}.0.message.role": "system",
+            f"{prefix}.0.message.contents.0.message_content.text": "Be brief.",
+            f"{prefix}.1.message.role": "user",
+            f"{prefix}.1.message.contents.0.message_content.text": "Weather in Paris?",
+            f"{prefix}.2.message.role": "tool",
+            f"{prefix}.2.message.tool_call_id": "call_1",
+            f"{prefix}.2.message.contents.0.message_content.text": "Sunny, ",
+            f"{prefix}.2.message.contents.1.message_content.text": "21C",
+            f"{prefix}.3.message.role": "tool",
+            f"{prefix}.3.message.tool_call_id": "call_2",
+            f"{prefix}.3.message.contents.0.message_content.type": "image",
+            f"{prefix}.3.message.contents.0.message_content.image.image.url": (
+                "https://example.com/map.png"
+            ),
+            "llm.output_messages.0.message.role": "assistant",
+            "llm.output_messages.0.message.contents.0.message_content.text": "Sunny.",
+        },
+        "ChatOpenAI",
+    )
+    result = extract_genai_span(span, project_id="p1")
+    map_part = {
+        "type": "uri",
+        "modality": "image",
+        "uri": "https://example.com/map.png",
+    }
+    assert (
+        result.input_messages,
+        result.output_messages,
+        result.system_instructions,
+    ) == (
+        [
+            NormalizedMessage(
+                role="user",
+                content=_parts({"type": "text", "content": "Weather in Paris?"}),
+            ),
+            NormalizedMessage(
+                role="tool",
+                content=_parts(
+                    {
+                        "type": "tool_call_response",
+                        "id": "call_1",
+                        "response": "Sunny, 21C",
+                    }
+                ),
+            ),
+            NormalizedMessage(
+                role="tool",
+                content=_parts(
+                    {
+                        "type": "tool_call_response",
+                        "id": "call_2",
+                        "response": [map_part],
+                    }
+                ),
+            ),
+        ],
+        [
+            NormalizedMessage(
+                role="assistant", content=_parts({"type": "text", "content": "Sunny."})
+            )
+        ],
+        ["Be brief."],
+    )
 
 
 def test_openinference_image_parts_map_to_blob_and_uri_parts() -> None:

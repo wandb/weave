@@ -224,9 +224,6 @@ def _genai_message(message: dict[str, Any]) -> dict[str, Any]:
     """A GenAI message from flattened OpenInference `message.*` attributes."""
     role = str(message.get("role") or "")
     content = message.get("content")
-    if role == _TOOL_ROLE:
-        return _tool_response_message(message.get("tool_call_id"), content)
-
     parts: list[dict[str, Any]] = []
     if content is not None and content != "":
         parts.append(_text_part(content))
@@ -239,17 +236,29 @@ def _genai_message(message: dict[str, Any]) -> dict[str, Any]:
         content_type = message_content.get("type")
         text = message_content.get("text")
         image = message_content.get("image")
-        if content_type == _TEXT_CONTENT_TYPE and text:
+        if content_type in {None, _TEXT_CONTENT_TYPE} and text:
             parts.append(_text_part(text))
         elif content_type == "image" and isinstance(image, dict):
             image_url = image.get("image")
             if isinstance(image_url, dict) and (part := _image_part(image_url)):
                 parts.append(part)
+    if role == _TOOL_ROLE:
+        return _tool_response_message(
+            message.get("tool_call_id"), _tool_response(content, parts)
+        )
     for item in _indexed(message.get("tool_calls")):
         tool_call = item.get("tool_call") if isinstance(item, dict) else None
         if isinstance(tool_call, dict):
             parts.append(_tool_call_part(tool_call))
     return {"role": role, "parts": parts}
+
+
+def _tool_response(content: Any, parts: list[dict[str, Any]]) -> Any:
+    """A tool message's `content`, else its `contents` text, else its `contents` parts."""
+    if (content is not None and content != "") or not parts:
+        return content
+    texts = [part["content"] for part in parts if part["type"] == _TEXT_CONTENT_TYPE]
+    return "".join(texts) if len(texts) == len(parts) else parts
 
 
 def _text_part(value: Any) -> dict[str, Any]:
