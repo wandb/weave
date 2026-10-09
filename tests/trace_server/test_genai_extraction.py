@@ -19,6 +19,7 @@ from opentelemetry.proto.trace.v1.trace_pb2 import Span as PbSpan
 from opentelemetry.proto.trace.v1.trace_pb2 import SpanFlags
 
 from weave.trace_server.agents import semconv
+from weave.trace_server.agents.schema import NormalizedMessage
 from weave.trace_server.credential_redaction import REDACTED_VALUE
 from weave.trace_server.opentelemetry.genai_extraction import (
     extract_genai_span,
@@ -632,6 +633,10 @@ def _openinference_span(
     )
 
 
+def _parts(*parts: dict[str, Any]) -> str:
+    return json.dumps(list(parts))
+
+
 def test_openinference_llm_span_fills_chat_columns() -> None:
     span = _openinference_span(_OPENINFERENCE_LLM_ATTRS, "ChatOpenAI")
     result = extract_genai_span(span, project_id="p1")
@@ -646,6 +651,7 @@ def test_openinference_llm_span_fills_chat_columns() -> None:
         result.finish_reasons,
         result.conversation_id,
         result.agent_name,
+        result.system_instructions,
     ) == (
         "chat",
         "openai",
@@ -657,7 +663,43 @@ def test_openinference_llm_span_fills_chat_columns() -> None:
         ["stop"],
         "session-paris",
         "",
+        ["You are a weather assistant."],
     )
+    assert result.input_messages == [
+        NormalizedMessage(
+            role="user",
+            content=_parts({"type": "text", "content": "Weather in Paris?"}),
+        ),
+        NormalizedMessage(
+            role="assistant",
+            content=_parts(
+                {
+                    "type": "tool_call",
+                    "id": "call_1",
+                    "name": "get_weather",
+                    "arguments": {"city": "Paris"},
+                }
+            ),
+        ),
+        NormalizedMessage(
+            role="tool",
+            content=_parts(
+                {
+                    "type": "tool_call_response",
+                    "id": "call_1",
+                    "response": "Sunny, 21C in Paris",
+                }
+            ),
+        ),
+    ]
+    assert result.output_messages == [
+        NormalizedMessage(
+            role="assistant",
+            content=_parts(
+                {"type": "text", "content": "It is sunny and 21C in Paris."}
+            ),
+        )
+    ]
 
 
 def test_openinference_token_details_map_to_cache_and_reasoning() -> None:
@@ -941,6 +983,260 @@ def test_openinference_chain_with_remote_parent_is_the_turn(
     assert (result.operation_name, result.agent_name) == expected
 
 
+def test_openinference_messages_are_read_only_from_llm_spans() -> None:
+    """The LangChain instrumentor also copies graph-state messages onto CHAIN spans."""
+    span = _openinference_span(
+        {
+            "openinference.span.kind": "CHAIN",
+            "llm.input_messages.0.message.role": "system",
+            "llm.input_messages.0.message.content": "You are a weather assistant.",
+            "llm.input_messages.1.message.role": "user",
+            "llm.input_messages.1.message.content": "Weather in Paris?",
+            "llm.output_messages.0.message.role": "assistant",
+            "llm.output_messages.0.message.content": "Sunny, 21C.",
+            "input.value": '{"messages": [{"role": "user", "content": "hi"}]}',
+            "output.value": '{"messages": []}',
+        },
+        "model",
+    )
+    result = extract_genai_span(span, project_id="p1")
+    assert (
+        result.input_messages,
+        result.output_messages,
+        result.system_instructions,
+        result.tool_call_arguments,
+        result.tool_call_result,
+    ) == ([], [], [], "", "")
+
+
+@pytest.mark.parametrize(
+    ("message_attrs", "expected"),
+    [
+        pytest.param(
+            {
+                "llm.input_messages.².message.role": "user",
+                "llm.input_messages.².message.content": "hi",
+            },
+            [],
+            id="superscript-index",
+        ),
+        pytest.param({"llm.input_messages.0": "not a message"}, [], id="non-dict-item"),
+        pytest.param({"llm.input_messages": "not a list"}, [], id="string-messages"),
+        pytest.param(
+            {"llm.input_messages": '[{"message": {"role": "user", "content": "hi"}}]'},
+            [
+                NormalizedMessage(
+                    role="user", content=_parts({"type": "text", "content": "hi"})
+                )
+            ],
+            id="json-list-messages",
+        ),
+        pytest.param(
+            {"llm.input_messages.0.message.content": "hi"},
+            [
+                NormalizedMessage(
+                    role="user", content=_parts({"type": "text", "content": "hi"})
+                )
+            ],
+            id="missing-role",
+        ),
+        pytest.param(
+            {
+                "llm.input_messages.0.message.role": "user",
+                "llm.input_messages.0.message.contents.0.message_content.type": "image",
+                "llm.input_messages.0.message.contents.0.message_content.image.image.url": (
+                    "https://example.com/cat.png"
+                ),
+                "llm.input_messages.0.message.contents.1.message_content.type": "text",
+                "llm.input_messages.0.message.contents.1.message_content.text": (
+                    "What is this?"
+                ),
+            },
+            [
+                NormalizedMessage(
+                    role="user",
+                    content=_parts(
+                        {
+                            "type": "uri",
+                            "modality": "image",
+                            "uri": "https://example.com/cat.png",
+                        },
+                        {"type": "text", "content": "What is this?"},
+                    ),
+                )
+            ],
+            id="image-part",
+        ),
+        pytest.param(
+            {
+                "llm.input_messages.0.message.role": "user",
+                "llm.input_messages.0.message.content": '{"é": "ü"}',
+            },
+            [
+                NormalizedMessage(
+                    role="user",
+                    content=_parts({"type": "text", "content": '{"é": "ü"}'}),
+                )
+            ],
+            id="json-shaped-unicode",
+        ),
+        pytest.param(
+            {
+                "llm.input_messages.0.message.role": "user",
+                "llm.input_messages.0.message.content": "hi",
+                "llm.input_messages.0.message.contents.0.message_content.type": "[]",
+                "llm.input_messages.0.message.contents.0.message_content.text": "x",
+            },
+            [
+                NormalizedMessage(
+                    role="user", content=_parts({"type": "text", "content": "hi"})
+                )
+            ],
+            id="json-list-content-type",
+        ),
+    ],
+)
+def test_openinference_messages_tolerate_odd_shapes(
+    message_attrs: dict[str, Any], expected: list[NormalizedMessage]
+) -> None:
+    span = _openinference_span(
+        {"openinference.span.kind": "LLM", **message_attrs}, "ChatOpenAI"
+    )
+    result = extract_genai_span(span, project_id="p1")
+    assert result.input_messages == expected
+
+
+def test_openinference_message_contents_without_a_type_are_text() -> None:
+    """LangChain writes a string item of list content as `message_content.text` alone."""
+    prefix = "llm.input_messages"
+    span = _openinference_span(
+        {
+            "openinference.span.kind": "LLM",
+            f"{prefix}.0.message.role": "system",
+            f"{prefix}.0.message.contents.0.message_content.text": "Be brief.",
+            f"{prefix}.1.message.role": "user",
+            f"{prefix}.1.message.contents.0.message_content.text": "Weather in Paris?",
+            f"{prefix}.2.message.role": "tool",
+            f"{prefix}.2.message.tool_call_id": "call_1",
+            f"{prefix}.2.message.contents.0.message_content.text": "Sunny, ",
+            f"{prefix}.2.message.contents.1.message_content.text": "21C",
+            f"{prefix}.3.message.role": "tool",
+            f"{prefix}.3.message.tool_call_id": "call_2",
+            f"{prefix}.3.message.contents.0.message_content.type": "image",
+            f"{prefix}.3.message.contents.0.message_content.image.image.url": (
+                "https://example.com/map.png"
+            ),
+            "llm.output_messages.0.message.role": "assistant",
+            "llm.output_messages.0.message.contents.0.message_content.text": "Sunny.",
+        },
+        "ChatOpenAI",
+    )
+    result = extract_genai_span(span, project_id="p1")
+    map_part = {
+        "type": "uri",
+        "modality": "image",
+        "uri": "https://example.com/map.png",
+    }
+    assert (
+        result.input_messages,
+        result.output_messages,
+        result.system_instructions,
+    ) == (
+        [
+            NormalizedMessage(
+                role="user",
+                content=_parts({"type": "text", "content": "Weather in Paris?"}),
+            ),
+            NormalizedMessage(
+                role="tool",
+                content=_parts(
+                    {
+                        "type": "tool_call_response",
+                        "id": "call_1",
+                        "response": "Sunny, 21C",
+                    }
+                ),
+            ),
+            NormalizedMessage(
+                role="tool",
+                content=_parts(
+                    {
+                        "type": "tool_call_response",
+                        "id": "call_2",
+                        "response": [map_part],
+                    }
+                ),
+            ),
+        ],
+        [
+            NormalizedMessage(
+                role="assistant", content=_parts({"type": "text", "content": "Sunny."})
+            )
+        ],
+        ["Be brief."],
+    )
+
+
+def test_openinference_image_parts_map_to_blob_and_uri_parts() -> None:
+    png = base64.b64encode(b"\x89PNG\r\n\x1a\n").decode("ascii")
+    span = _openinference_span(
+        {
+            "openinference.span.kind": "LLM",
+            "llm.input_messages.0.message.role": "user",
+            "llm.input_messages.0.message.contents.0.message_content.type": "image",
+            "llm.input_messages.0.message.contents.0.message_content.image.image.url": (
+                f"data:image/png;base64,{png}"
+            ),
+            "llm.input_messages.0.message.contents.1.message_content.type": "image",
+            "llm.input_messages.0.message.contents.1.message_content.image.image.url": (
+                "https://example.com/cat.png"
+            ),
+        },
+        "ChatOpenAI",
+    )
+    result = extract_genai_span(span, project_id="p1")
+    assert result.input_messages == [
+        NormalizedMessage(
+            role="user",
+            content=_parts(
+                {
+                    "type": "blob",
+                    "modality": "image",
+                    "mime_type": "image/png",
+                    "content": png,
+                },
+                {
+                    "type": "uri",
+                    "modality": "image",
+                    "uri": "https://example.com/cat.png",
+                },
+            ),
+        )
+    ]
+
+
+def test_openinference_large_data_url_image_becomes_a_content_ref() -> None:
+    """The blob strip replaces the data URL before extraction maps the image."""
+    b64 = base64.b64encode(b"a" * 12000).decode("ascii")
+    span = _openinference_span(
+        {
+            "openinference.span.kind": "LLM",
+            "llm.input_messages.0.message.role": "user",
+            "llm.input_messages.0.message.contents.0.message_content.type": "image",
+            "llm.input_messages.0.message.contents.0.message_content.image.image.url": (
+                f"data:image/png;base64,{b64}"
+            ),
+        },
+        "ChatOpenAI",
+    )
+    strip_inline_blobs_from_span(span, "p1", _mock_trace_server())
+    result = extract_genai_span(span, project_id="p1")
+    [part] = json.loads(result.input_messages[0].content)
+    assert (part["type"], part["modality"]) == ("uri", "image")
+    assert part["uri"].startswith("weave-trace-internal:///p1/object/")
+    assert part["uri"].endswith(":obj_digest")
+
+
 def test_gen_ai_keys_win_over_openinference_fallbacks() -> None:
     span = _openinference_span(
         {
@@ -953,6 +1249,9 @@ def test_gen_ai_keys_win_over_openinference_fallbacks() -> None:
             "gen_ai.usage.output_tokens": 2,
             "gen_ai.response.finish_reasons": '["length"]',
             "gen_ai.conversation.id": "conversation-1",
+            "gen_ai.system_instructions": '["Be brief."]',
+            "gen_ai.input.messages": '[{"role": "user", "content": "hi"}]',
+            "gen_ai.output.messages": '[{"role": "assistant", "content": "hello"}]',
             "gen_ai.tool.definitions": '[{"type": "function", "name": "lookup"}]',
             "llm.tools.0.tool.json_schema": '{"name": "search"}',
         },
@@ -968,6 +1267,9 @@ def test_gen_ai_keys_win_over_openinference_fallbacks() -> None:
         result.output_tokens,
         result.finish_reasons,
         result.conversation_id,
+        result.system_instructions,
+        result.input_messages,
+        result.output_messages,
         result.tool_definitions,
     ) == (
         "generate_content",
@@ -978,6 +1280,9 @@ def test_gen_ai_keys_win_over_openinference_fallbacks() -> None:
         2,
         ["length"],
         "conversation-1",
+        ["Be brief."],
+        [NormalizedMessage(role="user", content="hi")],
+        [NormalizedMessage(role="assistant", content="hello")],
         '[{"type": "function", "name": "lookup"}]',
     )
 
