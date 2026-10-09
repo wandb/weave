@@ -19,6 +19,12 @@ from clickhouse_connect.driver.client import Client as CHClient
 from weave.trace_server import clickhouse_trace_server_settings as ch_settings
 from weave.trace_server import environment as wf_env
 from weave.trace_server import trace_server_interface as tsi
+from weave.trace_server.export_admission import (
+    AdmissionError,
+    ExportAdmission,
+    acquire_export_admission,
+    export_query_id,
+)
 from weave.trace_server.export_targets import EXPORT_TARGET_NAMES, build_export_query
 from weave.trace_server.file_storage import (
     FileStorageClient,
@@ -52,6 +58,7 @@ def start_export(
     project_id: str,
     target_names: list[str],
     calls_read_table: ReadTable,
+    query_log_cluster: str | None = None,
 ) -> str:
     """Write the job manifest, then run its targets serially off-thread."""
     targets = _resolve_targets(target_names, calls_read_table)
@@ -61,29 +68,59 @@ def start_export(
             "EXPORT_STORAGE_UNAVAILABLE",
             "export storage is not configured",
         )
-    # Fail closed before a job or artifact exists, so a rejected request cannot
-    # leave an object the status API might later discover.
-    targets_with_counts: list[tuple[str, int]] = []
-    cap = wf_env.wf_export_max_rows()
-    for target in targets:
-        rows = precount_rows(ch_client, project_id, target)
-        if rows > cap:
-            raise ExportError(
-                409,
-                "TOO_LARGE",
-                f"target {target.name!r} has {rows} rows > cap {cap}",
-            )
-        targets_with_counts.append((target.name, rows))
     job_id = str(uuid.uuid4())
     if not JOB_ID_RE.match(job_id):
         raise ExportError(500, "BAD_JOB_ID", f"job_id {job_id!r} fails validation")
-    _write_manifest(file_storage_client, project_id, job_id, targets_with_counts)
-    threading.Thread(
-        target=_run_export,
-        args=(mint_client, project_id, job_id, targets),
-        daemon=True,
-    ).start()
+    try:
+        client = mint_client()
+        admission = acquire_export_admission(client, job_id, query_log_cluster)
+    except AdmissionError as exc:
+        raise ExportError(exc.http_status, exc.code, str(exc)) from exc
+    try:
+        targets_with_counts = _count_export_targets(
+            ch_client, project_id, job_id, targets, admission
+        )
+        _write_manifest(file_storage_client, project_id, job_id, targets_with_counts)
+        threading.Thread(
+            target=_run_export,
+            args=(client, project_id, job_id, targets, admission),
+            daemon=True,
+        ).start()
+    except Exception as exc:
+        _close_admission(admission, completed=isinstance(exc, ExportError))
+        if isinstance(exc, AdmissionError):
+            raise ExportError(exc.http_status, exc.code, str(exc)) from exc
+        raise
+
     return job_id
+
+
+def _count_export_targets(
+    client: CHClient,
+    project_id: str,
+    job_id: str,
+    targets: list[ResolvedExportTarget],
+    admission: ExportAdmission,
+) -> list[tuple[str, int]]:
+    targets_with_counts = []
+    cap = wf_env.wf_export_max_rows()
+    for target in targets:
+        query_id = export_query_id(job_id, f"{target.name}:count")
+        admission.prepare_query(query_id)
+        rows = precount_rows(client, project_id, target, query_id)
+        if rows > cap:
+            raise ExportError(
+                409, "TOO_LARGE", f"target {target.name!r} has {rows} rows > cap {cap}"
+            )
+        targets_with_counts.append((target.name, rows))
+    return targets_with_counts
+
+
+def _close_admission(admission: ExportAdmission, *, completed: bool) -> None:
+    try:
+        admission.close(completed=completed)
+    except AdmissionError:
+        logger.warning("Export admission cleanup unavailable")
 
 
 def get_export_status(
@@ -151,12 +188,18 @@ def poll_query_status(
 
 
 def precount_rows(
-    ch_client: CHClient, project_id: str, target: ResolvedExportTarget
+    ch_client: CHClient,
+    project_id: str,
+    target: ResolvedExportTarget,
+    query_id: str | None = None,
 ) -> int:
     """Count the rows a target would export, project_id bound as a param."""
     result = ch_client.query(
         f"SELECT count() FROM ({target.source_sql})",
         parameters={"project_id": project_id},
+        settings=ch_settings.merge_default_query_settings(
+            {"query_id": query_id} if query_id else None
+        ),
     )
     return int(result.result_rows[0][0])
 
@@ -270,8 +313,14 @@ def _manifest_entry(
     query_log_cluster: str | None,
 ) -> tsi.ExportManifestEntry:
     status, rows, error = poll_query_status(
-        ch_client, f"{job_id}:{target}", query_log_cluster
+        ch_client, export_query_id(job_id, target), query_log_cluster
     )
+    if status == "running":
+        legacy_status = poll_query_status(
+            ch_client, f"{job_id}:{target}", query_log_cluster
+        )
+        if legacy_status[0] != "running":
+            status, rows, error = legacy_status
     objects: list[str] = []
     urls: list[str] = []
     expires_at: str | None = None
@@ -300,15 +349,24 @@ def _manifest_entry(
 
 
 def _run_export(
-    mint_client: Callable[[], CHClient],
+    client: CHClient,
     project_id: str,
     job_id: str,
     targets: list[ResolvedExportTarget],
+    admission: ExportAdmission,
 ) -> None:
     """Run one job's targets serially to bound its ClickHouse concurrency."""
-    client = mint_client()
-    for target in targets:
-        _run_target_insert(client, project_id, job_id, target)
+    completed = False
+    try:
+        for target in targets:
+            admission.prepare_query(export_query_id(job_id, target.name))
+            if not _run_target_insert(client, project_id, job_id, target):
+                return
+        completed = True
+    except AdmissionError:
+        logger.warning("Export worker lost admission; stopping remaining targets")
+    finally:
+        _close_admission(admission, completed=completed)
 
 
 def _run_target_insert(
@@ -316,7 +374,7 @@ def _run_target_insert(
     project_id: str,
     job_id: str,
     target: ResolvedExportTarget,
-) -> None:
+) -> bool:
     filename = export_object_prefix(project_id, job_id, target.name) + "data.parquet"
     sql = build_export_insert_sql(target, filename)
     # `query_id` rides in settings: the driver routes valid_transport_settings
@@ -324,7 +382,7 @@ def _run_target_insert(
     settings = ch_settings.merge_default_command_settings(
         {
             "max_execution_time": EXPORT_MAX_EXECUTION_SECONDS,
-            "query_id": f"{job_id}:{target.name}",
+            "query_id": export_query_id(job_id, target.name),
         }
     )
     try:
@@ -332,6 +390,8 @@ def _run_target_insert(
     except Exception:
         # Detached by design: query_log records the failure for the status path.
         logger.debug("export insert failed: %s:%s", job_id, target.name, exc_info=True)
+        return False
+    return True
 
 
 def _resolve_targets(

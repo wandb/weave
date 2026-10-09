@@ -31,7 +31,10 @@ from weave.trace_server.parallel_bucket_uploads import BucketUploadBatch
 from weave.trace_server.project_version import project_version
 from weave.trace_server.secret_fetcher_context import secret_fetcher_context
 
-pytest_plugins = ["tests.trace_server.conftest_lib.clickhouse_server"]
+pytest_plugins = [
+    "tests.trace_server.conftest_lib.clickhouse_server",
+    "tests.trace_server.conftest_lib.export_redis",
+]
 
 
 @dataclass(frozen=True)
