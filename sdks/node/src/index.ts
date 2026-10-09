@@ -10,10 +10,22 @@ export {Dataset} from './dataset';
 export {Evaluation} from './evaluation';
 export {EvaluationLogger, ScoreLogger} from './evaluationLogger';
 export type {
+  AgentChatAgentHandoff,
+  AgentChatAgentStart,
+  AgentChatAssistantMessage,
+  AgentChatContextCompacted,
+  AgentChatMessage,
+  AgentChatToolCall,
+  AgentChatUserMessage,
+  AgentSchema,
+  AgentSpanSchema,
+  AgentTraceChatRes,
+  AgentVersionSchema,
   CallSchema,
   CallsFilter,
   HttpResponse,
   HTTPValidationError,
+  NormalizedMessage,
   Query,
   SortBy,
 } from './traceServerTypes';
