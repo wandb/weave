@@ -1931,6 +1931,49 @@ def test_custom_attrs_schema_discovers_keys_types_and_counts(ch_server):
     assert last_page.has_more is False
 
 
+def test_custom_attrs_schema_omits_known_semconv_subtrees(ch_server):
+    project_id = _make_project_id("cattr_schema_semconv")
+    _insert_spans(
+        ch_server.ch_client,
+        [
+            _make_span(
+                project_id,
+                custom_attrs_string={
+                    "gen_ai.tool.call.arguments.controls.tone": "warm",
+                    "weave.tool.call.result.files.output": "saved",
+                    "app.payload.region": "us",
+                },
+                custom_attrs_bool={
+                    "gen_ai.tool.call.result.files.output.ok": True,
+                    "app.payload.cached": True,
+                },
+            )
+        ],
+    )
+
+    res = ch_server.agent_custom_attrs_schema(
+        AgentCustomAttrsSchemaReq(project_id=project_id)
+    )
+
+    assert [attr.model_dump() for attr in res.attributes] == [
+        {
+            "source": "custom_attrs_bool",
+            "key": "app.payload.cached",
+            "value_type": "bool",
+            "span_count": 1,
+        },
+        {
+            "source": "custom_attrs_string",
+            "key": "app.payload.region",
+            "value_type": "string",
+            "span_count": 1,
+        },
+    ]
+    assert res.limit == 200
+    assert res.offset == 0
+    assert res.has_more is False
+
+
 def test_spans_query_filters_sorts_and_projects_custom_attrs(ch_server):
     """Ungrouped spans can filter and sort by custom attrs while projecting keys."""
     project_id = _make_project_id("cattr_filter_sort")

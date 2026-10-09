@@ -13,6 +13,7 @@ import pytest
 import sqlparse
 from pydantic import ValidationError
 
+from weave.trace_server.agents import semconv
 from weave.trace_server.agents.span_costs import cost_augmented_source_sql
 from weave.trace_server.agents.types import (
     AGENT_INTENT_SENTIMENTS,
@@ -1862,7 +1863,10 @@ class TestMakeCustomAttrsSchemaQuery:
                        key,
                        count() AS span_count
                 FROM spans s
-                ARRAY JOIN s.custom_attrs_string.keys AS key
+                ARRAY JOIN arrayFilter(
+                    attr_key -> NOT match(attr_key, {genai_1:String}),
+                    s.custom_attrs_string.keys
+                ) AS key
                 WHERE s.project_id = {genai_0:String}
                 GROUP BY key
                 UNION ALL
@@ -1871,7 +1875,10 @@ class TestMakeCustomAttrsSchemaQuery:
                        key,
                        count() AS span_count
                 FROM spans s
-                ARRAY JOIN s.custom_attrs_int.keys AS key
+                ARRAY JOIN arrayFilter(
+                    attr_key -> NOT match(attr_key, {genai_1:String}),
+                    s.custom_attrs_int.keys
+                ) AS key
                 WHERE s.project_id = {genai_0:String}
                 GROUP BY key
                 UNION ALL
@@ -1880,7 +1887,10 @@ class TestMakeCustomAttrsSchemaQuery:
                        key,
                        count() AS span_count
                 FROM spans s
-                ARRAY JOIN s.custom_attrs_float.keys AS key
+                ARRAY JOIN arrayFilter(
+                    attr_key -> NOT match(attr_key, {genai_1:String}),
+                    s.custom_attrs_float.keys
+                ) AS key
                 WHERE s.project_id = {genai_0:String}
                 GROUP BY key
                 UNION ALL
@@ -1889,16 +1899,28 @@ class TestMakeCustomAttrsSchemaQuery:
                        key,
                        count() AS span_count
                 FROM spans s
-                ARRAY JOIN s.custom_attrs_bool.keys AS key
+                ARRAY JOIN arrayFilter(
+                    attr_key -> NOT match(attr_key, {genai_1:String}),
+                    s.custom_attrs_bool.keys
+                ) AS key
                 WHERE s.project_id = {genai_0:String}
                 GROUP BY key
             )
             ORDER BY span_count DESC, key ASC, source ASC
-            LIMIT {genai_1:UInt64} OFFSET {genai_2:UInt64}
+            LIMIT {genai_2:UInt64} OFFSET {genai_3:UInt64}
         """
         assert_sql(
             expected,
-            {"genai_0": "p1", "genai_1": 201, "genai_2": 0},
+            {
+                "genai_0": "p1",
+                "genai_1": (
+                    r"^(?:"
+                    + "|".join(re.escape(key) for key in sorted(semconv.KNOWN_KEYS))
+                    + r")(?:\.|$)"
+                ),
+                "genai_2": 201,
+                "genai_3": 0,
+            },
             query,
             pb.get_params(),
         )
@@ -1934,7 +1956,10 @@ class TestMakeCustomAttrsSchemaQuery:
                        key,
                        count() AS span_count
                 FROM spans s
-                ARRAY JOIN s.custom_attrs_string.keys AS key
+                ARRAY JOIN arrayFilter(
+                    attr_key -> NOT match(attr_key, {genai_3:String}),
+                    s.custom_attrs_string.keys
+                ) AS key
                 WHERE s.project_id = {genai_0:String}
                 AND s.started_at >= {genai_1:DateTime64(6)}
                 AND (s.agent_name = {genai_2:String})
@@ -1945,7 +1970,10 @@ class TestMakeCustomAttrsSchemaQuery:
                        key,
                        count() AS span_count
                 FROM spans s
-                ARRAY JOIN s.custom_attrs_int.keys AS key
+                ARRAY JOIN arrayFilter(
+                    attr_key -> NOT match(attr_key, {genai_3:String}),
+                    s.custom_attrs_int.keys
+                ) AS key
                 WHERE s.project_id = {genai_0:String}
                 AND s.started_at >= {genai_1:DateTime64(6)}
                 AND (s.agent_name = {genai_2:String})
@@ -1956,7 +1984,10 @@ class TestMakeCustomAttrsSchemaQuery:
                        key,
                        count() AS span_count
                 FROM spans s
-                ARRAY JOIN s.custom_attrs_float.keys AS key
+                ARRAY JOIN arrayFilter(
+                    attr_key -> NOT match(attr_key, {genai_3:String}),
+                    s.custom_attrs_float.keys
+                ) AS key
                 WHERE s.project_id = {genai_0:String}
                 AND s.started_at >= {genai_1:DateTime64(6)}
                 AND (s.agent_name = {genai_2:String})
@@ -1967,21 +1998,29 @@ class TestMakeCustomAttrsSchemaQuery:
                        key,
                        count() AS span_count
                 FROM spans s
-                ARRAY JOIN s.custom_attrs_bool.keys AS key
+                ARRAY JOIN arrayFilter(
+                    attr_key -> NOT match(attr_key, {genai_3:String}),
+                    s.custom_attrs_bool.keys
+                ) AS key
                 WHERE s.project_id = {genai_0:String}
                 AND s.started_at >= {genai_1:DateTime64(6)}
                 AND (s.agent_name = {genai_2:String})
                 GROUP BY key
             )
             ORDER BY span_count DESC, key ASC, source ASC
-            LIMIT {genai_3:UInt64} OFFSET {genai_4:UInt64}
+            LIMIT {genai_4:UInt64} OFFSET {genai_5:UInt64}
         """
         expected_params = {
             "genai_0": "p1",
             "genai_1": start,
             "genai_2": "bot",
-            "genai_3": 11,
-            "genai_4": 20,
+            "genai_3": (
+                r"^(?:"
+                + "|".join(re.escape(key) for key in sorted(semconv.KNOWN_KEYS))
+                + r")(?:\.|$)"
+            ),
+            "genai_4": 11,
+            "genai_5": 20,
         }
         assert_sql(expected, expected_params, query, pb.get_params())
 
