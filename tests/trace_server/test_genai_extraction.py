@@ -1080,6 +1080,20 @@ def test_openinference_messages_are_read_only_from_llm_spans() -> None:
             ],
             id="json-shaped-unicode",
         ),
+        pytest.param(
+            {
+                "llm.input_messages.0.message.role": "user",
+                "llm.input_messages.0.message.content": "hi",
+                "llm.input_messages.0.message.contents.0.message_content.type": "[]",
+                "llm.input_messages.0.message.contents.0.message_content.text": "x",
+            },
+            [
+                NormalizedMessage(
+                    role="user", content=_parts({"type": "text", "content": "hi"})
+                )
+            ],
+            id="json-list-content-type",
+        ),
     ],
 )
 def test_openinference_messages_tolerate_odd_shapes(

@@ -236,7 +236,7 @@ def _genai_message(message: dict[str, Any]) -> dict[str, Any]:
         content_type = message_content.get("type")
         text = message_content.get("text")
         image = message_content.get("image")
-        if content_type in {None, _TEXT_CONTENT_TYPE} and text:
+        if (content_type is None or content_type == _TEXT_CONTENT_TYPE) and text:
             parts.append(_text_part(text))
         elif content_type == "image" and isinstance(image, dict):
             image_url = image.get("image")
