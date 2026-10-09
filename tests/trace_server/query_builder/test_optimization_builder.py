@@ -15,6 +15,92 @@ from weave.trace_server.interface import query as tsi_query
 from weave.trace_server.project_version.types import ReadTable
 
 
+@pytest.mark.parametrize(
+    "read_table", [ReadTable.CALLS_MERGED, ReadTable.CALLS_COMPLETE]
+)
+@pytest.mark.parametrize("operator", ["$eq", "$in", "$contains"])
+def test_heavy_prefilter_treats_like_wildcards_as_literal_data(
+    read_table: ReadTable, operator: str
+) -> None:
+    literal = "gb300-indomain_base_i83%"
+    field = {"$getField": "inputs.group"}
+    if operator == "$contains":
+        operand = {operator: {"input": field, "substr": {"$literal": literal}}}
+        expected = '%"%gb300-indomain\\_base\\_i83\\%%"%'
+    elif operator == "$in":
+        operand = {operator: [field, [{"$literal": literal}]]}
+        expected = '%"gb300-indomain\\_base\\_i83\\%"%'
+    else:
+        operand = {operator: [field, {"$literal": literal}]}
+        expected = '%"gb300-indomain\\_base\\_i83\\%"%'
+
+    condition = Condition.model_validate({"operand": operand})
+    pb = ParamBuilder("pb")
+    result = process_query_to_optimization_sql(
+        [condition], pb, read_table.value, read_table
+    )
+
+    assert result.heavy_filter_opt_sql is not None
+    assert pb.get_params() == {"pb_0": expected}
+
+
+@pytest.mark.parametrize("operator", ["$eq", "$in", "$contains"])
+@pytest.mark.parametrize(
+    "literal",
+    [
+        'quoted"_%',
+        r"backslash\_%",
+        "line\n_%",
+        "雪_%",
+        pytest.param("control\x7f_%", id="del"),
+    ],
+)
+def test_heavy_prefilter_leaves_json_encoded_literals_to_the_exact_predicate(
+    operator: str, literal: str
+) -> None:
+    field = {"$getField": "inputs.group"}
+    if operator == "$contains":
+        operand = {operator: {"input": field, "substr": {"$literal": literal}}}
+    elif operator == "$in":
+        operand = {
+            operator: [field, [{"$literal": "safe_term"}, {"$literal": literal}]]
+        }
+    else:
+        operand = {operator: [field, {"$literal": literal}]}
+
+    result = process_query_to_optimization_sql(
+        [Condition.model_validate({"operand": operand})],
+        ParamBuilder("pb"),
+        "calls_complete",
+        ReadTable.CALLS_COMPLETE,
+    )
+
+    assert result.heavy_filter_opt_sql is None
+
+
+def test_case_insensitive_contains_escapes_literal_wildcards() -> None:
+    condition = Condition.model_validate(
+        {
+            "operand": {
+                "$contains": {
+                    "input": {"$getField": "inputs.group"},
+                    "substr": {"$literal": "GB300_BASE%"},
+                    "case_insensitive": True,
+                }
+            }
+        }
+    )
+    pb = ParamBuilder("pb")
+    result = process_query_to_optimization_sql(
+        [condition], pb, "calls_complete", ReadTable.CALLS_COMPLETE
+    )
+    assert (
+        result.heavy_filter_opt_sql
+        == "AND (lower(calls_complete.inputs_dump) LIKE {pb_0:String})"
+    )
+    assert pb.get_params() == {"pb_0": '%"%gb300\\_base\\%%"%'}
+
+
 @pytest.mark.parametrize("table_alias", ["calls_merged", "calls_complete"])
 def test_condition_is_heavy(table_alias: str) -> None:
     """Ensure heavy-field detection works for both table types."""

@@ -14,6 +14,7 @@ from weave.shared import refs_internal as ri
 from weave.trace_server import clickhouse_trace_server_settings as ch_settings
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.base64_content_conversion import AUTO_CONVERSION_MIN_SIZE
+from weave.trace_server.calls_query_builder.calls_query_builder import CallsQuery
 from weave.trace_server.calls_query_builder.utils import param_slot
 from weave.trace_server.ch_sentinel_values import EXPIRE_AT_NEVER, SENTINEL_EPOCH
 from weave.trace_server.clickhouse_trace_server_batched import ClickHouseTraceServer
@@ -243,6 +244,117 @@ def _make_completed_call(
         summary={"usage": {}, "status_counts": {}},
         display_name=display_name,
     )
+
+
+@pytest.mark.parametrize("operator", ["$eq", "$in", "$contains"])
+@pytest.mark.parametrize(
+    "literal",
+    [
+        "gb300-indomain_base_i83%",
+        r"backslash\_%",
+        'quoted"_%',
+        "雪_%",
+        pytest.param("control\x7f_%", id="del"),
+    ],
+)
+def test_calls_query_literal_wildcards_preserve_history_and_pagination(
+    trace_server, clickhouse_trace_server, operator, literal
+):
+    project_id = f"{TEST_ENTITY}/literal_wildcards"
+    values = [literal, literal.replace("_", "X").replace("%", "anything"), literal]
+    call_ids = [str(uuid.uuid4()) for _ in values]
+    batch = []
+    for year, call_id, value in zip([2000, 2024, 2026], call_ids, values, strict=True):
+        started_at = datetime.datetime(year, 1, 1, tzinfo=datetime.timezone.utc)
+        batch.append(
+            _make_completed_call(
+                project_id,
+                call_id,
+                str(uuid.uuid4()),
+                started_at,
+                started_at + datetime.timedelta(seconds=1),
+                inputs={"group": value},
+            )
+        )
+    trace_server.calls_complete(tsi.CallsUpsertCompleteReq(batch=batch))
+
+    field = {"$getField": "inputs.group"}
+    if operator == "$contains":
+        expression = {operator: {"input": field, "substr": {"$literal": literal}}}
+    elif operator == "$in":
+        expression = {operator: [field, [{"$literal": literal}]]}
+    else:
+        expression = {operator: [field, {"$literal": literal}]}
+    query = tsi.Query.model_validate({"$expr": expression})
+
+    calls = list(
+        trace_server.calls_query_stream(
+            tsi.CallsQueryReq(project_id=project_id, query=query)
+        )
+    )
+    assert [call.id for call in calls] == [call_ids[0], call_ids[2]]
+    page = list(
+        trace_server.calls_query_stream(
+            tsi.CallsQueryReq(project_id=project_id, query=query, limit=1, offset=1)
+        )
+    )
+    assert [call.id for call in page] == [call_ids[2]]
+
+
+def test_group_prefilter_uses_existing_token_index(
+    trace_server, clickhouse_trace_server
+):
+    project_id = f"{TEST_ENTITY}/group_prefilter_index"
+    started_at = datetime.datetime(2000, 1, 1, tzinfo=datetime.timezone.utc)
+    trace_server.calls_complete(
+        tsi.CallsUpsertCompleteReq(
+            batch=[
+                _make_completed_call(
+                    project_id,
+                    str(uuid.uuid4()),
+                    str(uuid.uuid4()),
+                    started_at,
+                    started_at + datetime.timedelta(seconds=1),
+                    inputs={"group": "gb300-existingdomain_base_i83"},
+                )
+            ]
+        )
+    )
+    literal = "gb300-missingdomain_base_i999"
+    query = CallsQuery(project_id=b64(project_id), read_table=ReadTable.CALLS_COMPLETE)
+    query.add_field("id")
+    query.add_condition(
+        tsi.Query.model_validate(
+            {
+                "$expr": {
+                    "$eq": [
+                        {"$getField": "inputs.group"},
+                        {"$literal": literal},
+                    ]
+                }
+            }
+        ).expr_
+    )
+    pb = ParamBuilder("pb")
+    sql = query.as_sql(pb)
+    parameters = pb.get_params()
+    pattern_key = next(
+        key
+        for key, value in parameters.items()
+        if isinstance(value, str) and value.startswith('%"')
+    )
+    settings = {"use_query_condition_cache": 0}
+    baseline = clickhouse_trace_server.ch_client.query(
+        sql,
+        parameters={**parameters, pattern_key: f'%"{literal}"%'},
+        settings=settings,
+    )
+    fixed = clickhouse_trace_server.ch_client.query(
+        sql, parameters=parameters, settings=settings
+    )
+    assert baseline.result_rows == fixed.result_rows == []
+    assert int(baseline.summary["read_rows"]) > 0
+    assert int(fixed.summary["read_rows"]) == 0
 
 
 def test_calls_query_latest_only_deduplicates_before_filter(

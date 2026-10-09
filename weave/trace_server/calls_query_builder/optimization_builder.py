@@ -12,6 +12,7 @@ Optimization SQL is applied before GROUP BY, reducing memory usage and
 improving performance for complex conditions.
 """
 
+import json
 from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING
 
@@ -433,7 +434,14 @@ def process_query_to_optimization_sql(
     )
 
 
-def _create_like_patterns_for_value(value: str | float | bool) -> list[str]:
+def _escape_like_literal(value: str) -> str | None:
+    """Escape literal wildcards, or skip text whose raw JSON encoding can differ."""
+    if json.dumps(value)[1:-1] != value:
+        return None
+    return value.replace("_", r"\_").replace("%", r"\%")
+
+
+def _create_like_patterns_for_value(value: str | float | bool) -> list[str] | None:
     """Creates LIKE patterns for a value based on its type in JSON format.
 
     Returns a list because a single value can serialize to JSON in more than
@@ -442,6 +450,8 @@ def _create_like_patterns_for_value(value: str | float | bool) -> list[str]:
     `%1.0%` and `%1%` to avoid being stricter than HAVING. Likewise a bool
     literal must match both `%true%`/`%false%` and the legacy numeric
     encodings `%1%`/`%0%` that the HAVING bool cast accepts.
+
+    Return None when raw JSON cannot reliably contain the decoded literal.
     """
     # bool must be checked before int since bool is a subclass of int.
     if isinstance(value, bool):
@@ -450,7 +460,10 @@ def _create_like_patterns_for_value(value: str | float | bool) -> list[str]:
         # Boolean string literals are not wrapped in quotes in JSON payloads.
         if value in {"true", "false"}:
             return [f"%{value}%"]
-        return [f'%"{value}"%']
+        literal = _escape_like_literal(value)
+        if literal is None:
+            return None
+        return [f'%"{literal}"%']
     if isinstance(value, float) and value.is_integer():
         return [f"%{value}%", f"%{int(value)}%"]
     return [f"%{value}%"]
@@ -554,6 +567,8 @@ def _create_like_optimized_eq_condition(
         return None
 
     like_patterns = _create_like_patterns_for_value(literal_value)
+    if like_patterns is None:
+        return None
     per_pattern = [
         _create_like_condition(field, p, pb, table_alias) for p in like_patterns
     ]
@@ -604,7 +619,10 @@ def _create_like_optimized_contains_condition(
         return None
 
     case_insensitive = operation.contains_.case_insensitive or False
-    like_pattern = f'%"%{substr_value}%"%'
+    literal = _escape_like_literal(substr_value)
+    if literal is None:
+        return None
+    like_pattern = f'%"%{literal}%"%'
 
     like_condition = _create_like_condition(
         field, like_pattern, pb, table_alias, case_insensitive
@@ -660,7 +678,10 @@ def _create_like_optimized_in_condition(
         if isinstance(value_operand.literal_, str) and not value_operand.literal_:
             return None
 
-        for like_pattern in _create_like_patterns_for_value(value_operand.literal_):
+        like_patterns = _create_like_patterns_for_value(value_operand.literal_)
+        if like_patterns is None:
+            return None
+        for like_pattern in like_patterns:
             like_condition = _create_like_condition(
                 field, like_pattern, pb, table_alias
             )
