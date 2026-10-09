@@ -4957,6 +4957,120 @@ def test_stats_query_calls_merged_started_at_window_uses_distinct_anti_set() -> 
     )
 
 
+def test_stats_query_calls_merged_started_at_negated_upper_bound_uses_fast_path() -> (
+    None
+):
+    """The UI encodes "before T" as `$not: [$gte]`; it negates to `< T` and
+    still takes Pattern 4 instead of the per-id GROUP BY.
+    """
+    req = tsi.CallsQueryStatsReq(
+        project_id="project",
+        query=_started_at_query(
+            {
+                "$and": [
+                    {"$gte": [{"$getField": "started_at"}, {"$literal": 1709251200}]},
+                    {
+                        "$not": [
+                            {
+                                "$gte": [
+                                    {"$getField": "started_at"},
+                                    {"$literal": 1709337600},
+                                ]
+                            }
+                        ]
+                    },
+                ]
+            }
+        ),
+    )
+    assert_stats_sql(
+        req,
+        """
+        SELECT raw_count AS count, toUInt8(0) AS has_more
+        FROM (
+            SELECT uniq(calls_merged.id) AS raw_count
+            FROM calls_merged
+            PREWHERE calls_merged.project_id = {pb_0:String}
+            WHERE calls_merged.sortable_datetime >= {pb_2:String}
+              AND calls_merged.sortable_datetime < {pb_4:String}
+              AND calls_merged.started_at >= {pb_1:String}
+              AND calls_merged.started_at < {pb_3:String}
+              AND isNotNull(calls_merged.op_name)
+              AND calls_merged.id NOT IN (
+                  SELECT calls_merged.id
+                  FROM calls_merged
+                  PREWHERE calls_merged.project_id = {pb_0:String}
+                  WHERE calls_merged.sortable_datetime >= {pb_2:String}
+                    AND isNotNull(calls_merged.deleted_at)))
+        """,
+        {
+            "pb_0": "project",
+            "pb_1": "2024-03-01 00:00:00.000000",
+            "pb_2": "2024-02-29 23:55:00.000000",
+            "pb_3": "2024-03-02 00:00:00.000000",
+            "pb_4": "2024-03-02 00:05:00.000000",
+        },
+        read_table=ReadTable.CALLS_MERGED,
+    )
+
+
+def test_stats_query_calls_merged_started_at_negated_compound_falls_back() -> None:
+    """NOT of an AND window is not a bound list, so it keeps the GROUP BY path."""
+    req = tsi.CallsQueryStatsReq(
+        project_id="project",
+        query=_started_at_query(
+            {
+                "$not": [
+                    {
+                        "$and": [
+                            {
+                                "$gt": [
+                                    {"$getField": "started_at"},
+                                    {"$literal": 1709251200},
+                                ]
+                            },
+                            {
+                                "$lt": [
+                                    {"$getField": "started_at"},
+                                    {"$literal": 1709337600},
+                                ]
+                            },
+                        ]
+                    }
+                ]
+            }
+        ),
+    )
+    assert_stats_sql(
+        req,
+        """
+        SELECT count() AS count, toUInt8(0) AS has_more
+        FROM (
+            SELECT calls_merged.id AS id
+            FROM calls_merged
+            PREWHERE calls_merged.project_id = {pb_4:String}
+            WHERE (NOT ((calls_merged.sortable_datetime > {pb_2:String}
+                         AND calls_merged.sortable_datetime < {pb_3:String})))
+            GROUP BY (calls_merged.project_id, calls_merged.id)
+            HAVING (
+                ((NOT (((any(calls_merged.started_at) > {pb_0:String})
+                        AND (any(calls_merged.started_at) < {pb_1:String})))))
+                AND ((any(calls_merged.deleted_at) IS NULL))
+                AND ((NOT ((any(calls_merged.op_name) IS NULL))))
+            )
+        )
+        """,
+        {
+            "pb_0": "2024-03-01 00:00:00.000000",
+            "pb_1": "2024-03-02 00:00:00.000000",
+            "pb_2": "2024-03-01 00:05:00.000000",
+            "pb_3": "2024-03-01 23:55:00.000000",
+            "pb_4": "project",
+        },
+        read_table=ReadTable.CALLS_MERGED,
+    )
+
+
 def test_stats_query_calls_merged_started_at_fast_path_gates() -> None:
     """The fast path fires only when a lower-bounded started_at is the sole
     filter. An upper-bound-only window (cannot window the delete anti-set) and a

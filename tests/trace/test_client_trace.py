@@ -5188,6 +5188,31 @@ def test_calls_query_stats_started_at_window_excludes_deletes(client):
             tsi.CallsQueryStatsReq(project_id=project_id, query=query)
         ).count
 
+    def ui_window_count(lower: int, upper: int) -> int:
+        # The UI encodes "before" as $not: [$gte]; it must take the same fast path.
+        query = tsi.Query(
+            **{
+                "$expr": {
+                    "$and": [
+                        {"$gte": [{"$getField": "started_at"}, {"$literal": lower}]},
+                        {
+                            "$not": [
+                                {
+                                    "$gte": [
+                                        {"$getField": "started_at"},
+                                        {"$literal": upper},
+                                    ]
+                                }
+                            ]
+                        },
+                    ]
+                }
+            }
+        )
+        return client.server.calls_query_stats(
+            tsi.CallsQueryStatsReq(project_id=project_id, query=query)
+        ).count
+
     def unfiltered_count() -> int:
         # No query -> exercises the flat distinct-id fast path (Pattern 3).
         return client.server.calls_query_stats(
@@ -5197,8 +5222,11 @@ def test_calls_query_stats_started_at_window_excludes_deletes(client):
     # Lower bound in the distant past counts every (non-deleted) call.
     assert count(1) == 3
     assert unfiltered_count() == 3
+    assert ui_window_count(1, 99999999999) == 3
     # Lower bound in the far future counts nothing.
     assert count(99999999999) == 0
+    # An upper bound before every call counts nothing.
+    assert ui_window_count(1, 2) == 0
 
     # Deleting a call removes it from both counts (delete exclusion).
     client.server.calls_delete(
@@ -5206,6 +5234,7 @@ def test_calls_query_stats_started_at_window_excludes_deletes(client):
     )
     assert count(1) == 2
     assert unfiltered_count() == 2
+    assert ui_window_count(1, 99999999999) == 2
 
     # An orphaned call-end (end row, no start) carries started_at since #6933 but
     # has no op_name; the op_name guard must keep it out of both fast-path counts.
@@ -5223,6 +5252,7 @@ def test_calls_query_stats_started_at_window_excludes_deletes(client):
     )
     assert count(1) == 2
     assert unfiltered_count() == 2
+    assert ui_window_count(1, 99999999999) == 2
 
 
 @pytest.mark.parametrize(
