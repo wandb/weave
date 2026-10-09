@@ -3534,6 +3534,7 @@ _STARTED_AT_BOUND_OPS: dict[type[tsi_query.Operation], str] = {
     tsi_query.LtOperation: "<",
     tsi_query.LteOperation: "<=",
 }
+_NEGATED_BOUND_OPS = {">": "<=", ">=": "<", "<": ">=", "<=": ">"}
 
 
 def _extract_started_at_only_bounds(
@@ -3542,9 +3543,12 @@ def _extract_started_at_only_bounds(
     """Return the started_at bounds iff `operand` filters on nothing else.
 
     Accepts a single gt/gte/lt/lte comparison of `started_at` against a numeric
-    literal (field on the left), or an AND tree of such comparisons. Returns
-    None for any other shape (other fields, OR/NOT, non-numeric literal, field
-    on the right, ...) so the caller falls back to the GROUP BY path.
+    literal (field on the left), the NOT of one such comparison, or an AND tree
+    of those. The UI encodes "before T" as `$not: [$gte]`, which negates to the
+    complementary bound; start rows always carry started_at, so the negation
+    has no NULL case to preserve. Returns None for any other shape (other
+    fields, OR, NOT of a compound, non-numeric literal, field on the right, ...)
+    so the caller falls back to the GROUP BY path.
     """
     if isinstance(operand, tsi_query.AndOperation):
         bounds: list[tuple[str, float]] = []
@@ -3554,6 +3558,15 @@ def _extract_started_at_only_bounds(
                 return None
             bounds.extend(sub_bounds)
         return bounds or None
+
+    if isinstance(operand, tsi_query.NotOperation):
+        (negated,) = operand.not_
+        if isinstance(negated, (tsi_query.AndOperation, tsi_query.NotOperation)):
+            return None
+        negated_bounds = _extract_started_at_only_bounds(negated)
+        if negated_bounds is None:
+            return None
+        return [(_NEGATED_BOUND_OPS[op], ts) for op, ts in negated_bounds]
 
     if not isinstance(
         operand,
