@@ -18,9 +18,11 @@ from weave.trace_server.interface.builtin_object_classes.provider import (
     Provider,
     ProviderModel,
 )
-from weave.trace_server.model_providers.model_providers import (
-    VERTEX_PROVIDER_NAMES,
-)
+
+# Vertex provider selection is disabled.
+# from weave.trace_server.model_providers.model_providers import (
+#     VERTEX_PROVIDER_NAMES,
+# )
 from weave.trace_server.secret_fetcher_context import _secret_fetcher_context
 
 NOVA_MODELS = ("nova-pro-v1", "nova-lite-v1", "nova-micro-v1")
@@ -432,9 +434,10 @@ def _build_litellm_kwargs(
             f"Invalid provider configuration: provider '{provider}' must be 'custom' if base_url is provided"
         )
 
-    # For vertex providers, use vertex_credentials when provided instead of api_key
-    is_vertex_provider = provider in VERTEX_PROVIDER_NAMES
-    api_key_for_call = None if (is_vertex_provider and vertex_credentials) else api_key
+    # Vertex credential forwarding is disabled.
+    # is_vertex_provider = provider in VERTEX_PROVIDER_NAMES
+    # api_key_for_call = None if (is_vertex_provider and vertex_credentials) else api_key
+    api_key_for_call = api_key
     completion_kwargs: dict[str, Any] = {
         **inputs_dict,
         "api_key": api_key_for_call,
@@ -444,8 +447,8 @@ def _build_litellm_kwargs(
         "api_base": azure_api_base,
         "api_version": azure_api_version,
     }
-    if is_vertex_provider and vertex_credentials:
-        completion_kwargs["vertex_credentials"] = vertex_credentials
+    # if is_vertex_provider and vertex_credentials:
+    #     completion_kwargs["vertex_credentials"] = vertex_credentials
     return completion_kwargs
 
 
@@ -766,10 +769,12 @@ def lite_llm_completion_stream(
                     stream_options={"include_usage": True},
                 )
             else:
-                is_vertex_provider = provider in VERTEX_PROVIDER_NAMES
+                # Vertex credential forwarding is disabled.
+                # is_vertex_provider = provider in VERTEX_PROVIDER_NAMES
+                # api_key_for_call = api_key
+                # if is_vertex_provider and vertex_credentials:
+                #     api_key_for_call = None
                 api_key_for_call = api_key
-                if is_vertex_provider and vertex_credentials:
-                    api_key_for_call = None
                 stream_kwargs: dict[str, Any] = {
                     **inputs.model_dump(
                         exclude_none=True,
@@ -784,8 +789,8 @@ def lite_llm_completion_stream(
                     "stream": True,
                     "stream_options": {"include_usage": True},
                 }
-                if is_vertex_provider and vertex_credentials:
-                    stream_kwargs["vertex_credentials"] = vertex_credentials
+                # if is_vertex_provider and vertex_credentials:
+                #     stream_kwargs["vertex_credentials"] = vertex_credentials
                 stream = litellm.completion(**stream_kwargs)
 
             # `stream=True` always yields a CustomStreamWrapper of pydantic
