@@ -18,6 +18,7 @@ import pytest
 from pydantic import ValidationError
 
 import weave
+from tests.trace.util import HTTP_NOT_PORTED
 from weave.trace import base_objects
 from weave.trace.refs import ObjectRef
 from weave.trace.serialization.serialize import to_json
@@ -377,6 +378,7 @@ def test_digest_equality(client):
     assert top_level_pythonic_digest == top_level_interface_style_digest
 
 
+@pytest.mark.skipif(HTTP_NOT_PORTED, reason="http: not ported yet")
 def test_schema_validation(client):
     # Test that we can't create an object with the wrong schema
     with pytest.raises(ValidationError):
@@ -1083,6 +1085,7 @@ def test_exclude_base_object_classes_with_inherited_objects(client: WeaveClient)
     )
 
 
+@pytest.mark.skipif(HTTP_NOT_PORTED, reason="http: not ported yet")
 def test_obj_create_rejects_name_type_collision(client: WeaveClient):
     """WB-30574: object_id is bound to one base_object_class per project.
 
@@ -1179,6 +1182,7 @@ def _create_monitor(client: WeaveClient, name: str, query: dict | None):
     )
 
 
+@pytest.mark.skipif(HTTP_NOT_PORTED, reason="http: not ported yet")
 def test_monitor_create_rejects_unknown_query_field(client: WeaveClient):
     """A Monitor query on an unknown field is rejected with the complete allowed-field list."""
     bad_query = {

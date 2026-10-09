@@ -4,6 +4,7 @@ from typing import Annotated, Any, Literal, get_type_hints
 import pytest
 
 import weave
+from tests.trace.util import HTTP_NOT_PORTED
 from weave.trace.call import Call
 from weave.trace.op import (
     OpCallError,
@@ -125,6 +126,7 @@ def test_sync_method(weave_active, weave_obj, py_obj):
         weave_obj_method2 = weave_obj_method_ref.get()
 
 
+@pytest.mark.skipif(HTTP_NOT_PORTED, reason="http: not ported yet")
 def test_sync_method_call(weave_active, weave_obj, py_obj):
     res, call = weave_obj.method.call(weave_obj, 1)
     assert isinstance(call, Call)
@@ -159,6 +161,7 @@ async def test_async_method(weave_active, weave_obj, py_obj):
         weave_obj_amethod2 = weave_obj_amethod_ref.get()
 
 
+@pytest.mark.skipif(HTTP_NOT_PORTED, reason="http: not ported yet")
 @pytest.mark.asyncio
 async def test_async_method_call(weave_active, weave_obj, py_obj):
     res, call = await weave_obj.amethod.call(weave_obj, 1)

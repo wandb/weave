@@ -9,6 +9,7 @@ from spec import SerializationTestCase
 from test_cases import cases
 
 import weave
+from tests.trace.util import HTTP_NOT_PORTED
 from weave.trace.refs import ObjectRef
 from weave.trace_server.trace_server_interface import (
     CallReadReq,
@@ -46,6 +47,7 @@ def set_weave_logger_to_debug():
         logger.setLevel(current_level)
 
 
+@pytest.mark.skipif(HTTP_NOT_PORTED, reason="http: not ported yet")
 @pytest.mark.parametrize(
     "case",
     cases,
