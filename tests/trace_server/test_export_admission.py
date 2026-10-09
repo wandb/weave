@@ -155,6 +155,7 @@ def test_busy_other_project_never_counts_writes_or_submits(export_redis, monkeyp
     try:
         with pytest.raises(export.ExportError) as exc:
             export.start_export(
+                ch,
                 lambda: ch,
                 MagicMock(),
                 "other-project",
@@ -176,7 +177,7 @@ def test_redis_failure_does_not_submit_export(monkeypatch):
     ch = query_client()
     with pytest.raises(export.ExportError) as exc:
         export.start_export(
-            lambda: ch, MagicMock(), "project", ["calls"], ReadTable.CALLS_COMPLETE
+            ch, lambda: ch, MagicMock(), "project", ["calls"], ReadTable.CALLS_COMPLETE
         )
     assert (exc.value.http_status, exc.value.code) == (
         503,

@@ -17,6 +17,7 @@ from dataclasses import dataclass
 from clickhouse_connect.driver.client import Client as CHClient
 
 from weave.trace_server import clickhouse_trace_server_settings as ch_settings
+from weave.trace_server import environment as wf_env
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.export_admission import (
     AdmissionError,
@@ -51,6 +52,7 @@ class ResolvedExportTarget:
 
 
 def start_export(
+    ch_client: CHClient,
     mint_client: Callable[[], CHClient],
     file_storage_client: FileStorageClient | None,
     project_id: str,
@@ -75,16 +77,50 @@ def start_export(
     except AdmissionError as exc:
         raise ExportError(exc.http_status, exc.code, str(exc)) from exc
     try:
-        _write_manifest(file_storage_client, project_id, job_id, target_names)
+        targets_with_counts = _count_export_targets(
+            ch_client, project_id, job_id, targets, admission
+        )
+        _write_manifest(file_storage_client, project_id, job_id, targets_with_counts)
         threading.Thread(
             target=_run_export,
             args=(client, project_id, job_id, targets, admission),
             daemon=True,
         ).start()
-    except Exception:
-        admission.close(completed=True)
+    except Exception as exc:
+        _close_admission(admission, completed=isinstance(exc, ExportError))
+        if isinstance(exc, AdmissionError):
+            raise ExportError(exc.http_status, exc.code, str(exc)) from exc
         raise
+
     return job_id
+
+
+def _count_export_targets(
+    client: CHClient,
+    project_id: str,
+    job_id: str,
+    targets: list[ResolvedExportTarget],
+    admission: ExportAdmission,
+) -> list[tuple[str, int]]:
+    targets_with_counts = []
+    cap = wf_env.wf_export_max_rows()
+    for target in targets:
+        query_id = export_query_id(job_id, f"{target.name}:count")
+        admission.prepare_query(query_id)
+        rows = precount_rows(client, project_id, target, query_id)
+        if rows > cap:
+            raise ExportError(
+                409, "TOO_LARGE", f"target {target.name!r} has {rows} rows > cap {cap}"
+            )
+        targets_with_counts.append((target.name, rows))
+    return targets_with_counts
+
+
+def _close_admission(admission: ExportAdmission, *, completed: bool) -> None:
+    try:
+        admission.close(completed=completed)
+    except AdmissionError:
+        logger.warning("Export admission cleanup unavailable")
 
 
 def get_export_status(
@@ -151,6 +187,23 @@ def poll_query_status(
     return "running", 0, None
 
 
+def precount_rows(
+    ch_client: CHClient,
+    project_id: str,
+    target: ResolvedExportTarget,
+    query_id: str | None = None,
+) -> int:
+    """Count the rows a target would export, project_id bound as a param."""
+    result = ch_client.query(
+        f"SELECT count() FROM ({target.source_sql})",
+        parameters={"project_id": project_id},
+        settings=ch_settings.merge_default_query_settings(
+            {"query_id": query_id} if query_id else None
+        ),
+    )
+    return int(result.result_rows[0][0])
+
+
 def build_export_insert_sql(target: ResolvedExportTarget, filename: str) -> str:
     """Build the detached export INSERT.
 
@@ -173,14 +226,21 @@ def export_job_prefix(project_id: str, job_id: str) -> str:
     return f"exports/{project_id}/{job_id}/"
 
 
-def build_manifest_json(job_id: str, target_names: list[str]) -> bytes:
+def build_manifest_json(
+    job_id: str, targets_with_counts: list[tuple[str, int]]
+) -> bytes:
     """Build the durable job index without exposing the internal project id."""
     manifest = {
         "job_id": job_id,
         "format": "parquet",
         "created_at": datetime.datetime.now(datetime.timezone.utc).isoformat(),
         "targets": [
-            {"target": name, "object": f"{name}/data.parquet"} for name in target_names
+            {
+                "target": name,
+                "expected_rows": rows,
+                "object": f"{name}/data.parquet",
+            }
+            for name, rows in targets_with_counts
         ],
     }
     return json.dumps(manifest, sort_keys=True).encode()
@@ -190,14 +250,14 @@ def _write_manifest(
     file_storage_client: FileStorageClient,
     project_id: str,
     job_id: str,
-    target_names: list[str],
+    targets_with_counts: list[tuple[str, int]],
 ) -> None:
     """Persist the job record before accepting detached work."""
     try:
         store_in_bucket(
             file_storage_client,
             export_job_prefix(project_id, job_id) + "manifest.json",
-            build_manifest_json(job_id, target_names),
+            build_manifest_json(job_id, targets_with_counts),
         )
     except FileStorageWriteError as exc:
         raise ExportError(
@@ -306,10 +366,7 @@ def _run_export(
     except AdmissionError:
         logger.warning("Export worker lost admission; stopping remaining targets")
     finally:
-        try:
-            admission.close(completed=completed)
-        except AdmissionError:
-            logger.warning("Export admission cleanup unavailable")
+        _close_admission(admission, completed=completed)
 
 
 def _run_target_insert(
