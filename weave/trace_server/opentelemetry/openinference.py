@@ -9,6 +9,7 @@ column misses, so a span carrying both keeps its GenAI values.
 Spec: https://github.com/Arize-ai/openinference/blob/main/spec/semantic_conventions.md
 """
 
+import json
 from typing import Any
 
 from weave.trace_server.agents.constants import OP_EXECUTE_TOOL, OP_INVOKE_AGENT
@@ -121,6 +122,7 @@ def _tool_message(value: Any) -> dict[str, Any] | None:
     Requires the message's own `type`, `content` and `tool_call_id`, so a tool
     that returns `{"type": "tool", "data": ...}` itself keeps its result.
     """
+    value = _json_value(value)
     if not isinstance(value, dict) or value.get("type") != _TOOL_ROLE:
         return None
     data = value.get("data")
@@ -135,7 +137,7 @@ def _tool_message(value: Any) -> dict[str, Any] | None:
 
 
 def _tool_definition(tool: dict[str, Any]) -> dict[str, Any] | None:
-    schema = tool.get("json_schema")
+    schema = _json_value(tool.get("json_schema"))
     if not isinstance(schema, dict):
         schema = {}
     function = schema.get("function")
@@ -150,6 +152,16 @@ def _tool_definition(tool: dict[str, Any]) -> dict[str, Any] | None:
     if not definition["name"]:
         return None
     return {key: value for key, value in definition.items() if value is not None}
+
+
+def _json_value(value: Any) -> Any:
+    """Decode a JSON string that ingest left as text, such as one with leading whitespace."""
+    if not isinstance(value, str):
+        return value
+    try:
+        return json.loads(value)
+    except json.JSONDecodeError:
+        return value
 
 
 def _indexed(value: Any) -> list[Any]:

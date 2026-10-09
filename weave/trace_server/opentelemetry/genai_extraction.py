@@ -277,6 +277,7 @@ def extract_tool_call_arguments(
     val = _get(attrs, *semconv.TOOL_CALL_ARGUMENTS.lookup_keys)
     if val:
         return _json_str(val)
+    has_genai_value = val is not None
 
     for event in events:
         if event.get("name") == "gen_ai.tool.input":
@@ -284,7 +285,10 @@ def extract_tool_call_arguments(
             val = get_attribute(event_attrs, "gen_ai.tool.call.arguments")
             if val:
                 return _json_str(val)
+            has_genai_value = has_genai_value or val is not None
 
+    if has_genai_value:
+        return ""
     return _json_str(openinference.tool_call_arguments(attrs))
 
 
@@ -294,6 +298,7 @@ def extract_tool_call_result(
     val = _get(attrs, *semconv.TOOL_CALL_RESULT.lookup_keys)
     if val:
         return _json_str(val)
+    has_genai_value = val is not None
 
     for event in events:
         if event.get("name") == "gen_ai.tool.output":
@@ -301,7 +306,10 @@ def extract_tool_call_result(
             val = get_attribute(event_attrs, "gen_ai.tool.call.result")
             if val:
                 return _json_str(val)
+            has_genai_value = has_genai_value or val is not None
 
+    if has_genai_value:
+        return ""
     return _json_str(openinference.tool_call_result(attrs))
 
 

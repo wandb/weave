@@ -765,6 +765,63 @@ def test_openinference_tool_result_shaped_like_a_tool_message_is_kept() -> None:
     )
 
 
+@pytest.mark.parametrize(
+    ("arguments", "result"),
+    [("", ""), ("{}", "[]")],
+    ids=["empty-strings", "empty-json"],
+)
+def test_empty_gen_ai_tool_values_win_over_openinference_fallbacks(
+    arguments: str, result: str
+) -> None:
+    span = _openinference_span(
+        {
+            "openinference.span.kind": "TOOL",
+            "gen_ai.tool.call.arguments": arguments,
+            "gen_ai.tool.call.result": result,
+            "input.value": "Paris",
+            "output.value": "Sunny, 21C in Paris",
+        },
+        "get_weather",
+    )
+    extracted = extract_genai_span(span, project_id="p1")
+    assert (extracted.tool_call_arguments, extracted.tool_call_result) == ("", "")
+
+
+def test_openinference_json_with_leading_whitespace_is_decoded() -> None:
+    """Ingest decodes only strings that start with `{` or `[`."""
+    tool_span = _openinference_span(
+        {
+            "openinference.span.kind": "TOOL",
+            "output.value": " "
+            + json.dumps(
+                {
+                    "type": "tool",
+                    "data": {
+                        "type": "tool",
+                        "content": "Sunny",
+                        "tool_call_id": "call_1",
+                    },
+                }
+            ),
+        },
+        "get_weather",
+    )
+    llm_span = _openinference_span(
+        {
+            "openinference.span.kind": "LLM",
+            "llm.tools.0.tool.json_schema": ' {"name": "search"}',
+        },
+        "ChatOpenAI",
+    )
+    tool_result = extract_genai_span(tool_span, project_id="p1")
+    llm_result = extract_genai_span(llm_span, project_id="p1")
+    assert (
+        tool_result.tool_call_id,
+        tool_result.tool_call_result,
+        llm_result.tool_definitions,
+    ) == ("call_1", "Sunny", '[{"type": "function", "name": "search"}]')
+
+
 def test_openinference_llm_tools_map_to_tool_definitions() -> None:
     weather_parameters = {
         "type": "object",
