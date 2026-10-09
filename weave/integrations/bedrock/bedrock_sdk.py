@@ -112,6 +112,8 @@ def extract_model_name_from_inference_profile_arn(profile_arn: str) -> str:
     Args:
         profile_arn: The inference profile ARN in format:
             - Simple inference profiles: 'arn:aws:bedrock:region:account-id:inference-profile/model-id'
+              The profile ID (e.g. 'us.openai.gpt-6-astra') is returned as is, the same
+              model name a call that passes the profile ID directly is recorded under.
             - Application inference profiles: 'arn:aws:bedrock:region:account-id:application-inference-profile/profileId'
               In the case of application inference profiles, a list of inference profiles is returned,
               and the model from the first profile is used.
@@ -119,6 +121,8 @@ def extract_model_name_from_inference_profile_arn(profile_arn: str) -> str:
     Returns:
         The extracted model name (e.g. "amazon.nova-lite-v1:0")
     """
+    if ":inference-profile/" in profile_arn:
+        return profile_arn.rsplit("/", maxsplit=1)[-1]
     try:
         aws_region_name = os.environ.get("AWS_REGION_NAME")
         profile_id = profile_arn.rsplit("/", maxsplit=1)[-1]
