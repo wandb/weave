@@ -106,6 +106,7 @@ class AsyncClickHouseTraceServer(ClickHouseTraceServer):
             base_url=info.base_url,
             extra_headers=info.extra_headers,
             vertex_credentials=info.vertex_credentials,
+            is_custom_runtime=info.is_custom_runtime,
         )
         end_time = datetime.datetime.now()
 

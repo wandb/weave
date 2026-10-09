@@ -117,6 +117,7 @@ def test_rejects_non_global_ipv4(url: str) -> None:
         "http://[::1]/",
         "http://[fe80::1]/",
         "http://[fc00::1]/",
+        "http://[fec0::1]/",
         "http://[ff00::1]/",
         "http://[::ffff:169.254.169.254]/",
         "http://[::ffff:10.0.0.1]/",
