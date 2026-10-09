@@ -27,6 +27,11 @@ pytestmark = pytest.mark.skipif(
 BUCKET = "weave-export-cap-manifest"
 
 
+@pytest.fixture(autouse=True)
+def use_export_redis(export_redis):
+    return export_redis
+
+
 @pytest.fixture
 def clickhouse_trace_server(trace_server):
     """Return the internal ClickHouse server and enforce AUTO routing mode."""
