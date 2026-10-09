@@ -588,15 +588,11 @@ not-iterable = "ignore"
 # additionally not reach into the client SDK. `weave.shared` is the intentional
 # neutral zone that both sides may import, and it imports neither.
 #
-# The repo is currently entangled, so every existing cross-boundary import is
-# listed under each contract's `ignore_imports` as a TEMPORARY allowance. Those
-# lists ARE the untangling backlog: as we decouple the repo we delete entries
-# (and fix the code), never add. `unmatched_ignore_imports_alerting` is left at
-# its default (error), so a stale ignore that no longer matches a real import
-# fails the linter and forces the list to stay honest.
+# No contract has an `ignore_imports` list: the direct cross-boundary imports
+# are gone. Fix a new violation in the code rather than adding an ignore.
 #
 # `allow_indirect_imports = true` keeps each contract focused on *direct*
-# imports, so every ignored entry maps to a concrete `import` statement to fix.
+# imports, so every violation maps to a concrete `import` statement to fix.
 # The `weave.shared` contract sets it to `false`: both sides import that
 # package, so an indirect path out of it couples them just the same.
 # ---------------------------------------------------------------------------
@@ -631,18 +627,9 @@ forbidden_modules = [
   "weave.wandb_interface",
 ]
 allow_indirect_imports = true
-# TEMPORARY: existing trace_server -> client imports to untangle. Do not add.
 # NOTE: bare `from weave import ...` / `import weave` (the root package) is not
 # listed here because the root cannot be a forbidden module without also
-# forbidding trace_server's internal imports; every file that does so also
-# leaks via a client subpackage below, so none escape the contract.
-ignore_imports = [
-  # evaluate_model_worker re-exports the body from the client side; its row goes
-  # with that re-export.
-  "weave.trace_server.workers.evaluate_model_worker.evaluate_model_worker -> weave.evaluation.evaluate_model_worker",
-  # llm_structured_model is the alias on the old path; its row goes with it.
-  "weave.trace_server.interface.builtin_object_classes.llm_structured_model -> weave.flow.llm_structured_model",
-]
+# forbidding trace_server's internal imports.
 
 [[tool.importlinter.contracts]]
 name = "Weave client SDK must not import the trace server"
@@ -702,14 +689,6 @@ forbidden_modules = [
   "weave.wandb_interface",
 ]
 allow_indirect_imports = true
-# TEMPORARY: existing workers -> client imports to untangle. Do not add.
-# These also appear in the trace_server -> client contract above (workers are a
-# subpackage of trace_server); both must clear before either ignore is removed.
-ignore_imports = [
-  # evaluate_model_worker re-exports the body from the client side; its row goes
-  # with that re-export.
-  "weave.trace_server.workers.evaluate_model_worker.evaluate_model_worker -> weave.evaluation.evaluate_model_worker",
-]
 
 [[tool.importlinter.contracts]]
 name = "Shared code must not import the Weave client SDK or the trace server"

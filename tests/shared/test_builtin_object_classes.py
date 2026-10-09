@@ -20,9 +20,6 @@ from weave.trace_server.interface.builtin_object_classes import (
     leaderboard as leaderboard_legacy,
 )
 from weave.trace_server.interface.builtin_object_classes import (
-    llm_structured_model as llm_structured_model_legacy,
-)
-from weave.trace_server.interface.builtin_object_classes import (
     saved_view as saved_view_legacy,
 )
 from weave.trace_server.interface.builtin_object_classes import (
@@ -45,16 +42,6 @@ def test_trace_server_builtin_object_classes_reexport_the_same_objects() -> None
     assert (
         builtin_object_registry.BUILTIN_OBJECT_REGISTRY
         is builtin_object_registry_legacy.BUILTIN_OBJECT_REGISTRY
-    )
-    assert llm_structured_model_legacy is llm_structured_model_sdk
-    assert llm_structured_model_legacy.Message is llm_structured_model.Message
-    assert (
-        llm_structured_model_legacy.LLMStructuredCompletionModelDefaultParams
-        is llm_structured_model.LLMStructuredCompletionModelDefaultParams
-    )
-    assert (
-        llm_structured_model_legacy.parse_response
-        is llm_structured_model.parse_response
     )
 
 
