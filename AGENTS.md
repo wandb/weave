@@ -260,6 +260,12 @@ Focus on these primary test shards:
 The Claude Agent SDK shard combines ClickHouse-backed calls tests with
 no-server OTel tests. PR CI runs `tests-3.10(shard='claude_agent_sdk')` once
 without a marker filter so both tracing paths contribute coverage.
+
+TypeSafe `system_one` tests live in `tests/integrations/typesafe/` and mock
+the SDK's HTTP transport. They do not use the trace server. PR CI runs
+`tests-3.13(shard='typesafe')` once, without `-m trace_server` and without
+starting ClickHouse. Node tests are
+`sdks/node/src/__tests__/integrations/typesafe.test.ts`.
 Calls-based tests must include the integration's intentional text and thinking
 child calls in exact operation-set assertions.
 

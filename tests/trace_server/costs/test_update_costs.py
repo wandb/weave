@@ -8,6 +8,7 @@ import pytest
 
 from weave.trace_server.costs.update_costs import (
     COST_FILE,
+    add_typesafe_bare_aliases,
     fetch_manual_costs,
     fetch_models_begin_costs,
     fetch_new_costs,
@@ -554,6 +555,36 @@ def test_fetch_models_begin_costs_prices_bare_and_prefixed_id(mock_file, mock_ex
         assert costs[key]["output"] == 2e-07
         assert costs[key]["provider"] == "coreweave"
         assert costs[key]["created_at"] == "2025-01-01 12:00:00"
+
+
+def test_add_typesafe_bare_aliases_copies_missing_ids_only():
+    prefixed = {"input": 4.2e-08, "output": 0.0, "provider": "typesafe"}
+    authoritative = {"input": 9.0, "output": 9.0, "provider": "typesafe"}
+    costs = {
+        "typesafe/jev-1.13.0": prefixed,
+        "typesafe/jev-latest": {"input": 1.0, "output": 0.0, "provider": "typesafe"},
+        "jev-latest": authoritative,
+        "openrouter/typesafe/jev-1.13": {
+            "input": 0.0,
+            "output": 0.0,
+            "provider": "openrouter",
+        },
+    }
+
+    add_typesafe_bare_aliases(costs)
+
+    assert costs["jev-1.13.0"] is prefixed
+    prefixed["input"] = 5.0
+    assert costs["jev-1.13.0"]["input"] == 5.0
+    assert costs["jev-latest"] is authoritative
+    assert "jev-1.13" not in costs
+    assert "typesafe/jev-1.13" not in costs
+
+
+def test_typesafe_checkpoint_bare_aliases_match_prefixed_rows():
+    costs = get_current_costs()
+    for bare in ("jev-1.13.0", "jev-latest", "jev-preview"):
+        assert costs[bare] == costs[f"typesafe/{bare}"]
 
 
 if __name__ == "__main__":
