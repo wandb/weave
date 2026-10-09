@@ -1021,6 +1021,58 @@ def test_openinference_llm_tools_map_to_tool_definitions() -> None:
         ),
         pytest.param(
             "CHAIN",
+            "tools",
+            "graph-span",
+            {
+                "metadata": json.dumps(
+                    {
+                        "ls_integration": "langchain_create_agent",
+                        "lc_agent_name": "tools",
+                        "langgraph_node": "tools",
+                        "langgraph_checkpoint_ns": "tools:t1",
+                    }
+                )
+            },
+            ("", ""),
+            id="tools-node-of-an-agent-named-tools",
+        ),
+        pytest.param(
+            "CHAIN",
+            "Audit.before_model",
+            "graph-span",
+            {
+                "metadata": json.dumps(
+                    {
+                        "ls_integration": "langchain_create_agent",
+                        "lc_agent_name": "Audit.before_model",
+                        "langgraph_node": "Audit.before_model",
+                        "langgraph_checkpoint_ns": "Audit.before_model:t1",
+                    }
+                )
+            },
+            ("", ""),
+            id="middleware-node-of-an-agent-named-after-it",
+        ),
+        pytest.param(
+            "CHAIN",
+            "model",
+            "graph-span",
+            {
+                "metadata": json.dumps(
+                    {
+                        "ls_integration": "langchain_create_agent",
+                        "lc_agent_name": "model",
+                        "langgraph_node": "model",
+                        "checkpoint_ns": 1,
+                        "langgraph_checkpoint_ns": True,
+                    }
+                )
+            },
+            ("", ""),
+            id="model-node-with-non-string-namespaces",
+        ),
+        pytest.param(
+            "CHAIN",
             "model",
             "node-span",
             {

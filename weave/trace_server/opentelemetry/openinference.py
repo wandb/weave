@@ -63,6 +63,7 @@ _KIND_TO_OPERATION = {
 _LANGGRAPH_INTEGRATIONS = ("langgraph", "langchain_create_agent")
 # The nodes `create_agent` adds to its graph, besides middleware hooks.
 _CREATE_AGENT_NODES = ("model", "tools")
+_MIDDLEWARE_HOOKS = ("before_agent", "before_model", "after_model", "after_agent")
 _SYSTEM_ROLE = "system"
 _USER_ROLE = "user"
 _ASSISTANT_ROLE = "assistant"
@@ -196,18 +197,22 @@ def _is_named_agent_run(span_name: str, metadata: dict[str, Any]) -> bool:
     """Whether a LangGraph span is the run of the `create_agent` graph it names.
 
     The graph's own nodes inherit `lc_agent_name`. An agent named after one of
-    them (`model` or `tools`) therefore counts only as a graph run under a
-    top-level node, where `checkpoint_ns` equals `langgraph_checkpoint_ns`.
-    LangChain sets `checkpoint_ns` once, at the first nested level, so deeper
-    runs of such an agent cannot be told from its nodes.
+    them (`model`, `tools`, or a middleware hook such as `Audit.before_model`)
+    therefore counts only as a graph run under a top-level node, where
+    `checkpoint_ns` equals `langgraph_checkpoint_ns`. LangChain sets
+    `checkpoint_ns` once, at the first nested level, so deeper runs of such an
+    agent cannot be told from its nodes.
     """
     if span_name != metadata.get("lc_agent_name"):
         return False
-    if span_name not in _CREATE_AGENT_NODES:
+    _, dot, hook = span_name.rpartition(".")
+    if span_name not in _CREATE_AGENT_NODES and not (dot and hook in _MIDDLEWARE_HOOKS):
         return True
     checkpoint_ns = metadata.get("checkpoint_ns")
-    return bool(checkpoint_ns) and checkpoint_ns == metadata.get(
-        "langgraph_checkpoint_ns"
+    return (
+        isinstance(checkpoint_ns, str)
+        and bool(checkpoint_ns)
+        and checkpoint_ns == metadata.get("langgraph_checkpoint_ns")
     )
 
 

@@ -849,8 +849,9 @@ deterministic.
   turn, also under an HTTP server span, and a named `create_agent` graph (span
   name equals `lc_agent_name`) is a subagent. Other LangGraph spans are not
   agents, including `create_react_agent` subgraphs, which carry no
-  `lc_agent_name`. The graph's `model` and `tools` nodes inherit
-  `lc_agent_name`, so an agent with one of those names counts only as a graph
+  `lc_agent_name`. The graph's `model` and `tools` nodes, and middleware hook
+  nodes such as `Audit.before_model`, inherit `lc_agent_name`, so an agent
+  with one of those names counts only as a graph
   run under a top-level node, whose `checkpoint_ns` equals its
   `langgraph_checkpoint_ns`; LangChain sets `checkpoint_ns` once, at the first
   nested level.
