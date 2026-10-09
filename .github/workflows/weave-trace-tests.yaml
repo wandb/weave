@@ -172,3 +172,201 @@ jobs:
         if: always()
         working-directory: ${{ env.CORE_DIR }}
         run: docker compose down --volumes --remove-orphans || true
+
+  # Runs the client tests against core's trace server: the image core publishes
+  # for the checked-out commit, with this weave commit mounted over its copy of
+  # weave. Tests marked HTTP_NOT_PORTED (tests/trace/util.py) skip here until
+  # they are ported.
+  weave-client-http-tests:
+    name: Weave client tests over HTTP
+    # Dependabot runs get no access to the GitHub App key this job needs.
+    if: github.actor != 'dependabot[bot]'
+    runs-on: ubuntu-latest-8-cores
+    timeout-minutes: 45
+
+    env:
+      CORE_DIR: core
+      COMPOSE_FILE: .github/compose/weave-trace-tests.yaml
+      COMPOSE_PROJECT_NAME: weave-client-http-tests
+
+    steps:
+      - name: Create GitHub App token
+        id: app-token
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3
+        with:
+          app-id: ${{ vars.WANDBOT_3000_APP_ID }}
+          private-key: ${{ secrets.WANDBOT_3000_PRIVATE_KEY }}
+          owner: wandb
+          repositories: core
+          permission-contents: read
+
+      - name: Checkout core
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          repository: wandb/core
+          ref: master
+          path: ${{ env.CORE_DIR }}
+          token: ${{ steps.app-token.outputs.token }}
+          persist-credentials: false
+
+      - name: Remove core Weave submodule placeholder
+        run: rm -rf "${CORE_DIR}/services/weave-trace/weave-public"
+
+      - name: Checkout current weave commit into core
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          path: ${{ env.CORE_DIR }}/services/weave-trace/weave-public
+          persist-credentials: false
+
+      - name: Verify overlaid Weave commit
+        run: |
+          set -euo pipefail
+
+          actual_sha="$(git -C "${CORE_DIR}/services/weave-trace/weave-public" rev-parse HEAD)"
+          echo "core_sha=$(git -C "${CORE_DIR}" rev-parse HEAD)"
+          echo "weave_sha=${actual_sha}"
+          test "${actual_sha}" = "${GITHUB_SHA}"
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3
+        with:
+          workload_identity_provider: ${{ secrets.WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.WORKLOAD_IDENTITY_SERVICE_ACCOUNT }}
+
+      - name: Set up gcloud
+        uses: google-github-actions/setup-gcloud@aa5489c8933f4cc7a4f7d45035b3b1440c9c10db # v3
+
+      - name: Configure Docker auth
+        run: gcloud auth configure-docker us-central1-docker.pkg.dev --quiet
+
+      - name: Start service containers
+        working-directory: ${{ env.CORE_DIR }}
+        run: docker compose up --detach wandb-local clickhouse
+
+      - name: Pull trace server image
+        run: |
+          set -euo pipefail
+          image="us-central1-docker.pkg.dev/wandb-production/images/weave-trace:$(git -C "${CORE_DIR}" rev-parse HEAD)"
+          # Core publishes the image a few minutes after each merge to master.
+          for _i in {1..30}; do
+            if docker pull --quiet "${image}"; then
+              echo "TRACE_SERVER_IMAGE=${image}" >> "${GITHUB_ENV}"
+              exit 0
+            fi
+            sleep 20
+          done
+          echo "::error::${image} was not published in time"
+          exit 1
+
+      - name: Wait for ClickHouse
+        run: |
+          set -euo pipefail
+          for _i in {1..60}; do
+            if curl --silent --fail --show-error http://localhost:8123/ping; then
+              echo "ClickHouse is ready"
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "::error::ClickHouse did not become ready in time"
+          exit 1
+
+      - name: Wait for Gorilla
+        run: |
+          set -euo pipefail
+          for _i in {1..120}; do
+            if (curl --silent --fail --show-error http://localhost:8080/ready >/dev/null \
+                || curl --silent --fail --show-error http://localhost:8080/healthz >/dev/null) \
+              && curl --silent --fail --show-error http://localhost:9015/health >/dev/null; then
+              echo "Gorilla and fixture service are ready"
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "::error::Gorilla did not become ready in time"
+          exit 1
+
+      - name: Create test user
+        run: |
+          set -euo pipefail
+          # The tests log to TEST_ENTITY (tests/trace/server_utils.py).
+          api_key="shawn-$(openssl rand -hex 20)"
+          echo "::add-mask::${api_key}"
+          curl --silent --fail --show-error http://localhost:9015/db/user \
+            --header "Content-Type: application/json" \
+            --data "{\"command\": \"up\", \"username\": \"shawn\", \"apiKey\": \"${api_key}\"}"
+          echo "WANDB_API_KEY=${api_key}" >> "${GITHUB_ENV}"
+
+      - name: Start trace server
+        working-directory: ${{ env.CORE_DIR }}/services/weave-trace
+        run: |
+          set -euo pipefail
+          make copy_weave_code
+          weave_code="${PWD}/_build/weave_copy:/weave/weave:ro"
+          docker run --rm --network host --volume "${weave_code}" "${TRACE_SERVER_IMAGE}" \
+            python -m src.migrator localhost 8123 default "" default
+          docker run --detach --name trace-server --network host --volume "${weave_code}" \
+            --env WF_CLICKHOUSE_HOST=localhost \
+            --env WF_CLICKHOUSE_PORT=8123 \
+            --env WF_CLICKHOUSE_USER=default \
+            --env WF_CLICKHOUSE_PASS= \
+            --env WF_CLICKHOUSE_DATABASE=default \
+            --env WANDB_BASE_URL=http://localhost:8080 \
+            --env WEAVE_TRACE_CLICKHOUSE_USE_ASYNC_INSERT=false \
+            --env DISABLE_TELEMETRY=true \
+            --env DD_TRACE_ENABLED=false \
+            "${TRACE_SERVER_IMAGE}" \
+            uvicorn src.tests.support.resettable_trace_server:app \
+              --host 127.0.0.1 --port 6345 --reset-contextvars
+          for _i in {1..60}; do
+            if curl --silent --fail http://127.0.0.1:6345/health >/dev/null; then
+              echo "Trace server is ready"
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "::error::Trace server did not become ready in time"
+          exit 1
+
+      - name: Set up Python 3.13
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: "3.13"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install nox uv
+
+      - name: Run nox (HTTP trace server)
+        working-directory: ${{ env.CORE_DIR }}/services/weave-trace/weave-public
+        env:
+          WEAVE_SENTRY_ENV: ci
+          CI: 1
+          WEAVE_SERVER_DISABLE_ECOSYSTEM: 1
+          DD_TRACE_ENABLED: false
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY || 'sk-1234567890abcdef1234567890abcdef' }}
+          WF_TRACE_SERVER_URL: http://127.0.0.1:6345
+        # The reset empties the whole database, so the tests share one process.
+        run: |
+          nox -e "tests-3.13(shard='trace')" -- --trace-server=http -n0
+
+      - name: Dump service logs
+        if: failure()
+        working-directory: ${{ env.CORE_DIR }}
+        run: |
+          echo "::group::trace-server logs"
+          docker logs trace-server || true
+          echo "::endgroup::"
+          for service in wandb-local clickhouse; do
+            echo "::group::${service} logs"
+            docker compose logs --no-color "${service}" || true
+            echo "::endgroup::"
+          done
+
+      - name: Stop service containers
+        if: always()
+        working-directory: ${{ env.CORE_DIR }}
+        run: |
+          docker rm --force trace-server || true
+          docker compose down --volumes --remove-orphans || true

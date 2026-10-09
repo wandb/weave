@@ -291,8 +291,8 @@ Examples:
 
 #### Backend Selection
 
-The `--trace-server` flag selects the backend: `clickhouse` (default) or
-`fake` (in-memory).
+The `--trace-server` flag selects the backend: `clickhouse` (default),
+`fake` (in-memory) or `http` (a running trace server).
 
 **Fake / in-memory (Fastest for Development):**
 
@@ -327,6 +327,18 @@ nox --no-install -e "tests-3.12(shard='trace')" -- tests/trace/test_client_trace
 container automatically), or a local `clickhouse-server` binary with
 `--clickhouse-process=true`. When neither is available, use the in-memory
 fake with `--trace-server=fake`.
+
+**HTTP (core's trace server):**
+
+`--trace-server=http` sends every request to the server at
+`WF_TRACE_SERVER_URL` with `WANDB_API_KEY`, and calls its
+`POST /testonly/reset` before each test. Only core's
+`src/tests/support/resettable_trace_server.py` app has that route, and the key
+must belong to a user named `shawn` (`TEST_ENTITY`). The reset empties the
+server's database, so give each test process its own server (`-n0` for one).
+CI runs this in the `Weave client tests over HTTP` job. Tests that do not pass
+over HTTP yet carry `skipif(HTTP_NOT_PORTED, ...)`; porting a test removes its
+marker.
 
 #### Remote HTTP Trace Server Implementation Selection
 
