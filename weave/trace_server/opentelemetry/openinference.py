@@ -257,11 +257,11 @@ def _text_messages(role: str, value: Any, item_key: str) -> list[dict[str, Any]]
     messages = []
     for item in _indexed(value):
         text = item
-        if isinstance(item, dict):
-            entry = item.get(item_key)
+        if isinstance(item, dict) and item_key in item:
+            entry = item[item_key]
             text = entry.get("text") if isinstance(entry, dict) else None
-        if isinstance(text, str) and text:
-            messages.append(_text_message(role, text))
+        if isinstance(text, (dict, list)) or (isinstance(text, str) and text):
+            messages.append(_text_message(role, _text(text)))
     return messages
 
 
@@ -383,7 +383,7 @@ def _openai_message(message: dict[str, Any]) -> dict[str, Any]:
                 parts.append(part)
     elif content is not None and content != "":
         parts.append(_text_part(content))
-    for tool_call in message.get("tool_calls") or []:
+    for tool_call in _indexed(message.get("tool_calls")):
         if isinstance(tool_call, dict):
             parts.append(_tool_call_part(tool_call))
     return {"role": role, "parts": parts}

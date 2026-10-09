@@ -1229,6 +1229,26 @@ def test_openinference_message_contents_without_a_type_are_text() -> None:
         ),
         pytest.param(
             {
+                "llm.prompts": ['{"city": "Paris"}'],
+                "llm.choices.0.completion.text": '["Paris", "London"]',
+            },
+            (
+                _text_messages("user", '{"city": "Paris"}'),
+                _text_messages("assistant", '["Paris", "London"]'),
+                [],
+            ),
+            id="json-looking-prompt-and-completion-texts",
+        ),
+        pytest.param(
+            {
+                "llm.prompts.0.prompt.text": "{}",
+                "llm.choices.0.completion.text": "[]",
+            },
+            (_text_messages("user", "{}"), _text_messages("assistant", "[]"), []),
+            id="empty-json-prompt-and-completion-texts",
+        ),
+        pytest.param(
+            {
                 "input.value": json.dumps({"prompt": "Question: Weather in Paris?"}),
                 "output.value": "It is sunny in Paris.",
             },
@@ -1276,6 +1296,15 @@ def test_openinference_message_contents_without_a_type_are_text() -> None:
                 ["You are a weather assistant."],
             ),
             id="openai-messages-and-chat-completion",
+        ),
+        pytest.param(
+            {
+                "input.value": json.dumps(
+                    [{"role": "user", "content": "Hello.", "tool_calls": 1}]
+                ),
+            },
+            (_text_messages("user", "Hello."), [], []),
+            id="openai-message-with-malformed-tool-calls",
         ),
         pytest.param(
             {
