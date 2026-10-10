@@ -192,7 +192,7 @@ def _reset_server_state(server: ClickHouseTraceServer) -> None:
     # Reset file storage client so tests that mock env vars get a fresh client
     server._file_storage_client = None
     server._file_storage_client_initialized = False
-    # Reset batch queues (thread-local, for current thread)
+    # Reset batch queues (context-local, for the current context)
     server._call_batch = []
     server._file_batch = []
     server._calls_complete_batch = []
