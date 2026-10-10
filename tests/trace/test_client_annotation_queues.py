@@ -4,7 +4,6 @@ These tests cover the queue-based call annotation system introduced in
 commit 7fd5bfd24bccce8f97449bee1676ac55e74fd993.
 """
 
-import base64
 import datetime
 import time
 from typing import NamedTuple
@@ -13,11 +12,17 @@ import pytest
 
 import weave
 from tests.trace.server_utils import TEST_ENTITY, find_server_layer
-from tests.trace.util import HTTP_NOT_PORTED, NOT_CLICKHOUSE_BACKEND
+from tests.trace.util import IN_PROCESS_ONLY, NOT_CLICKHOUSE_BACKEND
+from tests.trace_server.conftest_lib.trace_server_external_adapter import (
+    UserInjectingExternalTraceServer,
+)
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.clickhouse_trace_server_batched import ClickHouseTraceServer
 from weave.trace_server.common_interface import AnnotationQueueItemsFilter, SortBy
 from weave.trace_server.errors import NotFoundError
+from weave.trace_server.external_to_internal_trace_server_adapter import (
+    ExternalTraceServer,
+)
 from weave.trace_server.ids import generate_id
 
 
@@ -86,14 +91,13 @@ def create_annotation_queue(
         Queue ID
     """
     if scorer_refs is None:
-        scorer_refs = ["weave:///entity/project/scorer/test:abc123"]
+        scorer_refs = [f"weave:///{client.project_id}/scorer/test:abc123"]
 
     create_req = tsi.AnnotationQueueCreateReq(
         project_id=client.project_id,
         name=name,
         description=description,
         scorer_refs=scorer_refs,
-        wb_user_id="test_user",
     )
 
     create_res = client.server.annotation_queue_create(create_req)
@@ -132,7 +136,6 @@ def create_queue_with_calls(
         queue_id=queue_id,
         call_ids=calls_fixture.call_ids,
         display_fields=display_fields,
-        wb_user_id="test_user",
     )
     client.server.annotation_queue_add_calls(add_req)
 
@@ -143,16 +146,14 @@ def create_queue_with_calls(
     )
 
 
-@pytest.mark.skipif(HTTP_NOT_PORTED, reason="http: not ported yet")
-def test_annotation_queue_create_and_read(client):
+def test_annotation_queue_create_and_read(client, wb_user_id):
     """Test creating and reading an annotation queue."""
     # Create a queue
     create_req = tsi.AnnotationQueueCreateReq(
         project_id=client.project_id,
         name="Test Queue",
         description="A test annotation queue",
-        scorer_refs=["weave:///entity/project/scorer/test:abc123"],
-        wb_user_id="test_user_123",
+        scorer_refs=[f"weave:///{client.project_id}/scorer/test:abc123"],
     )
 
     create_res = client.server.annotation_queue_create(create_req)
@@ -172,12 +173,13 @@ def test_annotation_queue_create_and_read(client):
     assert read_res.queue.id == create_res.id
     assert read_res.queue.name == "Test Queue"
     assert read_res.queue.description == "A test annotation queue"
-    assert read_res.queue.scorer_refs == ["weave:///entity/project/scorer/test:abc123"]
-    assert read_res.queue.created_by == "test_user_123"
+    assert read_res.queue.scorer_refs == [
+        f"weave:///{client.project_id}/scorer/test:abc123"
+    ]
+    assert read_res.queue.created_by == wb_user_id
     assert read_res.queue.deleted_at is None
 
 
-@pytest.mark.skipif(HTTP_NOT_PORTED, reason="http: not ported yet")
 def test_annotation_queue_multiple_scorer_refs(client):
     """Test creating a queue with multiple scorer refs."""
     req = tsi.AnnotationQueueCreateReq(
@@ -185,11 +187,10 @@ def test_annotation_queue_multiple_scorer_refs(client):
         name="Multi Scorer Queue",
         description="Queue with multiple scorers",
         scorer_refs=[
-            "weave:///entity/project/scorer/accuracy:abc123",
-            "weave:///entity/project/scorer/relevance:def456",
-            "weave:///entity/project/scorer/safety:ghi789",
+            f"weave:///{client.project_id}/scorer/accuracy:abc123",
+            f"weave:///{client.project_id}/scorer/relevance:def456",
+            f"weave:///{client.project_id}/scorer/safety:ghi789",
         ],
-        wb_user_id="test_user",
     )
 
     res = client.server.annotation_queue_create(req)
@@ -204,24 +205,27 @@ def test_annotation_queue_multiple_scorer_refs(client):
 
     assert len(read_res.queue.scorer_refs) == 3
     assert (
-        "weave:///entity/project/scorer/accuracy:abc123" in read_res.queue.scorer_refs
+        f"weave:///{client.project_id}/scorer/accuracy:abc123"
+        in read_res.queue.scorer_refs
     )
     assert (
-        "weave:///entity/project/scorer/relevance:def456" in read_res.queue.scorer_refs
+        f"weave:///{client.project_id}/scorer/relevance:def456"
+        in read_res.queue.scorer_refs
     )
-    assert "weave:///entity/project/scorer/safety:ghi789" in read_res.queue.scorer_refs
+    assert (
+        f"weave:///{client.project_id}/scorer/safety:ghi789"
+        in read_res.queue.scorer_refs
+    )
 
 
-@pytest.mark.skipif(HTTP_NOT_PORTED, reason="http: not ported yet")
-def test_annotation_queue_update_all_fields(client):
+def test_annotation_queue_update_all_fields(client, wb_user_id):
     """Test updating all fields of an annotation queue."""
     # Create a queue
     create_req = tsi.AnnotationQueueCreateReq(
         project_id=client.project_id,
         name="Original Queue",
         description="Original description",
-        scorer_refs=["weave:///entity/project/scorer/original:abc123"],
-        wb_user_id="test_user_123",
+        scorer_refs=[f"weave:///{client.project_id}/scorer/original:abc123"],
     )
     create_res = client.server.annotation_queue_create(create_req)
     original_queue_id = create_res.id
@@ -233,10 +237,9 @@ def test_annotation_queue_update_all_fields(client):
         name="Updated Queue",
         description="Updated description",
         scorer_refs=[
-            "weave:///entity/project/scorer/new1:def456",
-            "weave:///entity/project/scorer/new2:ghi789",
+            f"weave:///{client.project_id}/scorer/new1:def456",
+            f"weave:///{client.project_id}/scorer/new2:ghi789",
         ],
-        wb_user_id="test_user_123",
     )
     update_res = client.server.annotation_queue_update(update_req)
 
@@ -245,9 +248,15 @@ def test_annotation_queue_update_all_fields(client):
     assert update_res.queue.name == "Updated Queue"
     assert update_res.queue.description == "Updated description"
     assert len(update_res.queue.scorer_refs) == 2
-    assert "weave:///entity/project/scorer/new1:def456" in update_res.queue.scorer_refs
-    assert "weave:///entity/project/scorer/new2:ghi789" in update_res.queue.scorer_refs
-    assert update_res.queue.created_by == "test_user_123"
+    assert (
+        f"weave:///{client.project_id}/scorer/new1:def456"
+        in update_res.queue.scorer_refs
+    )
+    assert (
+        f"weave:///{client.project_id}/scorer/new2:ghi789"
+        in update_res.queue.scorer_refs
+    )
+    assert update_res.queue.created_by == wb_user_id
     assert update_res.queue.deleted_at is None
 
     # Read back to verify persistence
@@ -262,7 +271,6 @@ def test_annotation_queue_update_all_fields(client):
     assert len(read_res.queue.scorer_refs) == 2
 
 
-@pytest.mark.skipif(HTTP_NOT_PORTED, reason="http: not ported yet")
 def test_annotation_queue_update_partial(client):
     """Test updating only some fields (partial update)."""
     # Create a queue
@@ -270,8 +278,7 @@ def test_annotation_queue_update_partial(client):
         project_id=client.project_id,
         name="Original Queue",
         description="Original description",
-        scorer_refs=["weave:///entity/project/scorer/test:abc123"],
-        wb_user_id="test_user_123",
+        scorer_refs=[f"weave:///{client.project_id}/scorer/test:abc123"],
     )
     create_res = client.server.annotation_queue_create(create_req)
     original_queue_id = create_res.id
@@ -283,7 +290,6 @@ def test_annotation_queue_update_partial(client):
         name="New Name Only",
         description=None,  # Not updating
         scorer_refs=None,  # Not updating
-        wb_user_id="test_user_123",
     )
     update_res = client.server.annotation_queue_update(update_req)
 
@@ -291,11 +297,10 @@ def test_annotation_queue_update_partial(client):
     assert update_res.queue.name == "New Name Only"
     assert update_res.queue.description == "Original description"
     assert update_res.queue.scorer_refs == [
-        "weave:///entity/project/scorer/test:abc123"
+        f"weave:///{client.project_id}/scorer/test:abc123"
     ]
 
 
-@pytest.mark.skipif(HTTP_NOT_PORTED, reason="http: not ported yet")
 def test_annotation_queue_update_nonexistent(client):
     """Test updating a non-existent queue raises NotFoundError."""
     # Try to update a non-existent queue
@@ -303,14 +308,12 @@ def test_annotation_queue_update_nonexistent(client):
         project_id=client.project_id,
         queue_id=generate_id(),  # Random non-existent ID
         name="New Name",
-        wb_user_id="test_user_123",
     )
 
     with pytest.raises(NotFoundError):
         client.server.annotation_queue_update(update_req)
 
 
-@pytest.mark.skipif(HTTP_NOT_PORTED, reason="http: not ported yet")
 def test_annotation_queue_update_no_fields(client):
     """Test updating with no fields provided returns existing queue."""
     # Create a queue
@@ -318,8 +321,7 @@ def test_annotation_queue_update_no_fields(client):
         project_id=client.project_id,
         name="Test Queue",
         description="Test description",
-        scorer_refs=["weave:///entity/project/scorer/test:abc123"],
-        wb_user_id="test_user_123",
+        scorer_refs=[f"weave:///{client.project_id}/scorer/test:abc123"],
     )
     create_res = client.server.annotation_queue_create(create_req)
     original_queue_id = create_res.id
@@ -331,7 +333,6 @@ def test_annotation_queue_update_no_fields(client):
         name=None,
         description=None,
         scorer_refs=None,
-        wb_user_id="test_user_123",
     )
     update_res = client.server.annotation_queue_update(update_req)
 
@@ -340,11 +341,10 @@ def test_annotation_queue_update_no_fields(client):
     assert update_res.queue.name == "Test Queue"
     assert update_res.queue.description == "Test description"
     assert update_res.queue.scorer_refs == [
-        "weave:///entity/project/scorer/test:abc123"
+        f"weave:///{client.project_id}/scorer/test:abc123"
     ]
 
 
-@pytest.mark.skipif(HTTP_NOT_PORTED, reason="http: not ported yet")
 def test_annotation_queues_query_stream_all(client):
     """Test querying all annotation queues for a project."""
     # Create multiple queues
@@ -353,8 +353,7 @@ def test_annotation_queues_query_stream_all(client):
             project_id=client.project_id,
             name=f"Queue {i}",
             description=f"Test queue number {i}",
-            scorer_refs=[f"weave:///entity/project/scorer/test{i}:hash{i}"],
-            wb_user_id="test_user_789",
+            scorer_refs=[f"weave:///{client.project_id}/scorer/test{i}:hash{i}"],
         )
         client.server.annotation_queue_create(req)
 
@@ -373,23 +372,20 @@ def test_annotation_queues_query_stream_all(client):
         assert queues[i].created_at >= queues[i + 1].created_at
 
 
-@pytest.mark.skipif(HTTP_NOT_PORTED, reason="http: not ported yet")
 def test_annotation_queues_query_stream_with_name_filter(client):
     """Test querying queues with name filter."""
     # Create queues with different names
     req1 = tsi.AnnotationQueueCreateReq(
         project_id=client.project_id,
         name="Error Review Queue",
-        scorer_refs=["weave:///entity/project/scorer/error:abc"],
-        wb_user_id="test_user",
+        scorer_refs=[f"weave:///{client.project_id}/scorer/error:abc"],
     )
     client.server.annotation_queue_create(req1)
 
     req2 = tsi.AnnotationQueueCreateReq(
         project_id=client.project_id,
         name="Quality Check Queue",
-        scorer_refs=["weave:///entity/project/scorer/quality:def"],
-        wb_user_id="test_user",
+        scorer_refs=[f"weave:///{client.project_id}/scorer/quality:def"],
     )
     client.server.annotation_queue_create(req2)
 
@@ -408,7 +404,6 @@ def test_annotation_queues_query_stream_with_name_filter(client):
     assert not any(q.name == "Quality Check Queue" for q in queues)
 
 
-@pytest.mark.skipif(HTTP_NOT_PORTED, reason="http: not ported yet")
 def test_annotation_queues_query_stream_with_pagination(client):
     """Test querying queues with limit and offset."""
     # Create 5 queues
@@ -416,8 +411,7 @@ def test_annotation_queues_query_stream_with_pagination(client):
         req = tsi.AnnotationQueueCreateReq(
             project_id=client.project_id,
             name=f"Pagination Queue {i}",
-            scorer_refs=[f"weave:///entity/project/scorer/test{i}:hash"],
-            wb_user_id="test_user",
+            scorer_refs=[f"weave:///{client.project_id}/scorer/test{i}:hash"],
         )
         client.server.annotation_queue_create(req)
 
@@ -445,7 +439,6 @@ def test_annotation_queues_query_stream_with_pagination(client):
     assert page1_ids.isdisjoint(page2_ids)
 
 
-@pytest.mark.skipif(HTTP_NOT_PORTED, reason="http: not ported yet")
 def test_annotation_queue_add_calls(client):
     """Test adding calls to an annotation queue."""
 
@@ -468,8 +461,7 @@ def test_annotation_queue_add_calls(client):
     create_req = tsi.AnnotationQueueCreateReq(
         project_id=client.project_id,
         name="Add Calls Test Queue",
-        scorer_refs=["weave:///entity/project/scorer/test:abc"],
-        wb_user_id="test_user",
+        scorer_refs=[f"weave:///{client.project_id}/scorer/test:abc"],
     )
     queue_res = client.server.annotation_queue_create(create_req)
 
@@ -479,7 +471,6 @@ def test_annotation_queue_add_calls(client):
         queue_id=queue_res.id,
         call_ids=call_ids,
         display_fields=["input.x", "output"],
-        wb_user_id="test_user",
     )
     add_res = client.server.annotation_queue_add_calls(add_req)
 
@@ -544,7 +535,6 @@ def test_annotation_queue_add_calls_retries_end_only_calls(client):
             queue_id=queue_id,
             call_ids=[complete_call_id, end_only_call_id],
             display_fields=["input", "output"],
-            wb_user_id="test_user",
         )
     )
 
@@ -585,7 +575,6 @@ def test_annotation_queue_add_calls_retries_end_only_calls(client):
             queue_id=queue_id,
             call_ids=[end_only_call_id],
             display_fields=["input", "output"],
-            wb_user_id="test_user",
         )
     )
 
@@ -610,7 +599,6 @@ def test_annotation_queue_add_calls_retries_end_only_calls(client):
     )
 
 
-@pytest.mark.skipif(HTTP_NOT_PORTED, reason="http: not ported yet")
 def test_annotation_queue_add_calls_duplicate_prevention(client):
     """Test that adding duplicate calls is handled correctly."""
     project_id = client.project_id
@@ -630,8 +618,7 @@ def test_annotation_queue_add_calls_duplicate_prevention(client):
     create_req = tsi.AnnotationQueueCreateReq(
         project_id=project_id,
         name="Duplicate Test Queue",
-        scorer_refs=["weave:///entity/project/scorer/test:abc"],
-        wb_user_id="test_user",
+        scorer_refs=[f"weave:///{client.project_id}/scorer/test:abc"],
     )
     queue_res = client.server.annotation_queue_create(create_req)
 
@@ -641,7 +628,6 @@ def test_annotation_queue_add_calls_duplicate_prevention(client):
         queue_id=queue_res.id,
         call_ids=[call_id],
         display_fields=["input.x", "output"],
-        wb_user_id="test_user",
     )
     add_res1 = client.server.annotation_queue_add_calls(add_req)
     assert add_res1.added_count == 1
@@ -653,14 +639,12 @@ def test_annotation_queue_add_calls_duplicate_prevention(client):
         queue_id=queue_res.id,
         call_ids=[call_id],
         display_fields=["input.x", "output"],
-        wb_user_id="test_user",
     )
     add_res2 = client.server.annotation_queue_add_calls(add_req2)
     assert add_res2.added_count == 0
     assert add_res2.duplicates == 1
 
 
-@pytest.mark.skipif(HTTP_NOT_PORTED, reason="http: not ported yet")
 def test_annotation_queue_add_calls_batch(client):
     """Test adding multiple calls in batch."""
 
@@ -681,8 +665,7 @@ def test_annotation_queue_add_calls_batch(client):
     create_req = tsi.AnnotationQueueCreateReq(
         project_id=client.project_id,
         name="Batch Test Queue",
-        scorer_refs=["weave:///entity/project/scorer/batch:xyz"],
-        wb_user_id="test_user",
+        scorer_refs=[f"weave:///{client.project_id}/scorer/batch:xyz"],
     )
     queue_res = client.server.annotation_queue_create(create_req)
 
@@ -692,7 +675,6 @@ def test_annotation_queue_add_calls_batch(client):
         queue_id=queue_res.id,
         call_ids=call_ids,
         display_fields=["input.x", "output"],
-        wb_user_id="test_user",
     )
     add_res = client.server.annotation_queue_add_calls(add_req)
 
@@ -700,7 +682,6 @@ def test_annotation_queue_add_calls_batch(client):
     assert add_res.duplicates == 0
 
 
-@pytest.mark.skipif(HTTP_NOT_PORTED, reason="http: not ported yet")
 def test_annotation_queue_add_calls_partial_duplicates(client):
     """Test adding calls where some are duplicates and some are new."""
 
@@ -720,8 +701,7 @@ def test_annotation_queue_add_calls_partial_duplicates(client):
     create_req = tsi.AnnotationQueueCreateReq(
         project_id=client.project_id,
         name="Partial Duplicate Queue",
-        scorer_refs=["weave:///entity/project/scorer/test:abc"],
-        wb_user_id="test_user",
+        scorer_refs=[f"weave:///{client.project_id}/scorer/test:abc"],
     )
     queue_res = client.server.annotation_queue_create(create_req)
 
@@ -731,7 +711,6 @@ def test_annotation_queue_add_calls_partial_duplicates(client):
         queue_id=queue_res.id,
         call_ids=call_ids[:3],
         display_fields=["input.x", "output"],
-        wb_user_id="test_user",
     )
     add_res1 = client.server.annotation_queue_add_calls(add_req1)
     assert add_res1.added_count == 3
@@ -743,7 +722,6 @@ def test_annotation_queue_add_calls_partial_duplicates(client):
         queue_id=queue_res.id,
         call_ids=call_ids,
         display_fields=["input.x", "output"],
-        wb_user_id="test_user",
     )
     add_res2 = client.server.annotation_queue_add_calls(add_req2)
     assert add_res2.added_count == 2  # Only 2 new calls added
@@ -775,8 +753,7 @@ def test_annotation_queues_stats(client):
         req = tsi.AnnotationQueueCreateReq(
             project_id=client.project_id,
             name=f"Stats Test Queue {i}",
-            scorer_refs=[f"weave:///entity/project/scorer/test{i}:abc"],
-            wb_user_id="test_user",
+            scorer_refs=[f"weave:///{client.project_id}/scorer/test{i}:abc"],
         )
         res = client.server.annotation_queue_create(req)
         queue_ids.append(res.id)
@@ -788,7 +765,6 @@ def test_annotation_queues_stats(client):
         queue_id=queue_ids[0],
         call_ids=call_ids[:3],
         display_fields=["input.x", "output"],
-        wb_user_id="test_user",
     )
     add_res1 = client.server.annotation_queue_add_calls(add_req1)
     assert add_res1.added_count == 3
@@ -799,7 +775,6 @@ def test_annotation_queues_stats(client):
         queue_id=queue_ids[1],
         call_ids=call_ids[:5],
         display_fields=["input.x", "output"],
-        wb_user_id="test_user",
     )
     add_res2 = client.server.annotation_queue_add_calls(add_req2)
     assert add_res2.added_count == 5
@@ -810,7 +785,6 @@ def test_annotation_queues_stats(client):
         queue_id=queue_ids[2],
         call_ids=call_ids[:7],
         display_fields=["input.x", "output"],
-        wb_user_id="test_user",
     )
     add_res3 = client.server.annotation_queue_add_calls(add_req3)
     assert add_res3.added_count == 7
@@ -923,7 +897,6 @@ def test_annotation_queues_stats(client):
     assert stats_map[queue_ids[2]].completed_items == 4
 
 
-@pytest.mark.skipif(HTTP_NOT_PORTED, reason="http: not ported yet")
 def test_annotation_queues_stats_empty_queues(client):
     """Test getting stats for queues with no items."""
     # Create two empty queues
@@ -932,8 +905,7 @@ def test_annotation_queues_stats_empty_queues(client):
         req = tsi.AnnotationQueueCreateReq(
             project_id=client.project_id,
             name=f"Empty Stats Queue {i}",
-            scorer_refs=[f"weave:///entity/project/scorer/empty{i}:abc"],
-            wb_user_id="test_user",
+            scorer_refs=[f"weave:///{client.project_id}/scorer/empty{i}:abc"],
         )
         res = client.server.annotation_queue_create(req)
         queue_ids.append(res.id)
@@ -965,8 +937,7 @@ def test_annotation_queues_stats_no_queue_ids(client):
     assert len(stats_res.stats) == 0
 
 
-@pytest.mark.skipif(HTTP_NOT_PORTED, reason="http: not ported yet")
-def test_annotation_queue_items_query_basic(client):
+def test_annotation_queue_items_query_basic(client, wb_user_id):
     """Test basic querying of annotation queue items."""
     # Create queue with 5 calls
     fixture = create_queue_with_calls(
@@ -989,11 +960,10 @@ def test_annotation_queue_items_query_basic(client):
         assert item.queue_id == fixture.queue_id
         assert item.call_id in fixture.call_ids
         assert item.display_fields == ["input.x", "output"]
-        assert item.added_by == "test_user"
+        assert item.added_by == wb_user_id
         assert item.deleted_at is None
 
 
-@pytest.mark.skipif(HTTP_NOT_PORTED, reason="http: not ported yet")
 def test_annotation_queue_items_query_with_pagination(client):
     """Test querying queue items with limit and offset."""
     # Create queue with 10 calls
@@ -1027,7 +997,6 @@ def test_annotation_queue_items_query_with_pagination(client):
     assert page1_ids.isdisjoint(page2_ids)
 
 
-@pytest.mark.skipif(HTTP_NOT_PORTED, reason="http: not ported yet")
 def test_annotation_queue_items_query_with_sorting(client):
     """Test querying queue items with different sort orders."""
     # Create queue with 3 calls
@@ -1064,7 +1033,6 @@ def test_annotation_queue_items_query_with_sorting(client):
         )
 
 
-@pytest.mark.skipif(HTTP_NOT_PORTED, reason="http: not ported yet")
 def test_annotation_queue_items_query_empty_queue(client):
     """Test querying items from an empty queue."""
     # Create an empty queue
@@ -1081,7 +1049,6 @@ def test_annotation_queue_items_query_empty_queue(client):
     assert len(query_res.items) == 0
 
 
-@pytest.mark.skipif(HTTP_NOT_PORTED, reason="http: not ported yet")
 def test_annotation_queue_items_query_with_multiple_sort_fields(client):
     """Test querying with multiple sort fields."""
     # Create queue with 5 calls
@@ -1104,7 +1071,6 @@ def test_annotation_queue_items_query_with_multiple_sort_fields(client):
     assert len(query_res.items) == 5
 
 
-@pytest.mark.skipif(HTTP_NOT_PORTED, reason="http: not ported yet")
 def test_annotation_queue_items_query_filter_by_call_id(client):
     """Test filtering queue items by call_id."""
     # Create queue with 5 calls
@@ -1128,7 +1094,6 @@ def test_annotation_queue_items_query_filter_by_call_id(client):
     assert query_res.items[0].call_id == target_call_id
 
 
-@pytest.mark.skipif(HTTP_NOT_PORTED, reason="http: not ported yet")
 def test_annotation_queue_items_query_filter_by_call_op_name(client):
     """Test filtering queue items by call_op_name."""
     # Create two different sets of calls with different op names
@@ -1163,7 +1128,6 @@ def test_annotation_queue_items_query_filter_by_call_op_name(client):
         assert item.call_op_name == target_op_name
 
 
-@pytest.mark.skipif(HTTP_NOT_PORTED, reason="http: not ported yet")
 def test_annotation_queue_items_query_filter_by_call_trace_id(client):
     """Test filtering queue items by call_trace_id."""
     # Create queue with 5 calls
@@ -1195,8 +1159,7 @@ def test_annotation_queue_items_query_filter_by_call_trace_id(client):
         assert item.call_trace_id == target_trace_id
 
 
-@pytest.mark.skipif(HTTP_NOT_PORTED, reason="http: not ported yet")
-def test_annotation_queue_items_query_filter_by_added_by(client):
+def test_annotation_queue_items_query_filter_by_added_by(client, wb_user_id):
     """Test filtering queue items by added_by."""
     # Create queue with 5 calls added by test_user
     fixture = create_queue_with_calls(
@@ -1207,14 +1170,14 @@ def test_annotation_queue_items_query_filter_by_added_by(client):
     query_req = tsi.AnnotationQueueItemsQueryReq(
         project_id=client.project_id,
         queue_id=fixture.queue_id,
-        filter=AnnotationQueueItemsFilter(added_by="test_user"),
+        filter=AnnotationQueueItemsFilter(added_by=wb_user_id),
     )
     query_res = client.server.annotation_queue_items_query(query_req)
 
     # Should return all 5 items
     assert len(query_res.items) == 5
     for item in query_res.items:
-        assert item.added_by == "test_user"
+        assert item.added_by == wb_user_id
 
     # Query with non-existent added_by
     query_req = tsi.AnnotationQueueItemsQueryReq(
@@ -1228,7 +1191,6 @@ def test_annotation_queue_items_query_filter_by_added_by(client):
     assert len(query_res.items) == 0
 
 
-@pytest.mark.skipif(HTTP_NOT_PORTED, reason="http: not ported yet")
 def test_annotation_queue_items_query_filter_by_annotation_states(client):
     """Test filtering queue items by annotation_states.
 
@@ -1266,8 +1228,7 @@ def test_annotation_queue_items_query_filter_by_annotation_states(client):
     assert len(query_res.items) == 0
 
 
-@pytest.mark.skipif(HTTP_NOT_PORTED, reason="http: not ported yet")
-def test_annotation_queue_items_query_filter_combined(client):
+def test_annotation_queue_items_query_filter_combined(client, wb_user_id):
     """Test filtering queue items with multiple filters combined."""
     # Create queue with 5 calls
     fixture = create_queue_with_calls(
@@ -1290,7 +1251,7 @@ def test_annotation_queue_items_query_filter_combined(client):
         queue_id=fixture.queue_id,
         filter=AnnotationQueueItemsFilter(
             call_id=target_call.id,
-            added_by="test_user",
+            added_by=wb_user_id,
             annotation_states=["unstarted"],
         ),
     )
@@ -1299,7 +1260,7 @@ def test_annotation_queue_items_query_filter_combined(client):
     # Should return exactly 1 item matching all criteria
     assert len(query_res.items) == 1
     assert query_res.items[0].call_id == target_call.id
-    assert query_res.items[0].added_by == "test_user"
+    assert query_res.items[0].added_by == wb_user_id
     assert query_res.items[0].annotation_state == "unstarted"
 
     # Query with conflicting filters (specific call_id + wrong annotation state)
@@ -1317,7 +1278,6 @@ def test_annotation_queue_items_query_filter_combined(client):
     assert len(query_res.items) == 0
 
 
-@pytest.mark.skipif(HTTP_NOT_PORTED, reason="http: not ported yet")
 def test_annotation_queue_items_query_filter_empty_results(client):
     """Test filtering queue items that returns no results."""
     # Create queue with 5 calls
@@ -1348,7 +1308,6 @@ def test_annotation_queue_items_query_filter_empty_results(client):
     assert len(query_res.items) == 0
 
 
-@pytest.mark.skipif(HTTP_NOT_PORTED, reason="http: not ported yet")
 def test_annotation_queue_items_query_filter_with_pagination(client):
     """Test filtering with pagination."""
     # Create queue with 10 calls
@@ -1386,8 +1345,7 @@ def test_annotation_queue_items_query_filter_with_pagination(client):
     assert page1_ids.isdisjoint(page2_ids)
 
 
-@pytest.mark.skipif(HTTP_NOT_PORTED, reason="http: not ported yet")
-def test_annotation_queue_items_query_filter_with_sorting(client):
+def test_annotation_queue_items_query_filter_with_sorting(client, wb_user_id):
     """Test filtering with sorting."""
     # Create queue with 5 calls
     fixture = create_queue_with_calls(
@@ -1399,7 +1357,7 @@ def test_annotation_queue_items_query_filter_with_sorting(client):
         project_id=client.project_id,
         queue_id=fixture.queue_id,
         filter=AnnotationQueueItemsFilter(
-            added_by="test_user", annotation_states=["unstarted"]
+            added_by=wb_user_id, annotation_states=["unstarted"]
         ),
         sort_by=[SortBy(field="call_started_at", direction="desc")],
     )
@@ -1413,7 +1371,6 @@ def test_annotation_queue_items_query_filter_with_sorting(client):
         )
 
 
-@pytest.mark.skipif(HTTP_NOT_PORTED, reason="http: not ported yet")
 def test_annotation_queue_items_query_with_position_basic(client):
     """Test querying queue items with position tracking enabled."""
     # Create queue with 5 calls
@@ -1442,7 +1399,6 @@ def test_annotation_queue_items_query_with_position_basic(client):
     assert positions == {1, 2, 3, 4, 5}
 
 
-@pytest.mark.skipif(HTTP_NOT_PORTED, reason="http: not ported yet")
 def test_annotation_queue_items_query_without_position(client):
     """Test that position_in_queue is None when include_position=False."""
     # Create queue with 3 calls
@@ -1463,7 +1419,6 @@ def test_annotation_queue_items_query_without_position(client):
         assert item.position_in_queue is None
 
 
-@pytest.mark.skipif(HTTP_NOT_PORTED, reason="http: not ported yet")
 def test_annotation_queue_items_query_position_with_sorting(client):
     """Test that position respects custom sort order."""
     # Create queue with 5 calls
@@ -1492,7 +1447,6 @@ def test_annotation_queue_items_query_position_with_sorting(client):
         )
 
 
-@pytest.mark.skipif(HTTP_NOT_PORTED, reason="http: not ported yet")
 def test_annotation_queue_items_query_position_with_filter_unstarted(client):
     """Test position calculation with annotation_states filter.
 
@@ -1526,8 +1480,7 @@ def test_annotation_queue_items_query_position_with_filter_unstarted(client):
 # ============================================================================
 
 
-@pytest.mark.skipif(HTTP_NOT_PORTED, reason="http: not ported yet")
-def test_annotator_queue_items_progress_update_completed(client):
+def test_annotator_queue_items_progress_update_completed(client, wb_user_id):
     """Test updating queue item state to 'completed'."""
     # Create queue with 1 call
     fixture = create_queue_with_calls(
@@ -1554,13 +1507,11 @@ def test_annotator_queue_items_progress_update_completed(client):
         queue_id=fixture.queue_id,
         item_id=item.id,
         annotation_state="completed",
-        wb_user_id="test_annotator",
     )
     update_res = client.server.annotator_queue_items_progress_update(update_req)
 
     # Verify response contains updated item with annotator_user_id
-    # Note: wb_user_id is stored in base64 format in the database
-    expected_annotator_id = base64.b64encode(b"test_annotator").decode()
+    expected_annotator_id = wb_user_id
     assert update_res.item.id == item.id
     assert update_res.item.annotation_state == "completed"
     assert update_res.item.annotator_user_id == expected_annotator_id
@@ -1577,8 +1528,7 @@ def test_annotator_queue_items_progress_update_completed(client):
     assert query_res.items[0].annotator_user_id == expected_annotator_id
 
 
-@pytest.mark.skipif(HTTP_NOT_PORTED, reason="http: not ported yet")
-def test_annotator_queue_items_progress_update_skipped(client):
+def test_annotator_queue_items_progress_update_skipped(client, wb_user_id):
     """Test updating queue item state to 'skipped'."""
     # Create queue with 1 call
     fixture = create_queue_with_calls(
@@ -1600,7 +1550,6 @@ def test_annotator_queue_items_progress_update_skipped(client):
         queue_id=fixture.queue_id,
         item_id=item.id,
         annotation_state="skipped",
-        wb_user_id="test_annotator",
     )
     update_res = client.server.annotator_queue_items_progress_update(update_req)
 
@@ -1609,8 +1558,7 @@ def test_annotator_queue_items_progress_update_skipped(client):
     assert update_res.item.annotation_state == "skipped"
 
 
-@pytest.mark.skipif(HTTP_NOT_PORTED, reason="http: not ported yet")
-def test_annotator_queue_items_progress_update_invalid_state(client):
+def test_annotator_queue_items_progress_update_invalid_state(client, wb_user_id):
     """Test that updating to invalid state raises error."""
     # Create queue with 1 call
     fixture = create_queue_with_calls(
@@ -1631,7 +1579,6 @@ def test_annotator_queue_items_progress_update_invalid_state(client):
         queue_id=fixture.queue_id,
         item_id=item.id,
         annotation_state="invalid_state",
-        wb_user_id="test_annotator",
     )
 
     # Should raise ValueError
@@ -1639,8 +1586,7 @@ def test_annotator_queue_items_progress_update_invalid_state(client):
         client.server.annotator_queue_items_progress_update(update_req)
 
 
-@pytest.mark.skipif(HTTP_NOT_PORTED, reason="http: not ported yet")
-def test_annotator_queue_items_progress_update_nonexistent_item(client):
+def test_annotator_queue_items_progress_update_nonexistent_item(client, wb_user_id):
     """Test that updating nonexistent item raises error."""
     # Create an empty queue
     queue_id = create_annotation_queue(client, name="Nonexistent Item Queue")
@@ -1651,7 +1597,6 @@ def test_annotator_queue_items_progress_update_nonexistent_item(client):
         queue_id=queue_id,
         item_id="nonexistent_item_id",
         annotation_state="completed",
-        wb_user_id="test_annotator",
     )
 
     # Should raise ValueError
@@ -1659,7 +1604,10 @@ def test_annotator_queue_items_progress_update_nonexistent_item(client):
         client.server.annotator_queue_items_progress_update(update_req)
 
 
-@pytest.mark.skipif(HTTP_NOT_PORTED, reason="http: not ported yet")
+@pytest.mark.skipif(
+    IN_PROCESS_ONLY,
+    reason="every HTTP route stamps the user; only the server itself sees no user id",
+)
 def test_annotator_queue_items_progress_update_no_user_id(client):
     """Test that updating without user_id raises error."""
     # Create queue with 1 call
@@ -1684,13 +1632,16 @@ def test_annotator_queue_items_progress_update_no_user_id(client):
         wb_user_id=None,
     )
 
-    # Should raise ValueError
+    # The tests-only layer above the adapter stamps the user like the HTTP
+    # routes do, so call the adapter underneath it.
+    adapter = find_server_layer(client.server, UserInjectingExternalTraceServer)
     with pytest.raises(ValueError, match="wb_user_id is required"):
-        client.server.annotator_queue_items_progress_update(update_req)
+        ExternalTraceServer.annotator_queue_items_progress_update(adapter, update_req)
 
 
-@pytest.mark.skipif(HTTP_NOT_PORTED, reason="http: not ported yet")
-def test_annotator_queue_items_progress_update_transition_from_in_progress(client):
+def test_annotator_queue_items_progress_update_transition_from_in_progress(
+    client, wb_user_id
+):
     """Test valid state transition from in_progress to completed."""
     # Create queue with 1 call
     fixture = create_queue_with_calls(
@@ -1711,7 +1662,6 @@ def test_annotator_queue_items_progress_update_transition_from_in_progress(clien
         queue_id=fixture.queue_id,
         item_id=item.id,
         annotation_state="in_progress",
-        wb_user_id="test_annotator",
     )
     client.server.annotator_queue_items_progress_update(update_req)
 
@@ -1731,7 +1681,6 @@ def test_annotator_queue_items_progress_update_transition_from_in_progress(clien
         queue_id=fixture.queue_id,
         item_id=item.id,
         annotation_state="completed",
-        wb_user_id="test_annotator",
     )
     update_res = client.server.annotator_queue_items_progress_update(update_req)
 
@@ -1739,7 +1688,6 @@ def test_annotator_queue_items_progress_update_transition_from_in_progress(clien
     assert update_res.item.annotation_state == "completed"
 
 
-@pytest.mark.skipif(HTTP_NOT_PORTED, reason="http: not ported yet")
 def test_annotator_queue_items_progress_update_invalid_transition_from_completed(
     client,
 ):
@@ -1763,7 +1711,6 @@ def test_annotator_queue_items_progress_update_invalid_transition_from_completed
         queue_id=fixture.queue_id,
         item_id=item.id,
         annotation_state="completed",
-        wb_user_id="test_annotator",
     )
     client.server.annotator_queue_items_progress_update(update_req)
 
@@ -1773,7 +1720,6 @@ def test_annotator_queue_items_progress_update_invalid_transition_from_completed
         queue_id=fixture.queue_id,
         item_id=item.id,
         annotation_state="skipped",
-        wb_user_id="test_annotator",
     )
 
     # Should raise ValueError about invalid state transition
@@ -1781,9 +1727,8 @@ def test_annotator_queue_items_progress_update_invalid_transition_from_completed
         client.server.annotator_queue_items_progress_update(update_req2)
 
 
-@pytest.mark.skipif(HTTP_NOT_PORTED, reason="http: not ported yet")
 @pytest.mark.parametrize("state", ["completed", "skipped"])
-def test_annotator_queue_items_progress_update_idempotent(client, state):
+def test_annotator_queue_items_progress_update_idempotent(client, wb_user_id, state):
     """Test that setting the same state twice is idempotent (no error, no-op).
 
     This simulates retry scenarios where the first request succeeded but the
@@ -1810,7 +1755,6 @@ def test_annotator_queue_items_progress_update_idempotent(client, state):
         queue_id=fixture.queue_id,
         item_id=item.id,
         annotation_state=state,
-        wb_user_id="test_annotator",
     )
     update_res1 = client.server.annotator_queue_items_progress_update(update_req1)
     assert update_res1.item.annotation_state == state
@@ -1823,14 +1767,12 @@ def test_annotator_queue_items_progress_update_idempotent(client, state):
         queue_id=fixture.queue_id,
         item_id=item.id,
         annotation_state=state,
-        wb_user_id="test_annotator",
     )
     update_res2 = client.server.annotator_queue_items_progress_update(update_req2)
     assert update_res2.item.annotation_state == state
 
 
-@pytest.mark.skipif(HTTP_NOT_PORTED, reason="http: not ported yet")
-def test_annotator_queue_items_progress_update_stats_integration(client):
+def test_annotator_queue_items_progress_update_stats_integration(client, wb_user_id):
     """Test that progress updates correctly affect queue stats."""
     # Create queue with 5 calls
     fixture = create_queue_with_calls(
@@ -1861,7 +1803,6 @@ def test_annotator_queue_items_progress_update_stats_integration(client):
             queue_id=fixture.queue_id,
             item_id=query_res.items[i].id,
             annotation_state="completed",
-            wb_user_id="test_annotator",
         )
         client.server.annotator_queue_items_progress_update(update_req)
 
@@ -1871,7 +1812,6 @@ def test_annotator_queue_items_progress_update_stats_integration(client):
         queue_id=fixture.queue_id,
         item_id=query_res.items[2].id,
         annotation_state="skipped",
-        wb_user_id="test_annotator",
     )
     client.server.annotator_queue_items_progress_update(update_req)
 
@@ -1887,8 +1827,7 @@ def test_annotator_queue_items_progress_update_stats_integration(client):
     assert stats_res.stats[0].completed_items == 3
 
 
-@pytest.mark.skipif(HTTP_NOT_PORTED, reason="http: not ported yet")
-def test_annotator_queue_items_progress_update_in_progress_new(client):
+def test_annotator_queue_items_progress_update_in_progress_new(client, wb_user_id):
     """Test updating queue item state to 'in_progress' for a new record."""
     # Create queue with 1 call
     fixture = create_queue_with_calls(
@@ -1913,7 +1852,6 @@ def test_annotator_queue_items_progress_update_in_progress_new(client):
         queue_id=fixture.queue_id,
         item_id=item.id,
         annotation_state="in_progress",
-        wb_user_id="test_annotator",
     )
     update_res = client.server.annotator_queue_items_progress_update(update_req)
 
@@ -1932,8 +1870,7 @@ def test_annotator_queue_items_progress_update_in_progress_new(client):
     assert query_res.items[0].annotation_state == "in_progress"
 
 
-@pytest.mark.skipif(HTTP_NOT_PORTED, reason="http: not ported yet")
-def test_annotator_queue_items_progress_update_in_progress_existing(client):
+def test_annotator_queue_items_progress_update_in_progress_existing(client, wb_user_id):
     """Test that in_progress -> in_progress is idempotent (no-op, succeeds)."""
     # Create queue with 1 call
     fixture = create_queue_with_calls(
@@ -1955,7 +1892,6 @@ def test_annotator_queue_items_progress_update_in_progress_existing(client):
         queue_id=fixture.queue_id,
         item_id=item.id,
         annotation_state="in_progress",
-        wb_user_id="test_annotator",
     )
     update_res = client.server.annotator_queue_items_progress_update(update_req1)
     assert update_res.item.annotation_state == "in_progress"
@@ -1968,14 +1904,14 @@ def test_annotator_queue_items_progress_update_in_progress_existing(client):
         queue_id=fixture.queue_id,
         item_id=item.id,
         annotation_state="in_progress",
-        wb_user_id="test_annotator",
     )
     update_res2 = client.server.annotator_queue_items_progress_update(update_req2)
     assert update_res2.item.annotation_state == "in_progress"
 
 
-@pytest.mark.skipif(HTTP_NOT_PORTED, reason="http: not ported yet")
-def test_annotator_queue_items_progress_update_in_progress_from_completed(client):
+def test_annotator_queue_items_progress_update_in_progress_from_completed(
+    client, wb_user_id
+):
     """Test that completed -> in_progress fails (can't restart a finished item)."""
     # Create queue with 1 call
     fixture = create_queue_with_calls(
@@ -1997,7 +1933,6 @@ def test_annotator_queue_items_progress_update_in_progress_from_completed(client
         queue_id=fixture.queue_id,
         item_id=item.id,
         annotation_state="completed",
-        wb_user_id="test_annotator",
     )
     update_res = client.server.annotator_queue_items_progress_update(update_req)
     assert update_res.item.annotation_state == "completed"
@@ -2008,7 +1943,6 @@ def test_annotator_queue_items_progress_update_in_progress_from_completed(client
         queue_id=fixture.queue_id,
         item_id=item.id,
         annotation_state="in_progress",
-        wb_user_id="test_annotator",
     )
     with pytest.raises(
         Exception,
@@ -2017,8 +1951,7 @@ def test_annotator_queue_items_progress_update_in_progress_from_completed(client
         client.server.annotator_queue_items_progress_update(update_req2)
 
 
-@pytest.mark.skipif(HTTP_NOT_PORTED, reason="http: not ported yet")
-def test_annotator_queue_items_progress_in_progress_to_completed(client):
+def test_annotator_queue_items_progress_in_progress_to_completed(client, wb_user_id):
     """Test transitioning from 'in_progress' to 'completed'."""
     # Create queue with 1 call
     fixture = create_queue_with_calls(
@@ -2040,7 +1973,6 @@ def test_annotator_queue_items_progress_in_progress_to_completed(client):
         queue_id=fixture.queue_id,
         item_id=item.id,
         annotation_state="in_progress",
-        wb_user_id="test_annotator",
     )
     update_res = client.server.annotator_queue_items_progress_update(update_req)
     assert update_res.item.annotation_state == "in_progress"
@@ -2052,7 +1984,6 @@ def test_annotator_queue_items_progress_in_progress_to_completed(client):
         queue_id=fixture.queue_id,
         item_id=item.id,
         annotation_state="completed",
-        wb_user_id="test_annotator",
     )
     update_res = client.server.annotator_queue_items_progress_update(update_req)
     assert update_res.item.annotation_state == "completed"
@@ -2068,8 +1999,7 @@ def test_annotator_queue_items_progress_in_progress_to_completed(client):
     assert query_res.items[0].annotation_state == "completed"
 
 
-@pytest.mark.skipif(HTTP_NOT_PORTED, reason="http: not ported yet")
-def test_annotator_queue_items_progress_in_progress_workflow(client):
+def test_annotator_queue_items_progress_in_progress_workflow(client, wb_user_id):
     """Test the full workflow: mark in_progress, then complete."""
     # Create queue with 3 calls
     fixture = create_queue_with_calls(
@@ -2084,8 +2014,6 @@ def test_annotator_queue_items_progress_in_progress_workflow(client):
     query_res = client.server.annotation_queue_items_query(query_req)
     assert len(query_res.items) == 3
 
-    annotator = "workflow_annotator"
-
     # Workflow for item 1: mark in_progress, then complete
     item1_id = query_res.items[0].id
     update_req = tsi.AnnotatorQueueItemsProgressUpdateReq(
@@ -2093,7 +2021,6 @@ def test_annotator_queue_items_progress_in_progress_workflow(client):
         queue_id=fixture.queue_id,
         item_id=item1_id,
         annotation_state="in_progress",
-        wb_user_id=annotator,
     )
     client.server.annotator_queue_items_progress_update(update_req)
 
@@ -2104,7 +2031,6 @@ def test_annotator_queue_items_progress_in_progress_workflow(client):
         queue_id=fixture.queue_id,
         item_id=item1_id,
         annotation_state="completed",
-        wb_user_id=annotator,
     )
     client.server.annotator_queue_items_progress_update(update_req)
 
@@ -2115,7 +2041,6 @@ def test_annotator_queue_items_progress_in_progress_workflow(client):
         queue_id=fixture.queue_id,
         item_id=item2_id,
         annotation_state="in_progress",
-        wb_user_id=annotator,
     )
     client.server.annotator_queue_items_progress_update(update_req)
 
@@ -2126,7 +2051,6 @@ def test_annotator_queue_items_progress_in_progress_workflow(client):
         queue_id=fixture.queue_id,
         item_id=item2_id,
         annotation_state="skipped",
-        wb_user_id=annotator,
     )
     client.server.annotator_queue_items_progress_update(update_req)
 
@@ -2137,7 +2061,6 @@ def test_annotator_queue_items_progress_in_progress_workflow(client):
         queue_id=fixture.queue_id,
         item_id=item3_id,
         annotation_state="in_progress",
-        wb_user_id=annotator,
     )
     client.server.annotator_queue_items_progress_update(update_req)
 
@@ -2151,7 +2074,7 @@ def test_annotator_queue_items_progress_in_progress_workflow(client):
     assert len(query_res.items) == 3
 
     # wb_user_id is stored in base64 format
-    expected_annotator_id = base64.b64encode(annotator.encode()).decode()
+    expected_annotator_id = wb_user_id
 
     items_by_id = {item.id: item for item in query_res.items}
     assert items_by_id[item1_id].annotation_state == "completed"
@@ -2173,8 +2096,7 @@ def test_annotator_queue_items_progress_in_progress_workflow(client):
     assert stats_res.stats[0].completed_items == 2
 
 
-@pytest.mark.skipif(HTTP_NOT_PORTED, reason="http: not ported yet")
-def test_annotator_queue_items_progress_update_returns_correct_item(client):
+def test_annotator_queue_items_progress_update_returns_correct_item(client, wb_user_id):
     """Test that progress update returns the specific item that was updated."""
     # Create queue with 3 items - we need multiple items to expose the bug
     fixture = create_queue_with_calls(
@@ -2201,7 +2123,6 @@ def test_annotator_queue_items_progress_update_returns_correct_item(client):
         queue_id=fixture.queue_id,
         item_id=target_item.id,
         annotation_state="completed",
-        wb_user_id="test_annotator",
     )
     update_res = client.server.annotator_queue_items_progress_update(update_req)
 
@@ -2267,8 +2188,7 @@ def test_annotation_queue_add_calls_with_calls_complete_table(trace_server):
             project_id=project_id,
             name="calls_complete_test_queue",
             description="Test queue for calls_complete table",
-            scorer_refs=["weave:///entity/project/scorer/test:xyz"],
-            wb_user_id="test_user",
+            scorer_refs=[f"weave:///{project_id}/scorer/test:xyz"],
         )
     )
     queue_id = queue_res.id
@@ -2281,7 +2201,6 @@ def test_annotation_queue_add_calls_with_calls_complete_table(trace_server):
             queue_id=queue_id,
             call_ids=queue_call_ids,
             display_fields=["input.x", "input.name", "output.result"],
-            wb_user_id="test_user",
         )
     )
 
@@ -2347,7 +2266,6 @@ def test_annotation_queue_add_calls_with_calls_complete_table(trace_server):
     )
 
 
-@pytest.mark.skipif(HTTP_NOT_PORTED, reason="http: not ported yet")
 def test_annotation_queue_read_nonexistent(client):
     """Test that reading a non-existent annotation queue raises NotFoundError.
 
@@ -2373,7 +2291,6 @@ def test_annotation_queue_read_nonexistent(client):
 # ============================================================================
 
 
-@pytest.mark.skipif(HTTP_NOT_PORTED, reason="http: not ported yet")
 def test_annotation_queue_delete_basic(client):
     """Test complete deletion lifecycle: delete, verify response, verify cannot read/delete again."""
     # Create a queue
@@ -2395,7 +2312,6 @@ def test_annotation_queue_delete_basic(client):
     delete_req = tsi.AnnotationQueueDeleteReq(
         project_id=client.project_id,
         queue_id=queue_id,
-        wb_user_id="test_user",
     )
     delete_res = client.server.annotation_queue_delete(delete_req)
 
@@ -2425,7 +2341,6 @@ def test_annotation_queue_delete_basic(client):
     delete_req = tsi.AnnotationQueueDeleteReq(
         project_id=client.project_id,
         queue_id=queue_id,
-        wb_user_id="test_user",
     )
     with pytest.raises(
         NotFoundError, match=f"Queue {queue_id} not found or already deleted"
@@ -2433,7 +2348,6 @@ def test_annotation_queue_delete_basic(client):
         client.server.annotation_queue_delete(delete_req)
 
 
-@pytest.mark.skipif(HTTP_NOT_PORTED, reason="http: not ported yet")
 def test_annotation_queue_delete_not_in_query(client):
     """Test that deleted queues don't appear in query results."""
     # Create two queues
@@ -2453,7 +2367,6 @@ def test_annotation_queue_delete_not_in_query(client):
     delete_req = tsi.AnnotationQueueDeleteReq(
         project_id=client.project_id,
         queue_id=queue1_id,
-        wb_user_id="test_user",
     )
     client.server.annotation_queue_delete(delete_req)
 
@@ -2467,7 +2380,6 @@ def test_annotation_queue_delete_not_in_query(client):
     assert queue2_id in queue_ids
 
 
-@pytest.mark.skipif(HTTP_NOT_PORTED, reason="http: not ported yet")
 def test_annotation_queue_delete_nonexistent(client):
     """Test that deleting a non-existent queue raises NotFoundError."""
     nonexistent_queue_id = "00000000-0000-0000-0000-000000000000"
@@ -2476,7 +2388,6 @@ def test_annotation_queue_delete_nonexistent(client):
     delete_req = tsi.AnnotationQueueDeleteReq(
         project_id=client.project_id,
         queue_id=nonexistent_queue_id,
-        wb_user_id="test_user",
     )
 
     with pytest.raises(

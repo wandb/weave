@@ -2,7 +2,6 @@ import pytest
 
 import weave
 from tests.trace.test_evaluate import Dataset
-from tests.trace.util import HTTP_NOT_PORTED
 from weave.trace.context.tests_context import raise_on_captured_errors
 
 
@@ -43,7 +42,6 @@ def _top_level_logs(log):
     return [l for l in log if not l.startswith("_")]
 
 
-@pytest.mark.skipif(HTTP_NOT_PORTED, reason="http: not ported yet")
 def test_dataset_laziness(client):
     """The intention of this test is to show that local construction of
     a dataset does not trigger any remote operations.
@@ -71,7 +69,6 @@ def test_dataset_laziness(client):
         assert _top_level_logs(log) == []
 
 
-@pytest.mark.skipif(HTTP_NOT_PORTED, reason="http: not ported yet")
 def test_published_dataset_laziness(client):
     """The intention of this test is to show that publishing a dataset,
     then iterating through the "gotten" version of the dataset has

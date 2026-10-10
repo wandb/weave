@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import datetime
 import os
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -8,6 +9,9 @@ import httpx
 import pytest
 
 from tests.trace.server_utils import TEST_ENTITY, find_server_layer
+from tests.trace_server.conftest_lib.http_error_decoding import (
+    HTTPErrorDecodingTraceServer,
+)
 from tests.trace_server.conftest_lib.trace_server_external_adapter import (
     DummyIdConverter,
     UserInjectingExternalTraceServer,
@@ -26,12 +30,15 @@ from weave.trace_server import (
     clickhouse_trace_server_settings as ch_settings,
 )
 from weave.trace_server import environment as wf_env
+from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.clickhouse_trace_server_batched import ClickHouseTraceServer
+from weave.trace_server.ids import generate_id
 from weave.trace_server.in_memory_trace_server import InMemoryTraceServer
 from weave.trace_server.parallel_bucket_uploads import BucketUploadBatch
 from weave.trace_server.project_version import project_version
 from weave.trace_server.secret_fetcher_context import secret_fetcher_context
 from weave.trace_server_bindings.remote_http_trace_server import RemoteHTTPTraceServer
+from weave.wandb_interface import project_creator
 from weave.wandb_interface.auth import ApiKeyCredentials
 
 pytest_plugins = ["tests.trace_server.conftest_lib.clickhouse_server"]
@@ -361,22 +368,80 @@ def get_fake_trace_server(
     return fake_trace_server_inner
 
 
+# The user id the HTTP server stamps on writes, keyed by server url. The
+# server derives it from the API key, so one probe per session is enough.
+_http_user_ids: dict[str, str] = {}
+
+
+def _probe_http_user_id(server: RemoteHTTPTraceServer) -> str:
+    """Write one call and read back the user id the server stamped on it."""
+    project_id = f"{TEST_ENTITY}/test-project"
+    call_id = generate_id()
+    server.call_start(
+        tsi.CallStartReq(
+            start=tsi.StartedCallSchemaForInsert(
+                project_id=project_id,
+                id=call_id,
+                op_name="probe_user_id",
+                trace_id=generate_id(),
+                started_at=datetime.datetime.now(datetime.timezone.utc),
+                attributes={},
+                inputs={},
+            )
+        )
+    )
+    user_id = server.call_read(
+        tsi.CallReadReq(project_id=project_id, id=call_id)
+    ).call.wb_user_id
+    assert user_id is not None
+    return user_id
+
+
 @pytest.fixture
-def get_http_trace_server() -> Callable[[], RemoteHTTPTraceServer]:
+def get_http_trace_server() -> Callable[[], HTTPErrorDecodingTraceServer]:
     """Factory for a trace server reached over HTTP, reset before each test.
 
     WF_TRACE_SERVER_URL must point at core's resettable test app, and
     WANDB_API_KEY must belong to a user named TEST_ENTITY.
     """
 
-    def http_trace_server_inner() -> RemoteHTTPTraceServer:
+    def http_trace_server_inner() -> HTTPErrorDecodingTraceServer:
         url = os.environ["WF_TRACE_SERVER_URL"]
-        httpx.post(f"{url}/testonly/reset").raise_for_status()
-        return RemoteHTTPTraceServer(
+        server = RemoteHTTPTraceServer(
             url, auth=ApiKeyCredentials(os.environ["WANDB_API_KEY"])
         )
+        if url not in _http_user_ids:
+            httpx.post(f"{url}/testonly/reset").raise_for_status()
+            _http_user_ids[url] = _probe_http_user_id(server)
+        httpx.post(f"{url}/testonly/reset").raise_for_status()
+        return HTTPErrorDecodingTraceServer(server)
 
     return http_trace_server_inner
+
+
+@pytest.fixture
+def ensure_project(trace_server) -> Callable[[str], str]:
+    """Return the id of a project called `name` under TEST_ENTITY that exists.
+
+    The in-process backends accept any project id. The HTTP server resolves
+    the project in W&B first, so the fixture creates it there, through the
+    W&B API at WANDB_BASE_URL.
+    """
+
+    def ensure_project_inner(name: str) -> str:
+        if not isinstance(trace_server, UserInjectingExternalTraceServer):
+            project_creator.ensure_project_exists(TEST_ENTITY, name)
+        return f"{TEST_ENTITY}/{name}"
+
+    return ensure_project_inner
+
+
+@pytest.fixture
+def wb_user_id(trace_server) -> str:
+    """The user id the backend stamps on everything the test writes."""
+    if isinstance(trace_server, UserInjectingExternalTraceServer):
+        return trace_server._user_id
+    return _http_user_ids[os.environ["WF_TRACE_SERVER_URL"]]
 
 
 class LocalSecretFetcher:
@@ -397,7 +462,7 @@ def trace_server(
     get_ch_trace_server,
     get_fake_trace_server,
     get_http_trace_server,
-) -> UserInjectingExternalTraceServer | RemoteHTTPTraceServer:
+) -> UserInjectingExternalTraceServer | HTTPErrorDecodingTraceServer:
     backend = get_trace_server_flag(request)
     if backend == "clickhouse":
         return get_ch_trace_server()

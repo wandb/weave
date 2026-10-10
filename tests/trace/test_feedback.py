@@ -3,7 +3,7 @@ import datetime
 import pytest
 
 import weave
-from tests.trace.util import HTTP_NOT_PORTED, NOT_CLICKHOUSE_BACKEND
+from tests.trace.util import NOT_CLICKHOUSE_BACKEND
 from tests.trace_server.conftest_lib.trace_server_external_adapter import (
     DummyIdConverter,
 )
@@ -93,8 +93,7 @@ def test_custom_feedback(client) -> None:
         trace_object.feedback.add("wandb.trying_to_use_reserved_prefix", value=1)
 
 
-@pytest.mark.skipif(HTTP_NOT_PORTED, reason="http: not ported yet")
-def test_annotation_feedback(client: WeaveClient) -> None:
+def test_annotation_feedback(client: WeaveClient, wb_user_id) -> None:
     project_id = client.project_id
     column_name = "column_name"
     feedback_type = f"wandb.annotation.{column_name}"
@@ -195,7 +194,7 @@ def test_annotation_feedback(client: WeaveClient) -> None:
         "id": create_res.id,
         "project_id": project_id,
         "weave_ref": weave_ref,
-        "wb_user_id": "shawn",
+        "wb_user_id": wb_user_id,
         "creator": None,
         "created_at": MatchAnyDatetime(),
         "feedback_type": feedback_type,
@@ -220,7 +219,6 @@ def test_annotation_feedback(client: WeaveClient) -> None:
     }
 
 
-@pytest.mark.skipif(HTTP_NOT_PORTED, reason="http: not ported yet")
 @pytest.mark.parametrize(
     "bad_spec",
     [None, {"field_schema": None}, "not-a-spec"],
@@ -253,8 +251,7 @@ def test_annotation_feedback_malformed_spec_is_invalid_request(
         )
 
 
-@pytest.mark.skipif(HTTP_NOT_PORTED, reason="http: not ported yet")
-def test_runnable_feedback(client: WeaveClient) -> None:
+def test_runnable_feedback(client: WeaveClient, wb_user_id) -> None:
     """Test feedback creation with runnable references."""
     project_id = client.project_id
     runnable_name = "runnable_name"
@@ -387,7 +384,7 @@ def test_runnable_feedback(client: WeaveClient) -> None:
         "id": create_res.id,
         "project_id": project_id,
         "weave_ref": weave_ref,
-        "wb_user_id": "shawn",
+        "wb_user_id": wb_user_id,
         "creator": None,
         "created_at": MatchAnyDatetime(),
         "feedback_type": feedback_type,
@@ -459,7 +456,6 @@ def test_runnable_feedback(client: WeaveClient) -> None:
     assert typed_row["scorer_rating_confidences"] == {"_rating_": 0.88}
 
 
-@pytest.mark.skipif(HTTP_NOT_PORTED, reason="http: not ported yet")
 def test_agent_monitor_feedback(client: WeaveClient) -> None:
     """End-to-end create/query for wandb.agent_monitor feedback with typed scorer columns."""
     project_id = client.project_id
@@ -1502,7 +1498,14 @@ def test_feedback_aggregate_filter_matching_functional(client: WeaveClient) -> N
 
 
 class MatchAnyDatetime:  # noqa: PLW1641
+    """Matches a datetime, or the ISO string a datetime becomes on the wire."""
+
     def __eq__(self, other):
+        if isinstance(other, str):
+            try:
+                other = datetime.datetime.fromisoformat(other)
+            except ValueError:
+                return False
         return isinstance(other, datetime.datetime)
 
 
@@ -1646,37 +1649,33 @@ async def test_filter_by_wildcard_feedback_with_multiple_items(
     )
 
 
-@pytest.mark.skipif(HTTP_NOT_PORTED, reason="http: not ported yet")
 def test_feedback_replace(client) -> None:
     # Create initial feedback
     create_req = FeedbackCreateReq(
-        project_id="test/project",
-        weave_ref="weave:///test/project/obj/123:abc",
+        project_id=client.project_id,
+        weave_ref=f"weave:///{client.project_id}/obj/123:abc",
         feedback_type="reaction",
         payload={"emoji": "👍"},
-        wb_user_id="test_user",
     )
     initial_feedback = client.server.feedback_create(create_req)
 
     # Create another feedback with different type
     note_feedback = client.server.feedback_create(
         FeedbackCreateReq(
-            project_id="test/project",
-            weave_ref="weave:///test/project/obj/456:def",
+            project_id=client.project_id,
+            weave_ref=f"weave:///{client.project_id}/obj/456:def",
             feedback_type="note",
             payload={"note": "This is a test note"},
-            wb_user_id="test_user",
         )
     )
 
     # Replace the first feedback with new content
     replace_req = FeedbackReplaceReq(
-        project_id="test/project",
-        weave_ref="weave:///test/project/obj/123:abc",
+        project_id=client.project_id,
+        weave_ref=f"weave:///{client.project_id}/obj/123:abc",
         feedback_type="note",
         payload={"note": "Updated feedback"},
         feedback_id=initial_feedback.id,
-        wb_user_id="test_user",
     )
     replaced_feedback = client.server.feedback_replace(replace_req)
 
@@ -1686,7 +1685,7 @@ def test_feedback_replace(client) -> None:
     # Verify the other feedback remains unchanged
     query_res = client.server.feedback_query(
         FeedbackQueryReq(
-            project_id="test/project", fields=["id", "feedback_type", "payload"]
+            project_id=client.project_id, fields=["id", "feedback_type", "payload"]
         )
     )
 
@@ -1700,12 +1699,11 @@ def test_feedback_replace(client) -> None:
 
     # now replace the replaced feedback with the original content
     replace_req = FeedbackReplaceReq(
-        project_id="test/project",
-        weave_ref="weave:///test/project/obj/123:abc",
+        project_id=client.project_id,
+        weave_ref=f"weave:///{client.project_id}/obj/123:abc",
         feedback_type="reaction",
         payload={"emoji": "👍"},
         feedback_id=replaced_feedback.id,
-        wb_user_id="test_user",
     )
     replaced_feedback = client.server.feedback_replace(replace_req)
 
@@ -1714,7 +1712,7 @@ def test_feedback_replace(client) -> None:
     # Verify the latest feedback payload
     query_res = client.server.feedback_query(
         FeedbackQueryReq(
-            project_id="test/project", fields=["id", "feedback_type", "payload"]
+            project_id=client.project_id, fields=["id", "feedback_type", "payload"]
         )
     )
     feedbacks = query_res.result
@@ -1724,7 +1722,6 @@ def test_feedback_replace(client) -> None:
     assert new_feedback["payload"] == {"emoji": "👍"}
 
 
-@pytest.mark.skipif(HTTP_NOT_PORTED, reason="http: not ported yet")
 def test_feedback_replace_validates_before_purge(client) -> None:
     """Replace must reject invalid payloads BEFORE deleting the existing row."""
     project_id = client.project_id
@@ -1736,7 +1733,6 @@ def test_feedback_replace_validates_before_purge(client) -> None:
             weave_ref=weave_ref,
             feedback_type="reaction",
             payload={"emoji": "👍"},
-            wb_user_id="test_user",
         )
     )
 
@@ -1751,7 +1747,6 @@ def test_feedback_replace_validates_before_purge(client) -> None:
                 feedback_type="reaction",
                 payload={"emoji": "👍"},
                 feedback_id=initial.id,
-                wb_user_id="test_user",
                 scorer_tags=["nsfw"],
             )
         )
@@ -1843,7 +1838,6 @@ def test_get_feedback_with_dict_query(client) -> None:
     assert len(list(no_results)) == 0
 
 
-@pytest.mark.skipif(HTTP_NOT_PORTED, reason="http: not ported yet")
 def test_feedback_query_bad_json_path(client) -> None:
     """Test that querying for nonexistent JSON paths raises appropriate error."""
     # Create some test feedback
@@ -1877,7 +1871,6 @@ def test_feedback_query_bad_json_path(client) -> None:
         )
 
 
-@pytest.mark.skipif(HTTP_NOT_PORTED, reason="http: not ported yet")
 @pytest.mark.disable_logging_error_check
 def test_feedback_query_contains_numeric_literal(client) -> None:
     """$contains with a numeric literal raises a guided error; string substr works."""
@@ -2003,7 +1996,6 @@ def test_feedback_query_typed_payload_filters(client: WeaveClient) -> None:
     assert rows[0]["payload"] == {"is_positive": False, "score": 0.1, "rank": 2}
 
 
-@pytest.mark.skipif(HTTP_NOT_PORTED, reason="http: not ported yet")
 def test_feedback_with_queue_id(client: WeaveClient) -> None:
     """Test feedback creation with queue_id field."""
     project_id = client.project_id
@@ -2015,7 +2007,6 @@ def test_feedback_with_queue_id(client: WeaveClient) -> None:
         name="Test Queue",
         description="Queue for testing feedback",
         scorer_refs=[],
-        wb_user_id="test_user",
     )
     queue_res = client.server.annotation_queue_create(queue_create_req)
     queue_id = queue_res.id
@@ -2055,7 +2046,6 @@ def test_feedback_with_queue_id(client: WeaveClient) -> None:
     assert no_queue_feedback["queue_id"] is None
 
 
-@pytest.mark.skipif(HTTP_NOT_PORTED, reason="http: not ported yet")
 def test_feedback_with_invalid_queue_id(client: WeaveClient) -> None:
     """Test feedback creation with invalid queue_id."""
     project_id = client.project_id
@@ -2075,11 +2065,12 @@ def test_feedback_with_invalid_queue_id(client: WeaveClient) -> None:
         )
 
 
-@pytest.mark.skipif(HTTP_NOT_PORTED, reason="http: not ported yet")
-def test_feedback_with_queue_id_from_different_project(client: WeaveClient) -> None:
+def test_feedback_with_queue_id_from_different_project(
+    client: WeaveClient, ensure_project
+) -> None:
     """Test feedback creation with queue_id from a different project."""
     project_id = client.project_id
-    other_project_id = f"{project_id}_other"
+    other_project_id = ensure_project("test-project-other")
 
     # Create a queue in the original project
     queue_create_req = tsi.AnnotationQueueCreateReq(
@@ -2087,7 +2078,6 @@ def test_feedback_with_queue_id_from_different_project(client: WeaveClient) -> N
         name="Original Project Queue",
         description="Queue in original project",
         scorer_refs=[],
-        wb_user_id="test_user",
     )
     queue_res = client.server.annotation_queue_create(queue_create_req)
     queue_id = queue_res.id
@@ -2106,7 +2096,6 @@ def test_feedback_with_queue_id_from_different_project(client: WeaveClient) -> N
         )
 
 
-@pytest.mark.skipif(HTTP_NOT_PORTED, reason="http: not ported yet")
 def test_feedback_query_by_queue_id(client: WeaveClient) -> None:
     """Test querying feedback filtered by queue_id."""
     project_id = client.project_id
@@ -2118,7 +2107,6 @@ def test_feedback_query_by_queue_id(client: WeaveClient) -> None:
             name="Queue 1",
             description="First queue",
             scorer_refs=[],
-            wb_user_id="test_user",
         )
     )
     queue1_id = queue1_res.id
@@ -2129,7 +2117,6 @@ def test_feedback_query_by_queue_id(client: WeaveClient) -> None:
             name="Queue 2",
             description="Second queue",
             scorer_refs=[],
-            wb_user_id="test_user",
         )
     )
     queue2_id = queue2_res.id
@@ -2354,22 +2341,23 @@ def test_feedback_stats_empty_metrics(client: WeaveClient) -> None:
     assert res.granularity == 3600
 
 
-@pytest.mark.skipif(HTTP_NOT_PORTED, reason="http: not ported yet")
 def test_feedback_query_returns_tz_aware_created_at(client: WeaveClient) -> None:
     """Ensure `feedback_query` returns tz-aware `created_at`."""
     project_id = client.project_id
     client.server.feedback_create(
         tsi.FeedbackCreateReq(
             project_id=project_id,
-            weave_ref="weave:///entity/project/object/test:digest",
+            weave_ref=f"weave:///{client.project_id}/object/test:digest",
             feedback_type="custom",
             payload={"k": "v"},
-            wb_user_id="",
         )
     )
     res = client.server.feedback_query(tsi.FeedbackQueryReq(project_id=project_id))
     assert len(res.result) == 1
     created_at = res.result[0]["created_at"]
+    # Over HTTP the row is plain JSON, so the timestamp arrives as a string.
+    if isinstance(created_at, str):
+        created_at = datetime.datetime.fromisoformat(created_at)
     assert isinstance(created_at, datetime.datetime)
     assert created_at.tzinfo is not None, (
         "feedback_query returned a naive datetime; browsers will misinterpret it"

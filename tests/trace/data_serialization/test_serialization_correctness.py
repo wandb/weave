@@ -9,7 +9,6 @@ from spec import SerializationTestCase
 from test_cases import cases
 
 import weave
-from tests.trace.util import HTTP_NOT_PORTED
 from weave.trace.refs import ObjectRef
 from weave.trace_server.trace_server_interface import (
     CallReadReq,
@@ -47,7 +46,6 @@ def set_weave_logger_to_debug():
         logger.setLevel(current_level)
 
 
-@pytest.mark.skipif(HTTP_NOT_PORTED, reason="http: not ported yet")
 @pytest.mark.parametrize(
     "case",
     cases,
@@ -55,12 +53,19 @@ def set_weave_logger_to_debug():
 )
 @pytest.mark.flaky(reruns=3, reruns_delay=2)
 def test_serialization_correctness(
-    client, case: SerializationTestCase, set_weave_logger_to_debug
+    client, case: SerializationTestCase, set_weave_logger_to_debug, request
 ):
     # Skip image test on macOS - PIL/Pillow produces different PNG encoding on macOS vs Linux
     # resulting in different file digests. This is expected behavior, not a bug.
     if sys.platform == "darwin" and case.id == "image":
         pytest.skip("Image encoding differs on macOS vs Linux")
+    # An object digest covers the refs inside it in their internal form, so it
+    # depends on the server's project id. Only the in-process id converter
+    # gives the pinned values.
+    if case.id.startswith("Library Objects - Scorer, Evaluation, Dataset") and (
+        request.config.getoption("--trace-server") == "http"
+    ):
+        pytest.skip("digests of objects with refs depend on the server's project id")
     # Since code serialization changes pretty significantly between versions, we will assume
     # legacy for anything other than the latest python version
     is_legacy = case.is_legacy

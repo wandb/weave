@@ -2,7 +2,6 @@ import pytest
 from pydantic import BaseModel, Field
 
 import weave
-from tests.trace.util import HTTP_NOT_PORTED
 from weave import AnnotationSpec
 from weave.trace_server.clickhouse_trace_server_batched import InvalidRequest
 from weave.trace_server.trace_server_interface import (
@@ -12,7 +11,6 @@ from weave.trace_server.trace_server_interface import (
 )
 
 
-@pytest.mark.skipif(HTTP_NOT_PORTED, reason="http: not ported yet")
 def test_human_feedback_basic(client):
     # create a human feedback spec
 
@@ -33,7 +31,7 @@ def test_human_feedback_basic(client):
     col2 = AnnotationSpec(
         name="Text field #1",
         field_schema={"type": "string", "maxLength": 100},
-        op_scope=["weave:///entity/project/op/name:digest"],
+        op_scope=[f"weave:///{client.project_id}/op/name:digest"],
     )
     ref2 = weave.publish(col2, "my text spec")
     assert ref2
@@ -57,7 +55,9 @@ def test_human_feedback_basic(client):
     )
     assert not objects.objs[1].val["description"]
     assert not objects.objs[0].val["op_scope"]
-    assert objects.objs[1].val["op_scope"] == ["weave:///entity/project/op/name:digest"]
+    assert objects.objs[1].val["op_scope"] == [
+        f"weave:///{client.project_id}/op/name:digest"
+    ]
     assert objects.objs[0].val["field_schema"] == {
         "type": "number",
         "minimum": -1,
@@ -73,7 +73,7 @@ def test_human_feedback_basic(client):
         FeedbackCreateReq.model_validate(
             {
                 "project_id": client.project_id,
-                "weave_ref": "weave:///entity/project/call/name:digest",
+                "weave_ref": f"weave:///{client.project_id}/call/name:digest",
                 "feedback_type": "wandb.annotation." + ref1.name,
                 "annotation_ref": ref1.uri,
                 "payload": {"value": 0},
@@ -86,7 +86,7 @@ def test_human_feedback_basic(client):
             FeedbackCreateReq.model_validate(
                 {
                     "project_id": client.project_id,
-                    "weave_ref": "weave:///entity/project/call/name:digest",
+                    "weave_ref": f"weave:///{client.project_id}/call/name:digest",
                     "feedback_type": "wandb.annotation." + ref1.name,
                     "annotation_ref": ref1.uri,
                     "payload": {"value": 42},
@@ -95,7 +95,6 @@ def test_human_feedback_basic(client):
         )
 
 
-@pytest.mark.skipif(HTTP_NOT_PORTED, reason="http: not ported yet")
 def test_feedback_create_on_deleted_annotation_spec(client):
     """A feedback ref pointing at a deleted annotation spec resolves to None;
     the request is rejected as not-found, not a 500 (TypeError on model_validate(None)).
@@ -120,7 +119,7 @@ def test_feedback_create_on_deleted_annotation_spec(client):
             FeedbackCreateReq.model_validate(
                 {
                     "project_id": client.project_id,
-                    "weave_ref": "weave:///entity/project/call/name:digest",
+                    "weave_ref": f"weave:///{client.project_id}/call/name:digest",
                     "feedback_type": "wandb.annotation." + ref.name,
                     "annotation_ref": ref.uri,
                     "payload": {"value": 0},
@@ -129,7 +128,6 @@ def test_feedback_create_on_deleted_annotation_spec(client):
         )
 
 
-@pytest.mark.skipif(HTTP_NOT_PORTED, reason="http: not ported yet")
 def test_field_schema_with_pydantic_model(client):
     # Test using a Pydantic model as field_schema
     class FeedbackModel(BaseModel):
@@ -188,7 +186,7 @@ def test_field_schema_with_pydantic_model(client):
         FeedbackCreateReq.model_validate(
             {
                 "project_id": client.project_id,
-                "weave_ref": "weave:///entity/project/call/name:digest",
+                "weave_ref": f"weave:///{client.project_id}/call/name:digest",
                 "feedback_type": "wandb.annotation." + ref.name,
                 "annotation_ref": ref.uri,
                 "payload": {
@@ -207,7 +205,7 @@ def test_field_schema_with_pydantic_model(client):
             FeedbackCreateReq.model_validate(
                 {
                     "project_id": client.project_id,
-                    "weave_ref": "weave:///entity/project/call/name:digest",
+                    "weave_ref": f"weave:///{client.project_id}/call/name:digest",
                     "feedback_type": "wandb.annotation." + ref.name,
                     "annotation_ref": ref.uri,
                     "payload": {

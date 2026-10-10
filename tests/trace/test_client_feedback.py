@@ -1,21 +1,18 @@
 import pytest
 
-from tests.trace.util import HTTP_NOT_PORTED
 from weave.trace.feedback import RefFeedbackQuery
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.errors import InvalidRequest
 from weave.trace_server.interface.query import Query
 
 
-@pytest.mark.skipif(HTTP_NOT_PORTED, reason="http: not ported yet")
 def test_feedback_apis(client):
     project_id = client.project_id
 
     # Emoji from Jamie
     req = tsi.FeedbackCreateReq(
         project_id=project_id,
-        wb_user_id="VXNlcjo0NTI1NDQ=",
-        weave_ref="weave:///entity/project/object/name:digest",
+        weave_ref=f"weave:///{client.project_id}/object/name:digest",
         feedback_type="wandb.reaction.1",
         payload={"emoji": "🎱"},
     )
@@ -27,8 +24,7 @@ def test_feedback_apis(client):
     # Another emoji from Jamie
     req = tsi.FeedbackCreateReq(
         project_id=project_id,
-        wb_user_id="VXNlcjo0NTI1NDQ=",
-        weave_ref="weave:///entity/project/object/name:digest",
+        weave_ref=f"weave:///{client.project_id}/object/name:digest",
         feedback_type="wandb.reaction.1",
         payload={"emoji": "👍🏻"},
     )
@@ -40,8 +36,7 @@ def test_feedback_apis(client):
     # Emoji from Shawn
     req = tsi.FeedbackCreateReq(
         project_id=project_id,
-        wb_user_id="VXNlcjoxOQ==",
-        weave_ref="weave:///entity/project/object/name:digest",
+        weave_ref=f"weave:///{client.project_id}/object/name:digest",
         feedback_type="wandb.reaction.1",
         payload={"emoji": "👍"},
     )
@@ -53,8 +48,7 @@ def test_feedback_apis(client):
     # Note from Jamie
     req = tsi.FeedbackCreateReq(
         project_id=project_id,
-        wb_user_id="VXNlcjo0NTI1NDQ=",
-        weave_ref="weave:///entity/project/object/name:digest",
+        weave_ref=f"weave:///{client.project_id}/object/name:digest",
         feedback_type="wandb.note.1",
         payload={"note": "this is a note"},
     )
@@ -65,8 +59,7 @@ def test_feedback_apis(client):
     # Custom from Jamie
     req = tsi.FeedbackCreateReq(
         project_id=project_id,
-        wb_user_id="VXNlcjo0NTI1NDQ=",
-        weave_ref="weave:///entity/project/object/name:digest",
+        weave_ref=f"weave:///{client.project_id}/object/name:digest",
         feedback_type="custom",
         payload={"key": "value"},
     )
@@ -77,8 +70,7 @@ def test_feedback_apis(client):
     # Custom on another object
     req = tsi.FeedbackCreateReq(
         project_id=project_id,
-        wb_user_id="VXNlcjo0NTI1NDQ=",
-        weave_ref="weave:///entity/project/object/name2:digest",
+        weave_ref=f"weave:///{client.project_id}/object/name2:digest",
         feedback_type="custom",
         payload={"key": "value"},
     )
@@ -119,7 +111,9 @@ def test_feedback_apis(client):
                 "$expr": {
                     "$eq": [
                         {"$getField": "weave_ref"},
-                        {"$literal": "weave:///entity/project/object/name:digest"},
+                        {
+                            "$literal": f"weave:///{client.project_id}/object/name:digest"
+                        },
                     ],
                 }
             }
@@ -202,15 +196,13 @@ def test_feedback_apis(client):
         client.server.feedback_purge(req)
 
 
-@pytest.mark.skipif(HTTP_NOT_PORTED, reason="http: not ported yet")
 def test_feedback_payload(client):
     project_id = client.project_id
 
     # Emoji from Jamie
     req = tsi.FeedbackCreateReq(
         project_id=project_id,
-        wb_user_id="VXNlcjo0NTI1NDQ=",
-        weave_ref="weave:///entity/project/object/name:digest",
+        weave_ref=f"weave:///{client.project_id}/object/name:digest",
         feedback_type="wandb.reaction.1",
         payload={"emoji": "🎱"},
     )
@@ -229,15 +221,13 @@ def test_feedback_payload(client):
     assert payload["emoji"] == "🎱"
 
 
-@pytest.mark.skipif(HTTP_NOT_PORTED, reason="http: not ported yet")
 def test_feedback_create_too_large(client):
     project_id = client.project_id
 
     value = "a" * (1 << 21)  # > 1 MiB, past the limit
     req = tsi.FeedbackCreateReq(
         project_id=project_id,
-        wb_user_id="VXNlcjo0NTI1NDQ=",
-        weave_ref="weave:///entity/project/object/name:digest",
+        weave_ref=f"weave:///{client.project_id}/object/name:digest",
         feedback_type="custom",
         payload={"value": value},
     )
@@ -245,7 +235,6 @@ def test_feedback_create_too_large(client):
         client.server.feedback_create(req)
 
 
-@pytest.mark.skipif(HTTP_NOT_PORTED, reason="http: not ported yet")
 def test_feedback_query_created_at_filter(client):
     """created_at filters accept ISO-8601 strings (regression for WB-34897).
 
@@ -258,8 +247,7 @@ def test_feedback_query_created_at_filter(client):
     created = client.server.feedback_create(
         tsi.FeedbackCreateReq(
             project_id=project_id,
-            wb_user_id="VXNlcjoxOQ==",
-            weave_ref="weave:///entity/project/object/name:digest",
+            weave_ref=f"weave:///{client.project_id}/object/name:digest",
             feedback_type="custom",
             payload={"key": "value123"},
         )
