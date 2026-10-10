@@ -4,6 +4,7 @@ import os
 from collections.abc import Callable
 from dataclasses import dataclass
 
+import httpx
 import pytest
 
 from tests.trace.server_utils import TEST_ENTITY, find_server_layer
@@ -30,6 +31,8 @@ from weave.trace_server.in_memory_trace_server import InMemoryTraceServer
 from weave.trace_server.parallel_bucket_uploads import BucketUploadBatch
 from weave.trace_server.project_version import project_version
 from weave.trace_server.secret_fetcher_context import secret_fetcher_context
+from weave.trace_server_bindings.remote_http_trace_server import RemoteHTTPTraceServer
+from weave.wandb_interface.auth import ApiKeyCredentials
 
 pytest_plugins = ["tests.trace_server.conftest_lib.clickhouse_server"]
 
@@ -51,7 +54,7 @@ def pytest_addoption(parser):
             "--trace-server",
             action="store",
             default="clickhouse",
-            help="Specify the backend to use: clickhouse or fake (in-memory)",
+            help="Specify the backend to use: clickhouse, fake (in-memory) or http (a running server)",
         )
         parser.addoption(
             "--ch",
@@ -358,6 +361,24 @@ def get_fake_trace_server(
     return fake_trace_server_inner
 
 
+@pytest.fixture
+def get_http_trace_server() -> Callable[[], RemoteHTTPTraceServer]:
+    """Factory for a trace server reached over HTTP, reset before each test.
+
+    WF_TRACE_SERVER_URL must point at core's resettable test app, and
+    WANDB_API_KEY must belong to a user named TEST_ENTITY.
+    """
+
+    def http_trace_server_inner() -> RemoteHTTPTraceServer:
+        url = os.environ["WF_TRACE_SERVER_URL"]
+        httpx.post(f"{url}/testonly/reset").raise_for_status()
+        return RemoteHTTPTraceServer(
+            url, auth=ApiKeyCredentials(os.environ["WANDB_API_KEY"])
+        )
+
+    return http_trace_server_inner
+
+
 class LocalSecretFetcher:
     def fetch(self, secret_name: str) -> dict:
         return {"secrets": {secret_name: os.getenv(secret_name)}}
@@ -371,13 +392,19 @@ def local_secret_fetcher():
 
 @pytest.fixture
 def trace_server(
-    request, local_secret_fetcher, get_ch_trace_server, get_fake_trace_server
-) -> UserInjectingExternalTraceServer:
+    request,
+    local_secret_fetcher,
+    get_ch_trace_server,
+    get_fake_trace_server,
+    get_http_trace_server,
+) -> UserInjectingExternalTraceServer | RemoteHTTPTraceServer:
     backend = get_trace_server_flag(request)
     if backend == "clickhouse":
         return get_ch_trace_server()
     elif backend == "fake":
         return get_fake_trace_server()
+    elif backend == "http":
+        return get_http_trace_server()
     raise ValueError(f"Invalid trace server: {backend}")
 
 

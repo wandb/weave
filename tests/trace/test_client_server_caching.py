@@ -13,6 +13,7 @@ import pytest
 import weave
 from tests.conftest import CachingMiddlewareTraceServer
 from tests.trace.server_utils import find_server_layer
+from tests.trace.util import HTTP_NOT_PORTED
 from weave.trace import weave_client
 from weave.trace_server.service_interface import EnsureProjectExistsRes
 from weave.trace_server.trace_server_interface import (
@@ -242,6 +243,7 @@ def test_server_cache_latency():
         assert added_latency < 0.003
 
 
+@pytest.mark.skipif(HTTP_NOT_PORTED, reason="http: not ported yet")
 def test_file_create_caching(client):
     caching_server = find_server_layer(client.server, CachingMiddlewareTraceServer)
     file_bytes = b"hello"
@@ -300,6 +302,7 @@ def test_file_create_caching(client):
     assert read_0.content == read_1.content == file_bytes
 
 
+@pytest.mark.skipif(HTTP_NOT_PORTED, reason="http: not ported yet")
 def test_obj_create_caching(client):
     caching_server = find_server_layer(client.server, CachingMiddlewareTraceServer)
     val = {"hello": "world"}

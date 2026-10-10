@@ -3,7 +3,7 @@ import datetime
 import pytest
 
 import weave
-from tests.trace.util import NOT_CLICKHOUSE_BACKEND
+from tests.trace.util import HTTP_NOT_PORTED, NOT_CLICKHOUSE_BACKEND
 from tests.trace_server.conftest_lib.trace_server_external_adapter import (
     DummyIdConverter,
 )
@@ -93,6 +93,7 @@ def test_custom_feedback(client) -> None:
         trace_object.feedback.add("wandb.trying_to_use_reserved_prefix", value=1)
 
 
+@pytest.mark.skipif(HTTP_NOT_PORTED, reason="http: not ported yet")
 def test_annotation_feedback(client: WeaveClient) -> None:
     project_id = client.project_id
     column_name = "column_name"
@@ -219,6 +220,7 @@ def test_annotation_feedback(client: WeaveClient) -> None:
     }
 
 
+@pytest.mark.skipif(HTTP_NOT_PORTED, reason="http: not ported yet")
 @pytest.mark.parametrize(
     "bad_spec",
     [None, {"field_schema": None}, "not-a-spec"],
@@ -251,6 +253,7 @@ def test_annotation_feedback_malformed_spec_is_invalid_request(
         )
 
 
+@pytest.mark.skipif(HTTP_NOT_PORTED, reason="http: not ported yet")
 def test_runnable_feedback(client: WeaveClient) -> None:
     """Test feedback creation with runnable references."""
     project_id = client.project_id
@@ -456,6 +459,7 @@ def test_runnable_feedback(client: WeaveClient) -> None:
     assert typed_row["scorer_rating_confidences"] == {"_rating_": 0.88}
 
 
+@pytest.mark.skipif(HTTP_NOT_PORTED, reason="http: not ported yet")
 def test_agent_monitor_feedback(client: WeaveClient) -> None:
     """End-to-end create/query for wandb.agent_monitor feedback with typed scorer columns."""
     project_id = client.project_id
@@ -1642,6 +1646,7 @@ async def test_filter_by_wildcard_feedback_with_multiple_items(
     )
 
 
+@pytest.mark.skipif(HTTP_NOT_PORTED, reason="http: not ported yet")
 def test_feedback_replace(client) -> None:
     # Create initial feedback
     create_req = FeedbackCreateReq(
@@ -1719,6 +1724,7 @@ def test_feedback_replace(client) -> None:
     assert new_feedback["payload"] == {"emoji": "👍"}
 
 
+@pytest.mark.skipif(HTTP_NOT_PORTED, reason="http: not ported yet")
 def test_feedback_replace_validates_before_purge(client) -> None:
     """Replace must reject invalid payloads BEFORE deleting the existing row."""
     project_id = client.project_id
@@ -1837,6 +1843,7 @@ def test_get_feedback_with_dict_query(client) -> None:
     assert len(list(no_results)) == 0
 
 
+@pytest.mark.skipif(HTTP_NOT_PORTED, reason="http: not ported yet")
 def test_feedback_query_bad_json_path(client) -> None:
     """Test that querying for nonexistent JSON paths raises appropriate error."""
     # Create some test feedback
@@ -1870,6 +1877,7 @@ def test_feedback_query_bad_json_path(client) -> None:
         )
 
 
+@pytest.mark.skipif(HTTP_NOT_PORTED, reason="http: not ported yet")
 @pytest.mark.disable_logging_error_check
 def test_feedback_query_contains_numeric_literal(client) -> None:
     """$contains with a numeric literal raises a guided error; string substr works."""
@@ -1995,6 +2003,7 @@ def test_feedback_query_typed_payload_filters(client: WeaveClient) -> None:
     assert rows[0]["payload"] == {"is_positive": False, "score": 0.1, "rank": 2}
 
 
+@pytest.mark.skipif(HTTP_NOT_PORTED, reason="http: not ported yet")
 def test_feedback_with_queue_id(client: WeaveClient) -> None:
     """Test feedback creation with queue_id field."""
     project_id = client.project_id
@@ -2046,6 +2055,7 @@ def test_feedback_with_queue_id(client: WeaveClient) -> None:
     assert no_queue_feedback["queue_id"] is None
 
 
+@pytest.mark.skipif(HTTP_NOT_PORTED, reason="http: not ported yet")
 def test_feedback_with_invalid_queue_id(client: WeaveClient) -> None:
     """Test feedback creation with invalid queue_id."""
     project_id = client.project_id
@@ -2065,6 +2075,7 @@ def test_feedback_with_invalid_queue_id(client: WeaveClient) -> None:
         )
 
 
+@pytest.mark.skipif(HTTP_NOT_PORTED, reason="http: not ported yet")
 def test_feedback_with_queue_id_from_different_project(client: WeaveClient) -> None:
     """Test feedback creation with queue_id from a different project."""
     project_id = client.project_id
@@ -2095,6 +2106,7 @@ def test_feedback_with_queue_id_from_different_project(client: WeaveClient) -> N
         )
 
 
+@pytest.mark.skipif(HTTP_NOT_PORTED, reason="http: not ported yet")
 def test_feedback_query_by_queue_id(client: WeaveClient) -> None:
     """Test querying feedback filtered by queue_id."""
     project_id = client.project_id
@@ -2342,6 +2354,7 @@ def test_feedback_stats_empty_metrics(client: WeaveClient) -> None:
     assert res.granularity == 3600
 
 
+@pytest.mark.skipif(HTTP_NOT_PORTED, reason="http: not ported yet")
 def test_feedback_query_returns_tz_aware_created_at(client: WeaveClient) -> None:
     """Ensure `feedback_query` returns tz-aware `created_at`."""
     project_id = client.project_id

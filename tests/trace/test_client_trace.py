@@ -22,6 +22,7 @@ import weave
 import weave.trace.call
 from tests.trace.server_utils import find_server_layer
 from tests.trace.util import (
+    HTTP_NOT_PORTED,
     NOT_CLICKHOUSE_BACKEND,
     AnyIntMatcher,
     DatetimeMatcher,
@@ -104,6 +105,7 @@ def get_client_project_id(client: weave_client.WeaveClient) -> str:
 ## End hacky interface compatibility helpers
 
 
+@pytest.mark.skipif(HTTP_NOT_PORTED, reason="http: not ported yet")
 @pytest.mark.flaky(reruns=2, reruns_delay=0.2)
 def test_simple_op(client):
     @weave.op
@@ -163,6 +165,7 @@ def test_simple_op(client):
     )
 
 
+@pytest.mark.skipif(HTTP_NOT_PORTED, reason="http: not ported yet")
 def test_trace_server_call_start_and_end(client):
     call_id = generate_id()
     trace_id = generate_id()
@@ -980,6 +983,7 @@ def test_trace_call_query_filter_wb_run_ids(client, no_autoflush):
 
 # Flaky against ClickHouse in CI: read-after-write visibility lag means a
 # calls_query right after flush can miss just-written rows. Rerun to absorb it.
+@pytest.mark.skipif(HTTP_NOT_PORTED, reason="http: not ported yet")
 @pytest.mark.flaky(reruns=2)
 def test_trace_call_query_filter_wb_user_ids(client, trace_server, no_autoflush):
     call_spec_1 = simple_line_call_bootstrap()
@@ -1909,6 +1913,7 @@ def test_bound_op_retrieval_no_self(weave_active):
         my_op2 = my_op_ref.get()
 
 
+@pytest.mark.skipif(HTTP_NOT_PORTED, reason="http: not ported yet")
 def test_dataset_row_ref(weave_active):
     d = weave.Dataset(rows=[{"a": 5, "b": 6}, {"a": 7, "b": 10}])
     ref = weave.publish(d)
@@ -1922,6 +1927,7 @@ def test_dataset_row_ref(weave_active):
     assert gotten == 5
 
 
+@pytest.mark.skipif(HTTP_NOT_PORTED, reason="http: not ported yet")
 def test_table_query_empty_sort_field_validation(client):
     """Test that empty or invalid sort fields in table queries are properly validated."""
     # Create a dataset with table data
@@ -2710,6 +2716,7 @@ def test_call_query_stream_equality(client):
     assert i == len(calls.calls)
 
 
+@pytest.mark.skipif(HTTP_NOT_PORTED, reason="http: not ported yet")
 def test_call_query_stream_columns(client):
     @weave.op
     def calculate(a: int, b: int) -> dict[str, Any]:
@@ -2770,6 +2777,7 @@ def test_call_query_stream_columns(client):
     assert calls2[0].output is None
 
 
+@pytest.mark.skipif(HTTP_NOT_PORTED, reason="http: not ported yet")
 def test_call_query_stream_columns_with_costs(client):
     @weave.op
     def calculate(a: int, b: int) -> dict[str, Any]:
@@ -2863,6 +2871,7 @@ def test_call_query_stream_columns_with_costs(client):
     assert calls[0].summary.get("weave", {}).get("costs") is None
 
 
+@pytest.mark.skipif(HTTP_NOT_PORTED, reason="http: not ported yet")
 def test_call_query_stream_trace_name_column_with_costs(client):
     @weave.op
     def my_traced_op(x: int) -> dict[str, Any]:
@@ -2917,6 +2926,7 @@ def test_call_query_stream_trace_name_column_with_costs(client):
     assert calls[0].summary.get("weave", {}).get("costs") is not None
 
 
+@pytest.mark.skipif(HTTP_NOT_PORTED, reason="http: not ported yet")
 def test_read_call_start_with_cost(client):
 
     project_id = client.project_id
@@ -2993,6 +3003,7 @@ def test_read_call_start_with_cost(client):
     client.purge_costs(price_id)
 
 
+@pytest.mark.skipif(HTTP_NOT_PORTED, reason="http: not ported yet")
 def test_call_read_with_unkown_llm(client):
     """Tests that if an op reports usage for an LLM ID that has no cost entry
     in the database, the cost calculation handles it gracefully (by not adding cost info).
@@ -3358,6 +3369,7 @@ def test_model_save(client):
     assert expected_predict_op.startswith("weave:///")
 
 
+@pytest.mark.skipif(HTTP_NOT_PORTED, reason="http: not ported yet")
 def test_calls_stream_column_expansion(client):
     # make an object, and a nested object
     # make an op that accepts the nested object, and returns it
@@ -3493,6 +3505,7 @@ class Custom(weave.Object):
     val: dict
 
 
+@pytest.mark.skipif(HTTP_NOT_PORTED, reason="http: not ported yet")
 def test_object_with_disallowed_keys(client):
     name = "thing % with / disallowed : keys"
     obj = Custom(name=name, val={"1": 1})
@@ -3542,6 +3555,7 @@ def test_object_with_char_limit(client):
     client.server.obj_create(create_req)
 
 
+@pytest.mark.skipif(HTTP_NOT_PORTED, reason="http: not ported yet")
 def test_object_with_char_over_limit(client):
     name = "l" * (CHAR_LIMIT + 1)
     obj = Custom(name=name, val={"1": 1})
@@ -3628,6 +3642,7 @@ def test_object_name_over_limit_warns_after_the_log_level_is_raised(client, capl
     assert caplog.messages == [_expected_truncation_warning(name)]
 
 
+@pytest.mark.skipif(HTTP_NOT_PORTED, reason="http: not ported yet")
 @pytest.mark.disable_logging_error_check
 def test_names_truncated_to_one_id_are_rejected_with_the_name_that_was_sent(client):
     """Two types cannot share an id (WB-30574). When the id is a truncation, the
@@ -4808,6 +4823,7 @@ def test_calls_hydrated(client):
     assert calls[2].inputs["input_ref"]["hi"]["there"]["foo"] == "bar"
 
 
+@pytest.mark.skipif(HTTP_NOT_PORTED, reason="http: not ported yet")
 def test_obj_query_with_storage_size_clickhouse(client):
     """Test querying objects with storage size information."""
     # Create a test object with some data to ensure it has size
@@ -4909,6 +4925,7 @@ def test_call_query_stream_with_costs_and_storage_size(client):
     assert child_call.storage_size_bytes is None
 
 
+@pytest.mark.skipif(HTTP_NOT_PORTED, reason="http: not ported yet")
 def test_call_query_stream_with_invalid_filter_field(client):
 
     with pytest.raises(InvalidFieldError):
@@ -5047,6 +5064,7 @@ def test_dedupe_ref_in_calls_stream(client):
     }
 
 
+@pytest.mark.skipif(HTTP_NOT_PORTED, reason="http: not ported yet")
 def test_calls_query_stats_with_limit(client):
     def calls_stats(limit=None, filter=None, include_total_storage_size=False):
         return client.server.calls_query_stats(

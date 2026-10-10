@@ -2,6 +2,7 @@ import pytest
 from pydantic import BaseModel, Field
 
 import weave
+from tests.trace.util import HTTP_NOT_PORTED
 from weave import AnnotationSpec
 from weave.trace_server.clickhouse_trace_server_batched import InvalidRequest
 from weave.trace_server.trace_server_interface import (
@@ -11,6 +12,7 @@ from weave.trace_server.trace_server_interface import (
 )
 
 
+@pytest.mark.skipif(HTTP_NOT_PORTED, reason="http: not ported yet")
 def test_human_feedback_basic(client):
     # create a human feedback spec
 
@@ -93,6 +95,7 @@ def test_human_feedback_basic(client):
         )
 
 
+@pytest.mark.skipif(HTTP_NOT_PORTED, reason="http: not ported yet")
 def test_feedback_create_on_deleted_annotation_spec(client):
     """A feedback ref pointing at a deleted annotation spec resolves to None;
     the request is rejected as not-found, not a 500 (TypeError on model_validate(None)).
@@ -126,6 +129,7 @@ def test_feedback_create_on_deleted_annotation_spec(client):
         )
 
 
+@pytest.mark.skipif(HTTP_NOT_PORTED, reason="http: not ported yet")
 def test_field_schema_with_pydantic_model(client):
     # Test using a Pydantic model as field_schema
     class FeedbackModel(BaseModel):

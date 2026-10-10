@@ -30,6 +30,16 @@ NOT_CLICKHOUSE_BACKEND = (
 # ClickHouse. (NOT_CLICKHOUSE_BACKEND, by contrast, is permanent CH-only.)
 FAKE_NOT_IMPLEMENTED = NOT_CLICKHOUSE_BACKEND
 
+# Condition string for `pytest.mark.skipif`: True on the HTTP backend, marking
+# tests that do not pass over HTTP yet. Most rely on the in-process server (its
+# internals, its Python exceptions, the user id the adapter injects). TEMPORARY
+# like FAKE_NOT_IMPLEMENTED: porting a test to HTTP deletes its decorator.
+# NOT_CLICKHOUSE_BACKEND (so FAKE_NOT_IMPLEMENTED) is True on HTTP too.
+HTTP_NOT_PORTED = (
+    "not config.getoption('--clickhouse') "
+    "and config.getoption('--trace-server') == 'http'"
+)
+
 
 def client_is_clickhouse(client):
     """True only for a real ClickHouse backend (NOT the in-memory fake).

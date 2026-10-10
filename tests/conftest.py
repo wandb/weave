@@ -450,8 +450,6 @@ def create_client(
     if trace_server_flag == "prod":
         # Note: this is only for local dev testing and should be removed
         return weave_init.init_weave("dev_testing")
-    elif trace_server_flag == "http":
-        server = RemoteHTTPTraceServer(trace_server_flag)
     else:
         server = trace_server
 
