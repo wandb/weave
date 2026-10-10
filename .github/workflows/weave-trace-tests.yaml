@@ -347,7 +347,7 @@ jobs:
           DD_TRACE_ENABLED: false
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY || 'sk-1234567890abcdef1234567890abcdef' }}
           WF_TRACE_SERVER_URL: http://127.0.0.1:6345
-        # The reset empties the whole database, so the tests share one process.
+        # The reset is database-wide, so the tests share one process.
         run: |
           nox -e "tests-3.13(shard='trace')" -- --trace-server=http -n0
 
