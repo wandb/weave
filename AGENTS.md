@@ -334,12 +334,13 @@ fake with `--trace-server=fake`.
 `WF_TRACE_SERVER_URL` with `WANDB_API_KEY`, and calls its
 `POST /testonly/reset` before each test. Only the app in wandb/core's
 `services/weave-trace/src/tests/support/resettable_trace_server.py` has that
-route (its docstring has the start command), and the key must belong to a user
-named `shawn` (`TEST_ENTITY`). The reset is database-wide, so give each test
-process its own server (`-n0` for one):
+route; the `Start trace server` step in `.github/workflows/weave-trace-tests.yaml`
+shows how to run it. The key must belong to a user named `shawn` (`TEST_ENTITY`).
+The reset is database-wide, so give each test process its own server (`-n0` for
+one):
 
 ```bash
-WF_TRACE_SERVER_URL=http://127.0.0.1:6345 WANDB_API_KEY=<shawn's key> nox --no-install -e "tests-3.12(shard='trace')" -- tests/trace/test_dataset.py::test_basic_dataset_lifecycle --trace-server=http -n0
+WF_TRACE_SERVER_URL=http://127.0.0.1:6345 WANDB_API_KEY=<shawn-api-key> nox --no-install -e "tests-3.12(shard='trace')" -- tests/trace/test_dataset.py::test_basic_dataset_lifecycle --trace-server=http -n0
 ```
 
 CI runs this in the `Weave client tests over HTTP` job. Tests that do not pass
