@@ -4953,7 +4953,6 @@ def test_call_query_stream_with_costs_and_storage_size(client):
     assert child_call.storage_size_bytes is None
 
 
-@pytest.mark.skipif(HTTP_NOT_PORTED, reason="http: not ported yet")
 def test_call_query_stream_with_invalid_filter_field(client):
 
     with pytest.raises(InvalidFieldError):

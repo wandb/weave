@@ -629,6 +629,21 @@ class RemoteHTTPTraceServer(TraceServerClientInterface):
         # TODO: Add docs link (DOCS-1390)
         raise NotImplementedError("Sending otel traces directly is not yet supported.")
 
+    @validate_call
+    def eval_results_query(
+        self, req: tsi.EvalResultsQueryReq
+    ) -> tsi.EvalResultsQueryRes:
+        entity, project = from_project_id(req.project_id)
+        body = tsi.EvalResultsQueryBody.model_validate(
+            req.model_dump(exclude={"project_id"})
+        )
+        return self._generic_request(
+            f"/v2/{entity}/{project}/eval_results/query",
+            body,
+            tsi.EvalResultsQueryBody,
+            tsi.EvalResultsQueryRes,
+        )
+
     # === GenAI / Agent Observability API (read) ===
 
     @validate_call
@@ -963,8 +978,8 @@ class RemoteHTTPTraceServer(TraceServerClientInterface):
 
     @validate_call
     def table_query_stats_batch(
-        self, req: tsi.TableQueryStatsReq
-    ) -> tsi.TableQueryStatsRes:
+        self, req: tsi.TableQueryStatsBatchReq
+    ) -> tsi.TableQueryStatsBatchRes:
         return self._generic_request(
             "/table/query_stats_batch",
             req,
@@ -1006,7 +1021,7 @@ class RemoteHTTPTraceServer(TraceServerClientInterface):
 
     def files_stats(self, req: tsi.FilesStatsReq) -> tsi.FilesStatsRes:
         return self._generic_request(
-            "/files/stats", req, tsi.FilesStatsReq, tsi.FilesStatsRes
+            "/files/query_stats", req, tsi.FilesStatsReq, tsi.FilesStatsRes
         )
 
     @validate_call
@@ -1384,8 +1399,6 @@ class RemoteHTTPTraceServer(TraceServerClientInterface):
             params["limit"] = req.limit
         if req.offset is not None:
             params["offset"] = req.offset
-        if req.eager:
-            params["eager"] = "true"
         return self._generic_stream_request(
             url,
             req,
@@ -1734,13 +1747,14 @@ class RemoteHTTPTraceServer(TraceServerClientInterface):
             params["limit"] = req.limit
         if req.offset is not None:
             params["offset"] = req.offset
+        # The route takes each filter as a repeated query parameter.
         if req.filter:
             if req.filter.evaluations:
-                params["evaluation_refs"] = ",".join(req.filter.evaluations)
+                params["evaluations"] = req.filter.evaluations
             if req.filter.models:
-                params["model_refs"] = ",".join(req.filter.models)
+                params["models"] = req.filter.models
             if req.filter.evaluation_run_ids:
-                params["evaluation_run_ids"] = ",".join(req.filter.evaluation_run_ids)
+                params["evaluation_run_ids"] = req.filter.evaluation_run_ids
         return self._generic_stream_request(
             url,
             req,
