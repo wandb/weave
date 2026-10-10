@@ -306,11 +306,6 @@ jobs:
           docker run --rm --network host --volume "${weave_code}" "${TRACE_SERVER_IMAGE}" \
             python -m src.migrator localhost 8123 default "" default
           docker run --detach --name trace-server --network host --volume "${weave_code}" \
-            --env WF_CLICKHOUSE_HOST=localhost \
-            --env WF_CLICKHOUSE_PORT=8123 \
-            --env WF_CLICKHOUSE_USER=default \
-            --env WF_CLICKHOUSE_PASS= \
-            --env WF_CLICKHOUSE_DATABASE=default \
             --env WANDB_BASE_URL=http://localhost:8080 \
             --env WEAVE_TRACE_CLICKHOUSE_USE_ASYNC_INSERT=false \
             --env DISABLE_TELEMETRY=true \
