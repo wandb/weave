@@ -18,7 +18,6 @@ import datetime
 import pytest
 
 import weave
-from tests.trace.util import HTTP_NOT_PORTED
 from weave.evaluation.eval_imperative import EvaluationLogger
 from weave.trace_server import constants
 from weave.trace_server import trace_server_interface as tsi
@@ -74,7 +73,6 @@ class TestOpsV2API:
         assert read_res.code == source_code
         assert read_res.created_at is not None
 
-    @pytest.mark.skipif(HTTP_NOT_PORTED, reason="http: not ported yet")
     def test_op_list(self, client):
         """Test listing ops via V2 API."""
         project_id = client.project_id
@@ -99,7 +97,6 @@ class TestOpsV2API:
         assert "list_test_op_1" in op_names
         assert "list_test_op_2" in op_names
 
-    @pytest.mark.skipif(HTTP_NOT_PORTED, reason="http: not ported yet")
     def test_op_list_with_limit(self, client):
         """Test listing ops with limit via V2 API."""
         project_id = client.project_id
@@ -995,7 +992,6 @@ class ReadEvalRunModel(weave.Model):
         assert read_res.evaluation == eval_res.evaluation_ref
         assert read_res.model == model_res.model_ref
 
-    @pytest.mark.skipif(HTTP_NOT_PORTED, reason="http: not ported yet")
     def test_evaluation_run_list(self, client):
         """Test listing evaluation runs via V2 API."""
         project_id = client.project_id
@@ -1816,7 +1812,6 @@ class ScoreEvalRunModel(weave.Model):
 class TestEvalResultsReadAPI:
     """Tests for the read-oriented eval results API."""
 
-    @pytest.mark.skipif(HTTP_NOT_PORTED, reason="http: not ported yet")
     def test_eval_results_query_intersection(self, client):
         """Keeps only rows shared by all requested evaluations."""
         project_id = client.project_id
@@ -1936,7 +1931,6 @@ class TestEvalResultsReadAPI:
             run_b.evaluation_run_id,
         }
 
-    @pytest.mark.skipif(HTTP_NOT_PORTED, reason="http: not ported yet")
     def test_eval_results_summary_pass_signal(self, client):
         """Aggregates pass-rate stats from scorer outputs with `passed` booleans."""
         project_id = client.project_id
@@ -2039,7 +2033,6 @@ class TestEvalResultsReadAPI:
         assert scorer_stats.pass_true_count == 1
         assert scorer_stats.pass_rate == 1.0
 
-    @pytest.mark.skipif(HTTP_NOT_PORTED, reason="http: not ported yet")
     def test_eval_results_summary_nested_passed_dimension(self, client):
         """Verify scorer_stats emits one entry per flattened leaf (e.g. token_distance.passed)."""
         project_id = client.project_id
@@ -2150,7 +2143,6 @@ class TestEvalResultsReadAPI:
         assert distance_stats.numeric_count == 1
         assert distance_stats.numeric_mean == 0.0
 
-    @pytest.mark.skipif(HTTP_NOT_PORTED, reason="http: not ported yet")
     @pytest.mark.asyncio
     async def test_eval_results_from_high_level_evaluation(self, client):
         """Run a real weave.Evaluation then verify eval_results_query and summary."""
@@ -2234,7 +2226,6 @@ class TestEvalResultsReadAPI:
         assert match_stats.pass_true_count == 2
         assert match_stats.pass_rate == 1.0
 
-    @pytest.mark.skipif(HTTP_NOT_PORTED, reason="http: not ported yet")
     def test_eval_results_from_imperative_evaluation(self, client):
         """Run a real EvaluationLogger then verify eval_results_query and summary."""
         project_id = client.project_id
@@ -2306,7 +2297,6 @@ class TestEvalResultsReadAPI:
         assert conf.numeric_mean == pytest.approx((0.9 + 0.3 + 0.7) / 3)
         assert conf.pass_known_count == 0
 
-    @pytest.mark.skipif(HTTP_NOT_PORTED, reason="http: not ported yet")
     def test_eval_results_summary_numeric_mean(self, client):
         """Verify numeric aggregation in eval_results_summary."""
         project_id = client.project_id
@@ -2382,7 +2372,6 @@ class TestEvalResultsReadAPI:
         assert stats.pass_rate is None
         assert stats.pass_known_count == 0
 
-    @pytest.mark.skipif(HTTP_NOT_PORTED, reason="http: not ported yet")
     def test_eval_results_query_multiple_scorers(self, client):
         """Verify multiple scorers appear in query and summary results."""
         project_id = client.project_id
@@ -2516,7 +2505,6 @@ class TestEvalResultsReadAPI:
         assert beta.numeric_count == 2
         assert beta.numeric_mean == pytest.approx(0.15)
 
-    @pytest.mark.skipif(HTTP_NOT_PORTED, reason="http: not ported yet")
     def test_eval_results_query_combined_sections_match_separate_calls(self, client):
         """Combined eval_results/query sections should match separate query+summary."""
         project_id = client.project_id
@@ -2575,7 +2563,6 @@ class TestEvalResultsReadAPI:
         assert combined_query.summary is not None
         assert combined_query.summary.model_dump() == separate_summary.model_dump()
 
-    @pytest.mark.skipif(HTTP_NOT_PORTED, reason="http: not ported yet")
     def test_eval_results_summary_text_dimension_scalar(self, client):
         """A scorer that returns a plain string produces a 'text' scorer_stats entry."""
         project_id = client.project_id
@@ -2679,7 +2666,6 @@ class TestEvalResultsReadAPI:
         assert stats.pass_known_count == 0
         assert stats.pass_rate is None
 
-    @pytest.mark.skipif(HTTP_NOT_PORTED, reason="http: not ported yet")
     def test_eval_results_summary_text_dimension_mixed_dict(self, client):
         """A scorer returning a dict with string and bool produces one 'text' and one 'binary' entry."""
         project_id = client.project_id

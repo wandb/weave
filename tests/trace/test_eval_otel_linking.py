@@ -7,7 +7,6 @@ from opentelemetry.sdk.trace.export import SimpleSpanProcessor
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
 
 import weave
-from tests.trace.util import HTTP_NOT_PORTED
 from weave import Evaluation
 from weave.conversation import start_conversation
 from weave.evaluation.otel_eval_linker import EvalLinkSpanProcessor
@@ -54,7 +53,6 @@ def _emit_weave_operation_span(operation: str = "invoke_agent") -> None:
     span.end()
 
 
-@pytest.mark.skipif(HTTP_NOT_PORTED, reason="http: not ported yet")
 @pytest.mark.asyncio
 async def test_genai_span_ref_not_written_for_eval_spans(client, otel_setup):
     """A GenAI OTel span emitted during a prediction should be queryable via
@@ -97,7 +95,6 @@ async def test_genai_span_ref_not_written_for_eval_spans(client, otel_setup):
     assert trial.genai_span_ref is None
 
 
-@pytest.mark.skipif(HTTP_NOT_PORTED, reason="http: not ported yet")
 @pytest.mark.asyncio
 async def test_multiple_genai_spans_get_eval_metadata_without_refs(client, otel_setup):
     """All GenAI OTel spans emitted during a prediction should be stamped."""
@@ -168,7 +165,6 @@ async def test_eval_metadata_injected_onto_spans(client, otel_setup):
     assert span_attrs[constants.EVAL_KIND_SPAN_ATTR] == "standard"
 
 
-@pytest.mark.skipif(HTTP_NOT_PORTED, reason="http: not ported yet")
 @pytest.mark.asyncio
 async def test_non_genai_span_gets_eval_metadata_but_no_span_ref(client, otel_setup):
     """Non-GenAI spans during eval get eval metadata and no GenAISpanRef."""
@@ -220,7 +216,6 @@ async def test_genai_span_outside_eval_does_not_crash(otel_setup):
     )
 
 
-@pytest.mark.skipif(HTTP_NOT_PORTED, reason="http: not ported yet")
 def test_imperative_eval_logger_stamps_explicit_eval_metadata(
     client,
     otel_setup,
@@ -298,7 +293,6 @@ def test_imperative_eval_logger_derives_row_digest_and_trial_index(client, otel_
     assert spans_by_model["gpt-4o-mini"][constants.EVAL_TRIAL_INDEX_SPAN_ATTR] == 1
 
 
-@pytest.mark.skipif(HTTP_NOT_PORTED, reason="http: not ported yet")
 def test_imperative_eval_logger_stamps_conversation_sdk_spans(
     client,
     otel_setup,
@@ -351,7 +345,6 @@ def test_imperative_eval_logger_stamps_conversation_sdk_spans(
     assert trial.genai_span_ref is None
 
 
-@pytest.mark.skipif(HTTP_NOT_PORTED, reason="http: not ported yet")
 def test_imperative_eval_logger_stamps_weave_operation_spans(client, otel_setup):
     """Non-GenAI OTel integrations get eval metadata on Weave operation spans."""
     exporter = otel_setup
