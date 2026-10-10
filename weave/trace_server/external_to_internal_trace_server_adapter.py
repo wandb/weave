@@ -541,6 +541,8 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
         if res.obj.project_id != req.project_id:
             raise ValueError("Internal Error - Project Mismatch")
         res.obj.project_id = original_project_id
+        if res.obj.wb_user_id is not None:
+            res.obj.wb_user_id = self._idc.int_to_ext_user_id(res.obj.wb_user_id)
         return res
 
     def objs_query(self, req: tsi.ObjQueryReq) -> tsi.ObjQueryRes:
@@ -554,6 +556,8 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
             if obj.project_id != req.project_id:
                 raise ValueError("Internal Error - Project Mismatch")
             obj.project_id = original_project_id
+            if obj.wb_user_id is not None:
+                obj.wb_user_id = self._idc.int_to_ext_user_id(obj.wb_user_id)
         return res
 
     def obj_delete(self, req: tsi.ObjDeleteReq) -> tsi.ObjDeleteRes:
@@ -978,11 +982,17 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
     ) -> tsi.AnnotationQueueItemsQueryRes:
         req = req.model_copy(deep=True)
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)
-        return self._ref_apply(
+        res = self._ref_apply(
             self._internal_trace_server.annotation_queue_items_query,
             req,
             req.project_id,
         )
+        for item in res.items:
+            if item.annotator_user_id:
+                item.annotator_user_id = self._idc.int_to_ext_user_id(
+                    item.annotator_user_id
+                )
+        return res
 
     def annotation_queues_stats(
         self, req: tsi.AnnotationQueuesStatsReq
@@ -1000,11 +1010,16 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)
         if req.wb_user_id is not None:
             req.wb_user_id = self._idc.ext_to_int_user_id(req.wb_user_id)
-        return self._ref_apply(
+        res = self._ref_apply(
             self._internal_trace_server.annotator_queue_items_progress_update,
             req,
             req.project_id,
         )
+        if res.item.annotator_user_id:
+            res.item.annotator_user_id = self._idc.int_to_ext_user_id(
+                res.item.annotator_user_id
+            )
+        return res
 
     # Dataset Sources API
     def dataset_sources_link(

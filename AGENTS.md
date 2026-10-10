@@ -340,13 +340,36 @@ The reset is database-wide, so give each test process its own server (`-n0` for
 one):
 
 ```bash
-WF_TRACE_SERVER_URL=http://127.0.0.1:6345 WANDB_API_KEY=<shawn-api-key> nox --no-install -e "tests-3.12(shard='trace')" -- tests/trace/test_dataset.py::test_basic_dataset_lifecycle --trace-server=http -n0
+WF_TRACE_SERVER_URL=http://127.0.0.1:6345 WANDB_API_KEY=<shawn-api-key> WANDB_BASE_URL=http://localhost:8080 nox --no-install -e "tests-3.12(shard='trace')" -- tests/trace/test_dataset.py::test_basic_dataset_lifecycle --trace-server=http -n0
 ```
+
+`WANDB_BASE_URL` points at the W&B server the trace server uses; the
+`ensure_project` fixture creates extra projects there.
 
 CI runs this in the `Weave client tests over HTTP` job. Tests that do not pass
 over HTTP yet carry `skipif(HTTP_NOT_PORTED, ...)`; porting a test removes its
-marker. ClickHouse-only gates (`NOT_CLICKHOUSE_BACKEND`, `client_is_clickhouse`)
-skip on HTTP as well.
+marker. Tests that need the in-process server itself (its middleware layers,
+a request the HTTP routes never send, a second user) carry
+`skipif(IN_PROCESS_ONLY, ...)`, which stays. ClickHouse-only gates
+(`NOT_CLICKHOUSE_BACKEND`, `client_is_clickhouse`) skip on HTTP as well.
+
+Writing a test that runs on every backend:
+
+- The server stamps the user on every write and rejects a `wb_user_id` in the
+  request. Do not send one; compare against the `wb_user_id` fixture, which is
+  the id the backend stamps (`shawn` in-process, the W&B user id over HTTP).
+- Refs and project ids must name a project that exists. Use
+  `client.project_id`, or `ensure_project("name")` for a second project.
+- Server errors arrive as the server's exception class on every backend
+  (`NotFoundError`, `InvalidRequest`, `ValueError`, ...). Over HTTP the
+  tests-only `HTTPErrorDecodingTraceServer` rebuilds them from the response
+  body, which carries `error_type` for that purpose.
+- The HTTP route returns only the columns a `CallsQueryReq.columns` asks for
+  (plus ids, names and timestamps). The in-process server returns more, so
+  request every column the test reads.
+- An object digest covers the refs inside it in their internal form, so it
+  depends on the server's project id. Compare with the ref `weave.publish`
+  returned, not with a pinned digest.
 
 #### Remote HTTP Trace Server Implementation Selection
 

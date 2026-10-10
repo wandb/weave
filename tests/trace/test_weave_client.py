@@ -20,6 +20,7 @@ from tests.trace.server_utils import find_server_layer
 from tests.trace.testutil import ObjectRefStrMatcher
 from tests.trace.util import (
     HTTP_NOT_PORTED,
+    IN_PROCESS_ONLY,
     AnyIntMatcher,
     DatetimeMatcher,
     RegexStringMatcher,
@@ -83,13 +84,12 @@ from weave.trace_server_bindings.stainless_remote_http_trace_server import (
 )
 
 
-@pytest.mark.skipif(HTTP_NOT_PORTED, reason="http: not ported yet")
 @pytest.mark.flaky(reruns=3, reruns_delay=0.2)
 def test_table_create(client):
     res = client.server.table_create(
         TableCreateReq(
             table=TableSchemaForInsert(
-                project_id="test/test-project",
+                project_id=client.project_id,
                 rows=[
                     {TABLE_ROW_ID_EDGE_NAME: 1, "val": 1},
                     {TABLE_ROW_ID_EDGE_NAME: 2, "val": 2},
@@ -99,7 +99,7 @@ def test_table_create(client):
         )
     )
     result = client.server.table_query(
-        TableQueryReq(project_id="test/test-project", digest=res.digest)
+        TableQueryReq(project_id=client.project_id, digest=res.digest)
     )
     assert result.rows[0].val["val"] == 1
     assert result.rows[1].val["val"] == 2
@@ -363,8 +363,7 @@ def test_get_calls_forwards_include_usernames(client, monkeypatch):
     assert captured_kwargs["include_usernames"] is True
 
 
-@pytest.mark.skipif(HTTP_NOT_PORTED, reason="http: not ported yet")
-def test_call_create(client):
+def test_call_create(client, wb_user_id):
     call = client.create_call("x", {"a": 5, "b": 10})
     client.finish_call(call, "hello")
     result = client.get_call(call.id)
@@ -402,13 +401,12 @@ def test_call_create(client):
         started_at=DatetimeMatcher(),
         ended_at=DatetimeMatcher(),
         deleted_at=None,
-        wb_user_id=client.entity,
+        wb_user_id=wb_user_id,
     )
     assert result == expected
 
 
-@pytest.mark.skipif(HTTP_NOT_PORTED, reason="http: not ported yet")
-def test_calls_query(client):
+def test_calls_query(client, wb_user_id):
     call0 = client.create_call("x", {"a": 5, "b": 10})
     call1 = client.create_call("x", {"a": 6, "b": 11})
     call2 = client.create_call("y", {"a": 5, "b": 10})
@@ -439,7 +437,7 @@ def test_calls_query(client):
         },
         started_at=DatetimeMatcher(),
         ended_at=None,
-        wb_user_id=client.entity,
+        wb_user_id=wb_user_id,
     )
     assert result[1] == weave.trace.call.Call(
         _op_name="weave:///shawn/test-project/op/x:6jAV4T6F42RKlabeB2RO0BXkbFFPrKyU2yyQedpotB8",
@@ -466,14 +464,13 @@ def test_calls_query(client):
         },
         started_at=DatetimeMatcher(),
         ended_at=None,
-        wb_user_id=client.entity,
+        wb_user_id=wb_user_id,
     )
     client.finish_call(call2, None)
     client.finish_call(call1, None)
     client.finish_call(call0, None)
 
 
-@pytest.mark.skipif(HTTP_NOT_PORTED, reason="http: not ported yet")
 def test_get_calls_complete(client):
     obj = weave.Dataset(rows=[{"a": 1}, {"a": 2}, {"a": 3}])
     ref = client.save(obj, "my-dataset")
@@ -508,7 +505,7 @@ def test_get_calls_complete(client):
             query=query,
             sort_by=[SortBy(field="started_at", direction="desc")],
             include_feedback=True,
-            columns=["inputs.dataset.rows"],
+            columns=["inputs", "summary", "display_name", "parent_id"],
         )
     )
     assert len(client_result) == 1
@@ -526,7 +523,7 @@ def test_get_calls_complete(client):
                 query=query,
                 sort_by=[SortBy(field="started_at", direction="desc")],
                 include_feedback=True,
-                columns=["inputs.dataset"],
+                columns=["inputs", "summary", "display_name", "parent_id"],
                 expand_columns=["inputs.dataset"],
             )
         ).calls
@@ -561,7 +558,7 @@ def test_get_calls_complete(client):
                 query=query,
                 include_costs=True,
                 include_feedback=True,
-                columns=["inputs.dataset", "display_name", "parent_id"],
+                columns=["inputs", "summary", "display_name", "parent_id"],
                 expand_columns=["inputs.dataset"],
             )
         ).calls
@@ -1381,7 +1378,6 @@ def test_refs_read_batch_multi_project(client):
     assert res.vals[2] == {"ab": [3, 4, 5]}
 
 
-@pytest.mark.skipif(HTTP_NOT_PORTED, reason="http: not ported yet")
 def test_refs_read_batch_call_ref(client):
     call_ref = refs.CallRef(entity="shawn", project="test-project", id="my-call")
     with pytest.raises(ValueError, match="Call refs not supported"):
@@ -1578,7 +1574,6 @@ def row_gen(num_rows: int, approx_row_bytes: int = 1024):
         yield {"a": i, "b": "x" * approx_row_bytes}
 
 
-@pytest.mark.skipif(HTTP_NOT_PORTED, reason="http: not ported yet")
 @pytest.mark.timeout(60)
 @pytest.mark.flaky(reruns=3, reruns_delay=2)
 @pytest.mark.parametrize("use_parallel_table_upload", [False, True])
@@ -1741,7 +1736,7 @@ def test_flush_drains_the_processor_installed_by_a_calls_complete_upgrade(monkey
     )
     now = datetime.datetime.now(tz=datetime.timezone.utc)
     started = tsi.StartedCallSchemaForInsert(
-        project_id="entity/project",
+        project_id=client.project_id,
         id="call-id",
         trace_id="trace-id",
         op_name="op",
@@ -1750,7 +1745,7 @@ def test_flush_drains_the_processor_installed_by_a_calls_complete_upgrade(monkey
         inputs={"a": 1},
     )
     ended = tsi.EndedCallSchemaForInsertWithStartedAt(
-        project_id="entity/project",
+        project_id=client.project_id,
         id="call-id",
         trace_id="trace-id",
         ended_at=now,
@@ -2075,7 +2070,6 @@ def test_calls_stream_table_ref_expansion(client):
     assert calls[0].output["table"] == o.table.table_ref.uri
 
 
-@pytest.mark.skipif(HTTP_NOT_PORTED, reason="http: not ported yet")
 def test_object_version_read(client):
     refs = []
     for i in range(10):
@@ -2240,7 +2234,6 @@ def test_long_display_names_are_elided(weave_active):
     assert len(call.display_name) <= MAX_DISPLAY_NAME_LENGTH
 
 
-@pytest.mark.skipif(HTTP_NOT_PORTED, reason="http: not ported yet")
 def test_object_deletion(client):
     # Simple case, delete a single version of an object
     obj = {"a": 5}
@@ -2296,7 +2289,6 @@ def test_object_deletion(client):
     assert len(versions.objs) == 0
 
 
-@pytest.mark.skipif(HTTP_NOT_PORTED, reason="http: not ported yet")
 def test_recursive_object_deletion(weave_active):
     # Create a bunch of objects that refer to each other
     obj1 = {"a": 5}
@@ -2327,7 +2319,6 @@ def test_recursive_object_deletion(weave_active):
     assert obj3_ref.get() == {"c": obj2}
 
 
-@pytest.mark.skipif(HTTP_NOT_PORTED, reason="http: not ported yet")
 def test_delete_op_version(weave_active):
     @weave.op
     def my_op(a: int) -> int:
@@ -3393,7 +3384,10 @@ def test_calls_query_hardcoded_filter_length_validation(client):
         calls = client.get_calls(filter={"trace_ids": ["11111"] * 1001})[0]
 
 
-@pytest.mark.skipif(HTTP_NOT_PORTED, reason="http: not ported yet")
+@pytest.mark.skipif(
+    HTTP_NOT_PORTED,
+    reason="http: the ClickHouse condition cache returns wrong rows until wandb/core#58054 is deployed",
+)
 def test_calls_query_datetime_optimization_with_gt_operation(client):
     """Test that datetime optimization works correctly with GT operations on started_at and ended_at fields."""
     # Use a unique test ID to identify these calls
@@ -4213,12 +4207,11 @@ def test_no_400_on_invalid_artifact_url(client):
     assert server_call.id == id
 
 
-@pytest.mark.skipif(HTTP_NOT_PORTED, reason="http: not ported yet")
 def test_no_400_on_invalid_refs(client):
     @weave.op
     def test() -> str:
         # This ref is too long, should be weave:///entity/project/object/name:version
-        return "weave:///entity/project/object/toxic-extra-path/object:latest"
+        return f"weave:///{client.project_id}/object/toxic-extra-path/object:latest"
 
     _, call = test.call()
     id = call.id
@@ -4247,7 +4240,6 @@ def test_get_evaluations(client, make_evals):
     assert evs[1].dataset.rows[0] == {"dataset_id": "jkl"}
 
 
-@pytest.mark.skipif(HTTP_NOT_PORTED, reason="http: not ported yet")
 def test_feedback_batching(network_proxy_client):
     """Test that feedback batching works correctly when enabled."""
     # Set up advanced client that uses the RemoteHttpTraceServer handler
@@ -4474,7 +4466,6 @@ def test_parallel_table_uploads_digest_consistency(
     assert saved_table5.table_ref is not None
 
 
-@pytest.mark.skipif(HTTP_NOT_PORTED, reason="http: not ported yet")
 def test_table_create_from_digests(network_proxy_client):
     """Test that table_create_from_digests works correctly to merge existing row digests."""
     basic_client, remote_client, records = network_proxy_client
@@ -4647,8 +4638,8 @@ def test_get_calls_columns_wb_run_id(client, monkeypatch):
     assert calls[0].wb_run_id == mock_run_id
 
 
-@pytest.mark.skipif(HTTP_NOT_PORTED, reason="http: not ported yet")
-def test_get_calls_include_usernames(client, monkeypatch):
+@pytest.mark.skipif(IN_PROCESS_ONLY, reason="stubs the in-process username resolver")
+def test_get_calls_include_usernames(client, monkeypatch, wb_user_id):
     external_server = find_server_layer(client.server, UserInjectingExternalTraceServer)
     internal_user_id = external_server._idc.ext_to_int_user_id(client.entity)
 

@@ -12,7 +12,7 @@ from PIL import Image
 
 import weave
 from tests.trace.server_utils import find_server_layer
-from tests.trace.util import HTTP_NOT_PORTED
+from tests.trace.util import IN_PROCESS_ONLY
 from weave.shared.digest import (
     compute_file_digest,
     compute_object_digest,
@@ -301,7 +301,6 @@ class TestDataCorrectness:
 class TestServerDigestValidation:
     """Server must reject wrong expected_digest and accept correct ones."""
 
-    @pytest.mark.skipif(HTTP_NOT_PORTED, reason="http: not ported yet")
     @pytest.mark.parametrize("correct", [True, False], ids=["correct", "wrong"])
     def test_object(self, client: WeaveClient, correct: bool):
         val = {"hello": "world"}
@@ -323,7 +322,6 @@ class TestServerDigestValidation:
             with pytest.raises(DigestMismatchError):
                 client.server.obj_create(req)
 
-    @pytest.mark.skipif(HTTP_NOT_PORTED, reason="http: not ported yet")
     @pytest.mark.parametrize("correct", [True, False], ids=["correct", "wrong"])
     def test_table(self, client: WeaveClient, correct: bool):
         rows = [{"a": 1}, {"a": 2}, {"a": 3}]
@@ -348,7 +346,6 @@ class TestServerDigestValidation:
             with pytest.raises(DigestMismatchError):
                 client.server.table_create(req)
 
-    @pytest.mark.skipif(HTTP_NOT_PORTED, reason="http: not ported yet")
     @pytest.mark.parametrize("correct", [True, False], ids=["correct", "wrong"])
     def test_file(self, client: WeaveClient, correct: bool):
         content = b"hello world"
@@ -404,7 +401,7 @@ class TestConvertRefsToInternal:
         with pytest.raises(CrossProjectRefError):
             client._convert_refs_to_internal(json_val)
 
-    @pytest.mark.skipif(HTTP_NOT_PORTED, reason="http: not ported yet")
+    @pytest.mark.skipif(IN_PROCESS_ONLY, reason="tampers with the in-process adapter")
     def test_cross_project_ref_skips_expected_digest(
         self, client: WeaveClient, fast_path: None, monkeypatch
     ) -> None:
@@ -448,7 +445,7 @@ class TestDigestMismatchAutoDisable:
     and disables client-side digests for the rest of the session.
     """
 
-    @pytest.mark.skipif(HTTP_NOT_PORTED, reason="http: not ported yet")
+    @pytest.mark.skipif(IN_PROCESS_ONLY, reason="tampers with the in-process adapter")
     @pytest.mark.disable_logging_error_check
     def test_object_mismatch_retries_and_disables(
         self, client: WeaveClient, fast_path: None, monkeypatch
@@ -486,7 +483,7 @@ class TestDigestMismatchAutoDisable:
 
         assert seen_digests == [None]
 
-    @pytest.mark.skipif(HTTP_NOT_PORTED, reason="http: not ported yet")
+    @pytest.mark.skipif(IN_PROCESS_ONLY, reason="tampers with the in-process adapter")
     @pytest.mark.disable_logging_error_check
     def test_table_mismatch_retries_and_disables(
         self, client: WeaveClient, fast_path: None, monkeypatch
@@ -516,7 +513,7 @@ class TestDigestMismatchAutoDisable:
         got_rows = list(got.rows)
         assert len(got_rows) == 2
 
-    @pytest.mark.skipif(HTTP_NOT_PORTED, reason="http: not ported yet")
+    @pytest.mark.skipif(IN_PROCESS_ONLY, reason="tampers with the in-process adapter")
     @pytest.mark.disable_logging_error_check
     def test_file_mismatch_retries_and_disables(
         self, client: WeaveClient, fast_path: None, monkeypatch

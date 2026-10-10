@@ -434,7 +434,9 @@ def make_server_recorder(server: tsi.TraceServerInterface):  # type: ignore
             if name == "attribute_access_log":
                 return access_log
             attr = self_server.__getattribute__(name)
-            if name != "attribute_access_log":
+            # Plain attributes (`call_processor`, `remote_request_bytes_limit`)
+            # are the client's bookkeeping, not requests to the server.
+            if name != "attribute_access_log" and callable(attr):
                 access_log.append(name)
             return attr
 
@@ -699,12 +701,10 @@ def network_proxy_client(client, monkeypatch):
 
     with TestClient(app) as c:
 
-        def post(url, data=None, json=None, **kwargs):
+        def post(url, *args, trace_id=None, **kwargs):
             kwargs.pop("stream", None)
-            return c.post(url, data=data, json=json, **kwargs)
-
-        orig_post = weave.utils.http_requests.post
-        weave.utils.http_requests.post = post
+            headers = remote_client._build_dynamic_request_headers(trace_id=trace_id)
+            return c.post(url, *args, headers=headers, **kwargs)
 
         def make_fast_async_batch_processor(*args, **kwargs):
             kwargs.setdefault("min_batch_interval", 0)
@@ -729,9 +729,12 @@ def network_proxy_client(client, monkeypatch):
             trace_server_url="",
             should_batch=True,
         )
+        # Route this instance's requests into the app above. Patching the
+        # module-level `http_requests.post` instead would also catch the
+        # requests `client.server` makes when it is itself an HTTP server, and
+        # the app would call back into itself.
+        remote_client.post = post
         yield (client, remote_client, records)
-
-        weave.utils.http_requests.post = orig_post
 
 
 @pytest.fixture(autouse=True)
