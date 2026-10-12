@@ -172,8 +172,9 @@ nox -e "$TARGET_ENV"  # e.g. nox -e "tests-3.12(shard='trace')"
 Tests are split up into shards, which include:
 
 1. `trace` -- all of the trace SDK tests
-2. `trace_server` -- tests for trace server backend
-3. various integrations, like `openai`, `instructor`, etc -- these envs are isolated to simplify testing
+2. various integrations, like `openai`, `instructor`, etc -- these envs are isolated to simplify testing
+
+Tests that use the `client` fixture run against a trace server over HTTP; see "Running Tests" in `AGENTS.md` for what it needs. That setup needs access to wandb/core, so without it run only the tests that need no server: `-m "not trace_server"`.
 
 Nox is the most thorough way to run the tests, as it sets important environment variables needed to run specific integrations and shards. However, it is slower. A combination of `uv` and `pytest` can be used for faster iteration when your code is agnostic to integration type, python version, etc.
 ```sh

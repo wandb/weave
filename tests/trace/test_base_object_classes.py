@@ -22,9 +22,6 @@ from weave.trace.refs import ObjectRef
 from weave.trace.serialization.serialize import to_json
 from weave.trace.weave_client import WeaveClient, map_to_refs
 from weave.trace_server import trace_server_interface as tsi
-from weave.trace_server.calls_query_builder.calls_query_builder import (
-    _invalid_field_message,
-)
 from weave.trace_server.errors import (
     InvalidFieldError,
     InvalidRequest,
@@ -1186,7 +1183,7 @@ def test_monitor_create_rejects_unknown_query_field(client: WeaveClient):
     with pytest.raises(InvalidFieldError) as exc_info:
         _create_monitor(client, "bad-monitor", bad_query)
 
-    assert str(exc_info.value) == _invalid_field_message("operation_name")
+    assert str(exc_info.value).startswith("Field operation_name is not allowed. ")
     assert "_dump" not in str(exc_info.value)
 
     # A structurally invalid query (empty $and) is a bad request, not a field error.

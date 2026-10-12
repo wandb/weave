@@ -7,7 +7,6 @@ import pytest
 from flask import Flask
 
 import weave
-from tests.trace.util import NOT_CLICKHOUSE_BACKEND
 
 
 @pytest.fixture
@@ -34,17 +33,15 @@ def flask_server(weave_active):
     return url
 
 
-@pytest.mark.skipif(
-    NOT_CLICKHOUSE_BACKEND,
-    reason="requires a served HTTP backend; the in-process fake client is not "
-    "reachable from werkzeug request threads",
-)
 def test_flask_server(flask_server):
     url = flask_server
     with httpx.Client() as client:
         response = client.get(url)
     assert response.status_code == 200
-    assert response.text == "FkWFKCRcl9wsGp3yclN7v1IIAICTPenpZYrWo0otI4Y"
+    # The digest covers the server's project id, so compare with the same
+    # dataset published from this thread.
+    expected = weave.publish(weave.Dataset(rows=[{"a": 5, "b": 6}, {"a": 7, "b": 10}]))
+    assert response.text == expected.digest
 
 
 def test_weave_client_global_accessible_in_thread(weave_active):

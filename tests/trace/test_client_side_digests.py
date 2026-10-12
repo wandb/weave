@@ -12,7 +12,6 @@ from PIL import Image
 
 import weave
 from tests.trace.server_utils import find_server_layer
-from tests.trace.util import IN_PROCESS_ONLY
 from weave.shared.digest import (
     compute_file_digest,
     compute_object_digest,
@@ -31,9 +30,7 @@ from weave.trace.weave_client import (
 )
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.errors import DigestMismatchError
-from weave.trace_server.external_to_internal_trace_server_adapter import (
-    ExternalTraceServer,
-)
+from weave.trace_server_bindings.remote_http_trace_server import RemoteHTTPTraceServer
 
 
 def _configure_digests(client: WeaveClient, *, enable: bool) -> None:
@@ -401,7 +398,6 @@ class TestConvertRefsToInternal:
         with pytest.raises(CrossProjectRefError):
             client._convert_refs_to_internal(json_val)
 
-    @pytest.mark.skipif(IN_PROCESS_ONLY, reason="tampers with the in-process adapter")
     def test_cross_project_ref_skips_expected_digest(
         self, client: WeaveClient, fast_path: None, monkeypatch
     ) -> None:
@@ -411,9 +407,9 @@ class TestConvertRefsToInternal:
         CrossProjectRefError which is caught by the caller, causing it to skip
         expected_digest and let the server compute the digest instead.
         """
-        # Spy on the adapter's obj_create to capture expected_digest values
+        # Spy on obj_create to capture expected_digest values
         captured: list[str | None] = []
-        adapter = find_server_layer(client.server, ExternalTraceServer)
+        adapter = find_server_layer(client.server, RemoteHTTPTraceServer)
         original = type(adapter).obj_create
 
         def spy(self, req):
@@ -445,7 +441,6 @@ class TestDigestMismatchAutoDisable:
     and disables client-side digests for the rest of the session.
     """
 
-    @pytest.mark.skipif(IN_PROCESS_ONLY, reason="tampers with the in-process adapter")
     @pytest.mark.disable_logging_error_check
     def test_object_mismatch_retries_and_disables(
         self, client: WeaveClient, fast_path: None, monkeypatch
@@ -453,7 +448,7 @@ class TestDigestMismatchAutoDisable:
         """First obj_create with expected_digest fails; client retries without
         it and disables fast path for subsequent saves.
         """
-        adapter = find_server_layer(client.server, ExternalTraceServer)
+        adapter = find_server_layer(client.server, RemoteHTTPTraceServer)
         original = adapter.obj_create
         seen_digests: list[str | None] = []
         injected = False
@@ -483,13 +478,12 @@ class TestDigestMismatchAutoDisable:
 
         assert seen_digests == [None]
 
-    @pytest.mark.skipif(IN_PROCESS_ONLY, reason="tampers with the in-process adapter")
     @pytest.mark.disable_logging_error_check
     def test_table_mismatch_retries_and_disables(
         self, client: WeaveClient, fast_path: None, monkeypatch
     ) -> None:
         """Table digest mismatch retries and disables fast path."""
-        adapter = find_server_layer(client.server, ExternalTraceServer)
+        adapter = find_server_layer(client.server, RemoteHTTPTraceServer)
         original = adapter.table_create
         injected = False
 
@@ -513,13 +507,12 @@ class TestDigestMismatchAutoDisable:
         got_rows = list(got.rows)
         assert len(got_rows) == 2
 
-    @pytest.mark.skipif(IN_PROCESS_ONLY, reason="tampers with the in-process adapter")
     @pytest.mark.disable_logging_error_check
     def test_file_mismatch_retries_and_disables(
         self, client: WeaveClient, fast_path: None, monkeypatch
     ) -> None:
         """File digest mismatch retries and disables fast path."""
-        adapter = find_server_layer(client.server, ExternalTraceServer)
+        adapter = find_server_layer(client.server, RemoteHTTPTraceServer)
         original = adapter.file_create
         injected = False
 

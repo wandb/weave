@@ -1,8 +1,8 @@
 """Request/response types for the Weave Agents observability API.
 
 All types are Pydantic BaseModel subclasses used by both the FastAPI
-endpoints (services/weave-trace) and the ClickHouse query handlers
-(weave/trace_server/clickhouse_trace_server_batched.py).
+endpoints (services/weave-trace) and the ClickHouse query handlers, both in
+wandb/core.
 
 Response models inherit AgentResponseModel so defaulted fields are required
 in the serialization JSON Schema. Request models stay on BaseModel.
@@ -102,7 +102,7 @@ AgentSpanStatsDerivedMetric = Literal[
     # Query-time costs (USD). Computed by joining the span's model against
     # llm_token_prices; only resolvable when the query's span source is
     # cost-augmented. Mirror of span_costs.COST_DERIVED_METRIC_NAMES — keep the
-    # two in sync. See weave/trace_server/agents/span_costs.py.
+    # two in sync. See agents/span_costs.py in wandb/core's trace server.
     "total_cost_usd",
     "input_cost_usd",
     "output_cost_usd",
@@ -512,7 +512,8 @@ class AgentSpanSchema(AgentResponseModel):
     cache_read_input_tokens: int | None = None
     # Query-time costs (USD), only populated when AgentSpansQueryReq.include_costs
     # is set. None (not 0) when the span's model has no matching price, so the UI
-    # can distinguish "unpriced" from "free". See agents/span_costs.py.
+    # can distinguish "unpriced" from "free". See agents/span_costs.py in
+    # wandb/core's trace server.
     input_cost_usd: float | None = None
     output_cost_usd: float | None = None
     cache_read_cost_usd: float | None = None
@@ -792,7 +793,8 @@ class AgentSpanGroupRow(AgentResponseModel):
     error_count: int = 0
     # Summed query-time costs (USD) across the group's spans. Only populated
     # when AgentSpansQueryReq.include_costs is set; None when no span in the
-    # group had a matching model price. See agents/span_costs.py.
+    # group had a matching model price. See agents/span_costs.py in wandb/core's
+    # trace server.
     total_cost_usd: float | None = None
     total_input_cost_usd: float | None = None
     total_output_cost_usd: float | None = None

@@ -13,16 +13,13 @@ from fastapi.responses import StreamingResponse
 from fastapi.testclient import TestClient
 
 import weave
+from tests.trace.server_utils import TEST_ENTITY
 from tests.trace.util import DummyTestException
-from tests.trace_server.conftest import TEST_ENTITY, get_trace_server_flag
-from weave.trace import weave_client, weave_init
+from weave.shared import trace_server_interface as tsi
+from weave.trace import weave_client
 from weave.trace.context import weave_client_context
 from weave.trace.context.call_context import set_call_stack
 from weave.trace.settings import replace_settings
-from weave.trace_server import trace_server_interface as tsi
-from weave.trace_server.project_version.project_version import (
-    reset_project_residence_cache as reset_residence_caches,
-)
 from weave.trace_server_bindings import remote_http_trace_server
 from weave.trace_server_bindings.async_batch_processor import AsyncBatchProcessor
 from weave.trace_server_bindings.caching_middleware_trace_server import (
@@ -31,7 +28,7 @@ from weave.trace_server_bindings.caching_middleware_trace_server import (
 from weave.trace_server_bindings.call_batch_processor import CallBatchProcessor
 from weave.trace_server_bindings.remote_http_trace_server import RemoteHTTPTraceServer
 
-pytest_plugins = ["tests.trace_server.conftest"]
+pytest_plugins = ["tests.conftest_lib.http_trace_server"]
 
 # Force testing to never report wandb sentry events
 os.environ["WANDB_ERROR_REPORTING"] = "false"
@@ -42,20 +39,6 @@ os.environ["WANDB_ERROR_REPORTING"] = "false"
 # including flush overhead).  On ClickHouse with concurrent eval rows the
 # flush contention can exceed 1s on loaded CI runners.
 LATENCY_TOL = 10 if sys.platform == "win32" else 2
-
-
-@pytest.fixture(autouse=True)
-def patch_kafka_producer():
-    """Patch the Kafka producer. Without this, attempt to connect to the brokers will fail.
-    This is ok but this introduces a `message.timeout.ms` (500ms) delay in each test.
-
-    If a test needs to test the Kafka producer, they should orride this patch explicitly.
-    """
-    with patch(
-        "weave.trace_server.kafka.KafkaProducer.from_env",
-        return_value=MagicMock(),
-    ):
-        yield
 
 
 @pytest.fixture(autouse=True)
@@ -85,14 +68,6 @@ def reset_serializer_load_refs():
     for serializer in SERIALIZERS:
         if isinstance(serializer.load, Op):
             remove_ref(serializer.load)
-
-
-@pytest.fixture(autouse=True)
-def reset_project_residence_cache():
-    """Clear residence caches (populated LRU + empty TTL) between tests."""
-    reset_residence_caches()
-    yield
-    reset_residence_caches()
 
 
 @pytest.fixture(autouse=True)
@@ -444,23 +419,13 @@ def make_server_recorder(server: tsi.TraceServerInterface):  # type: ignore
 
 
 def create_client(
-    request,
     trace_server,
     attributes: dict[str, Any] | None = None,
 ) -> weave_client.WeaveClient:
-    trace_server_flag = get_trace_server_flag(request)
-    if trace_server_flag == "prod":
-        # Note: this is only for local dev testing and should be removed
-        return weave_init.init_weave("dev_testing")
-    else:
-        server = trace_server
-
     # Removing this as it lead to passing tests that were not passing in prod!
     # Keeping off for now until it is the default behavior.
     # os.environ["WEAVE_USE_SERVER_CACHE"] = "true"
-    caching_server = CachingMiddlewareTraceServer.from_env(server)
-    # ensure_project_exists=False because in-process backends don't
-    # implement ServiceInterface — project creation is a remote-only concern.
+    caching_server = CachingMiddlewareTraceServer.from_env(trace_server)
     # In tests we assume the project already exists.
     client = TestOnlyFlushingWeaveClient(
         TEST_ENTITY,
@@ -524,7 +489,7 @@ def _teardown_test_client(
 
 
 @pytest.fixture
-def client(zero_stack, request, trace_server, caching_client_isolation):
+def client(zero_stack, trace_server, caching_client_isolation):
     """This is the standard fixture used everywhere in tests to test end to end
     client functionality.
 
@@ -532,7 +497,7 @@ def client(zero_stack, request, trace_server, caching_client_isolation):
     directory is set before the client is created. Without this, the cache might
     be shared across tests causing flaky test failures.
     """
-    client = create_client(request, trace_server)
+    client = create_client(trace_server)
     try:
         yield client
     finally:
@@ -566,7 +531,7 @@ def no_autoflush(client):
 
 
 @pytest.fixture
-def client_creator(zero_stack, request, trace_server, caching_client_isolation):
+def client_creator(zero_stack, trace_server, caching_client_isolation):
     """This fixture is useful for delaying the creation of the client (ex. when you want to set settings first).
 
     Note: caching_client_isolation is explicitly depended on to ensure the cache
@@ -580,7 +545,7 @@ def client_creator(zero_stack, request, trace_server, caching_client_isolation):
     ):
         if settings is not None:
             weave.trace.settings.replace_settings(settings)
-        client = create_client(request, trace_server, attributes)
+        client = create_client(trace_server, attributes)
         try:
             yield client
         finally:

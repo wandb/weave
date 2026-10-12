@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import TypeVar
 
-from weave.trace_server import trace_server_interface as tsi
+from weave.shared import trace_server_interface as tsi
 
 T = TypeVar("T")
 

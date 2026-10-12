@@ -29,40 +29,14 @@ Notes on test data:
 
 from __future__ import annotations
 
-import datetime
-import logging
 import uuid
 from typing import NamedTuple
 
 import pytest
 
 import weave
-from tests.trace.server_utils import TEST_ENTITY, find_server_layer
-from tests.trace.util import client_is_clickhouse
 from weave.trace_server import trace_server_interface as tsi
-from weave.trace_server.agents.helpers import genai_span_to_row
-from weave.trace_server.agents.schema import (
-    ALL_SPAN_INSERT_COLUMNS,
-    AgentSpanCHInsertable,
-)
-from weave.trace_server.clickhouse_trace_server_batched import ClickHouseTraceServer
 from weave.trace_server.errors import Error as TraceServerError
-
-# Internal (base64) project_id the `client` fixture uses: b64("shawn/test-project").
-# Used only for direct ClickHouse `spans` inserts in span-kind tests.
-INTERNAL_PROJECT_ID = "c2hhd24vdGVzdC1wcm9qZWN0"
-
-
-@pytest.fixture(autouse=True)
-def _require_clickhouse(client):
-    """dataset_sources is implemented for the ClickHouse backend only.
-
-    The provenance layer is raw ClickHouse SQL (ReplacingMergeTree + argMax +
-    bloom skip indexes) and the span-kind tests insert directly into the CH
-    `spans` table, so these tests can't run on the in-memory fake backend.
-    """
-    if not client_is_clickhouse(client):
-        pytest.skip("dataset_sources is ClickHouse-only (not on the in-memory fake)")
 
 
 class CallsFixture(NamedTuple):
@@ -134,7 +108,6 @@ def link_req(
         dataset_digest=dataset_digest,
         links=links,
         include_created_status=include_created_status,
-        wb_user_id="test_user",
     )
 
 
@@ -472,7 +445,6 @@ def test_dataset_sources_soft_delete_removes_from_forward_and_reverse(client):
         tsi.DatasetSourcesLinkDeleteReq(
             project_id=client.project_id,
             link_ids=[link_id],
-            wb_user_id="test_user",
         )
     )
     assert len(del_res.entries) == 1
@@ -524,7 +496,6 @@ def test_dataset_sources_delete_edge_cases(client, scenario):
                 tsi.DatasetSourcesLinkDeleteReq(
                     project_id=client.project_id,
                     link_ids=[link_id, "unknown-link-" + uuid.uuid4().hex],
-                    wb_user_id="test_user",
                 )
             )
 
@@ -533,7 +504,7 @@ def test_dataset_sources_delete_edge_cases(client, scenario):
     else:
         first = client.server.dataset_sources_link_delete(
             tsi.DatasetSourcesLinkDeleteReq(
-                project_id=client.project_id, link_ids=[link_id], wb_user_id="test_user"
+                project_id=client.project_id, link_ids=[link_id]
             )
         )
         assert first.entries[0].deleted is True
@@ -541,7 +512,7 @@ def test_dataset_sources_delete_edge_cases(client, scenario):
         # Deleting an already-soft-deleted id is idempotent-ish: deleted=False.
         second = client.server.dataset_sources_link_delete(
             tsi.DatasetSourcesLinkDeleteReq(
-                project_id=client.project_id, link_ids=[link_id], wb_user_id="test_user"
+                project_id=client.project_id, link_ids=[link_id]
             )
         )
         assert second.entries[0].link_id == link_id
@@ -564,7 +535,7 @@ def test_dataset_sources_relink_after_delete_restores_with_same_id(client):
 
     client.server.dataset_sources_link_delete(
         tsi.DatasetSourcesLinkDeleteReq(
-            project_id=client.project_id, link_ids=[link_id], wb_user_id="test_user"
+            project_id=client.project_id, link_ids=[link_id]
         )
     )
     assert len(forward_query(client, dataset_object_id=ds_obj).links) == 0
@@ -830,7 +801,6 @@ def test_dataset_sources_forward_query_include_deleted_flag(client):
         tsi.DatasetSourcesLinkDeleteReq(
             project_id=client.project_id,
             link_ids=[drop_res.entries[0].link_id],
-            wb_user_id="test_user",
         )
     )
 
@@ -896,71 +866,8 @@ def test_dataset_sources_links_span_dataset_versions(client):
 
 
 # ---------------------------------------------------------------------------
-# Span-kind sources: ClickHouse-only (the `spans` table is CH-only)
+# Span-kind sources
 # ---------------------------------------------------------------------------
-
-
-def _insert_span(client, *, span_id: str, trace_id: str, span_name: str) -> None:
-    """Insert a single agent span directly into the ClickHouse `spans` table.
-
-    Mirrors tests/trace_server/test_genai_agent_queries.py.
-    """
-    ch_server = find_server_layer(client.server, ClickHouseTraceServer)
-    now = datetime.datetime.now(tz=datetime.timezone.utc)
-    span = AgentSpanCHInsertable(
-        project_id=INTERNAL_PROJECT_ID,
-        trace_id=trace_id,
-        span_id=span_id,
-        span_name=span_name,
-        started_at=now,
-        ended_at=now,
-        status_code="OK",
-        operation_name="chat",
-        agent_name="test-agent",
-        provider_name="openai",
-        request_model="gpt-4o",
-        input_tokens=100,
-        output_tokens=50,
-    )
-    ch_server.ch_client.insert(
-        "spans",
-        data=[genai_span_to_row(span)],
-        column_names=ALL_SPAN_INSERT_COLUMNS,
-    )
-
-
-def test_dataset_sources_link_span_source_forward_query(client):
-    """Span-kind source link + forward query (spans live in the `spans` table)."""
-    span_id = uuid.uuid4().hex
-    trace_id = uuid.uuid4().hex
-    _insert_span(client, span_id=span_id, trace_id=trace_id, span_name="my-span")
-
-    ds_obj = "span_source_dataset"
-    digest = new_digest("span")
-    span_source = tsi.SourceRef(
-        source_kind=tsi.SourceKind.SPAN,
-        source_id=span_id,
-        source_trace_id=trace_id,
-    )
-
-    res = client.server.dataset_sources_link(
-        link_req(
-            client,
-            dataset_object_id=ds_obj,
-            links=[
-                tsi.DatasetSourceLinkPayload(row_digest=digest, sources=[span_source])
-            ],
-        )
-    )
-    assert len(res.entries) == 1
-
-    fq = forward_query(
-        client, dataset_object_id=ds_obj, source_kinds=[tsi.SourceKind.SPAN]
-    )
-    assert len(fq.links) == 1
-    assert fq.links[0].source_kind == tsi.SourceKind.SPAN
-    assert fq.links[0].source_id == span_id
-    assert fq.links[0].source_trace_id == trace_id
 
 
 def test_dataset_sources_link_missing_span_errors(client):
@@ -995,47 +902,6 @@ def test_dataset_sources_link_missing_span_errors(client):
 # ---------------------------------------------------------------------------
 # D1: source_trace_id is part of the logical key
 # ---------------------------------------------------------------------------
-
-
-def test_dataset_sources_same_span_id_distinct_traces_yield_distinct_links(client):
-    """D1: a span's identity is (trace_id, span_id). Two spans sharing a span_id
-    across different traces, linked to the SAME row_digest, are distinct links
-    and must NOT collapse under the logical key. ClickHouse-only (spans table).
-    """
-    span_id = uuid.uuid4().hex
-    trace_a = "trace-a-" + uuid.uuid4().hex
-    trace_b = "trace-b-" + uuid.uuid4().hex
-    _insert_span(client, span_id=span_id, trace_id=trace_a, span_name="span-a")
-    _insert_span(client, span_id=span_id, trace_id=trace_b, span_name="span-b")
-
-    ds_obj = "dup_span_id_dataset"
-    digest = new_digest("dupspan")
-    src_a = tsi.SourceRef(
-        source_kind=tsi.SourceKind.SPAN, source_id=span_id, source_trace_id=trace_a
-    )
-    src_b = tsi.SourceRef(
-        source_kind=tsi.SourceKind.SPAN, source_id=span_id, source_trace_id=trace_b
-    )
-
-    res = client.server.dataset_sources_link(
-        link_req(
-            client,
-            dataset_object_id=ds_obj,
-            links=[
-                tsi.DatasetSourceLinkPayload(row_digest=digest, sources=[src_a, src_b])
-            ],
-        )
-    )
-    # Two distinct links (distinct ids), not one collapsed link.
-    assert len(res.entries) == 2
-    assert res.entries[0].link_id != res.entries[1].link_id
-
-    fq = forward_query(
-        client, dataset_object_id=ds_obj, source_kinds=[tsi.SourceKind.SPAN]
-    )
-    assert len(fq.links) == 2
-    assert {link.source_trace_id for link in fq.links} == {trace_a, trace_b}
-    assert all(link.source_id == span_id for link in fq.links)
 
 
 # ---------------------------------------------------------------------------
@@ -1109,65 +975,18 @@ def test_dataset_sources_conversation_link_rejects_non_empty_trace(client):
     assert len(fq.links) == 0
 
 
-def test_dataset_sources_conversation_subset_add_freezes_sampled_spans(client):
-    """D3: adding a conversation can sample a SUBSET of its spans. The frozen
-    record is per-span links for exactly the sampled spans PLUS one coarse-grain
-    conversation link -- never the un-sampled spans. ClickHouse-only (spans
-    table). This is why model C (derive from spans WHERE conversation_id=X) is
-    wrong: it would resurface the un-sampled span.
-    """
-    trace_id = "conv-trace-" + uuid.uuid4().hex
-    conv_id = "conv-" + uuid.uuid4().hex
-    span_ids = [uuid.uuid4().hex for _ in range(3)]
-    for i, sid in enumerate(span_ids):
-        _insert_span(client, span_id=sid, trace_id=trace_id, span_name=f"span-{i}")
-
-    # Sample only the first two spans (the curated subset), plus the conversation.
-    sampled = span_ids[:2]
-    sources = [
-        tsi.SourceRef(
-            source_kind=tsi.SourceKind.SPAN, source_id=sid, source_trace_id=trace_id
-        )
-        for sid in sampled
-    ] + [conversation_source(conv_id)]
-
-    ds_obj = "conversation_subset_dataset"
-    digest = new_digest("subset")
-    res = client.server.dataset_sources_link(
-        link_req(
-            client,
-            dataset_object_id=ds_obj,
-            links=[tsi.DatasetSourceLinkPayload(row_digest=digest, sources=sources)],
-        )
-    )
-    assert len(res.entries) == 3  # 2 sampled spans + 1 conversation
-
-    fq = forward_query(client, dataset_object_id=ds_obj)
-    span_links = [link for link in fq.links if link.source_kind == tsi.SourceKind.SPAN]
-    conv_links = [
-        link for link in fq.links if link.source_kind == tsi.SourceKind.CONVERSATION
-    ]
-    # Exactly the sampled spans are frozen -- the == set(sampled) below proves
-    # the un-sampled third span (span_ids[2]) is absent.
-    assert {link.source_id for link in span_links} == set(sampled)
-    # Plus the coarse-grain conversation link.
-    assert len(conv_links) == 1
-    assert conv_links[0].source_id == conv_id
-
-
 # ---------------------------------------------------------------------------
 # added_by user id translation (external <-> internal)
 # ---------------------------------------------------------------------------
 
 
-def test_dataset_sources_forward_query_added_by_is_external(client):
+def test_dataset_sources_forward_query_added_by_is_external(client, wb_user_id):
     """added_by must be returned as the external user id, not the internal
-    (base64) one the adapter stored.
+    one the server stored.
 
-    The link is written with an external wb_user_id (TEST_ENTITY); the adapter
-    stores its internal (base64) form as added_by. The forward query must
-    translate that back to the external id on read -- without the fix it leaks
-    the raw base64 internal id.
+    The server stamps the authenticated user on the link and stores its
+    internal form as added_by. The forward query must translate that back to
+    the external id on read.
     """
     calls = create_test_calls(client, 1)
     ds_obj = "added_by_external_dataset"
@@ -1181,36 +1000,7 @@ def test_dataset_sources_forward_query_added_by_is_external(client):
             )
         ],
     )
-    req.wb_user_id = TEST_ENTITY
     client.server.dataset_sources_link(req)
     res = forward_query(client, dataset_object_id=ds_obj, row_digests=[digest])
     assert len(res.links) == 1
-    assert res.links[0].added_by == TEST_ENTITY
-
-
-# ---------------------------------------------------------------------------
-# Audit log: dataset_digest is audit-log-only (never stored on the rows)
-# ---------------------------------------------------------------------------
-
-
-def test_dataset_sources_link_emits_audit_log_with_dataset_digest(client, caplog):
-    """dataset_digest is audit-log-only; a link write must emit it."""
-    calls = create_test_calls(client, 1)
-    digest = new_digest()
-    with caplog.at_level(logging.INFO, logger="weave.trace_server.dataset_sources"):
-        client.server.dataset_sources_link(
-            link_req(
-                client,
-                dataset_object_id="audit_log_dataset",
-                dataset_digest="ds-digest-xyz",
-                links=[
-                    tsi.DatasetSourceLinkPayload(
-                        row_digest=digest, sources=[call_source(calls.calls[0])]
-                    )
-                ],
-            )
-        )
-    audit = [r for r in caplog.records if "dataset_sources_link" in r.getMessage()]
-    assert len(audit) == 1
-    assert getattr(audit[0], "dataset_digest", None) == "ds-digest-xyz"
-    assert getattr(audit[0], "link_count", None) == 1
+    assert res.links[0].added_by == wb_user_id

@@ -83,32 +83,6 @@ rich = ["rich"]           # Optional dependency for enhanced console output
 #   "weave_server_sdk @ git+https://github.com/wandb/weave-stainless.git@9ce4f0792a54f05fba22531faee0c439ae9d70fa",
 # ]
 
-# `trace_server` is the dependency list of the trace server itself. We eventually will extract
-# this to a separate package. Note, when that happens, we will need to pull along some of the
-# default dependencies as well.
-trace_server = [
-  # BYOB - S3
-  "boto3>=1.34.0",
-  # BYOB - Azure
-  "azure-identity>=1.25.0,<2.0.0",
-  "azure-storage-blob>=12.24.0,<12.26.0",
-  # BYOB - GCP
-  "google-cloud-storage>=2.7.0",
-  # LLM Support
-  "litellm>=1.36.1,<1.82.7",
-  # OTEL trace support
-  "opentelemetry-proto>=1.28.0",
-  # For emoji shortcode support in Feedback
-  "emoji>=2.12.1",
-  # Redis for optional task tracking and caching
-  "redis>=5.0.0",
-  "clickhouse_connect>=1.6,<1.7",
-  "sqlparse>=0.5.0,<0.6",
-  "confluent-kafka>=2.9.0",
-  "openai>=1.99.9",
-  "requests>=2.32.0",
-  "urllib3>=2.0.0",
-]
 video_support = ["moviepy<=1.0.3"]
 anthropic = ["anthropic>=0.18.0"]
 cerebras = ["cerebras-cloud-sdk"]
@@ -223,7 +197,6 @@ exclude = [
   "examples",
   "tests",
   "dev_docs",
-  "weave/trace_server/model_providers",
 ]
 
 [tool.hatch.metadata]
@@ -350,7 +323,6 @@ exclude = ["rules", "weave/vendor/weave_server_sdk"]
 # and use pytest.raises match strings with regex-like characters.
 "tests/**/*.py" = ["RUF029", "RUF043", "RUF069"]
 "weave/trace/serialization/op_type.py" = ["RUF100", "N802"]
-"weave/trace_server/costs/update_costs.py" = ["PLW1514"]
 "weave/type_handlers/Video/video.py" = ["PLW0603"]
 "weave/type_handlers/Audio/audio.py" = ["PLW1514"]
 "weave/type_handlers/Content/content.py" = ["PLW1514"]
@@ -443,12 +415,6 @@ dev = [
   "ty>=0.0.2",
   "import-linter>=2.0",
 ]
-trace_server_tests = [
-  # BYOB - S3
-  "moto[s3]>=5.0.0",
-  "opentelemetry-semantic-conventions-ai>=0.4.3",
-  "openinference-semantic-conventions>=0.1.17",
-]
 autogen_tests = [
   "autogen-agentchat>=0.5.7; python_version >= '3.10'",
   "autogen-ext[openai]>=0.5.7; python_version >= '3.10'",
@@ -489,11 +455,6 @@ test = [
   # MIME type detection (requires libmagic system library on Linux/macOS)
   "python-magic; sys_platform != 'win32'",
   "python-magic-bin; sys_platform == 'win32'",
-
-  "confluent-kafka",
-
-  "weave[trace_server]",
-  "moto[s3]>=5.0.0",
 ]
 
 [tool.uv]
@@ -581,12 +542,12 @@ too-many-positional-arguments = "ignore"
 not-iterable = "ignore"
 
 # ---------------------------------------------------------------------------
-# import-linter: enforce the trace-server / client / workers import boundaries.
+# import-linter: enforce the trace-server / client import boundaries.
 #
 # Goal: the trace server (`weave.trace_server`) and the Weave client SDK
-# (everything else under `weave`) must not import each other, and workers must
-# additionally not reach into the client SDK. `weave.shared` is the intentional
-# neutral zone that both sides may import, and it imports neither.
+# (everything else under `weave`) must not import each other. `weave.shared`
+# is the intentional neutral zone that both sides may import, and it imports
+# neither.
 #
 # No contract has an `ignore_imports` list: the direct cross-boundary imports
 # are gone. Fix a new violation in the code rather than adding an ignore.
@@ -659,35 +620,6 @@ source_modules = [
   "weave.wandb_interface",
 ]
 forbidden_modules = ["weave.trace_server"]
-allow_indirect_imports = true
-
-[[tool.importlinter.contracts]]
-name = "Workers must not import the Weave client SDK"
-type = "forbidden"
-source_modules = ["weave.trace_server.workers"]
-forbidden_modules = [
-  "weave.agent",
-  "weave.chat",
-  "weave.compat",
-  "weave.conversation",
-  "weave.dataset",
-  "weave.durability",
-  "weave.evaluation",
-  "weave.flow",
-  "weave.initialization",
-  "weave.integrations",
-  "weave.object",
-  "weave.prompt",
-  "weave.scorers",
-  "weave.session",
-  "weave.telemetry",
-  "weave.trace",
-  "weave.trace_server_bindings",
-  "weave.type_handlers",
-  "weave.type_wrappers",
-  "weave.utils",
-  "weave.wandb_interface",
-]
 allow_indirect_imports = true
 
 [[tool.importlinter.contracts]]

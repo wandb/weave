@@ -117,7 +117,7 @@ When developing a new integration, it will automatically work with both implicit
    ```
    import pytest
    import weave
-   from weave.trace_server import trace_server_interface as tsi
+   from weave.shared import trace_server_interface as tsi
    from typing import Generator
 
    @pytest.fixture()
@@ -127,7 +127,7 @@ When developing a new integration, it will automatically work with both implicit
 
    2. Create your first test function. There are a few components:
       - `pytest.mark.vcr` - this is a utility that will allow you to capture the vendor's network requests locally, and save it for unit tests later. The library we use is `pytest-recording` which uses `vcrpy`. Read those docs to learn more!
-      - `client: weave.weave_client.WeaveClient`. This tells the system to use a fake `W&B Trace Server` for the tests
+      - `client: weave.weave_client.WeaveClient`. This tells the system to use the test trace server for the tests
       - `patch_<vendor>`. This will automatically call the above patch function to facilitate the patching.
 
    ```
@@ -263,8 +263,6 @@ When developing a new integration, it will automatically work with both implicit
    ```
 
 10. Now, run the unit test again, for example: `MISTRAL_API_KEY=... pytest --record-mode=rewrite weave/integrations/mistral/mistral_test.py::test_mistral_quickstart`. If everything worked, you should now see a PASSING test!
-
-    - Optional: if you want to see this in the UI, run `MISTRAL_API_KEY=... pytest --trace-server=prod --record-mode=rewrite weave/integrations/mistral/mistral_test.py::test_mistral_quickstart` (notice the `--trace-server=prod`). This tells the system to target prod so you can actually see the results of your integration in the UI and make sure everything looks good.
 
 11. Finally, when you are ready, save the network recordings:
     - Run `MISTRAL_API_KEY=... pytest --record-mode=rewrite weave/integrations/mistral/mistral_test.py::test_mistral_quickstart` to generate the recording

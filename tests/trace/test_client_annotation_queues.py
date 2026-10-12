@@ -5,24 +5,15 @@ commit 7fd5bfd24bccce8f97449bee1676ac55e74fd993.
 """
 
 import datetime
-import time
 from typing import NamedTuple
 
 import pytest
 
 import weave
-from tests.trace.server_utils import TEST_ENTITY, find_server_layer
-from tests.trace.util import IN_PROCESS_ONLY, NOT_CLICKHOUSE_BACKEND
-from tests.trace_server.conftest_lib.trace_server_external_adapter import (
-    UserInjectingExternalTraceServer,
-)
+from tests.trace.server_utils import TEST_ENTITY
 from weave.trace_server import trace_server_interface as tsi
-from weave.trace_server.clickhouse_trace_server_batched import ClickHouseTraceServer
 from weave.trace_server.common_interface import AnnotationQueueItemsFilter, SortBy
 from weave.trace_server.errors import NotFoundError
-from weave.trace_server.external_to_internal_trace_server_adapter import (
-    ExternalTraceServer,
-)
 from weave.trace_server.ids import generate_id
 
 
@@ -479,10 +470,6 @@ def test_annotation_queue_add_calls(client):
     assert add_res.duplicates == 0
 
 
-@pytest.mark.skipif(
-    NOT_CLICKHOUSE_BACKEND,
-    reason="ClickHouse-only: calls_merged can contain end-only rows",
-)
 def test_annotation_queue_add_calls_retries_end_only_calls(client):
     project_id = client.project_id
     complete_call_id = generate_id()
@@ -726,175 +713,6 @@ def test_annotation_queue_add_calls_partial_duplicates(client):
     add_res2 = client.server.annotation_queue_add_calls(add_req2)
     assert add_res2.added_count == 2  # Only 2 new calls added
     assert add_res2.duplicates == 3  # 3 were duplicates
-
-
-@pytest.mark.skipif(
-    NOT_CLICKHOUSE_BACKEND,
-    reason="ClickHouse-only: direct annotator-progress table inserts",
-)
-def test_annotation_queues_stats(client):
-    """Test getting stats for multiple annotation queues with partial completion."""
-
-    # Create test calls
-    @weave.op
-    def stats_test_op(x: int) -> int:
-        return x * 10
-
-    for i in range(10):
-        stats_test_op(i)
-
-    calls = list(client.get_calls())
-    assert len(calls) == 10
-    call_ids = [call.id for call in calls]
-
-    # Create three queues
-    queue_ids = []
-    for i in range(3):
-        req = tsi.AnnotationQueueCreateReq(
-            project_id=client.project_id,
-            name=f"Stats Test Queue {i}",
-            scorer_refs=[f"weave:///{client.project_id}/scorer/test{i}:abc"],
-        )
-        res = client.server.annotation_queue_create(req)
-        queue_ids.append(res.id)
-
-    # Add different numbers of calls to each queue
-    # Queue 0: 3 calls
-    add_req1 = tsi.AnnotationQueueAddCallsReq(
-        project_id=client.project_id,
-        queue_id=queue_ids[0],
-        call_ids=call_ids[:3],
-        display_fields=["input.x", "output"],
-    )
-    add_res1 = client.server.annotation_queue_add_calls(add_req1)
-    assert add_res1.added_count == 3
-
-    # Queue 1: 5 calls
-    add_req2 = tsi.AnnotationQueueAddCallsReq(
-        project_id=client.project_id,
-        queue_id=queue_ids[1],
-        call_ids=call_ids[:5],
-        display_fields=["input.x", "output"],
-    )
-    add_res2 = client.server.annotation_queue_add_calls(add_req2)
-    assert add_res2.added_count == 5
-
-    # Queue 2: 7 calls
-    add_req3 = tsi.AnnotationQueueAddCallsReq(
-        project_id=client.project_id,
-        queue_id=queue_ids[2],
-        call_ids=call_ids[:7],
-        display_fields=["input.x", "output"],
-    )
-    add_res3 = client.server.annotation_queue_add_calls(add_req3)
-    assert add_res3.added_count == 7
-
-    # Now mark some items as completed/skipped by inserting progress records
-    # This simulates the annotation workflow where annotators work on items
-    # Progress records are only created when an annotator interacts with an item
-
-    # For Queue 0 (3 items): Mark 2 as completed, 1 stays pending (no progress record)
-    # For Queue 1 (5 items): Mark 3 as completed, 1 as skipped, 1 stays pending (no progress record)
-    # For Queue 2 (7 items): Mark 4 as skipped, 3 stay pending (no progress record)
-
-    # We need to insert into the annotator_queue_items_progress table
-    ch_server = find_server_layer(client.server, ClickHouseTraceServer)
-    ch_client = ch_server.ch_client
-
-    # Ensure writes are flushed
-
-    time.sleep(0.5)
-
-    # Use internal project_id (base64 encoded format)
-    # TODO: Use proper ID converter once available
-    internal_project_id = "c2hhd24vdGVzdC1wcm9qZWN0"  # base64 of "shawn/test-project"
-
-    # Get queue_item_ids for Queue 0
-    result = ch_client.query(
-        f"SELECT id FROM annotation_queue_items WHERE project_id = '{internal_project_id}' AND queue_id = '{queue_ids[0]}' AND deleted_at IS NULL ORDER BY created_at LIMIT 3"
-    )
-    queue0_items = [row[0] for row in result.result_rows]
-    assert len(queue0_items) == 3
-
-    # Mark first 2 items of Queue 0 as completed by inserting progress records
-    for item_id in queue0_items[:2]:
-        progress_id = generate_id()
-        ch_client.command(
-            f"""
-            INSERT INTO annotator_queue_items_progress (id, project_id, queue_item_id, queue_id, annotator_id, annotation_state)
-            VALUES ('{progress_id}', '{internal_project_id}', '{item_id}', '{queue_ids[0]}', 'test_annotator', 'completed')
-            """
-        )
-
-    # Get queue_item_ids for Queue 1
-    result = ch_client.query(
-        f"SELECT id FROM annotation_queue_items WHERE project_id = '{internal_project_id}' AND queue_id = '{queue_ids[1]}' AND deleted_at IS NULL ORDER BY created_at LIMIT 5"
-    )
-    queue1_items = [row[0] for row in result.result_rows]
-    assert len(queue1_items) == 5
-
-    # Mark first 3 items of Queue 1 as completed by inserting progress records
-    for item_id in queue1_items[:3]:
-        progress_id = generate_id()
-        ch_client.command(
-            f"""
-            INSERT INTO annotator_queue_items_progress (id, project_id, queue_item_id, queue_id, annotator_id, annotation_state)
-            VALUES ('{progress_id}', '{internal_project_id}', '{item_id}', '{queue_ids[1]}', 'test_annotator', 'completed')
-            """
-        )
-
-    # Mark 4th item of Queue 1 as skipped by inserting a progress record
-    item_id = queue1_items[3]
-    progress_id = generate_id()
-    ch_client.command(
-        f"""
-        INSERT INTO annotator_queue_items_progress (id, project_id, queue_item_id, queue_id, annotator_id, annotation_state)
-        VALUES ('{progress_id}', '{internal_project_id}', '{item_id}', '{queue_ids[1]}', 'test_annotator', 'skipped')
-        """
-    )
-
-    # Get queue_item_ids for Queue 2
-    result = ch_client.query(
-        f"SELECT id FROM annotation_queue_items WHERE project_id = '{internal_project_id}' AND queue_id = '{queue_ids[2]}' AND deleted_at IS NULL ORDER BY created_at LIMIT 7"
-    )
-    queue2_items = [row[0] for row in result.result_rows]
-    assert len(queue2_items) == 7
-
-    # Mark first 4 items of Queue 2 as skipped by inserting progress records
-    for item_id in queue2_items[:4]:
-        progress_id = generate_id()
-        ch_client.command(
-            f"""
-            INSERT INTO annotator_queue_items_progress (id, project_id, queue_item_id, queue_id, annotator_id, annotation_state)
-            VALUES ('{progress_id}', '{internal_project_id}', '{item_id}', '{queue_ids[2]}', 'test_annotator', 'skipped')
-            """
-        )
-
-    # Get stats for all queues
-    stats_req = tsi.AnnotationQueuesStatsReq(
-        project_id=client.project_id,
-        queue_ids=queue_ids,
-    )
-    stats_res = client.server.annotation_queues_stats(stats_req)
-
-    # Verify we got stats for all 3 queues
-    assert len(stats_res.stats) == 3
-
-    # Create a map of queue_id to stats for easier verification
-    stats_map = {stat.queue_id: stat for stat in stats_res.stats}
-
-    # Verify stats for each queue
-    # Queue 0: 3 total, 2 completed
-    assert stats_map[queue_ids[0]].total_items == 3
-    assert stats_map[queue_ids[0]].completed_items == 2
-
-    # Queue 1: 5 total, 4 completed (3 completed + 1 skipped)
-    assert stats_map[queue_ids[1]].total_items == 5
-    assert stats_map[queue_ids[1]].completed_items == 4
-
-    # Queue 2: 7 total, 4 skipped
-    assert stats_map[queue_ids[2]].total_items == 7
-    assert stats_map[queue_ids[2]].completed_items == 4
 
 
 def test_annotation_queues_stats_empty_queues(client):
@@ -1604,41 +1422,6 @@ def test_annotator_queue_items_progress_update_nonexistent_item(client, wb_user_
         client.server.annotator_queue_items_progress_update(update_req)
 
 
-@pytest.mark.skipif(
-    IN_PROCESS_ONLY,
-    reason="every HTTP route stamps the user; only the server itself sees no user id",
-)
-def test_annotator_queue_items_progress_update_no_user_id(client):
-    """Test that updating without user_id raises error."""
-    # Create queue with 1 call
-    fixture = create_queue_with_calls(
-        client, num_calls=1, queue_name="No User ID Queue"
-    )
-
-    # Get the queue item
-    query_req = tsi.AnnotationQueueItemsQueryReq(
-        project_id=client.project_id,
-        queue_id=fixture.queue_id,
-    )
-    query_res = client.server.annotation_queue_items_query(query_req)
-    item = query_res.items[0]
-
-    # Try to update without user_id
-    update_req = tsi.AnnotatorQueueItemsProgressUpdateReq(
-        project_id=client.project_id,
-        queue_id=fixture.queue_id,
-        item_id=item.id,
-        annotation_state="completed",
-        wb_user_id=None,
-    )
-
-    # The tests-only layer above the adapter stamps the user like the HTTP
-    # routes do, so call the adapter underneath it.
-    adapter = find_server_layer(client.server, UserInjectingExternalTraceServer)
-    with pytest.raises(ValueError, match="wb_user_id is required"):
-        ExternalTraceServer.annotator_queue_items_progress_update(adapter, update_req)
-
-
 def test_annotator_queue_items_progress_update_transition_from_in_progress(
     client, wb_user_id
 ):
@@ -2133,9 +1916,6 @@ def test_annotator_queue_items_progress_update_returns_correct_item(client, wb_u
     assert update_res.item.annotation_state == "completed"
 
 
-@pytest.mark.skipif(
-    NOT_CLICKHOUSE_BACKEND, reason="ClickHouse-only: calls_complete table residence"
-)
 def test_annotation_queue_add_calls_with_calls_complete_table(trace_server):
     """Test adding calls to annotation queue when using calls_complete table.
 

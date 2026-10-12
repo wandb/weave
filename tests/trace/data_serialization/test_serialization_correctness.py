@@ -17,6 +17,7 @@ from weave.trace_server.trace_server_interface import (
     ObjCreateReq,
     ObjReadReq,
 )
+from weave.type_handlers.Markdown import markdown
 from weave.utils.project_id import to_project_id
 
 """
@@ -53,19 +54,19 @@ def set_weave_logger_to_debug():
 )
 @pytest.mark.flaky(reruns=3, reruns_delay=2)
 def test_serialization_correctness(
-    client, case: SerializationTestCase, set_weave_logger_to_debug, request
+    client, case: SerializationTestCase, set_weave_logger_to_debug, monkeypatch
 ):
     # Skip image test on macOS - PIL/Pillow produces different PNG encoding on macOS vs Linux
     # resulting in different file digests. This is expected behavior, not a bug.
     if sys.platform == "darwin" and case.id == "image":
         pytest.skip("Image encoding differs on macOS vs Linux")
     # An object digest covers the refs inside it in their internal form, so it
-    # depends on the server's project id. Only the in-process id converter
-    # gives the pinned values.
-    if case.id.startswith("Library Objects - Scorer, Evaluation, Dataset") and (
-        request.config.getoption("--trace-server") == "http"
-    ):
+    # depends on the server's project id, which the pinned values do not match.
+    if case.id.startswith("Library Objects - Scorer, Evaluation, Dataset"):
         pytest.skip("digests of objects with refs depend on the server's project id")
+    # The cases were recorded against the hosted server, where large markdown is
+    # stored as a file; the local server URL would make it inline.
+    monkeypatch.setattr(markdown, "is_mtsaas", lambda: True)
     # Since code serialization changes pretty significantly between versions, we will assume
     # legacy for anything other than the latest python version
     is_legacy = case.is_legacy

@@ -15,13 +15,16 @@ on:
 jobs:
   nightly-tests:
     name: Nightly Tests
-    timeout-minutes: 30
+    timeout-minutes: 60
     permissions:
       contents: read
       packages: write
+      id-token: write
     runs-on: ubuntu-latest
     env:
       MAX_ATTEMPTS: 3
+      CORE_DIR: core
+      COMPOSE_FILE: .github/compose/weave-trace-tests.yaml
     strategy:
       matrix:
         python-version-major: ["3"]
@@ -36,7 +39,6 @@ jobs:
           [
             "trace",
             "flow",
-            "trace_server",
             "trace_server_bindings",
             "anthropic",
             "bedrock",
@@ -84,30 +86,51 @@ jobs:
           fi
           echo "Running shard: ${{ matrix.shard }}"
           echo "skip=false" >> $GITHUB_OUTPUT
-      - name: Start ClickHouse
+      - name: Create GitHub App token
+        id: app-token
+        if: steps.filter_shards.outputs.skip != 'true'
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3
+        with:
+          app-id: ${{ vars.WANDBOT_3000_APP_ID }}
+          private-key: ${{ secrets.WANDBOT_3000_PRIVATE_KEY }}
+          owner: wandb
+          repositories: core
+          permission-contents: read
+      - name: Checkout core
+        if: steps.filter_shards.outputs.skip != 'true'
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          repository: wandb/core
+          ref: master
+          path: ${{ env.CORE_DIR }}
+          token: ${{ steps.app-token.outputs.token }}
+          persist-credentials: false
+      - name: Remove core Weave submodule placeholder
+        if: steps.filter_shards.outputs.skip != 'true'
+        run: rm -rf "${CORE_DIR}/services/weave-trace/weave-public"
+      - name: Checkout current weave commit into core
+        if: steps.filter_shards.outputs.skip != 'true'
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          path: ${{ env.CORE_DIR }}/services/weave-trace/weave-public
+          persist-credentials: false
+      - name: Authenticate to Google Cloud
+        if: steps.filter_shards.outputs.skip != 'true'
+        uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3
+        with:
+          workload_identity_provider: ${{ secrets.WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.WORKLOAD_IDENTITY_SERVICE_ACCOUNT }}
+      - name: Set up gcloud
+        if: steps.filter_shards.outputs.skip != 'true'
+        uses: google-github-actions/setup-gcloud@aa5489c8933f4cc7a4f7d45035b3b1440c9c10db # v3
+      - name: Configure Docker auth
+        if: steps.filter_shards.outputs.skip != 'true'
+        run: gcloud auth configure-docker us-central1-docker.pkg.dev --quiet
+      - name: Start trace server
         if: steps.filter_shards.outputs.skip != 'true'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          set -euo pipefail
-          image=$(.github/scripts/ch-image.sh)
-          docker run --detach --rm --name weave_clickhouse \
-            --env CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT=1 \
-            --env CLICKHOUSE_USER=default \
-            --env CLICKHOUSE_PASSWORD= \
-            --env CLICKHOUSE_DB=default \
-            --publish 8123:8123 \
-            -v ${{ github.workspace }}/tests/trace_server/conftest_lib/test_overrides.xml:/etc/clickhouse-server/users.d/test_overrides.xml:ro \
-            "$image"
-          for _i in {1..30}; do
-            if wget -q -O- 'http://localhost:8123/ping' >/dev/null; then
-              echo "clickhouse is healthy"
-              exit 0
-            fi
-            sleep 1
-          done
-          docker logs weave_clickhouse
-          exit 1
+        run: .github/scripts/start-trace-server.sh
       - name: Enable debug logging
         if: steps.filter_shards.outputs.skip != 'true'
         run: echo "ACTIONS_STEP_DEBUG=true" >> $GITHUB_ENV
@@ -126,21 +149,21 @@ jobs:
         if: steps.filter_shards.outputs.skip != 'true'
         run: |
           # Shards that are in the regular test matrix and need trace_server markers
-          TRACE_SERVER_SHARDS="flow trace_server trace_server_bindings anthropic cerebras cohere crewai dspy groq google_genai google_ai_studio instructor langchain litellm llamaindex mistral notdiamond openai openai_agents vertexai bedrock scorers pandas_test huggingface smolagents fastmcp autogen_tests trace trace_no_server"
+          TRACE_SERVER_SHARDS="flow trace_server_bindings anthropic cerebras cohere crewai dspy groq google_genai google_ai_studio instructor langchain litellm llamaindex mistral notdiamond openai openai_agents vertexai bedrock scorers pandas_test huggingface smolagents fastmcp autogen_tests trace trace_no_server"
           if [[ " $TRACE_SERVER_SHARDS " =~ " ${{ matrix.shard }} " ]]; then
             echo "needs_markers=true" >> $GITHUB_OUTPUT
           else
             echo "needs_markers=false" >> $GITHUB_OUTPUT
           fi
-      - name: Run nox (Clickhouse Trace Server)
+      - name: Run nox (HTTP trace server)
         if: steps.filter_shards.outputs.skip != 'true' && steps.check_trace_markers.outputs.needs_markers == 'true'
         env:
           WEAVE_SENTRY_ENV: ci
           CI: 1
           WEAVE_USE_MEMRAY: 1
-          WF_CLICKHOUSE_HOST: localhost
+          WF_TRACE_SERVER_URL: http://127.0.0.1:6345
+          WANDB_BASE_URL: http://localhost:8080
           WEAVE_SERVER_DISABLE_ECOSYSTEM: 1
-          WANDB_API_KEY: ${{ secrets.WANDB_API_KEY }}
           GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
@@ -156,9 +179,9 @@ jobs:
           WEAVE_SENTRY_ENV: ci
           CI: 1
           WEAVE_USE_MEMRAY: 1
-          WF_CLICKHOUSE_HOST: localhost
+          WF_TRACE_SERVER_URL: http://127.0.0.1:6345
+          WANDB_BASE_URL: http://localhost:8080
           WEAVE_SERVER_DISABLE_ECOSYSTEM: 1
-          WANDB_API_KEY: ${{ secrets.WANDB_API_KEY }}
           GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
@@ -167,37 +190,23 @@ jobs:
           DD_TRACE_ENABLED: false
         run: |
           .github/scripts/retry.sh nox -e "tests-${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}(shard='${{ matrix.shard }}')"
-
-  nightly-tests-replicated-1s3r:
-    name: Nightly Tests (replicated 1s3r)
-    permissions:
-      contents: read
-    uses: ./.github/workflows/nightly-replicated-leg.yaml
-    with:
-      topology: "1s3r"
-      ch_port: "8130"
-      use_distributed: false
-      shards: ${{ github.event.inputs.shards }}
-    secrets: inherit
-
-  nightly-tests-replicated-2s2r:
-    name: Nightly Tests (replicated 2s2r)
-    permissions:
-      contents: read
-    uses: ./.github/workflows/nightly-replicated-leg.yaml
-    with:
-      topology: "2s2r"
-      ch_port: "8131"
-      use_distributed: true
-      shards: ${{ github.event.inputs.shards }}
-    secrets: inherit
+      - name: Dump service logs
+        if: failure() && steps.filter_shards.outputs.skip != 'true'
+        working-directory: ${{ env.CORE_DIR }}
+        run: |
+          echo "::group::trace-server logs"
+          docker logs trace-server || true
+          echo "::endgroup::"
+          for service in wandb-local clickhouse; do
+            echo "::group::${service} logs"
+            docker compose logs --no-color "${service}" || true
+            echo "::endgroup::"
+          done
 
   slack-notification:
     name: Slack Notification
     needs:
       - nightly-tests
-      - nightly-tests-replicated-1s3r
-      - nightly-tests-replicated-2s2r
 
     runs-on: ubuntu-latest
     if: always()

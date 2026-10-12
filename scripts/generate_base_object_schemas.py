@@ -21,25 +21,11 @@ OUTPUT_DIR = (
 )
 OUTPUT_PATH = OUTPUT_DIR / FILENAME
 
-# Legacy location. The frontend schema generator in wandb/core still reads the
-# file from here. Drop this copy once core reads the canonical path.
-LEGACY_OUTPUT_DIR = (
-    REPO_ROOT
-    / "weave"
-    / "trace_server"
-    / "interface"
-    / "builtin_object_classes"
-    / "generated"
-)
-LEGACY_OUTPUT_PATH = LEGACY_OUTPUT_DIR / FILENAME
-
-OUTPUT_PATHS = (OUTPUT_PATH, LEGACY_OUTPUT_PATH)
-
 
 def generate_schemas() -> None:
     """Generate JSON schemas for all registered base objects in BUILTIN_OBJECT_REGISTRY.
     Creates a top-level schema that includes all registered objects and writes it
-    to 'generated_builtin_object_class_schemas.json' in every output location.
+    to 'generated_builtin_object_class_schemas.json'.
     """
     # Dynamically create a parent model with all registered objects as properties
     CompositeModel = create_model(  # noqa: N806
@@ -52,10 +38,9 @@ def generate_schemas() -> None:
     serialized = json.dumps(top_level_schema, indent=2)
 
     print(f"Generated schema for {len(BUILTIN_OBJECT_REGISTRY)} objects")
-    for output_path in OUTPUT_PATHS:
-        output_path.parent.mkdir(parents=True, exist_ok=True)
-        output_path.write_text(serialized)
-        print(f"Wrote schema to {output_path.absolute()}")
+    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+    OUTPUT_PATH.write_text(serialized)
+    print(f"Wrote schema to {OUTPUT_PATH.absolute()}")
 
 
 if __name__ == "__main__":
