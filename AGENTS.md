@@ -363,7 +363,8 @@ Writing a test that runs on every backend:
 - Server errors arrive as the server's exception class on every backend
   (`NotFoundError`, `InvalidRequest`, `ValueError`, ...). Over HTTP the
   tests-only `HTTPErrorDecodingTraceServer` rebuilds them from the response
-  body, which carries `error_type` for that purpose.
+  body. Production bodies do not name the exception class, on purpose; core's
+  resettable test server adds `error_type` and the exception's fields.
 - The HTTP route returns only the columns a `CallsQueryReq.columns` asks for
   (plus ids, names and timestamps). The in-process server returns more, so
   request every column the test reads.

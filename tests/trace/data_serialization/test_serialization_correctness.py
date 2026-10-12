@@ -66,6 +66,10 @@ def test_serialization_correctness(
         request.config.getoption("--trace-server") == "http"
     ):
         pytest.skip("digests of objects with refs depend on the server's project id")
+    # Markdown goes to a file only when the client thinks it talks to MTSaaS
+    # (`is_mtsaas()`), and over HTTP WF_TRACE_SERVER_URL names a local server.
+    if case.id == "markdown" and request.config.getoption("--trace-server") == "http":
+        pytest.skip("markdown is stored inline unless WF_TRACE_SERVER_URL is MTSaaS")
     # Since code serialization changes pretty significantly between versions, we will assume
     # legacy for anything other than the latest python version
     is_legacy = case.is_legacy

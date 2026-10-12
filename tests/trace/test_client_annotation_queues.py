@@ -12,7 +12,7 @@ import pytest
 
 import weave
 from tests.trace.server_utils import TEST_ENTITY, find_server_layer
-from tests.trace.util import IN_PROCESS_ONLY, NOT_CLICKHOUSE_BACKEND
+from tests.trace.util import HTTP_NOT_PORTED, IN_PROCESS_ONLY, NOT_CLICKHOUSE_BACKEND
 from tests.trace_server.conftest_lib.trace_server_external_adapter import (
     UserInjectingExternalTraceServer,
 )
@@ -1558,6 +1558,10 @@ def test_annotator_queue_items_progress_update_skipped(client, wb_user_id):
     assert update_res.item.annotation_state == "skipped"
 
 
+@pytest.mark.skipif(
+    HTTP_NOT_PORTED,
+    reason="http: the server names the error class once wandb/core#58054 is deployed",
+)
 def test_annotator_queue_items_progress_update_invalid_state(client, wb_user_id):
     """Test that updating to invalid state raises error."""
     # Create queue with 1 call
@@ -1586,6 +1590,10 @@ def test_annotator_queue_items_progress_update_invalid_state(client, wb_user_id)
         client.server.annotator_queue_items_progress_update(update_req)
 
 
+@pytest.mark.skipif(
+    HTTP_NOT_PORTED,
+    reason="http: the server names the error class once wandb/core#58054 is deployed",
+)
 def test_annotator_queue_items_progress_update_nonexistent_item(client, wb_user_id):
     """Test that updating nonexistent item raises error."""
     # Create an empty queue
@@ -1688,6 +1696,10 @@ def test_annotator_queue_items_progress_update_transition_from_in_progress(
     assert update_res.item.annotation_state == "completed"
 
 
+@pytest.mark.skipif(
+    HTTP_NOT_PORTED,
+    reason="http: the server names the error class once wandb/core#58054 is deployed",
+)
 def test_annotator_queue_items_progress_update_invalid_transition_from_completed(
     client,
 ):

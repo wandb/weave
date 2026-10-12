@@ -3,7 +3,7 @@ import datetime
 import pytest
 
 import weave
-from tests.trace.util import NOT_CLICKHOUSE_BACKEND
+from tests.trace.util import HTTP_NOT_PORTED, NOT_CLICKHOUSE_BACKEND
 from tests.trace_server.conftest_lib.trace_server_external_adapter import (
     DummyIdConverter,
 )
@@ -1838,6 +1838,10 @@ def test_get_feedback_with_dict_query(client) -> None:
     assert len(list(no_results)) == 0
 
 
+@pytest.mark.skipif(
+    HTTP_NOT_PORTED,
+    reason="http: the server names the error class once wandb/core#58054 is deployed",
+)
 def test_feedback_query_bad_json_path(client) -> None:
     """Test that querying for nonexistent JSON paths raises appropriate error."""
     # Create some test feedback
@@ -1872,6 +1876,10 @@ def test_feedback_query_bad_json_path(client) -> None:
 
 
 @pytest.mark.disable_logging_error_check
+@pytest.mark.skipif(
+    HTTP_NOT_PORTED,
+    reason="http: the server names the error class once wandb/core#58054 is deployed",
+)
 def test_feedback_query_contains_numeric_literal(client) -> None:
     """$contains with a numeric literal raises a guided error; string substr works."""
     project_id = client.project_id

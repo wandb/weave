@@ -1378,6 +1378,10 @@ def test_refs_read_batch_multi_project(client):
     assert res.vals[2] == {"ab": [3, 4, 5]}
 
 
+@pytest.mark.skipif(
+    HTTP_NOT_PORTED,
+    reason="http: the server names the error class once wandb/core#58054 is deployed",
+)
 def test_refs_read_batch_call_ref(client):
     call_ref = refs.CallRef(entity="shawn", project="test-project", id="my-call")
     with pytest.raises(ValueError, match="Call refs not supported"):
@@ -2234,6 +2238,10 @@ def test_long_display_names_are_elided(weave_active):
     assert len(call.display_name) <= MAX_DISPLAY_NAME_LENGTH
 
 
+@pytest.mark.skipif(
+    HTTP_NOT_PORTED,
+    reason="http: the server names the error class once wandb/core#58054 is deployed",
+)
 def test_object_deletion(client):
     # Simple case, delete a single version of an object
     obj = {"a": 5}
@@ -2289,6 +2297,10 @@ def test_object_deletion(client):
     assert len(versions.objs) == 0
 
 
+@pytest.mark.skipif(
+    HTTP_NOT_PORTED,
+    reason="http: the server names the error class once wandb/core#58054 is deployed",
+)
 def test_recursive_object_deletion(weave_active):
     # Create a bunch of objects that refer to each other
     obj1 = {"a": 5}
@@ -2319,6 +2331,10 @@ def test_recursive_object_deletion(weave_active):
     assert obj3_ref.get() == {"c": obj2}
 
 
+@pytest.mark.skipif(
+    HTTP_NOT_PORTED,
+    reason="http: the server names the error class once wandb/core#58054 is deployed",
+)
 def test_delete_op_version(weave_active):
     @weave.op
     def my_op(a: int) -> int:

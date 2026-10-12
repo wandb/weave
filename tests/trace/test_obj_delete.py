@@ -1,6 +1,7 @@
 import pytest
 
 import weave
+from tests.trace.util import HTTP_NOT_PORTED
 from weave.trace.weave_client import WeaveClient
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.common_interface import SortBy
@@ -108,6 +109,10 @@ def test_delete_version_correctness(client: WeaveClient):
     assert objs[1].version_index == 2
 
 
+@pytest.mark.skipif(
+    HTTP_NOT_PORTED,
+    reason="http: the server names the error class once wandb/core#58054 is deployed",
+)
 def test_delete_object_max_limit(client: WeaveClient):
     # Create more than MAX_OBJECTS_TO_DELETE objects
     max_objs = 100
@@ -215,6 +220,10 @@ def test_republish_after_deleting_all_versions(
     assert latest[0].val == republish_val
 
 
+@pytest.mark.skipif(
+    HTTP_NOT_PORTED,
+    reason="http: the server names the error class once wandb/core#58054 is deployed",
+)
 def test_read_deleted_object(client: WeaveClient):
     weave.publish({"i": 1}, name="obj_1")
     weave.publish({"i": 2}, name="obj_1")
@@ -270,6 +279,10 @@ def test_op_versions(client: WeaveClient):
     assert len(objs3) == 0
 
 
+@pytest.mark.skipif(
+    HTTP_NOT_PORTED,
+    reason="http: the server names the error class once wandb/core#58054 is deployed",
+)
 def test_read_deleted_op(client: WeaveClient):
     @weave.op
     def my_op(x: int) -> int:

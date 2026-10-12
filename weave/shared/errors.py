@@ -6,10 +6,8 @@ from typing import Any
 
 import httpx
 from gql.transport.exceptions import TransportQueryError, TransportServerError
-from pydantic import ValidationError as PydanticValidationError
 
 from weave.shared.constants import MAX_OBJECT_NAME_LENGTH
-from weave.shared.refs_internal import InvalidInternalRef
 from weave.shared.validation_util import CHValidationError
 
 # =============================================================================
@@ -244,10 +242,6 @@ def _format_error_to_json_with_extra(
     if hasattr(exc, "error_code"):
         result["error_code"] = exc.error_code
 
-    # The exception class, so a client can tell apart errors that share a
-    # status code (for example InvalidRequest and ValueError, both 400).
-    result["error_type"] = type(exc).__name__
-
     if extra_fields:
         result.update(extra_fields)
     return result
@@ -337,7 +331,7 @@ class ErrorRegistry:
         # 400
         self.register(InvalidRequest, 400)
         self.register(CallsCompleteModeRequired, 400)
-        self.register(ObjectNameTypeCollision, 400, _format_object_name_type_collision)
+        self.register(ObjectNameTypeCollision, 400)
         self.register(InvalidExternalRef, 400)
         self.register(DigestMismatchError, 409)
         self.register(QueryNoCommonTypeError, 400)
@@ -379,8 +373,6 @@ class ErrorRegistry:
 
         # Validation errors
         self.register(CHValidationError, 400)
-        self.register(PydanticValidationError, 400)
-        self.register(InvalidInternalRef, 400)
 
         # Standard library exceptions
         self.register(ValueError, 400)
@@ -556,18 +548,6 @@ def _format_missing_llm_api_key(exc: Exception) -> dict[str, Any]:
     extra = {}
     if isinstance(exc, MissingLLMApiKeyError):
         extra["api_key"] = exc.api_key_name
-    return _format_error_to_json_with_extra(exc, extra)
-
-
-def _format_object_name_type_collision(exc: Exception) -> dict[str, Any]:
-    """Format ObjectNameTypeCollision with the colliding name and types."""
-    extra = {}
-    if isinstance(exc, ObjectNameTypeCollision):
-        extra["object_id"] = exc.object_id
-        extra["kind"] = exc.kind
-        extra["new_base_object_class"] = exc.new_base_object_class
-        extra["existing_base_object_classes"] = exc.existing_base_object_classes
-        extra["object_name"] = exc.object_name
     return _format_error_to_json_with_extra(exc, extra)
 
 
