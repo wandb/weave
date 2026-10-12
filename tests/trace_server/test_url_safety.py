@@ -101,6 +101,9 @@ def test_rejects_cloud_metadata_hostnames(url: str) -> None:
         "http://192.168.1.1/",
         # link-local (incl. IMDS)
         "http://169.254.169.254/latest/meta-data/",
+        # shared address space (RFC 6598), incl. Alibaba Cloud metadata
+        "http://100.64.0.1/",
+        "http://100.100.100.200/",
         # unspecified / multicast / broadcast
         "http://0.0.0.0/",
         "http://224.0.0.1/",
@@ -117,6 +120,7 @@ def test_rejects_non_global_ipv4(url: str) -> None:
         "http://[::1]/",
         "http://[fe80::1]/",
         "http://[fc00::1]/",
+        "http://[fec0::1]/",
         "http://[ff00::1]/",
         "http://[::ffff:169.254.169.254]/",
         "http://[::ffff:10.0.0.1]/",
