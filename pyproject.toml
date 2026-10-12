@@ -547,7 +547,9 @@ not-iterable = "ignore"
 # Goal: the trace server (`weave.trace_server`) and the Weave client SDK
 # (everything else under `weave`) must not import each other. `weave.shared`
 # is the intentional neutral zone that both sides may import, and it imports
-# neither.
+# neither. `weave.trace_server` now only holds deprecated aliases for
+# `weave.shared`. TODO: drop it from these contracts when the aliases are
+# deleted after weave 0.53.13.
 #
 # No contract has an `ignore_imports` list: the direct cross-boundary imports
 # are gone. Fix a new violation in the code rather than adding an ignore.

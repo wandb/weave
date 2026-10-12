@@ -1,5 +1,10 @@
+import importlib
+import pkgutil
+import sys
+
 import pytest
 
+import weave.trace_server
 from weave.shared import (
     common_interface,
     http_service_interface,
@@ -43,3 +48,26 @@ def test_trace_server_paths_are_the_shared_modules() -> None:
     assert policy is policy_legacy
     assert url_safety is url_safety_legacy
 
+
+def _trace_server_modules() -> list[str]:
+    return [
+        info.name
+        for info in pkgutil.walk_packages(
+            weave.trace_server.__path__, "weave.trace_server."
+        )
+        if not info.ispkg
+    ]
+
+
+@pytest.mark.parametrize("name", _trace_server_modules())
+def test_trace_server_paths_warn_with_the_new_path(
+    name: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.delitem(sys.modules, name, raising=False)
+    new_name = name.replace("weave.trace_server", "weave.shared", 1)
+    with pytest.warns(FutureWarning) as record:
+        importlib.import_module(name)
+    assert [str(w.message) for w in record] == [
+        f"{name} is deprecated since weave 0.53.13 and will be removed after "
+        f"weave 0.53.13; import {new_name} instead."
+    ]
