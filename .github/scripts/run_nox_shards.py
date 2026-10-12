@@ -3,7 +3,8 @@
 The servers come from WEAVE_TEST_TRACE_SERVER_URLS, which
 .github/scripts/start-trace-server.sh writes. A test resets its server's whole
 database, so a server serves one shard at a time. Each shard's output goes to
-its own log, printed when the shard finishes.
+its own log, printed when the shard finishes. A shard that runs past
+--timeout is killed, so its log still prints before the job times out.
 """
 
 from __future__ import annotations
@@ -11,6 +12,7 @@ from __future__ import annotations
 import argparse
 import os
 import queue
+import signal
 import subprocess
 import sys
 import time
@@ -29,6 +31,7 @@ def main() -> int:
         help="Shards to run without the -m trace_server filter",
     )
     parser.add_argument("--attempts", type=int, default=1)
+    parser.add_argument("--timeout", type=int, default=480, help="Seconds per attempt")
     parser.add_argument("--log-dir", type=Path, required=True)
     args = parser.parse_args()
 
@@ -50,15 +53,21 @@ def main() -> int:
             with (args.log_dir / f"{shard}.log").open("w") as log:
                 for attempt in range(1, args.attempts + 1):
                     print(f"Attempt {attempt} of {args.attempts}", file=log, flush=True)
-                    result = subprocess.run(
+                    # Its own session, so a timeout also kills pytest under nox.
+                    process = subprocess.Popen(
                         command,
                         env={**os.environ, "WF_TRACE_SERVER_URL": url},
                         stdout=log,
                         stderr=subprocess.STDOUT,
-                        check=False,
+                        start_new_session=True,
                     )
-                    if result.returncode == 0:
-                        return True, time.monotonic() - started
+                    try:
+                        if process.wait(timeout=args.timeout) == 0:
+                            return True, time.monotonic() - started
+                    except subprocess.TimeoutExpired:
+                        os.killpg(process.pid, signal.SIGKILL)
+                        process.wait()
+                        print(f"Killed after {args.timeout}s", file=log, flush=True)
             return False, time.monotonic() - started
         finally:
             servers.put(url)
@@ -71,8 +80,9 @@ def main() -> int:
             passed, seconds = future.result()
             results[shard] = passed
             status = "passed" if passed else "FAILED"
+            output = (args.log_dir / f"{shard}.log").read_text(errors="replace")
             print(f"::group::{shard} {status} in {seconds:.0f}s", flush=True)
-            print((args.log_dir / f"{shard}.log").read_text(), flush=True)
+            print(output, flush=True)
             print("::endgroup::", flush=True)
 
     failed = [shard for shard in args.shards if not results[shard]]

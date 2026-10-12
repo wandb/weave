@@ -230,12 +230,13 @@ Focus on these primary test shards:
 
 The Claude Agent SDK shard combines server-backed calls tests with
 no-server OTel tests. PR CI runs `tests-3.10(shard='claude_agent_sdk')` once
-without a marker filter so both tracing paths contribute coverage.
+without a marker filter, so both kinds of test run.
 Calls-based tests must include the integration's intentional text and thinking
 child calls in exact operation-set assertions.
 
 Every other shard, `flow` included, is run by CI with `-m "trace_server"`, and
-that filter comes from the workflow rather than from `noxfile.py`. A test that
+that filter comes from the workflow and `.github/scripts/run_nox_shards.py`
+rather than from `noxfile.py`. A test that
 uses no server fixture therefore never runs in CI unless it carries
 `@pytest.mark.trace_server` itself.
 
@@ -270,7 +271,7 @@ route; `.github/scripts/start-trace-server.sh` shows how CI runs it. The key
 must belong to a user named `shawn` (`TEST_ENTITY`). The reset is
 database-wide, so each test process needs its own server. To run xdist
 workers, list one server per worker, comma-separated, in
-`WEAVE_TEST_TRACE_SERVER_URLS`: worker `gwN` takes the Nth.
+`WEAVE_TEST_TRACE_SERVER_URLS`: worker `gwN` takes entry N, counting from 0.
 
 ```bash
 WF_TRACE_SERVER_URL=http://127.0.0.1:6345 WANDB_API_KEY=<shawn-api-key> WANDB_BASE_URL=http://localhost:8080 nox --no-install -e "tests-3.12(shard='trace')" -- tests/trace/test_dataset.py::test_basic_dataset_lifecycle
@@ -280,9 +281,8 @@ WF_TRACE_SERVER_URL=http://127.0.0.1:6345 WANDB_API_KEY=<shawn-api-key> WANDB_BA
 `ensure_project` fixture creates extra projects there.
 
 CI runs every server-backed shard this way (`trace-tests` in
-`.github/workflows/test.yaml`), with eight servers per job: the two trace
-shards run eight xdist workers, and the other shards share one job per Python
-version and run side by side (`.github/scripts/run_nox_shards.py`). A test that
+`.github/workflows/test.yaml`), on several servers per job; shards that share a
+job run side by side with `.github/scripts/run_nox_shards.py`. A test that
 needs the server's internals (its SQL, storage, middleware layers) belongs in
 wandb/core next to the server.
 

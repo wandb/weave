@@ -52,6 +52,23 @@ def pytest_configure(config):
     os.environ["WF_TRACE_SERVER_URL"] = servers[index]
 
 
+_crashed_workers: list[str] = []
+
+
+@pytest.hookimpl(optionalhook=True)
+def pytest_testnodedown(node, error):
+    if error is not None:
+        _crashed_workers.append(node.gateway.id)
+
+
+@pytest.hookimpl(trylast=True)
+def pytest_sessionfinish(session):
+    # xdist exits 0 when a worker dies before collecting, and the worker that
+    # replaces it has no server, so a crash must fail the run.
+    if _crashed_workers and session.exitstatus == pytest.ExitCode.OK:
+        session.exitstatus = pytest.ExitCode.TESTS_FAILED
+
+
 def pytest_collection_modifyitems(config, items):
     # Add the trace_server marker to all tests that use the trace_server fixture.
     # Note: Filtering based on remote-http-trace-server flag is handled in tests/trace_server_bindings/conftest.py

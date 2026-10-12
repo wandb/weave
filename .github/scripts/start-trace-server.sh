@@ -6,8 +6,7 @@
 # $CORE_DIR/services/weave-trace/weave-public, COMPOSE_FILE set to core's
 # compose file, uv on PATH and Docker logged in to Artifact Registry. Servers
 # listen on 127.0.0.1:6345 and up and log to $RUNNER_TEMP/trace-server. Writes
-# WANDB_API_KEY, WF_TRACE_SERVER_URL (the first server) and
-# WEAVE_TEST_TRACE_SERVER_URLS (all of them) to $GITHUB_ENV.
+# WANDB_API_KEY and WEAVE_TEST_TRACE_SERVER_URLS to $GITHUB_ENV.
 set -euo pipefail
 
 count="${TRACE_SERVER_COUNT:-1}"
@@ -89,6 +88,5 @@ done
 
 {
   echo "WANDB_API_KEY=${api_key}"
-  echo "WF_TRACE_SERVER_URL=${urls[0]}"
   echo "WEAVE_TEST_TRACE_SERVER_URLS=$(IFS=,; echo "${urls[*]}")"
 } >> "${GITHUB_ENV}"
