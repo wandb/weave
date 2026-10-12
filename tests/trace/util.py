@@ -40,6 +40,15 @@ HTTP_NOT_PORTED = (
     "and config.getoption('--trace-server') == 'http'"
 )
 
+# Condition string for `pytest.mark.skipif`: True on the HTTP backend, marking
+# tests that need the in-process server itself: its middleware layers, the
+# contract of a request the HTTP routes never send (no user id), or a second
+# user. PERMANENT, unlike HTTP_NOT_PORTED.
+IN_PROCESS_ONLY = (
+    "not config.getoption('--clickhouse') "
+    "and config.getoption('--trace-server') == 'http'"
+)
+
 
 def client_is_clickhouse(client):
     """True only for a real ClickHouse backend (NOT the in-memory fake).

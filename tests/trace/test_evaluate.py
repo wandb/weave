@@ -8,7 +8,6 @@ from pydantic import BaseModel
 
 import weave
 from tests.conftest import LATENCY_TOL
-from tests.trace.util import HTTP_NOT_PORTED
 from weave import Dataset, Evaluation, Model
 from weave.trace_server.constants import MAX_OBJECT_NAME_LENGTH
 
@@ -463,7 +462,6 @@ async def test_evaluation_from_weaveobject_missing_evaluation_name(weave_active)
     assert result == expected_eval_result
 
 
-@pytest.mark.skipif(HTTP_NOT_PORTED, reason="http: not ported yet")
 @pytest.mark.asyncio
 async def test_evaluate_table_lazy_iter(client, monkeypatch):
     """The intention of this test is to show that an evaluation harness

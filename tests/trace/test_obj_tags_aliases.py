@@ -3,7 +3,6 @@ import time
 import pytest
 
 import weave
-from tests.trace.util import HTTP_NOT_PORTED
 from weave.trace.refs import ObjectRef
 from weave.trace.weave_client import WeaveClient
 from weave.trace_server import trace_server_interface as tsi
@@ -436,7 +435,6 @@ def test_server_alias_crud(client: WeaveClient):
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.skipif(HTTP_NOT_PORTED, reason="http: not ported yet")
 def test_server_tag_errors(client: WeaveClient):
     """Tags on nonexistent or deleted objects raise NotFoundError.
 
@@ -455,7 +453,6 @@ def test_server_tag_errors(client: WeaveClient):
         )
 
 
-@pytest.mark.skipif(HTTP_NOT_PORTED, reason="http: not ported yet")
 def test_server_alias_errors(client: WeaveClient):
     """Aliases on nonexistent or deleted objects raise NotFoundError."""
     # Nonexistent object
@@ -470,7 +467,6 @@ def test_server_alias_errors(client: WeaveClient):
         )
 
 
-@pytest.mark.skipif(HTTP_NOT_PORTED, reason="http: not ported yet")
 def test_server_tag_on_deleted_object(client: WeaveClient):
     """Tags on deleted objects raise NotFoundError."""
     oid, digest = _publish_obj(client, "srv_err_deleted")
@@ -492,7 +488,6 @@ def test_server_tag_on_deleted_object(client: WeaveClient):
         )
 
 
-@pytest.mark.skipif(HTTP_NOT_PORTED, reason="http: not ported yet")
 def test_server_alias_on_deleted_object(client: WeaveClient):
     """Aliases on deleted objects raise NotFoundError."""
     oid, digest = _publish_obj(client, "srv_err_deleted2")
@@ -638,7 +633,6 @@ def test_server_enrichment(client: WeaveClient):
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.skipif(HTTP_NOT_PORTED, reason="http: not ported yet")
 def test_server_obj_read_digest_types(client: WeaveClient):
     """obj_read with real digest, alias, 'latest', and nonexistent alias."""
     oid, digest = _publish_obj(client, "srv_read_digest")
@@ -1350,7 +1344,6 @@ def test_sdk_uri_strings(client: WeaveClient):
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.skipif(HTTP_NOT_PORTED, reason="http: not ported yet")
 def test_sdk_add_tags_error_nonexistent(client: WeaveClient):
     """SDK add_tags raises NotFoundError on fake ref."""
     fake_ref = ObjectRef(
@@ -1363,7 +1356,6 @@ def test_sdk_add_tags_error_nonexistent(client: WeaveClient):
         client.add_tags(fake_ref, ["tag"])
 
 
-@pytest.mark.skipif(HTTP_NOT_PORTED, reason="http: not ported yet")
 def test_sdk_set_aliases_error_nonexistent(client: WeaveClient):
     """SDK set_aliases raises NotFoundError on fake ref."""
     fake_ref = ObjectRef(
@@ -1451,7 +1443,6 @@ def test_weave_tag_functions(weave_active):
     assert all_tags.count("only-on-a") == 1
 
 
-@pytest.mark.skipif(HTTP_NOT_PORTED, reason="http: not ported yet")
 def test_weave_alias_functions(client: WeaveClient):
     """weave.set_aliases, remove_aliases, get_aliases, list_aliases — full lifecycle."""
     ref = weave.publish({"data": "test"}, name="tl_aliases")
@@ -1521,7 +1512,6 @@ def test_weave_alias_functions(client: WeaveClient):
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.skipif(HTTP_NOT_PORTED, reason="http: not ported yet")
 def test_alias_resolution(client: WeaveClient):
     """Resolve by alias: latest, custom, reassignment, publish-time, implicit, nonexistent, digest check."""
     # latest alias
@@ -1724,7 +1714,6 @@ def _resolve_latest_digest(client: WeaveClient, object_id: str) -> str | None:
     return digest
 
 
-@pytest.mark.skipif(HTTP_NOT_PORTED, reason="http: not ported yet")
 def test_hybrid_latest_full_lifecycle(client: WeaveClient, monkeypatch):
     """Walk the full hybrid lifecycle: linear publish/delete, dedup-republish-
     then-delete, terminal delete-all, and self-heal on the next publish.
@@ -1920,7 +1909,6 @@ def test_delete_non_current_version_leaves_latest_unchanged(
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.skipif(HTTP_NOT_PORTED, reason="http: not ported yet")
 def test_full_lifecycle(weave_active):
     """Comprehensive lifecycle: publish, tag, alias, resolve, reassign, remove, verify lists."""
     ref_v0 = weave.publish({"v": 0}, name="lifecycle_obj")
@@ -1980,12 +1968,11 @@ def test_publish_with_tags_and_aliases(weave_active):
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.skipif(HTTP_NOT_PORTED, reason="http: not ported yet")
-def test_cross_project_isolation(client: WeaveClient):
+def test_cross_project_isolation(client: WeaveClient, ensure_project):
     """Tags, aliases, lists, and resolution are all scoped to their project."""
     server = client.server
-    proj_a = "test-entity/proj-iso-a"
-    proj_b = "test-entity/proj-iso-b"
+    proj_a = ensure_project("proj-iso-a")
+    proj_b = ensure_project("proj-iso-b")
 
     _, digest_a = _create_obj_in_project(server, proj_a, "shared_obj", {"proj": "a"})
     _, digest_b = _create_obj_in_project(server, proj_b, "shared_obj", {"proj": "b"})
@@ -2082,7 +2069,6 @@ def test_cross_project_isolation(client: WeaveClient):
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.skipif(HTTP_NOT_PORTED, reason="http: not ported yet")
 def test_deletion_cascades(client: WeaveClient):
     """Deleting versions cleans up tags/aliases; surviving versions keep theirs."""
     # Specific version cleanup — tags

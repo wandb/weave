@@ -1270,7 +1270,6 @@ class ReadPredictionModel(weave.Model):
         assert read_res.inputs == {"question": "What is 2+2?"}
         assert read_res.output == "4"
 
-    @pytest.mark.skipif(HTTP_NOT_PORTED, reason="http: not ported yet")
     def test_prediction_read_with_none_inputs(self, client):
         """Test reading a prediction where the underlying call has None inputs.
 
@@ -1287,12 +1286,12 @@ class ReadPredictionModel(weave.Model):
                 project_id=project_id,
                 id=prediction_id,
                 trace_id=prediction_id,
-                op_name="weave:///test/test/op/predict:abc123",
+                op_name=f"weave:///{client.project_id}/op/predict:abc123",
                 started_at=datetime.datetime.now(datetime.timezone.utc),
                 attributes={
                     constants.WEAVE_ATTRIBUTES_NAMESPACE: {
                         constants.PREDICTION_ATTR_KEY: True,
-                        constants.PREDICTION_MODEL_ATTR_KEY: "weave:///test/object/MyModel:v1",
+                        constants.PREDICTION_MODEL_ATTR_KEY: f"weave:///{client.project_id}/object/MyModel:v1",
                     }
                 },
                 inputs={"inputs": None},
@@ -1993,7 +1992,6 @@ class TestEvalResultsReadAPI:
                         }
                     },
                     inputs={"self": scorer_ref},
-                    wb_user_id="test-user",
                 )
             )
         )
@@ -2095,7 +2093,6 @@ class TestEvalResultsReadAPI:
                         }
                     },
                     inputs={"self": scorer_ref},
-                    wb_user_id="test-user",
                 )
             )
         )
@@ -2450,7 +2447,6 @@ class TestEvalResultsReadAPI:
                             }
                         },
                         inputs={"self": scorer_a_ref},
-                        wb_user_id="test-user",
                     )
                 )
             )
@@ -2634,7 +2630,6 @@ class TestEvalResultsReadAPI:
                         }
                     },
                     inputs={"self": scorer_ref},
-                    wb_user_id="test-user",
                 )
             )
         )
@@ -2739,7 +2734,6 @@ class TestEvalResultsReadAPI:
                         }
                     },
                     inputs={"self": scorer_ref},
-                    wb_user_id="test-user",
                 )
             )
         )

@@ -9,7 +9,10 @@ from weave.trace_server.errors import InvalidRequest
 from weave.trace_server.interface.query import Query
 
 
-@pytest.mark.skipif(HTTP_NOT_PORTED, reason="http: not ported yet")
+@pytest.mark.skipif(
+    HTTP_NOT_PORTED,
+    reason="http: prices added by earlier tests survive the reset until wandb/core#58054 is deployed",
+)
 def test_cost_apis(client):
     project_id = client.project_id
 
@@ -39,7 +42,6 @@ def test_cost_apis(client):
         tsi.CostCreateReq(
             project_id=project_id,
             costs=costs,
-            wb_user_id="VXNlcjo0NTI1NDQ=",
         )
     )
 
@@ -57,7 +59,6 @@ def test_cost_apis(client):
                     "completion_token_cost": 100,
                 }
             },
-            wb_user_id="VXNlcjo0NTI1NDQ=",
         )
     )
     assert len(res.ids) == 1
@@ -177,7 +178,6 @@ def test_cost_apis(client):
     assert len(res) == 0
 
 
-@pytest.mark.skipif(HTTP_NOT_PORTED, reason="http: not ported yet")
 def test_purge_only_ids(client):
     project_id = client.project_id
     costs = {
@@ -191,7 +191,6 @@ def test_purge_only_ids(client):
         tsi.CostCreateReq(
             project_id=project_id,
             costs=costs,
-            wb_user_id="VXNlcjo0NTI1NDQ=",
         )
     )
 
@@ -232,7 +231,6 @@ def test_purge_only_ids(client):
     )
 
 
-@pytest.mark.skipif(HTTP_NOT_PORTED, reason="http: not ported yet")
 def test_costs_streamed_with_all_fields(client):
     """Costs returned by calls_query_stream include extra metadata fields
     (provider_id, effective_date, pricing_level, etc.) and must not fail
@@ -254,7 +252,6 @@ def test_costs_streamed_with_all_fields(client):
                     ),
                 },
             },
-            wb_user_id="VXNlcjo0NTI1NDQ=",
         )
     )
 

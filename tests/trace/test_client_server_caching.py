@@ -13,7 +13,6 @@ import pytest
 import weave
 from tests.conftest import CachingMiddlewareTraceServer
 from tests.trace.server_utils import find_server_layer
-from tests.trace.util import HTTP_NOT_PORTED
 from weave.trace import weave_client
 from weave.trace_server.service_interface import EnsureProjectExistsRes
 from weave.trace_server.trace_server_interface import (
@@ -243,14 +242,13 @@ def test_server_cache_latency():
         assert added_latency < 0.003
 
 
-@pytest.mark.skipif(HTTP_NOT_PORTED, reason="http: not ported yet")
 def test_file_create_caching(client):
     caching_server = find_server_layer(client.server, CachingMiddlewareTraceServer)
     file_bytes = b"hello"
     caching_server.reset_cache_recorder()
     create_0 = client.server.file_create(
         FileCreateReq(
-            project_id="test",
+            project_id=client.project_id,
             name="test",
             content=file_bytes,
         )
@@ -263,7 +261,7 @@ def test_file_create_caching(client):
     caching_server.reset_cache_recorder()
     create_1 = client.server.file_create(
         FileCreateReq(
-            project_id="test",
+            project_id=client.project_id,
             name="test",
             content=file_bytes,
         )
@@ -278,7 +276,7 @@ def test_file_create_caching(client):
     caching_server.reset_cache_recorder()
     read_0 = client.server.file_content_read(
         FileContentReadReq(
-            project_id="test",
+            project_id=client.project_id,
             digest=create_0.digest,
         )
     )
@@ -290,7 +288,7 @@ def test_file_create_caching(client):
     caching_server.reset_cache_recorder()
     read_1 = client.server.file_content_read(
         FileContentReadReq(
-            project_id="test",
+            project_id=client.project_id,
             digest=create_0.digest,
         )
     )
@@ -302,7 +300,6 @@ def test_file_create_caching(client):
     assert read_0.content == read_1.content == file_bytes
 
 
-@pytest.mark.skipif(HTTP_NOT_PORTED, reason="http: not ported yet")
 def test_obj_create_caching(client):
     caching_server = find_server_layer(client.server, CachingMiddlewareTraceServer)
     val = {"hello": "world"}
@@ -310,7 +307,7 @@ def test_obj_create_caching(client):
     create_0 = client.server.obj_create(
         ObjCreateReq(
             obj=ObjSchemaForInsert(
-                project_id="test",
+                project_id=client.project_id,
                 object_id="test",
                 val=val,
             )
@@ -325,7 +322,7 @@ def test_obj_create_caching(client):
     create_1 = client.server.obj_create(
         ObjCreateReq(
             obj=ObjSchemaForInsert(
-                project_id="test",
+                project_id=client.project_id,
                 object_id="test",
                 val=val,
             )
@@ -341,7 +338,7 @@ def test_obj_create_caching(client):
     caching_server.reset_cache_recorder()
     read_0 = client.server.obj_read(
         ObjReadReq(
-            project_id="test",
+            project_id=client.project_id,
             object_id="test",
             digest=create_0.digest,
         )
@@ -354,7 +351,7 @@ def test_obj_create_caching(client):
     caching_server.reset_cache_recorder()
     read_1 = client.server.obj_read(
         ObjReadReq(
-            project_id="test",
+            project_id=client.project_id,
             object_id="test",
             digest=create_0.digest,
         )

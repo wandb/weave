@@ -27,7 +27,10 @@ def test_save_object(client):
     assert read_res.obj.val == {"a": 1}
 
 
-@pytest.mark.skipif(HTTP_NOT_PORTED, reason="http: not ported yet")
+@pytest.mark.skipif(
+    HTTP_NOT_PORTED,
+    reason="http: the server names the error class once wandb/core#58054 is deployed",
+)
 def test_robust_to_url_sensitive_chars(client):
     project_id = client.project_id
     object_id = "mali_cious-obj.ect"
@@ -86,7 +89,10 @@ def test_robust_to_url_sensitive_chars(client):
     assert read_res.vals[0] == bad_val[bad_key]
 
 
-@pytest.mark.skipif(HTTP_NOT_PORTED, reason="http: not ported yet")
+@pytest.mark.skipif(
+    HTTP_NOT_PORTED,
+    reason="http: the server names the error class once wandb/core#58054 is deployed",
+)
 def test_refs_read_batch_missing_refs_reports_digests(client):
     project_id = client.project_id
     create_res = client.server.obj_create(

@@ -12,12 +12,11 @@ import pytest
 
 import weave
 from tests.trace.server_utils import TEST_ENTITY
-from tests.trace.util import HTTP_NOT_PORTED, NOT_CLICKHOUSE_BACKEND
+from tests.trace.util import NOT_CLICKHOUSE_BACKEND
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.ids import generate_id
 
 
-@pytest.mark.skipif(HTTP_NOT_PORTED, reason="http: not ported yet")
 def test_filter_calls_by_queue_inner_join_behavior(client):
     """Test that INNER JOIN correctly filters calls by queue membership.
 
@@ -43,8 +42,7 @@ def test_filter_calls_by_queue_inner_join_behavior(client):
         project_id=client.project_id,
         name="Test Queue",
         description="Test queue filtering",
-        scorer_refs=["weave:///entity/project/scorer/test:abc123"],
-        wb_user_id="test_user",
+        scorer_refs=[f"weave:///{client.project_id}/scorer/test:abc123"],
     )
     queue_res = client.server.annotation_queue_create(create_req)
     queue_id = queue_res.id
@@ -54,7 +52,6 @@ def test_filter_calls_by_queue_inner_join_behavior(client):
         queue_id=queue_id,
         call_ids=call_ids[2:7],
         display_fields=["input.x", "output"],
-        wb_user_id="test_user",
     )
     client.server.annotation_queue_add_calls(add_req)
 
@@ -85,7 +82,6 @@ def test_filter_calls_by_queue_inner_join_behavior(client):
     assert returned_ids.isdisjoint(excluded_ids)
 
 
-@pytest.mark.skipif(HTTP_NOT_PORTED, reason="http: not ported yet")
 def test_filter_calls_by_multiple_distinct_queues(client):
     """Test that queue filtering correctly isolates calls by queue_id.
 
@@ -109,16 +105,14 @@ def test_filter_calls_by_multiple_distinct_queues(client):
         tsi.AnnotationQueueCreateReq(
             project_id=client.project_id,
             name="Queue 1",
-            scorer_refs=["weave:///entity/project/scorer/test:abc"],
-            wb_user_id="test_user",
+            scorer_refs=[f"weave:///{client.project_id}/scorer/test:abc"],
         )
     )
     queue2_res = client.server.annotation_queue_create(
         tsi.AnnotationQueueCreateReq(
             project_id=client.project_id,
             name="Queue 2",
-            scorer_refs=["weave:///entity/project/scorer/test:def"],
-            wb_user_id="test_user",
+            scorer_refs=[f"weave:///{client.project_id}/scorer/test:def"],
         )
     )
 
@@ -129,7 +123,6 @@ def test_filter_calls_by_multiple_distinct_queues(client):
             queue_id=queue1_res.id,
             call_ids=call_ids[:3],
             display_fields=["input.x"],
-            wb_user_id="test_user",
         )
     )
     client.server.annotation_queue_add_calls(
@@ -138,7 +131,6 @@ def test_filter_calls_by_multiple_distinct_queues(client):
             queue_id=queue2_res.id,
             call_ids=call_ids[3:],
             display_fields=["input.x"],
-            wb_user_id="test_user",
         )
     )
 
@@ -184,7 +176,6 @@ def test_filter_calls_by_multiple_distinct_queues(client):
     assert {call.id for call in res1.calls}.isdisjoint({call.id for call in res2.calls})
 
 
-@pytest.mark.skipif(HTTP_NOT_PORTED, reason="http: not ported yet")
 def test_filter_calls_by_queue_combined_with_other_filters(client):
     """Test queue filter works correctly when combined with other query conditions.
 
@@ -218,8 +209,7 @@ def test_filter_calls_by_queue_combined_with_other_filters(client):
         tsi.AnnotationQueueCreateReq(
             project_id=client.project_id,
             name="Mixed Queue",
-            scorer_refs=["weave:///entity/project/scorer/test:xyz"],
-            wb_user_id="test_user",
+            scorer_refs=[f"weave:///{client.project_id}/scorer/test:xyz"],
         )
     )
 
@@ -229,12 +219,11 @@ def test_filter_calls_by_queue_combined_with_other_filters(client):
             queue_id=queue_res.id,
             call_ids=include_ids[:2] + exclude_ids[:2],
             display_fields=["input.x"],
-            wb_user_id="test_user",
         )
     )
 
     # Query for queue + op_include (should return 2 calls)
-    # Note: op_name is a full ref like "weave:///entity/project/op/op_include:hash"
+    # Note: op_name is a full ref like f"weave:///{client.project_id}/op/op_include:hash"
     # so we use contains instead of equals
     query = tsi.Query(
         **{
@@ -358,8 +347,7 @@ def test_filter_calls_by_queue_with_calls_complete_table(trace_server):
             project_id=project_id,
             name="test_queue",
             description="Test queue for calls_complete filtering",
-            scorer_refs=["weave:///entity/project/scorer/test:xyz"],
-            wb_user_id="test_user",
+            scorer_refs=[f"weave:///{project_id}/scorer/test:xyz"],
         )
     )
     queue_id = queue_res.id
@@ -372,7 +360,6 @@ def test_filter_calls_by_queue_with_calls_complete_table(trace_server):
             queue_id=queue_id,
             call_ids=queue_call_ids,
             display_fields=["input.x"],
-            wb_user_id="test_user",
         )
     )
 

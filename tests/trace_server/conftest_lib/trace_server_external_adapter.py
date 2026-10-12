@@ -129,6 +129,10 @@ class UserInjectingExternalTraceServer(
         req.wb_user_id = self._user_id
         return super().feedback_create(req)
 
+    def feedback_replace(self, req: tsi.FeedbackReplaceReq) -> tsi.FeedbackReplaceRes:
+        req.wb_user_id = self._user_id
+        return super().feedback_replace(req)
+
     def feedback_create_batch(
         self, req: tsi.FeedbackCreateBatchReq
     ) -> tsi.FeedbackCreateBatchRes:
@@ -157,6 +161,12 @@ class UserInjectingExternalTraceServer(
     ) -> tsi.AnnotationQueueAddCallsRes:
         req.wb_user_id = req.wb_user_id or self._user_id
         return super().annotation_queue_add_calls(req)
+
+    def annotator_queue_items_progress_update(
+        self, req: tsi.AnnotatorQueueItemsProgressUpdateReq
+    ) -> tsi.AnnotatorQueueItemsProgressUpdateRes:
+        req.wb_user_id = self._user_id
+        return super().annotator_queue_items_progress_update(req)
 
     def obj_create(self, req: tsi.ObjCreateReq) -> tsi.ObjCreateRes:
         req.obj.wb_user_id = self._user_id
