@@ -4330,6 +4330,7 @@ class InMemoryTraceServer(tsi.FullTraceServerInterface):
             base_url=info.base_url,
             extra_headers=info.extra_headers,
             vertex_credentials=info.vertex_credentials,
+            is_custom_runtime=info.is_custom_runtime,
         )
         end_time = datetime.datetime.now()
 
@@ -4406,6 +4407,7 @@ class InMemoryTraceServer(tsi.FullTraceServerInterface):
             extra_headers=info.extra_headers,
             return_type=info.return_type,
             vertex_credentials=info.vertex_credentials,
+            is_custom_runtime=info.is_custom_runtime,
         )
 
         if not req.track_llm_call:

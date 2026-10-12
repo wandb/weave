@@ -2,10 +2,12 @@ import threading
 from collections.abc import Callable, Iterator
 from typing import Any
 
+import httpx
 import litellm
 from cachetools import TTLCache
 from litellm import CustomStreamWrapper
-from openai import AsyncOpenAI, OpenAI
+from litellm.llms.custom_httpx.http_handler import AsyncHTTPHandler, HTTPHandler
+from openai import AsyncOpenAI, DefaultAsyncHttpxClient, DefaultHttpxClient, OpenAI
 from pydantic import BaseModel
 
 from weave.trace_server import trace_server_interface as tsi
@@ -23,6 +25,11 @@ from weave.trace_server.interface.builtin_object_classes.provider import (
 # from weave.trace_server.model_providers.model_providers import (
 #     VERTEX_PROVIDER_NAMES,
 # )
+from weave.trace_server.public_network_transport import (
+    AsyncPublicNetworkTransport,
+    NonPublicAddressError,
+    PublicNetworkTransport,
+)
 from weave.trace_server.secret_fetcher_context import _secret_fetcher_context
 
 NOVA_MODELS = ("nova-pro-v1", "nova-lite-v1", "nova-micro-v1")
@@ -290,17 +297,10 @@ def lite_llm_completion(
     base_url: str | None = None,
     extra_headers: dict[str, str] | None = None,
     vertex_credentials: str | None = None,
+    is_custom_runtime: bool = False,
 ) -> tsi.CompletionsCreateRes:
-    if _use_direct_openai_client(provider, api_key, inputs.model):
-        client_kwargs = _build_openai_client_kwargs(base_url, extra_headers)
-        try:
-            with OpenAI(**client_kwargs) as client:
-                res = client.chat.completions.create(
-                    **_openai_compatible_inputs(inputs)
-                )
-            return tsi.CompletionsCreateRes(response=res.model_dump())
-        except Exception as e:
-            return _completion_error_response(e)
+    if is_custom_runtime:
+        return _custom_runtime_completion(api_key, inputs, base_url, extra_headers)
 
     kwargs = _build_litellm_kwargs(
         api_key, inputs, provider, base_url, extra_headers, vertex_credentials
@@ -319,18 +319,13 @@ async def lite_llm_acompletion(
     base_url: str | None = None,
     extra_headers: dict[str, str] | None = None,
     vertex_credentials: str | None = None,
+    is_custom_runtime: bool = False,
 ) -> tsi.CompletionsCreateRes:
     """Async twin of `lite_llm_completion`. No thread held during the LLM wait."""
-    if _use_direct_openai_client(provider, api_key, inputs.model):
-        client_kwargs = _build_openai_client_kwargs(base_url, extra_headers)
-        try:
-            async with AsyncOpenAI(**client_kwargs) as client:
-                res = await client.chat.completions.create(
-                    **_openai_compatible_inputs(inputs)
-                )
-            return tsi.CompletionsCreateRes(response=res.model_dump())
-        except Exception as e:
-            return _completion_error_response(e)
+    if is_custom_runtime:
+        return await _custom_runtime_acompletion(
+            api_key, inputs, base_url, extra_headers
+        )
 
     kwargs = _build_litellm_kwargs(
         api_key, inputs, provider, base_url, extra_headers, vertex_credentials
@@ -340,6 +335,111 @@ async def lite_llm_acompletion(
         return tsi.CompletionsCreateRes(response=res.model_dump())
     except Exception as e:
         return _completion_error_response(e)
+
+
+# Custom runtime URLs are user-chosen, so these requests only reach public addresses.
+# LiteLLM picks a route from the model name, which the user also chooses, and some
+# routes skip the guarded client, so only Ollama models go through LiteLLM.
+
+
+def _custom_runtime_completion(
+    api_key: str | None,
+    inputs: tsi.CompletionsCreateRequestInputs,
+    base_url: str | None,
+    extra_headers: dict[str, str] | None,
+) -> tsi.CompletionsCreateRes:
+    http_client = _build_public_network_http_client()
+    try:
+        if inputs.model.startswith("ollama/"):
+            kwargs = _build_litellm_kwargs(
+                api_key, inputs, "custom", base_url, extra_headers, None
+            )
+            res = litellm.completion(**kwargs, client=HTTPHandler(client=http_client))
+        else:
+            client = OpenAI(
+                **_build_openai_client_kwargs(api_key, base_url, extra_headers),
+                http_client=http_client,
+            )
+            res = client.chat.completions.create(**_openai_compatible_inputs(inputs))
+        return tsi.CompletionsCreateRes(response=res.model_dump())
+    except Exception as e:
+        return _completion_error_response(e)
+    finally:
+        http_client.close()
+
+
+async def _custom_runtime_acompletion(
+    api_key: str | None,
+    inputs: tsi.CompletionsCreateRequestInputs,
+    base_url: str | None,
+    extra_headers: dict[str, str] | None,
+) -> tsi.CompletionsCreateRes:
+    http_client = _build_public_network_async_http_client()
+    try:
+        if inputs.model.startswith("ollama/"):
+            kwargs = _build_litellm_kwargs(
+                api_key, inputs, "custom", base_url, extra_headers, None
+            )
+            res = await litellm.acompletion(
+                **kwargs, client=_PublicNetworkAsyncHTTPHandler(http_client)
+            )
+        else:
+            client = AsyncOpenAI(
+                **_build_openai_client_kwargs(api_key, base_url, extra_headers),
+                http_client=http_client,
+            )
+            res = await client.chat.completions.create(
+                **_openai_compatible_inputs(inputs)
+            )
+        return tsi.CompletionsCreateRes(response=res.model_dump())
+    except Exception as e:
+        return _completion_error_response(e)
+    finally:
+        await http_client.aclose()
+
+
+def _custom_runtime_completion_stream(
+    api_key: str | None,
+    inputs: tsi.CompletionsCreateRequestInputs,
+    base_url: str | None,
+    extra_headers: dict[str, str] | None,
+) -> Iterator[dict[str, Any]]:
+    http_client = _build_public_network_http_client()
+    try:
+        if inputs.model.startswith("ollama/"):
+            stream = litellm.completion(
+                **inputs.model_dump(
+                    exclude={"extra_headers", "stream", "stream_options"}
+                ),
+                api_key=api_key,
+                api_base=base_url,
+                extra_headers=extra_headers or {},
+                stream=True,
+                stream_options={"include_usage": True},
+                client=HTTPHandler(client=http_client),
+            )
+            if not isinstance(stream, CustomStreamWrapper):
+                raise InvalidRequest("Expected a streaming response from litellm")
+            for chunk in stream:
+                yield chunk.model_dump()
+        else:
+            client = OpenAI(
+                **_build_openai_client_kwargs(api_key, base_url, extra_headers),
+                http_client=http_client,
+            )
+            request_inputs = _openai_compatible_inputs(inputs)
+            request_inputs.pop("stream", None)
+            for chunk in client.chat.completions.create(
+                **request_inputs,
+                stream=True,
+                stream_options={"include_usage": True},
+            ):
+                yield chunk.model_dump()
+    except Exception as e:
+        blocked = _non_public_address_error(e)
+        yield {"error": str(blocked or e).replace("litellm.", "")}
+    finally:
+        http_client.close()
 
 
 def _openai_compatible_inputs(
@@ -358,10 +458,14 @@ def _openai_compatible_inputs(
     model = inputs_dict["model"]
     if model.startswith("openai/"):
         inputs_dict["model"] = model.removeprefix("openai/")
+    # The API accepts "30"; LiteLLM converts it, but the OpenAI SDK needs a number.
+    if isinstance(inputs_dict.get("timeout"), str):
+        inputs_dict["timeout"] = float(inputs_dict["timeout"])
     return inputs_dict
 
 
 def _build_openai_client_kwargs(
+    api_key: str | None,
     base_url: str | None,
     extra_headers: dict[str, str] | None,
 ) -> dict[str, Any]:
@@ -370,20 +474,35 @@ def _build_openai_client_kwargs(
             "Invalid provider configuration: must provide base_url if provider is 'custom'"
         )
     return {
-        "api_key": "",
+        "api_key": api_key or "",
         "base_url": base_url.rstrip("/"),
         "default_headers": extra_headers,
     }
 
 
-def _use_direct_openai_client(
-    provider: str | None,
-    api_key: str | None,
-    model: str,
-) -> bool:
-    # LiteLLM handles existing keyed providers. The direct client is only
-    # needed when an OpenAI-compatible custom endpoint has no bearer key.
-    return provider == "custom" and api_key is None and not model.startswith("ollama/")
+# One client per call: pooled connections are keyed by the pinned IP, not the hostname.
+# These clients ignore HTTP(S)_PROXY and LiteLLM's SSL_VERIFY and SSL_CERTIFICATE
+# (SSL_CERT_FILE still applies); add support when a deployment needs either.
+def _build_public_network_http_client() -> httpx.Client:
+    return DefaultHttpxClient(
+        transport=PublicNetworkTransport(), follow_redirects=False
+    )
+
+
+def _build_public_network_async_http_client() -> httpx.AsyncClient:
+    return DefaultAsyncHttpxClient(
+        transport=AsyncPublicNetworkTransport(), follow_redirects=False
+    )
+
+
+class _PublicNetworkAsyncHTTPHandler(AsyncHTTPHandler):
+    # AsyncHTTPHandler takes no client argument; its __init__ calls create_client.
+    def __init__(self, client: httpx.AsyncClient) -> None:
+        self._public_network_client = client
+        super().__init__()
+
+    def create_client(self, *args: Any, **kwargs: Any) -> httpx.AsyncClient:
+        return self._public_network_client
 
 
 def _build_litellm_kwargs(
@@ -458,7 +577,21 @@ def _build_litellm_kwargs(
 ERROR_STATUS_CODE_KEY = "error_status_code"
 
 
+def _non_public_address_error(e: BaseException) -> NonPublicAddressError | None:
+    # The OpenAI SDK and LiteLLM re-raise it as a generic "Connection error.".
+    seen: set[int] = set()
+    current: BaseException | None = e
+    while current is not None and id(current) not in seen:
+        if isinstance(current, NonPublicAddressError):
+            return current
+        seen.add(id(current))
+        current = current.__cause__ or current.__context__
+    return None
+
+
 def _completion_error_response(e: Exception) -> tsi.CompletionsCreateRes:
+    if blocked := _non_public_address_error(e):
+        return tsi.CompletionsCreateRes(response={"error": str(blocked)})
     response: dict[str, Any] = {"error": str(e).replace("litellm.", "", 1)}
     # OpenAI and LiteLLM exceptions carry the provider HTTP status code;
     # preserve it for status-class classification.
@@ -712,6 +845,7 @@ def lite_llm_completion_stream(
     extra_headers: dict[str, str] | None = None,
     return_type: str | None = None,
     vertex_credentials: str | None = None,
+    is_custom_runtime: bool = False,
 ) -> Iterator[dict[str, Any]]:
     """Stream completion chunks from the underlying LLM provider.
 
@@ -736,23 +870,15 @@ def lite_llm_completion_stream(
 
     litellm.drop_params = True
 
+    if is_custom_runtime:
+        return _custom_runtime_completion_stream(
+            api_key, inputs, base_url, extra_headers
+        )
+
     # Produce serializable dictionaries regardless of the underlying client.
     def _generate_chunks() -> Iterator[dict[str, Any]]:
         try:
-            if _use_direct_openai_client(provider, api_key, inputs.model):
-                client_kwargs = _build_openai_client_kwargs(base_url, extra_headers)
-                with OpenAI(**client_kwargs) as client:
-                    request_inputs = _openai_compatible_inputs(inputs)
-                    request_inputs.pop("stream", None)
-                    stream = client.chat.completions.create(
-                        **request_inputs,
-                        stream=True,
-                        stream_options={"include_usage": True},
-                    )
-                    for chunk in stream:
-                        yield chunk.model_dump()
-                return
-            elif provider == "custom" and base_url:
+            if provider == "custom" and base_url:
                 model_dict = inputs.model_dump(
                     exclude=[
                         "extra_headers",

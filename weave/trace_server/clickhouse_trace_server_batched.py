@@ -6915,6 +6915,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             base_url=info.base_url,
             extra_headers=info.extra_headers,
             vertex_credentials=info.vertex_credentials,
+            is_custom_runtime=info.is_custom_runtime,
         )
         end_time = datetime.datetime.now()
 
@@ -7135,6 +7136,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             extra_headers=extra_headers,
             return_type=return_type,
             vertex_credentials=vertex_credentials,
+            is_custom_runtime=completion_model_info.is_custom_runtime,
         )
 
         if not req.track_llm_call or span_id is None:
@@ -8363,6 +8365,7 @@ class CompletionModelInfo:
     extra_headers: dict[str, str]
     return_type: str | None
     vertex_credentials: str | None = None
+    is_custom_runtime: bool = False
 
 
 class CompletionPrepResult(NamedTuple):
@@ -8560,6 +8563,7 @@ def _setup_completion_model_info(
             extra_headers=custom_provider_info.extra_headers,
             return_type=custom_provider_info.return_type,
             vertex_credentials=None,
+            is_custom_runtime=True,
         )
     elif model_info:
         secret_name = model_info.get("api_key_name")

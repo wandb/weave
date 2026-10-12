@@ -1624,6 +1624,40 @@ def test_completions_usage_captured_in_span(
         assert span.request_model == "gpt-3.5-turbo"
 
 
+def test_completions_span_accepts_null_usage(
+    completions_mock_server, completions_secret_fetcher, completions_mock_response
+):
+    """The OpenAI client returns `usage: null` when a runtime omits usage."""
+    with (
+        patch(
+            "weave.trace_server.clickhouse_trace_server_batched.lite_llm_completion"
+        ) as mock_litellm,
+        patch(
+            "weave.trace_server.clickhouse_trace_server_batched.AgentWriteHandler"
+        ) as mock_agent_writer_cls,
+    ):
+        mock_agent_writer = MagicMock()
+        mock_agent_writer_cls.return_value = mock_agent_writer
+        mock_litellm.return_value = MagicMock(
+            response={**completions_mock_response, "usage": None}
+        )
+
+        req = tsi.CompletionsCreateReq(
+            project_id="dGVzdF9wcm9qZWN0",
+            inputs=tsi.CompletionsCreateRequestInputs(
+                model="gpt-3.5-turbo",
+                messages=[{"role": "user", "content": "Say hello"}],
+            ),
+            track_llm_call=True,
+        )
+
+        completions_mock_server.completions_create(req)
+
+        span = mock_agent_writer.insert_span.call_args[0][0]
+        assert span.input_tokens == 0
+        assert span.output_tokens == 0
+
+
 def test_streaming_completions_writes_agent_spans(
     completions_mock_server,
     completions_secret_fetcher,
@@ -2112,6 +2146,7 @@ def test_keyless_custom_completion_preserves_configured_auth(
         provider="custom",
         base_url="https://runtime.example.com/v1",
         extra_headers=headers,
+        is_custom_runtime=True,
     )
 
     assert "error" not in result.response, result.response
@@ -2152,6 +2187,7 @@ def test_custom_completion_with_api_key_uses_litellm(monkeypatch):
 
 def test_openai_client_kwargs_validate_and_normalize_configuration():
     assert llm_mod._build_openai_client_kwargs(
+        None,
         "https://runtime.example.com/v1/",
         {"X-Custom-Auth": "header-secret"},
     ) == {
@@ -2159,9 +2195,15 @@ def test_openai_client_kwargs_validate_and_normalize_configuration():
         "base_url": "https://runtime.example.com/v1",
         "default_headers": {"X-Custom-Auth": "header-secret"},
     }
+    assert (
+        llm_mod._build_openai_client_kwargs(
+            "runtime-secret", "https://r.example", None
+        )["api_key"]
+        == "runtime-secret"
+    )
 
     with pytest.raises(InvalidRequest, match="must provide base_url"):
-        llm_mod._build_openai_client_kwargs(None, None)
+        llm_mod._build_openai_client_kwargs(None, None, None)
 
 
 @pytest.mark.asyncio
@@ -2281,6 +2323,7 @@ def test_dedicated_inference_route_uses_personal_secret_and_gateway():
     assert model_info.provider == "custom"
     assert model_info.base_url == "https://cw.cwc38d.gw.cwinference.com/v1"
     assert model_info.return_type == "openai"
+    assert model_info.is_custom_runtime is False
 
 
 @pytest.mark.parametrize(
@@ -2354,6 +2397,7 @@ def test_custom_provider_name_matching_selector_prefix_is_preserved(monkeypatch)
         obj_read_func=obj_read,
     )
     assert model_info.model_name == "custom/gpt-4"
+    assert model_info.is_custom_runtime is True
 
 
 def test_coreweave_with_api_key_keeps_litellm_configuration():
@@ -2373,6 +2417,7 @@ def test_coreweave_with_api_key_keeps_litellm_configuration():
     assert info.base_url == "https://api.inference.wandb.ai/v1"
     assert info.extra_headers == {"X-Tenant": "customer"}
     assert req.inputs.model == "openai/test-model"
+    assert info.is_custom_runtime is False
 
 
 def test_keyless_ollama_streaming_completion_stays_on_litellm(monkeypatch):
@@ -2428,6 +2473,7 @@ async def test_custom_async_completion_supports_header_auth_without_api_key(
         provider="custom",
         base_url="https://runtime.example.com/v1",
         extra_headers={"X-API-Key": "header-secret"},
+        is_custom_runtime=True,
     )
 
     assert "error" not in result.response, result.response
@@ -2460,6 +2506,7 @@ def test_custom_streaming_completion_supports_header_auth_without_api_key(
             provider="custom",
             base_url="https://runtime.example.com/v1",
             extra_headers={"X-API-Key": "header-secret"},
+            is_custom_runtime=True,
         )
     )
 
@@ -2468,6 +2515,25 @@ def test_custom_streaming_completion_supports_header_auth_without_api_key(
     assert len(captured_requests) == 1
     assert captured_requests[0].headers.get("Authorization") is None
     assert captured_requests[0].headers["X-API-Key"] == "header-secret"
+
+
+def test_custom_completion_accepts_numeric_string_timeout(monkeypatch):
+    # The API types timeout as float | str; LiteLLM converted strings before custom
+    # runtimes moved to the OpenAI SDK, which rejects them.
+    captured_requests = _patch_openai_clients(monkeypatch)
+    inputs = _completion_inputs()
+    inputs.timeout = "30"
+
+    result = llm_mod.lite_llm_completion(
+        api_key="runtime-key",
+        inputs=inputs,
+        provider="custom",
+        base_url="https://runtime.example.com/v1",
+        is_custom_runtime=True,
+    )
+
+    assert "error" not in result.response, result.response
+    assert captured_requests[0].extensions["timeout"]["read"] == 30.0
 
 
 if __name__ == "__main__":

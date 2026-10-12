@@ -82,7 +82,7 @@ def build_completion_span(
             c.get("finish_reason", "") or "" for c in response.get("choices", [])
         ]
 
-    usage = (response or {}).get("usage", {})
+    usage = (response or {}).get("usage") or {}
     input_tokens = usage.get("prompt_tokens", 0) or 0
     output_tokens = usage.get("completion_tokens", 0) or 0
     reasoning_tokens = (

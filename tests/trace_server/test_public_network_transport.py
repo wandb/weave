@@ -1,23 +1,31 @@
 """Custom runtime requests reach only publicly routable addresses.
 
 A custom runtime's base URL is user-configured, so every connection made for it
-must land on a public address.
+must land on a public address, and redirects must not be followed.
 """
 
 from __future__ import annotations
 
+import http.server
+import json
 import socket
-from collections.abc import Callable
+import threading
+import uuid
+from collections.abc import Callable, Iterator
 
 import httpx
 import pytest
 
+from tests.trace_server.conftest import TEST_ENTITY
+from weave.trace_server import llm_completion as llm_mod
+from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.environment import CUSTOM_RUNTIME_ALLOWED_PRIVATE_CIDRS_ENV
 from weave.trace_server.public_network_transport import (
     AsyncPublicNetworkTransport,
     NonPublicAddressError,
     PublicNetworkTransport,
 )
+from weave.trace_server.secret_fetcher_context import _secret_fetcher_context
 
 
 def _fake_getaddrinfo(*addresses: str) -> Callable[..., list]:
@@ -187,3 +195,252 @@ def test_invalid_exempt_network_fails_closed(monkeypatch, forwarded):
             c.get("http://runtime.example.com/")
 
     assert forwarded == []
+
+
+# ---------------------------------------------------------------------------
+# Completion paths, against real local servers. Loopback is exempted so the
+# guarded clients can reach the local runtime server at all.
+# ---------------------------------------------------------------------------
+
+
+def _serve(handler: type[http.server.BaseHTTPRequestHandler]) -> http.server.HTTPServer:
+    server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), handler)
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    return server
+
+
+def _url(server: http.server.HTTPServer, path: str) -> str:
+    return f"http://127.0.0.1:{server.server_address[1]}{path}"
+
+
+@pytest.fixture
+def redirecting_runtime(
+    monkeypatch: pytest.MonkeyPatch,
+) -> Iterator[tuple[str, list, list]]:
+    """A runtime that answers every request with a 302 to an internal server."""
+    monkeypatch.setenv(CUSTOM_RUNTIME_ALLOWED_PRIVATE_CIDRS_ENV, "127.0.0.0/8")
+    runtime_hits: list[str] = []
+    internal_hits: list[str] = []
+
+    class Internal(http.server.BaseHTTPRequestHandler):
+        def _handle(self) -> None:
+            internal_hits.append(f"{self.command} {self.path}")
+            body = json.dumps({"gitVersion": "v1.35.8"}).encode()
+            self.send_response(200)
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+
+        do_GET = do_POST = _handle
+
+        def log_message(self, *args) -> None:
+            pass
+
+    internal = _serve(Internal)
+
+    class Redirect(http.server.BaseHTTPRequestHandler):
+        def _handle(self) -> None:
+            runtime_hits.append(f"{self.command} {self.path}")
+            self.rfile.read(int(self.headers.get("Content-Length") or 0))
+            self.send_response(302)
+            self.send_header("Location", _url(internal, "/version"))
+            self.send_header("Content-Length", "0")
+            self.end_headers()
+
+        do_GET = do_POST = _handle
+
+        def log_message(self, *args) -> None:
+            pass
+
+    runtime = _serve(Redirect)
+    try:
+        yield _url(runtime, "/v1"), runtime_hits, internal_hits
+    finally:
+        for server in (internal, runtime):
+            server.shutdown()
+            server.server_close()
+
+
+@pytest.fixture
+def working_runtime(monkeypatch: pytest.MonkeyPatch) -> Iterator[tuple[str, list]]:
+    """A runtime that answers OpenAI chat completions and Ollama generate."""
+    monkeypatch.setenv(CUSTOM_RUNTIME_ALLOWED_PRIVATE_CIDRS_ENV, "127.0.0.0/8")
+    tenant_headers: list[str] = []
+
+    class Runtime(http.server.BaseHTTPRequestHandler):
+        def do_POST(self) -> None:
+            body = json.loads(self.rfile.read(int(self.headers["Content-Length"])))
+            tenant_headers.append(self.headers.get("X-Tenant", ""))
+            if self.path.endswith("/api/generate"):
+                lines = [{"response": "ok", "done": False}, {"done": True}]
+                payload = (
+                    "".join(json.dumps(line) + "\n" for line in lines)
+                    if body.get("stream")
+                    else json.dumps({"response": "ok", "done": True})
+                )
+            elif body.get("stream"):
+                delta = {
+                    "index": 0,
+                    "delta": {"content": "ok"},
+                    "finish_reason": "stop",
+                }
+                chunk = {"id": "c", "object": "chat.completion.chunk", "created": 0}
+                chunk |= {"model": "test-model", "choices": [delta]}
+                payload = f"data: {json.dumps(chunk)}\n\ndata: [DONE]\n\n"
+            else:
+                message = {"role": "assistant", "content": "ok"}
+                choice = {"index": 0, "message": message, "finish_reason": "stop"}
+                payload = json.dumps(
+                    {"id": "c", "object": "chat.completion", "created": 0}
+                    | {"model": "test-model", "choices": [choice]}
+                )
+            encoded = payload.encode()
+            self.send_response(200)
+            self.send_header("Content-Length", str(len(encoded)))
+            self.end_headers()
+            self.wfile.write(encoded)
+
+        def log_message(self, *args) -> None:
+            pass
+
+    server = _serve(Runtime)
+    try:
+        yield _url(server, "/v1"), tenant_headers
+    finally:
+        server.shutdown()
+        server.server_close()
+
+
+async def _complete(
+    mode: str, model: str, api_key: str | None, base_url: str
+) -> dict | list[dict]:
+    kwargs = {
+        "api_key": api_key,
+        "inputs": tsi.CompletionsCreateRequestInputs(
+            model=model, messages=[{"role": "user", "content": "hi"}]
+        ),
+        "provider": "custom",
+        "base_url": base_url,
+        "extra_headers": {"X-Tenant": "customer"},
+        "is_custom_runtime": True,
+    }
+    if mode == "sync":
+        return llm_mod.lite_llm_completion(**kwargs).response
+    if mode == "async":
+        return (await llm_mod.lite_llm_acompletion(**kwargs)).response
+    return list(llm_mod.lite_llm_completion_stream(**kwargs))
+
+
+MODES = pytest.mark.parametrize("mode", ["sync", "async", "stream"])
+CLIENTS = [
+    pytest.param("openai/test-model", None, id="keyless"),
+    pytest.param("openai/test-model", "runtime-secret", id="keyed"),
+    pytest.param("ollama/llama3", None, id="ollama"),
+]
+
+
+@pytest.mark.asyncio
+@MODES
+@pytest.mark.parametrize(
+    ("model", "api_key"),
+    [
+        *CLIENTS,
+        # LiteLLM sends these names to its Responses API bridge, which builds its
+        # own HTTP client, so custom runtimes must never reach LiteLLM with them.
+        pytest.param("openai/responses/test-model", "runtime-secret", id="responses"),
+        pytest.param("openai/o1-pro", "runtime-secret", id="o1-pro"),
+    ],
+)
+async def test_custom_runtime_completions_do_not_follow_redirects(
+    redirecting_runtime, mode, model, api_key
+):
+    runtime_url, runtime_hits, internal_hits = redirecting_runtime
+
+    result = await _complete(mode, model, api_key, runtime_url)
+
+    is_ollama = model.startswith("ollama/")
+    path = "/v1/api/generate" if is_ollama else "/v1/chat/completions"
+    assert runtime_hits == [f"POST {path}"]
+    assert internal_hits == []
+    # LiteLLM reports the Ollama runtime's 302 as a connection error.
+    error = "APIConnectionError: OllamaException - " if is_ollama else "Error code: 302"
+    if mode == "stream":
+        assert result == [{"error": error}]
+    else:
+        assert result == {
+            "error": error,
+            "error_status_code": 500 if is_ollama else 302,
+        }
+
+
+@pytest.mark.asyncio
+@MODES
+@pytest.mark.parametrize(("model", "api_key"), CLIENTS)
+async def test_custom_runtime_completions_still_reach_allowed_runtimes(
+    working_runtime, mode, model, api_key
+):
+    runtime_url, tenant_headers = working_runtime
+
+    result = await _complete(mode, model, api_key, runtime_url)
+
+    if mode == "stream":
+        content = "".join(
+            chunk["choices"][0]["delta"]["content"] or ""
+            for chunk in result
+            if chunk["choices"]
+        )
+    else:
+        content = result["choices"][0]["message"]["content"]
+    assert content == "ok"
+    assert tenant_headers == ["customer"]
+
+
+class _NoSecrets:
+    def fetch(self, secret_name: str) -> dict:
+        return {"secrets": {}}
+
+
+@pytest.mark.parametrize("stream", [False, True], ids=["create", "stream"])
+def test_registered_runtime_cannot_resolve_to_internal_address(
+    trace_server, monkeypatch, stream
+):
+    # `runtime.test` passes the save-time URL check because it is a hostname,
+    # then resolves to loopback when the completion connects.
+    real_getaddrinfo = socket.getaddrinfo
+
+    def getaddrinfo(host, *args, **kwargs):
+        host = "127.0.0.1" if host == "runtime.test" else host
+        return real_getaddrinfo(host, *args, **kwargs)
+
+    monkeypatch.setattr(socket, "getaddrinfo", getaddrinfo)
+    project_id = f"{TEST_ENTITY}/custom-runtime-network"
+    runtime_name = f"runtime-{uuid.uuid4().hex[:8]}"
+    trace_server.custom_runtime_apply(
+        tsi.CustomRuntimeApplyReq(
+            project_id=project_id,
+            runtime_name=runtime_name,
+            base_url="http://runtime.test:9/v1",
+            api_key_secret=None,
+            headers={},
+            runtime_ids=[tsi.CustomRuntimeID(id="model", max_tokens=16)],
+        )
+    )
+    req = tsi.CompletionsCreateReq(
+        project_id=project_id,
+        inputs=tsi.CompletionsCreateRequestInputs(
+            model=f"custom::{runtime_name}::model",
+            messages=[{"role": "user", "content": "hi"}],
+        ),
+        track_llm_call=False,
+    )
+
+    token = _secret_fetcher_context.set(_NoSecrets())
+    try:
+        if stream:
+            result = json.dumps(list(trace_server.completions_create_stream(req)))
+        else:
+            result = json.dumps(trace_server.completions_create(req).response)
+    finally:
+        _secret_fetcher_context.reset(token)
+
+    assert "Refusing to connect to runtime.test" in result, result
