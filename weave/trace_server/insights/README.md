@@ -76,9 +76,12 @@ column name and carries `trace_id` for intents and `current_trace_id` for failur
 Only because both are a pure function of the row's own turn can one query serve both
 without branching on `signature_type`.
 
-`affected_trace_ids` still records the turns a failure is attributed to. A total
-across that set is a read-time expansion against `spans`, not a stored column, so a
-multi-turn aggregate can never be mistaken for a per-turn value.
+`affected_trace_ids` is always `[current_trace_id]`: the failure judge only sees prior
+turns as summarised assistant text and does not attribute failures to them (measured
+2026-09-28, zero prior-turn citations on production turns). Nothing reads the column. If
+a multi-turn writer ever lands, a total across that set is a read-time expansion against
+`spans`, not a stored column, so a multi-turn aggregate can never be mistaken for a
+per-turn value.
 
 ## Why dropping the columns would not help
 
