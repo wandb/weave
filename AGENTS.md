@@ -236,9 +236,8 @@ child calls in exact operation-set assertions.
 
 Every other shard, `flow` included, is run by CI with `-m "trace_server"`, and
 that filter comes from the workflow and `.github/scripts/run_nox_shards.py`
-rather than from `noxfile.py`. A test that
-uses no server fixture therefore never runs in CI unless it carries
-`@pytest.mark.trace_server` itself.
+rather than from `noxfile.py`. A test that uses no server fixture therefore
+never runs in CI unless it carries `@pytest.mark.trace_server` itself.
 
 ### Running Tests
 

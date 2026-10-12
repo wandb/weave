@@ -64,7 +64,8 @@ def pytest_testnodedown(node, error):
 @pytest.hookimpl(trylast=True)
 def pytest_sessionfinish(session):
     # xdist exits 0 when a worker dies before collecting, and the worker that
-    # replaces it has no server, so a crash must fail the run.
+    # replaces it has no server, so a crash must fail the run. trylast: after
+    # tests/conftest.py turns exit 5 into 0.
     if _crashed_workers and session.exitstatus == pytest.ExitCode.OK:
         session.exitstatus = pytest.ExitCode.TESTS_FAILED
 
