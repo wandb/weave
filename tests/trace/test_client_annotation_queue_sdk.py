@@ -4,6 +4,7 @@ import datetime
 
 import pytest
 
+from tests.trace.util import HTTP_NOT_PORTED
 from weave.trace.call import Call
 from weave.trace.weave_client import WeaveClient
 from weave.trace_server.common_interface import AnnotationQueueItemsFilter, SortBy
@@ -203,6 +204,7 @@ def _create_finished_calls(client, count: int) -> list[Call]:
     return calls
 
 
+@pytest.mark.skipif(HTTP_NOT_PORTED, reason="http: not ported yet")
 def test_annotation_queue_sdk_lifecycle(client):
     scorer_refs = ["weave:///entity/project/scorer/sdk_test:abc123"]
 

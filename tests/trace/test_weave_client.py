@@ -19,6 +19,7 @@ from tests.conftest import TestOnlyFlushingWeaveClient
 from tests.trace.server_utils import find_server_layer
 from tests.trace.testutil import ObjectRefStrMatcher
 from tests.trace.util import (
+    HTTP_NOT_PORTED,
     AnyIntMatcher,
     DatetimeMatcher,
     RegexStringMatcher,
@@ -82,6 +83,7 @@ from weave.trace_server_bindings.stainless_remote_http_trace_server import (
 )
 
 
+@pytest.mark.skipif(HTTP_NOT_PORTED, reason="http: not ported yet")
 @pytest.mark.flaky(reruns=3, reruns_delay=0.2)
 def test_table_create(client):
     res = client.server.table_create(
@@ -361,6 +363,7 @@ def test_get_calls_forwards_include_usernames(client, monkeypatch):
     assert captured_kwargs["include_usernames"] is True
 
 
+@pytest.mark.skipif(HTTP_NOT_PORTED, reason="http: not ported yet")
 def test_call_create(client):
     call = client.create_call("x", {"a": 5, "b": 10})
     client.finish_call(call, "hello")
@@ -404,6 +407,7 @@ def test_call_create(client):
     assert result == expected
 
 
+@pytest.mark.skipif(HTTP_NOT_PORTED, reason="http: not ported yet")
 def test_calls_query(client):
     call0 = client.create_call("x", {"a": 5, "b": 10})
     call1 = client.create_call("x", {"a": 6, "b": 11})
@@ -469,6 +473,7 @@ def test_calls_query(client):
     client.finish_call(call0, None)
 
 
+@pytest.mark.skipif(HTTP_NOT_PORTED, reason="http: not ported yet")
 def test_get_calls_complete(client):
     obj = weave.Dataset(rows=[{"a": 1}, {"a": 2}, {"a": 3}])
     ref = client.save(obj, "my-dataset")
@@ -1376,6 +1381,7 @@ def test_refs_read_batch_multi_project(client):
     assert res.vals[2] == {"ab": [3, 4, 5]}
 
 
+@pytest.mark.skipif(HTTP_NOT_PORTED, reason="http: not ported yet")
 def test_refs_read_batch_call_ref(client):
     call_ref = refs.CallRef(entity="shawn", project="test-project", id="my-call")
     with pytest.raises(ValueError, match="Call refs not supported"):
@@ -1572,6 +1578,7 @@ def row_gen(num_rows: int, approx_row_bytes: int = 1024):
         yield {"a": i, "b": "x" * approx_row_bytes}
 
 
+@pytest.mark.skipif(HTTP_NOT_PORTED, reason="http: not ported yet")
 @pytest.mark.timeout(60)
 @pytest.mark.flaky(reruns=3, reruns_delay=2)
 @pytest.mark.parametrize("use_parallel_table_upload", [False, True])
@@ -2068,6 +2075,7 @@ def test_calls_stream_table_ref_expansion(client):
     assert calls[0].output["table"] == o.table.table_ref.uri
 
 
+@pytest.mark.skipif(HTTP_NOT_PORTED, reason="http: not ported yet")
 def test_object_version_read(client):
     refs = []
     for i in range(10):
@@ -2232,6 +2240,7 @@ def test_long_display_names_are_elided(weave_active):
     assert len(call.display_name) <= MAX_DISPLAY_NAME_LENGTH
 
 
+@pytest.mark.skipif(HTTP_NOT_PORTED, reason="http: not ported yet")
 def test_object_deletion(client):
     # Simple case, delete a single version of an object
     obj = {"a": 5}
@@ -2287,6 +2296,7 @@ def test_object_deletion(client):
     assert len(versions.objs) == 0
 
 
+@pytest.mark.skipif(HTTP_NOT_PORTED, reason="http: not ported yet")
 def test_recursive_object_deletion(weave_active):
     # Create a bunch of objects that refer to each other
     obj1 = {"a": 5}
@@ -2317,6 +2327,7 @@ def test_recursive_object_deletion(weave_active):
     assert obj3_ref.get() == {"c": obj2}
 
 
+@pytest.mark.skipif(HTTP_NOT_PORTED, reason="http: not ported yet")
 def test_delete_op_version(weave_active):
     @weave.op
     def my_op(a: int) -> int:
@@ -3327,6 +3338,7 @@ def test_tracing_enabled_context(client):
         client.finish_call(call)  # Should not raise any error
 
 
+@pytest.mark.skipif(HTTP_NOT_PORTED, reason="http: not ported yet")
 def test_calls_query_hardcoded_filter_length_validation(client):
     @weave.op
     def test():
@@ -3381,6 +3393,7 @@ def test_calls_query_hardcoded_filter_length_validation(client):
         calls = client.get_calls(filter={"trace_ids": ["11111"] * 1001})[0]
 
 
+@pytest.mark.skipif(HTTP_NOT_PORTED, reason="http: not ported yet")
 def test_calls_query_datetime_optimization_with_gt_operation(client):
     """Test that datetime optimization works correctly with GT operations on started_at and ended_at fields."""
     # Use a unique test ID to identify these calls
@@ -4176,6 +4189,7 @@ def test_filter_calls_by_ref_wildcard_versions(client):
     assert sorted(call.inputs["ref"]["a"] for call in calls) == [1, 2]
 
 
+@pytest.mark.skipif(HTTP_NOT_PORTED, reason="http: not ported yet")
 def test_files_stats(client):
 
     f_bytes = b"0" * 10000005
@@ -4199,6 +4213,7 @@ def test_no_400_on_invalid_artifact_url(client):
     assert server_call.id == id
 
 
+@pytest.mark.skipif(HTTP_NOT_PORTED, reason="http: not ported yet")
 def test_no_400_on_invalid_refs(client):
     @weave.op
     def test() -> str:
@@ -4232,6 +4247,7 @@ def test_get_evaluations(client, make_evals):
     assert evs[1].dataset.rows[0] == {"dataset_id": "jkl"}
 
 
+@pytest.mark.skipif(HTTP_NOT_PORTED, reason="http: not ported yet")
 def test_feedback_batching(network_proxy_client):
     """Test that feedback batching works correctly when enabled."""
     # Set up advanced client that uses the RemoteHttpTraceServer handler
@@ -4458,6 +4474,7 @@ def test_parallel_table_uploads_digest_consistency(
     assert saved_table5.table_ref is not None
 
 
+@pytest.mark.skipif(HTTP_NOT_PORTED, reason="http: not ported yet")
 def test_table_create_from_digests(network_proxy_client):
     """Test that table_create_from_digests works correctly to merge existing row digests."""
     basic_client, remote_client, records = network_proxy_client
@@ -4630,6 +4647,7 @@ def test_get_calls_columns_wb_run_id(client, monkeypatch):
     assert calls[0].wb_run_id == mock_run_id
 
 
+@pytest.mark.skipif(HTTP_NOT_PORTED, reason="http: not ported yet")
 def test_get_calls_include_usernames(client, monkeypatch):
     external_server = find_server_layer(client.server, UserInjectingExternalTraceServer)
     internal_user_id = external_server._idc.ext_to_int_user_id(client.entity)

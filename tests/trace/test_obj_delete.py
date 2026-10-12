@@ -1,6 +1,7 @@
 import pytest
 
 import weave
+from tests.trace.util import HTTP_NOT_PORTED
 from weave.trace.weave_client import WeaveClient
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.common_interface import SortBy
@@ -27,6 +28,7 @@ def _obj_delete(client: WeaveClient, object_id: str, digests: list[str]) -> int:
     ).num_deleted
 
 
+@pytest.mark.skipif(HTTP_NOT_PORTED, reason="http: not ported yet")
 def test_delete_object_versions(client: WeaveClient):
     v0 = weave.publish({"i": 1}, name="obj_1")
     v1 = weave.publish({"i": 2}, name="obj_1")
@@ -54,6 +56,7 @@ def test_delete_object_versions(client: WeaveClient):
     assert len(objs) == 0
 
 
+@pytest.mark.skipif(HTTP_NOT_PORTED, reason="http: not ported yet")
 def test_delete_all_object_versions(client: WeaveClient):
     weave.publish({"i": 1}, name="obj_1")
     weave.publish({"i": 2}, name="obj_1")
@@ -108,6 +111,7 @@ def test_delete_version_correctness(client: WeaveClient):
     assert objs[1].version_index == 2
 
 
+@pytest.mark.skipif(HTTP_NOT_PORTED, reason="http: not ported yet")
 def test_delete_object_max_limit(client: WeaveClient):
     # Create more than MAX_OBJECTS_TO_DELETE objects
     max_objs = 100
@@ -121,11 +125,13 @@ def test_delete_object_max_limit(client: WeaveClient):
         _obj_delete(client, "obj_1", digests)
 
 
+@pytest.mark.skipif(HTTP_NOT_PORTED, reason="http: not ported yet")
 def test_delete_nonexistent_object_id(client: WeaveClient):
     with pytest.raises(weave.trace_server.errors.NotFoundError):
         _obj_delete(client, "nonexistent_obj", None)
 
 
+@pytest.mark.skipif(HTTP_NOT_PORTED, reason="http: not ported yet")
 def test_delete_mixed_valid_invalid_digests(client: WeaveClient):
     v0 = weave.publish({"i": 1}, name="obj_1")
     v1 = weave.publish({"i": 2}, name="obj_1")
@@ -215,6 +221,7 @@ def test_republish_after_deleting_all_versions(
     assert latest[0].val == republish_val
 
 
+@pytest.mark.skipif(HTTP_NOT_PORTED, reason="http: not ported yet")
 def test_read_deleted_object(client: WeaveClient):
     weave.publish({"i": 1}, name="obj_1")
     weave.publish({"i": 2}, name="obj_1")
@@ -270,6 +277,7 @@ def test_op_versions(client: WeaveClient):
     assert len(objs3) == 0
 
 
+@pytest.mark.skipif(HTTP_NOT_PORTED, reason="http: not ported yet")
 def test_read_deleted_op(client: WeaveClient):
     @weave.op
     def my_op(x: int) -> int:
@@ -298,6 +306,7 @@ def test_read_deleted_op(client: WeaveClient):
     assert ref_res.vals[0] is None
 
 
+@pytest.mark.skipif(HTTP_NOT_PORTED, reason="http: not ported yet")
 def test_delete_all_object_versions_api(client: WeaveClient):
     """Test the public API for deleting all versions of an object."""
     v0 = weave.publish({"i": 1}, name="obj_test_all")
@@ -319,6 +328,7 @@ def test_delete_all_object_versions_api(client: WeaveClient):
         client.delete_all_object_versions("obj_test_all")
 
 
+@pytest.mark.skipif(HTTP_NOT_PORTED, reason="http: not ported yet")
 def test_delete_all_op_versions_api(client: WeaveClient):
     """Test the public API for deleting all versions of an op."""
 

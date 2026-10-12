@@ -291,8 +291,8 @@ Examples:
 
 #### Backend Selection
 
-The `--trace-server` flag selects the backend: `clickhouse` (default) or
-`fake` (in-memory).
+The `--trace-server` flag selects the backend: `clickhouse` (default),
+`fake` (in-memory) or `http` (a running trace server).
 
 **Fake / in-memory (Fastest for Development):**
 
@@ -327,6 +327,26 @@ nox --no-install -e "tests-3.12(shard='trace')" -- tests/trace/test_client_trace
 container automatically), or a local `clickhouse-server` binary with
 `--clickhouse-process=true`. When neither is available, use the in-memory
 fake with `--trace-server=fake`.
+
+**HTTP (core's trace server):**
+
+`--trace-server=http` sends every request to the server at
+`WF_TRACE_SERVER_URL` with `WANDB_API_KEY`, and calls its
+`POST /testonly/reset` before each test. Only the app in wandb/core's
+`services/weave-trace/src/tests/support/resettable_trace_server.py` has that
+route; the `Start trace server` step in `.github/workflows/weave-trace-tests.yaml`
+shows how to run it. The key must belong to a user named `shawn` (`TEST_ENTITY`).
+The reset is database-wide, so give each test process its own server (`-n0` for
+one):
+
+```bash
+WF_TRACE_SERVER_URL=http://127.0.0.1:6345 WANDB_API_KEY=<shawn-api-key> nox --no-install -e "tests-3.12(shard='trace')" -- tests/trace/test_dataset.py::test_basic_dataset_lifecycle --trace-server=http -n0
+```
+
+CI runs this in the `Weave client tests over HTTP` job. Tests that do not pass
+over HTTP yet carry `skipif(HTTP_NOT_PORTED, ...)`; porting a test removes its
+marker. ClickHouse-only gates (`NOT_CLICKHOUSE_BACKEND`, `client_is_clickhouse`)
+skip on HTTP as well.
 
 #### Remote HTTP Trace Server Implementation Selection
 
