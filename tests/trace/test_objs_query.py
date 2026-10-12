@@ -5,6 +5,7 @@ import pytest
 
 import weave
 from tests.trace.server_utils import TEST_ENTITY
+from tests.trace.util import HTTP_NOT_PORTED
 from weave.trace.weave_client import WeaveClient
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.common_interface import SortBy
@@ -178,6 +179,7 @@ def test_objs_query_filter_metadata_only(client: WeaveClient):
         assert obj.val
 
 
+@pytest.mark.skipif(HTTP_NOT_PORTED, reason="http: not ported yet")
 def test_objs_query_wb_user_id(client: WeaveClient):
     weave.publish({"i": 1}, name="obj_1")
     weave.publish({"i": 2}, name="obj_1")

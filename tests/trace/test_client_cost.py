@@ -3,11 +3,13 @@ import uuid
 
 import pytest
 
+from tests.trace.util import HTTP_NOT_PORTED
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.errors import InvalidRequest
 from weave.trace_server.interface.query import Query
 
 
+@pytest.mark.skipif(HTTP_NOT_PORTED, reason="http: not ported yet")
 def test_cost_apis(client):
     project_id = client.project_id
 
@@ -175,6 +177,7 @@ def test_cost_apis(client):
     assert len(res) == 0
 
 
+@pytest.mark.skipif(HTTP_NOT_PORTED, reason="http: not ported yet")
 def test_purge_only_ids(client):
     project_id = client.project_id
     costs = {
@@ -229,6 +232,7 @@ def test_purge_only_ids(client):
     )
 
 
+@pytest.mark.skipif(HTTP_NOT_PORTED, reason="http: not ported yet")
 def test_costs_streamed_with_all_fields(client):
     """Costs returned by calls_query_stream include extra metadata fields
     (provider_id, effective_date, pricing_level, etc.) and must not fail
