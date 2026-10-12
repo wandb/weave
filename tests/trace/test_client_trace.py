@@ -3582,6 +3582,10 @@ def test_object_with_char_limit(client):
     client.server.obj_create(create_req)
 
 
+@pytest.mark.skipif(
+    HTTP_NOT_PORTED,
+    reason="http: the server names the error class once wandb/core#58054 is deployed",
+)
 def test_object_with_char_over_limit(client):
     name = "l" * (CHAR_LIMIT + 1)
     obj = Custom(name=name, val={"1": 1})
@@ -3669,6 +3673,10 @@ def test_object_name_over_limit_warns_after_the_log_level_is_raised(client, capl
 
 
 @pytest.mark.disable_logging_error_check
+@pytest.mark.skipif(
+    HTTP_NOT_PORTED,
+    reason="http: the server names the error class once wandb/core#58054 is deployed",
+)
 def test_names_truncated_to_one_id_are_rejected_with_the_name_that_was_sent(client):
     """Two types cannot share an id (WB-30574). When the id is a truncation, the
     rejection quotes the name that produced it, which is the only part the caller
@@ -5092,6 +5100,10 @@ def test_dedupe_ref_in_calls_stream(client):
     }
 
 
+@pytest.mark.skipif(
+    HTTP_NOT_PORTED,
+    reason="http: the server names the error class once wandb/core#58054 is deployed",
+)
 def test_calls_query_stats_with_limit(client):
     def calls_stats(limit=None, filter=None, include_total_storage_size=False):
         return client.server.calls_query_stats(

@@ -17,6 +17,7 @@ from typing import Literal
 import pytest
 
 import weave
+from tests.trace.util import HTTP_NOT_PORTED
 from weave.trace import base_objects
 from weave.trace.refs import ObjectRef
 from weave.trace.serialization.serialize import to_json
@@ -376,6 +377,10 @@ def test_digest_equality(client):
     assert top_level_pythonic_digest == top_level_interface_style_digest
 
 
+@pytest.mark.skipif(
+    HTTP_NOT_PORTED,
+    reason="http: the server names the error class once wandb/core#58054 is deployed",
+)
 def test_schema_validation(client):
     # Test that we can't create an object with the wrong schema
     with pytest.raises(ValueError, match="validation error"):
@@ -1082,6 +1087,10 @@ def test_exclude_base_object_classes_with_inherited_objects(client: WeaveClient)
     )
 
 
+@pytest.mark.skipif(
+    HTTP_NOT_PORTED,
+    reason="http: the server names the error class once wandb/core#58054 is deployed",
+)
 def test_obj_create_rejects_name_type_collision(client: WeaveClient):
     """WB-30574: object_id is bound to one base_object_class per project.
 

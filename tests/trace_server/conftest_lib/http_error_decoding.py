@@ -5,6 +5,11 @@ server turns them into a status code and a JSON body (`weave.shared.errors`),
 and `RemoteHTTPTraceServer` raises `httpx.HTTPStatusError`. This wrapper is
 the inverse of the server's error registry, so a test can expect the same
 exception on every backend.
+
+Production error bodies do not name the exception class, on purpose: the
+public API should not change for tests. Core's resettable test server adds
+`error_type` and the exception's fields; without them this wrapper falls back
+to the status code.
 """
 
 from __future__ import annotations

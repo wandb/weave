@@ -3,6 +3,7 @@ from unittest.mock import MagicMock, Mock, patch
 
 import pytest
 
+from tests.trace.util import HTTP_NOT_PORTED
 from weave import publish
 from weave.flow.llm_structured_model import (
     LLMStructuredCompletionModel,
@@ -850,6 +851,10 @@ def test_llm_structured_completion_model_prompt_takes_precedence(
     assert call_args.inputs.messages == []
 
 
+@pytest.mark.skipif(
+    HTTP_NOT_PORTED,
+    reason="http: the server names the error class once wandb/core#58054 is deployed",
+)
 def test_llm_structured_completion_model_schema_validation(client: WeaveClient):
     """Test schema validation for LLMStructuredCompletionModel."""
     # Test missing required field
