@@ -297,35 +297,17 @@ def lite_llm_completion(
     vertex_credentials: str | None = None,
     is_custom_runtime: bool = False,
 ) -> tsi.CompletionsCreateRes:
-    if _use_direct_openai_client(inputs.model, is_custom_runtime):
-        client_kwargs = _build_openai_client_kwargs(api_key, base_url, extra_headers)
-        try:
-            if is_custom_runtime:
-                client_kwargs["http_client"] = _build_public_network_http_client()
-            with OpenAI(**client_kwargs) as client:
-                res = client.chat.completions.create(
-                    **_openai_compatible_inputs(inputs)
-                )
-            return tsi.CompletionsCreateRes(response=res.model_dump())
-        except Exception as e:
-            return _completion_error_response(e)
+    if is_custom_runtime:
+        return _custom_runtime_completion(api_key, inputs, base_url, extra_headers)
 
     kwargs = _build_litellm_kwargs(
         api_key, inputs, provider, base_url, extra_headers, vertex_credentials
     )
-    litellm_client = None
     try:
-        if is_custom_runtime:
-            kwargs["client"] = litellm_client = HTTPHandler(
-                client=_build_public_network_http_client()
-            )
         res = litellm.completion(**kwargs)
         return tsi.CompletionsCreateRes(response=res.model_dump())
     except Exception as e:
         return _completion_error_response(e)
-    finally:
-        if litellm_client is not None:
-            litellm_client.close()
 
 
 async def lite_llm_acompletion(
@@ -338,33 +320,125 @@ async def lite_llm_acompletion(
     is_custom_runtime: bool = False,
 ) -> tsi.CompletionsCreateRes:
     """Async twin of `lite_llm_completion`. No thread held during the LLM wait."""
-    if _use_direct_openai_client(inputs.model, is_custom_runtime):
-        client_kwargs = _build_openai_client_kwargs(api_key, base_url, extra_headers)
-        try:
-            if is_custom_runtime:
-                client_kwargs["http_client"] = _build_public_network_async_http_client()
-            async with AsyncOpenAI(**client_kwargs) as client:
-                res = await client.chat.completions.create(
-                    **_openai_compatible_inputs(inputs)
-                )
-            return tsi.CompletionsCreateRes(response=res.model_dump())
-        except Exception as e:
-            return _completion_error_response(e)
+    if is_custom_runtime:
+        return await _custom_runtime_acompletion(
+            api_key, inputs, base_url, extra_headers
+        )
 
     kwargs = _build_litellm_kwargs(
         api_key, inputs, provider, base_url, extra_headers, vertex_credentials
     )
-    litellm_client = None
     try:
-        if is_custom_runtime:
-            kwargs["client"] = litellm_client = _PublicNetworkAsyncHTTPHandler()
         res = await litellm.acompletion(**kwargs)
         return tsi.CompletionsCreateRes(response=res.model_dump())
     except Exception as e:
         return _completion_error_response(e)
+
+
+# Custom runtimes are user-registered, so their requests only reach public
+# addresses. Every model except Ollama uses the OpenAI client: LiteLLM picks a
+# route from the model name, and some routes build their own HTTP client instead
+# of the guarded one. LiteLLM's Ollama route uses the injected client.
+
+
+def _custom_runtime_completion(
+    api_key: str | None,
+    inputs: tsi.CompletionsCreateRequestInputs,
+    base_url: str | None,
+    extra_headers: dict[str, str] | None,
+) -> tsi.CompletionsCreateRes:
+    http_client = _build_public_network_http_client()
+    try:
+        if inputs.model.startswith("ollama/"):
+            kwargs = _build_litellm_kwargs(
+                api_key, inputs, "custom", base_url, extra_headers, None
+            )
+            res = litellm.completion(**kwargs, client=HTTPHandler(client=http_client))
+        else:
+            client = OpenAI(
+                **_build_openai_client_kwargs(api_key, base_url, extra_headers),
+                http_client=http_client,
+            )
+            res = client.chat.completions.create(**_openai_compatible_inputs(inputs))
+        return tsi.CompletionsCreateRes(response=res.model_dump())
+    except Exception as e:
+        return _completion_error_response(e)
     finally:
-        if litellm_client is not None:
-            await litellm_client.close()
+        http_client.close()
+
+
+async def _custom_runtime_acompletion(
+    api_key: str | None,
+    inputs: tsi.CompletionsCreateRequestInputs,
+    base_url: str | None,
+    extra_headers: dict[str, str] | None,
+) -> tsi.CompletionsCreateRes:
+    http_client = _build_public_network_async_http_client()
+    try:
+        if inputs.model.startswith("ollama/"):
+            kwargs = _build_litellm_kwargs(
+                api_key, inputs, "custom", base_url, extra_headers, None
+            )
+            res = await litellm.acompletion(
+                **kwargs, client=_PublicNetworkAsyncHTTPHandler(http_client)
+            )
+        else:
+            client = AsyncOpenAI(
+                **_build_openai_client_kwargs(api_key, base_url, extra_headers),
+                http_client=http_client,
+            )
+            res = await client.chat.completions.create(
+                **_openai_compatible_inputs(inputs)
+            )
+        return tsi.CompletionsCreateRes(response=res.model_dump())
+    except Exception as e:
+        return _completion_error_response(e)
+    finally:
+        await http_client.aclose()
+
+
+def _custom_runtime_completion_stream(
+    api_key: str | None,
+    inputs: tsi.CompletionsCreateRequestInputs,
+    base_url: str | None,
+    extra_headers: dict[str, str] | None,
+) -> Iterator[dict[str, Any]]:
+    http_client = _build_public_network_http_client()
+    try:
+        if inputs.model.startswith("ollama/"):
+            stream = litellm.completion(
+                **inputs.model_dump(
+                    exclude={"extra_headers", "stream", "stream_options"}
+                ),
+                api_key=api_key,
+                api_base=base_url,
+                extra_headers=extra_headers or {},
+                stream=True,
+                stream_options={"include_usage": True},
+                client=HTTPHandler(client=http_client),
+            )
+            if not isinstance(stream, CustomStreamWrapper):
+                raise InvalidRequest("Expected a streaming response from litellm")
+            for chunk in stream:
+                yield chunk.model_dump()
+        else:
+            client = OpenAI(
+                **_build_openai_client_kwargs(api_key, base_url, extra_headers),
+                http_client=http_client,
+            )
+            request_inputs = _openai_compatible_inputs(inputs)
+            request_inputs.pop("stream", None)
+            for chunk in client.chat.completions.create(
+                **request_inputs,
+                stream=True,
+                stream_options={"include_usage": True},
+            ):
+                yield chunk.model_dump()
+    except Exception as e:
+        blocked = _non_public_address_error(e)
+        yield {"error": str(blocked or e).replace("litellm.", "")}
+    finally:
+        http_client.close()
 
 
 def _openai_compatible_inputs(
@@ -405,12 +479,6 @@ def _build_openai_client_kwargs(
     }
 
 
-def _use_direct_openai_client(model: str, is_custom_runtime: bool) -> bool:
-    # LiteLLM picks a route from the model name, and some routes build their own
-    # HTTP client instead of the guarded one; its Ollama route uses the injected client.
-    return is_custom_runtime and not model.startswith("ollama/")
-
-
 # One client per call: pooled connections are keyed by the pinned IP, not the hostname.
 # A custom transport disables HTTP(S)_PROXY, and these clients skip LiteLLM's
 # SSL_VERIFY and SSL_CERTIFICATE (SSL_CERT_FILE still applies). Add support when a
@@ -428,9 +496,13 @@ def _build_public_network_async_http_client() -> httpx.AsyncClient:
 
 
 class _PublicNetworkAsyncHTTPHandler(AsyncHTTPHandler):
-    # AsyncHTTPHandler takes no client argument; it always builds its own here.
+    # AsyncHTTPHandler takes no client argument; its __init__ calls create_client.
+    def __init__(self, client: httpx.AsyncClient) -> None:
+        self._public_network_client = client
+        super().__init__()
+
     def create_client(self, *args: Any, **kwargs: Any) -> httpx.AsyncClient:
-        return _build_public_network_async_http_client()
+        return self._public_network_client
 
 
 def _build_litellm_kwargs(
@@ -797,28 +869,15 @@ def lite_llm_completion_stream(
 
     litellm.drop_params = True
 
+    if is_custom_runtime:
+        return _custom_runtime_completion_stream(
+            api_key, inputs, base_url, extra_headers
+        )
+
     # Produce serializable dictionaries regardless of the underlying client.
     def _generate_chunks() -> Iterator[dict[str, Any]]:
-        litellm_client = None
         try:
-            if _use_direct_openai_client(inputs.model, is_custom_runtime):
-                client_kwargs = _build_openai_client_kwargs(
-                    api_key, base_url, extra_headers
-                )
-                if is_custom_runtime:
-                    client_kwargs["http_client"] = _build_public_network_http_client()
-                with OpenAI(**client_kwargs) as client:
-                    request_inputs = _openai_compatible_inputs(inputs)
-                    request_inputs.pop("stream", None)
-                    stream = client.chat.completions.create(
-                        **request_inputs,
-                        stream=True,
-                        stream_options={"include_usage": True},
-                    )
-                    for chunk in stream:
-                        yield chunk.model_dump()
-                return
-            elif provider == "custom" and base_url:
+            if provider == "custom" and base_url:
                 model_dict = inputs.model_dump(
                     exclude=[
                         "extra_headers",
@@ -826,10 +885,6 @@ def lite_llm_completion_stream(
                         "stream_options",
                     ]
                 )
-                if is_custom_runtime:
-                    litellm_client = HTTPHandler(
-                        client=_build_public_network_http_client()
-                    )
                 stream = litellm.completion(
                     **model_dict,
                     api_key=api_key,
@@ -837,7 +892,6 @@ def lite_llm_completion_stream(
                     extra_headers=extra_headers or {},
                     stream=True,
                     stream_options={"include_usage": True},
-                    client=litellm_client,
                 )
             else:
                 is_vertex_provider = provider in VERTEX_PROVIDER_NAMES
@@ -869,12 +923,8 @@ def lite_llm_completion_stream(
             for chunk in stream:
                 yield chunk.model_dump()
         except Exception as e:
-            blocked = _non_public_address_error(e)
-            error_message = str(blocked or e).replace("litellm.", "")
+            error_message = str(e).replace("litellm.", "")
             yield {"error": error_message}
-        finally:
-            if litellm_client is not None:
-                litellm_client.close()
 
     # If the caller wants a custom return type transformation (currently unused)
     # they can wrap the generator themselves. We just return the raw iterator.
