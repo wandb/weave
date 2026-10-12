@@ -29,6 +29,29 @@ def pytest_addoption(parser):
         pass
 
 
+def pytest_configure(config):
+    # The reset clears the whole database, so each xdist worker (gw0, gw1, ...)
+    # takes its own server from the comma-separated list.
+    urls = os.environ.get("WEAVE_TEST_TRACE_SERVER_URLS")
+    if not urls:
+        return
+    servers = urls.split(",")
+    workers = len(config.getoption("tx", None) or [])
+    if workers > len(servers):
+        raise pytest.UsageError(
+            f"{workers} xdist workers, but WEAVE_TEST_TRACE_SERVER_URLS lists "
+            f"{len(servers)} servers"
+        )
+    worker = os.environ.get("PYTEST_XDIST_WORKER")
+    if not worker:
+        return
+    index = int(worker.removeprefix("gw"))
+    if index >= len(servers):
+        # xdist numbers a worker that replaces a crashed one past the others.
+        raise pytest.UsageError(f"{worker} replaced a crashed worker; no server left")
+    os.environ["WF_TRACE_SERVER_URL"] = servers[index]
+
+
 def pytest_collection_modifyitems(config, items):
     # Add the trace_server marker to all tests that use the trace_server fixture.
     # Note: Filtering based on remote-http-trace-server flag is handled in tests/trace_server_bindings/conftest.py

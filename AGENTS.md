@@ -268,8 +268,9 @@ Every request goes to the server at `WF_TRACE_SERVER_URL` with
 `services/weave-trace/src/tests/support/resettable_trace_server.py` has that
 route; `.github/scripts/start-trace-server.sh` shows how CI runs it. The key
 must belong to a user named `shawn` (`TEST_ENTITY`). The reset is
-database-wide, so give each test process its own server; the shards run in a
-single process.
+database-wide, so each test process needs its own server. To run xdist
+workers, list one server per worker, comma-separated, in
+`WEAVE_TEST_TRACE_SERVER_URLS`: worker `gwN` takes the Nth.
 
 ```bash
 WF_TRACE_SERVER_URL=http://127.0.0.1:6345 WANDB_API_KEY=<shawn-api-key> WANDB_BASE_URL=http://localhost:8080 nox --no-install -e "tests-3.12(shard='trace')" -- tests/trace/test_dataset.py::test_basic_dataset_lifecycle
@@ -279,8 +280,11 @@ WF_TRACE_SERVER_URL=http://127.0.0.1:6345 WANDB_API_KEY=<shawn-api-key> WANDB_BA
 `ensure_project` fixture creates extra projects there.
 
 CI runs every server-backed shard this way (`trace-tests` in
-`.github/workflows/test.yaml`). A test that needs the server's internals (its
-SQL, storage, middleware layers) belongs in wandb/core next to the server.
+`.github/workflows/test.yaml`), with eight servers per job: the two trace
+shards run eight xdist workers, and the other shards share one job per Python
+version and run side by side (`.github/scripts/run_nox_shards.py`). A test that
+needs the server's internals (its SQL, storage, middleware layers) belongs in
+wandb/core next to the server.
 
 Writing a test against the server:
 

@@ -20,11 +20,19 @@ jobs:
       contents: read
       packages: write
       id-token: write
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-latest-8-cores
     env:
       MAX_ATTEMPTS: 3
       CORE_DIR: core
       COMPOSE_FILE: .github/compose/weave-trace-tests.yaml
+      # One server per xdist worker or parallel shard.
+      TRACE_SERVER_COUNT: 8
+      # Longest first, so the parallel shards finish together.
+      INTEGRATION_SHARDS: >-
+        llamaindex langchain autogen_tests trace_server_bindings flow scorers
+        crewai openai dspy anthropic verifiers_test vertexai litellm mistral
+        instructor smolagents google_genai pandas_test bedrock fastmcp cohere
+        cerebras groq notdiamond
     strategy:
       matrix:
         python-version-major: ["3"]
@@ -35,57 +43,52 @@ jobs:
             "13",
             #
           ]
-        shard:
-          [
-            "trace",
-            "flow",
-            "trace_server_bindings",
-            "anthropic",
-            "bedrock",
-            "cerebras",
-            "cohere",
-            "crewai",
-            "dspy",
-            "groq",
-            "google_genai",
-            "instructor",
-            "langchain",
-            "litellm",
-            "llamaindex",
-            "mistral",
-            "notdiamond",
-            "openai",
-            "scorers",
-            "verifiers_test",
-            "vertexai",
-            "pandas_test",
-            "fastmcp",
-            "smolagents",
-            "autogen_tests",
-          ]
-        exclude:
+        # Every job starts core's stack, so the shards other than trace share
+        # one job per Python version and run side by side.
+        group: ["trace", "integrations"]
+        include:
           # verifiers_test dependencies require Python >= 3.11.
-          - python-version-major: "3"
-            python-version-minor: "10"
-            shard: "verifiers_test"
+          - python-version-minor: "10"
+            group: "integrations"
+            skip-shards: "verifiers_test"
       fail-fast: false
     steps:
       - name: Checkout
         uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
       - name: Filter shards if specified
         id: filter_shards
+        env:
+          INPUT_SHARDS: ${{ github.event.inputs.shards }}
+          SKIP_SHARDS: ${{ matrix.skip-shards }}
         run: |
-          INPUT_SHARDS="${{ github.event.inputs.shards }}"
-          if [ -n "$INPUT_SHARDS" ]; then
-            echo "Running specific shards: $INPUT_SHARDS"
-            if [[ ! ",$INPUT_SHARDS," == *",${{ matrix.shard }},"* ]]; then
-              echo "Skipping ${{ matrix.shard }} as it's not in the specified list"
-              echo "skip=true" >> $GITHUB_OUTPUT
-              exit 0
-            fi
+          if [[ "${{ matrix.group }}" == "trace" ]]; then
+            candidates="trace"
+          else
+            candidates="${INTEGRATION_SHARDS}"
           fi
-          echo "Running shard: ${{ matrix.shard }}"
-          echo "skip=false" >> $GITHUB_OUTPUT
+          shards=()
+          for shard in ${candidates}; do
+            [[ " ${SKIP_SHARDS} " == *" ${shard} "* ]] && continue
+            [[ -n "${INPUT_SHARDS}" && ",${INPUT_SHARDS}," != *",${shard},"* ]] && continue
+            shards+=("${shard}")
+          done
+          echo "Running shards: ${shards[*]}"
+          echo "shards=${shards[*]}" >> "$GITHUB_OUTPUT"
+          if [[ ${#shards[@]} == 0 ]]; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Set up Python ${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}
+        if: steps.filter_shards.outputs.skip != 'true'
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: ${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}
+      - name: Install dependencies
+        if: steps.filter_shards.outputs.skip != 'true'
+        run: |
+          python -m pip install --upgrade pip
+          pip install nox uv
       - name: Create GitHub App token
         id: app-token
         if: steps.filter_shards.outputs.skip != 'true'
@@ -126,7 +129,7 @@ jobs:
       - name: Configure Docker auth
         if: steps.filter_shards.outputs.skip != 'true'
         run: gcloud auth configure-docker us-central1-docker.pkg.dev --quiet
-      - name: Start trace server
+      - name: Start trace servers
         if: steps.filter_shards.outputs.skip != 'true'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -134,34 +137,12 @@ jobs:
       - name: Enable debug logging
         if: steps.filter_shards.outputs.skip != 'true'
         run: echo "ACTIONS_STEP_DEBUG=true" >> $GITHUB_ENV
-      - name: Set up Python ${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}
-        if: steps.filter_shards.outputs.skip != 'true'
-        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
-        with:
-          python-version: ${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}
-      - name: Install dependencies
-        if: steps.filter_shards.outputs.skip != 'true'
-        run: |
-          python -m pip install --upgrade pip
-          pip install nox uv
-      - name: Check if shard needs trace_server markers
-        id: check_trace_markers
-        if: steps.filter_shards.outputs.skip != 'true'
-        run: |
-          # Shards that are in the regular test matrix and need trace_server markers
-          TRACE_SERVER_SHARDS="flow trace_server_bindings anthropic cerebras cohere crewai dspy groq google_genai google_ai_studio instructor langchain litellm llamaindex mistral notdiamond openai openai_agents vertexai bedrock scorers pandas_test huggingface smolagents fastmcp autogen_tests trace trace_no_server"
-          if [[ " $TRACE_SERVER_SHARDS " =~ " ${{ matrix.shard }} " ]]; then
-            echo "needs_markers=true" >> $GITHUB_OUTPUT
-          else
-            echo "needs_markers=false" >> $GITHUB_OUTPUT
-          fi
       - name: Run nox (HTTP trace server)
-        if: steps.filter_shards.outputs.skip != 'true' && steps.check_trace_markers.outputs.needs_markers == 'true'
+        if: steps.filter_shards.outputs.skip != 'true'
         env:
           WEAVE_SENTRY_ENV: ci
           CI: 1
           WEAVE_USE_MEMRAY: 1
-          WF_TRACE_SERVER_URL: http://127.0.0.1:6345
           WANDB_BASE_URL: http://localhost:8080
           WEAVE_SERVER_DISABLE_ECOSYSTEM: 1
           GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
@@ -170,33 +151,26 @@ jobs:
           MISTRAL_API_KEY: ${{ secrets.MISTRAL_API_KEY }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           DD_TRACE_ENABLED: false
+          PYTHON_VERSION: ${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}
         run: |
-          .github/scripts/retry.sh nox -e "tests-${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}(shard='${{ matrix.shard }}')" -- \
-            -m "trace_server"
-      - name: Run nox (No marker filters for integration-only shards)
-        if: steps.filter_shards.outputs.skip != 'true' && steps.check_trace_markers.outputs.needs_markers == 'false'
-        env:
-          WEAVE_SENTRY_ENV: ci
-          CI: 1
-          WEAVE_USE_MEMRAY: 1
-          WF_TRACE_SERVER_URL: http://127.0.0.1:6345
-          WANDB_BASE_URL: http://localhost:8080
-          WEAVE_SERVER_DISABLE_ECOSYSTEM: 1
-          GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
-          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-          MISTRAL_API_KEY: ${{ secrets.MISTRAL_API_KEY }}
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-          DD_TRACE_ENABLED: false
-        run: |
-          .github/scripts/retry.sh nox -e "tests-${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}(shard='${{ matrix.shard }}')"
+          if [[ "${{ matrix.group }}" == "integrations" ]]; then
+            # verifiers_test is not a trace server shard.
+            python .github/scripts/run_nox_shards.py "${PYTHON_VERSION}" ${{ steps.filter_shards.outputs.shards }} \
+              --unfiltered verifiers_test --attempts "${MAX_ATTEMPTS}" --log-dir "${RUNNER_TEMP}/nox"
+          else
+            # Nothing reads the coverage files.
+            .github/scripts/retry.sh nox -e "tests-${PYTHON_VERSION}(shard='trace')" -- \
+              -m "trace_server" --no-cov -n "${TRACE_SERVER_COUNT}"
+          fi
       - name: Dump service logs
         if: failure() && steps.filter_shards.outputs.skip != 'true'
         working-directory: ${{ env.CORE_DIR }}
         run: |
-          echo "::group::trace-server logs"
-          docker logs trace-server || true
-          echo "::endgroup::"
+          for log in "${RUNNER_TEMP}"/trace-server/*.log; do
+            echo "::group::${log##*/}"
+            cat "${log}"
+            echo "::endgroup::"
+          done
           for service in wandb-local clickhouse; do
             echo "::group::${service} logs"
             docker compose logs --no-color "${service}" || true
