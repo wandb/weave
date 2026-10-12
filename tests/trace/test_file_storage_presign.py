@@ -9,6 +9,7 @@ enforce bucket policies).
 """
 
 import re
+from urllib.parse import parse_qs, urlparse
 
 import boto3
 import pytest
@@ -52,6 +53,9 @@ def test_s3_presign_read_round_trips_one_object_and_honors_ttl():
     client.store(objects, b"PAR1-objects")
 
     url = client.presign_read(calls, ttl=3600)
+    signed = parse_qs(urlparse(url).query)
+    assert signed["X-Amz-Algorithm"] == ["AWS4-HMAC-SHA256"]
+    assert signed["X-Amz-Expires"] == ["3600"]
     resp = requests.get(url, timeout=5)
     assert resp.status_code == 200
     assert resp.content == b"PAR1-calls"
@@ -107,3 +111,25 @@ def test_presign_read_rejects_sibling_and_out_of_prefix_objects_for_all_backends
         ) as out_of_prefix_error:
             client.presign_read(out_of_prefix_uri, ttl=3600)
         assert out_of_prefix_error.value.args == (out_of_prefix_message,)
+
+
+@mock_aws
+def test_resolved_storage_does_not_replace_explicit_environment(monkeypatch):
+    monkeypatch.setenv("WF_FILE_STORAGE_URI", "s3://explicit-bucket")
+    monkeypatch.setenv("WF_FILE_STORAGE_AWS_ACCESS_KEY_ID", "test-key")
+    monkeypatch.setenv("WF_FILE_STORAGE_AWS_SECRET_ACCESS_KEY", "test-secret")
+    monkeypatch.setenv("WF_FILE_STORAGE_AWS_REGION", "us-east-1")
+    resolved = file_storage.storage_client_from_uri("s3://resolved-bucket")
+    explicit = file_storage.maybe_get_storage_client_from_env()
+    assert resolved.base_uri.to_uri_str() == "s3://resolved-bucket"
+    assert explicit.base_uri.to_uri_str() == "s3://explicit-bucket"
+
+
+@pytest.mark.parametrize(
+    "uri", ["s3://bucket/exports", "gs://bucket/path", "az://account/container/path"]
+)
+def test_resolved_storage_rejects_object_prefix(uri):
+    with pytest.raises(
+        ValueError, match="export storage URI must identify a bucket or container root"
+    ):
+        file_storage.storage_client_from_uri(uri)

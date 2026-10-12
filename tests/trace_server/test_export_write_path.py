@@ -158,15 +158,21 @@ def test_start_export_persists_manifest_and_runs_targets_serially_in_one_worker(
 @pytest.mark.skipif(
     NOT_CLICKHOUSE_BACKEND, reason="ClickHouse-only: export server entry point"
 )
+@pytest.mark.parametrize("request_scoped", [False, True])
 def test_export_start_persists_manifest(
-    clickhouse_trace_server, storage_client: S3StorageClient
+    clickhouse_trace_server, storage_client: S3StorageClient, request_scoped: bool
 ):
-    clickhouse_trace_server._file_storage_client = storage_client
+    clickhouse_trace_server._file_storage_client = (
+        None if request_scoped else storage_client
+    )
     clickhouse_trace_server._file_storage_client_initialized = True
     project_id = b64(f"{TEST_ENTITY}/export-write-path")
     res = clickhouse_trace_server.export_start(
-        tsi.ExportStartReq(project_id=project_id, targets=["objects", "feedback"])
+        tsi.ExportStartReq(project_id=project_id, targets=["objects", "feedback"]),
+        storage_client=storage_client if request_scoped else None,
     )
+    if request_scoped:
+        assert clickhouse_trace_server._file_storage_client is None
     assert export.JOB_ID_RE.match(res.job_id)
     manifest = json.loads(
         storage_client.read(

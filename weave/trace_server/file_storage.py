@@ -312,6 +312,7 @@ class S3StorageClient(FileStorageClient):
         assert isinstance(base_uri, S3FileStorageURI)
         super().__init__(base_uri)
         config = Config(
+            signature_version="s3v4",
             connect_timeout=DEFAULT_CONNECT_TIMEOUT,
             read_timeout=DEFAULT_READ_TIMEOUT,
             retries={"max_attempts": 0},
@@ -601,6 +602,14 @@ def maybe_get_storage_client_from_env() -> FileStorageClient | None:
         )
         return None
 
+    return storage_client_from_uri(file_storage_uri)
+
+
+def storage_client_from_uri(file_storage_uri: str) -> FileStorageClient:
+    """Build an export storage client without changing process environment."""
+    parsed_uri = FileStorageURI.parse_uri_str(file_storage_uri)
+    if parsed_uri.has_path():
+        raise ValueError("export storage URI must identify a bucket or container root")
     if isinstance(parsed_uri, S3FileStorageURI):
         return S3StorageClient(parsed_uri, get_aws_credentials())
     elif isinstance(parsed_uri, GCSFileStorageURI):

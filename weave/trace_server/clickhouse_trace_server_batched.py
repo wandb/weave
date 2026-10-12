@@ -7447,7 +7447,9 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
         return res
 
-    def export_start(self, req: tsi.ExportStartReq) -> tsi.ExportStartRes:
+    def export_start(
+        self, req: tsi.ExportStartReq, *, storage_client: FileStorageClient | None = None
+    ) -> tsi.ExportStartRes:
         calls_read_table = ReadTable.CALLS_COMPLETE
         if "calls" in req.targets:
             calls_read_table = self.table_routing_resolver.resolve_read_table(
@@ -7458,7 +7460,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             lambda: self._mint_client(
                 send_receive_timeout=export.EXPORT_MAX_EXECUTION_SECONDS
             ),
-            self.file_storage_client,
+            storage_client if storage_client is not None else self.file_storage_client,
             req.project_id,
             req.targets,
             calls_read_table,
@@ -7466,10 +7468,12 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         )
         return tsi.ExportStartRes(job_id=job_id)
 
-    def export_status(self, req: tsi.ExportStatusReq) -> tsi.ExportStatusRes:
+    def export_status(
+        self, req: tsi.ExportStatusReq, *, storage_client: FileStorageClient | None = None
+    ) -> tsi.ExportStatusRes:
         return export.get_export_status(
             self.ch_client,
-            self.file_storage_client,
+            storage_client if storage_client is not None else self.file_storage_client,
             req.project_id,
             req.job_id,
             wf_env.wf_clickhouse_query_log_cluster(),

@@ -84,6 +84,13 @@ _Important:_ For OpenAI Codex agents (most likely you!), your environment does n
 
 ### Azure file storage authentication
 
+### Bulk export storage
+
+Export callers can supply a request-scoped storage client to the ClickHouse
+backend. Use `storage_client_from_uri` for resolved deployment destinations;
+never mutate WF_FILE_STORAGE_URI or the shared server client during a request.
+S3 signing uses SigV4, including for KMS-encrypted export downloads.
+
 ### Bulk export admission
 
 The export admission contract and recovery limits are documented in
