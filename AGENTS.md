@@ -295,8 +295,9 @@ Writing a test against the server:
   `client.project_id`, or `ensure_project("name")` for a second project.
 - Server errors arrive as the server's exception class (`NotFoundError`,
   `InvalidRequest`, `ValueError`, ...). The tests-only
-  `HTTPErrorDecodingTraceServer` rebuilds them from the response body, which
-  carries `error_type` for that purpose.
+  `HTTPErrorDecodingTraceServer` rebuilds them from the response body.
+  Production bodies do not name the exception class, on purpose; core's
+  resettable test server adds `error_type` and the exception's fields.
 - The HTTP route returns only the columns a `CallsQueryReq.columns` asks for
   (plus ids, names and timestamps), so request every column the test reads.
 - An object digest covers the refs inside it in their internal form, so it
