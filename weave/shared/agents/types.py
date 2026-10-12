@@ -283,7 +283,7 @@ class AgentSpanStatsColumn(AgentResponseModel):
     """Metadata describing one column in an agent span stats result row."""
 
     name: str
-    role: Literal["time", "bucket", "group", "metric"]
+    role: Literal["time", "time_end", "bucket", "group", "metric"]
     value_type: AgentSpanStatsColumnValueType
     metric: str | None = None
     aggregation: str | None = None

@@ -2087,6 +2087,7 @@ def test_agent_span_stats_ungrouped_metrics(ch_server):
         ("America/Los_Angeles", "2026-10-03", False),
         ("America/Los_Angeles", "2026-03-07", False),
         ("America/Los_Angeles", "2026-10-31", True),
+        ("America/Santiago", "2026-09-05", False),
         ("Asia/Kathmandu", "2026-10-03", False),
         ("Australia/Lord_Howe", "2026-10-03", False),
     ],
@@ -2152,18 +2153,14 @@ def test_agent_span_stats_calendar_day_buckets(
     assert res.timezone == timezone
     assert [(column.name, column.role) for column in res.columns] == [
         ("timestamp", "time"),
+        ("bucket_end", "time_end"),
         *([("provider_name", "group")] if grouped else []),
-        ("bucket_end", "time"),
         ("count_spans", "metric"),
     ]
     assert res.rows == [
         {
-            "timestamp": timestamp.replace(tzinfo=None)
-            if timezone == "UTC"
-            else timestamp,
-            "bucket_end": bucket_end.replace(tzinfo=None)
-            if timezone == "UTC"
-            else bucket_end,
+            "timestamp": timestamp,
+            "bucket_end": bucket_end,
             "count_spans": count,
             **({"provider_name": "openai"} if grouped else {}),
         }

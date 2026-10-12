@@ -12,6 +12,7 @@ import logging
 from collections.abc import Callable
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, NamedTuple, TypeAlias, TypeVar, cast
+from zoneinfo import ZoneInfo
 
 from weave.shared import refs_internal as ri
 from weave.trace_server.agents import ingest_sampling
@@ -370,6 +371,19 @@ class AgentQueryHandler:
         pb = ParamBuilder(PARAM_NAMESPACE)
         query = build_agent_span_stats_query(req, pb)
         result = self._query(query.sql, query.parameters)
+        rows = _rows_to_dicts(query.columns, result.result_rows)
+        if query.bucket_type == "time" and query.granularity_seconds is None:
+            timezone = ZoneInfo(req.timezone or "UTC")
+            time_columns = [
+                column.name
+                for column in query.column_metadata
+                if column.role in {"time", "time_end"}
+            ]
+            for row in rows:
+                for column in time_columns:
+                    value = row.get(column)
+                    if isinstance(value, datetime.datetime) and value.tzinfo is None:
+                        row[column] = value.replace(tzinfo=timezone)
         return AgentSpanStatsRes(
             start=query.start,
             end=query.end,
@@ -377,7 +391,7 @@ class AgentQueryHandler:
             timezone=req.timezone or "UTC",
             bucket_type=query.bucket_type,
             columns=query.column_metadata,
-            rows=_rows_to_dicts(query.columns, result.result_rows),
+            rows=rows,
         )
 
     def custom_attrs_schema(

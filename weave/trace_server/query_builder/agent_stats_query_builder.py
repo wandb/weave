@@ -14,6 +14,7 @@ import logging
 import math
 from dataclasses import dataclass
 from typing import Any
+from zoneinfo import ZoneInfo
 
 from weave.trace_server.agents import semconv
 from weave.trace_server.agents.constants import MAX_AGENT_STATS_RESULT_ROWS
@@ -35,6 +36,7 @@ from weave.trace_server.agents.types import (
     group_by_ref_alias,
 )
 from weave.trace_server.calls_query_builder.stats_query_base import (
+    MAX_BUCKETS,
     auto_select_granularity_seconds,
     ensure_max_buckets,
 )
@@ -62,8 +64,6 @@ from weave.trace_server.query_builder.agent_signal_filters import (
 )
 
 logger = logging.getLogger(__name__)
-
-_SECONDS_PER_DAY = 24 * 60 * 60
 
 _VALUE_TYPE_STRING: AgentSpanStatsValueType = "string"
 _VALUE_TYPE_NUMBER: AgentSpanStatsValueType = "number"
@@ -237,9 +237,22 @@ class _StatsQuerySQLParts:
 
     all_buckets_sql: str
     bucket_expr: str
+    outer_bucket_sql: str
     metric_select_sql: str
     agg_select_sql: str
     outer_metric_sql: str
+
+
+@dataclass(frozen=True, slots=True)
+class _TimeBucketPlan:
+    """Resolved time-bucket behavior shared by validation and SQL rendering."""
+
+    bucket_count: int
+    granularity_seconds: int | None
+
+    @property
+    def is_calendar_day(self) -> bool:
+        return self.granularity_seconds is None
 
 
 @dataclass(frozen=True, slots=True)
@@ -275,11 +288,6 @@ def build_agent_span_stats_query(
     metric_exprs = [expr for plan in metric_plans for expr in plan.expressions]
     metric_outputs = [output for plan in metric_plans for output in plan.outputs]
     bucket_by = req.bucket_by
-    calendar_interval = (
-        bucket_by.calendar_interval
-        if isinstance(bucket_by, AgentSpanStatsTimeBucketSpec)
-        else None
-    )
     numeric_bucket = (
         bucket_by if isinstance(bucket_by, AgentSpanStatsNumericBucketSpec) else None
     )
@@ -294,21 +302,19 @@ def build_agent_span_stats_query(
     )
     if numeric_bucket is not None and not metric_outputs:
         metric_outputs = [_count_metric_output()]
-    columns, column_metadata = (
-        _numeric_bucket_response_columns(metric_outputs)
+    bucket_plan = (
+        None
         if numeric_bucket is not None
-        else _response_columns(group_refs, metric_outputs)
+        else _resolve_time_bucket_plan(req, start, end, tz)
     )
-
-    if calendar_interval is not None:
-        columns.insert(1 + len(group_refs), _RESPONSE_BUCKET_END_COLUMN)
-        column_metadata.insert(
-            1 + len(group_refs),
-            AgentSpanStatsColumn(
-                name=_RESPONSE_BUCKET_END_COLUMN,
-                role="time",
-                value_type=_VALUE_TYPE_DATETIME,
-            ),
+    if numeric_bucket is not None:
+        columns, column_metadata = _numeric_bucket_response_columns(metric_outputs)
+    else:
+        assert bucket_plan is not None
+        columns, column_metadata = _response_columns(
+            group_refs,
+            metric_outputs,
+            include_bucket_end=bucket_plan.is_calendar_day,
         )
 
     if not metric_outputs:
@@ -322,12 +328,6 @@ def build_agent_span_stats_query(
     outer_metric_selects = [
         f"{output.outer_sql} AS {output.name}" for output in metric_outputs
     ]
-
-    if calendar_interval is not None:
-        outer_metric_selects.insert(
-            0,
-            f"{_CTE_ALL_BUCKETS}.{_BUCKET_COLUMN} + toIntervalDay(1) AS {_RESPONSE_BUCKET_END_COLUMN}",
-        )
 
     if numeric_bucket is not None:
         raw_sql = _build_numeric_bucket_stats_query(
@@ -350,30 +350,21 @@ def build_agent_span_stats_query(
             bucket_type="number",
         )
 
-    bucket_unit: str
-    if calendar_interval is not None:
-        granularity_seconds = _SECONDS_PER_DAY
-        if (
-            ensure_max_buckets(granularity_seconds, (end - start).total_seconds())
-            != granularity_seconds
-        ):
-            raise ValueError(
-                "calendar_interval produces too many buckets; shorten the date range"
-            )
-        bucket_size, bucket_unit = 1, calendar_interval
-    else:
-        granularity_seconds = _resolve_granularity(req, start, end)
-        bucket_size, bucket_unit = granularity_seconds, "second"
+    assert bucket_plan is not None
     # Whole unix seconds: a fractional float trips ClickHouse Int64 param parsing.
     start_epoch = int(start.replace(tzinfo=datetime.timezone.utc).timestamp())
     end_epoch = int(end.replace(tzinfo=datetime.timezone.utc).timestamp())
     start_param = pb.add_param(start_epoch)
     end_param = pb.add_param(end_epoch)
     tz_param = pb.add_param(tz)
-    bucket_interval_param = pb.add_param(bucket_size)
+    bucket_interval_param = (
+        None
+        if bucket_plan.granularity_seconds is None
+        else pb.add_param(bucket_plan.granularity_seconds)
+    )
     group_limit_slot = None
     if resolved_groups:
-        group_limit = _effective_group_limit(req, start, end, granularity_seconds)
+        group_limit = _effective_group_limit(req.group_limit, bucket_plan.bucket_count)
         group_limit_slot = pb.add(group_limit, param_type="UInt64")
 
     raw_sql = _build_stats_query(
@@ -386,8 +377,7 @@ def build_agent_span_stats_query(
         end_param=end_param,
         tz_param=tz_param,
         bucket_interval_param=bucket_interval_param,
-        bucket_size=bucket_size,
-        bucket_unit=bucket_unit,
+        bucket_plan=bucket_plan,
         group_limit_slot=group_limit_slot,
         group_filters=group_filters,
         pb=pb,
@@ -398,9 +388,7 @@ def build_agent_span_stats_query(
         columns=columns,
         column_metadata=column_metadata,
         parameters=pb.get_params(),
-        granularity_seconds=None
-        if calendar_interval is not None
-        else granularity_seconds,
+        granularity_seconds=bucket_plan.granularity_seconds,
         start=start,
         end=end,
         bucket_type="time",
@@ -435,18 +423,57 @@ def _resolve_granularity(
     return ensure_max_buckets(granularity, range_seconds)
 
 
-def _effective_group_limit(
+def _resolve_time_bucket_plan(
     req: AgentSpanStatsReq,
     start: datetime.datetime,
     end: datetime.datetime,
-    granularity_seconds: int,
-) -> int:
-    if not req.group_by:
-        return req.group_limit
+    timezone: str,
+) -> _TimeBucketPlan:
+    bucket = req.bucket_by
+    calendar_interval = (
+        bucket.calendar_interval
+        if isinstance(bucket, AgentSpanStatsTimeBucketSpec)
+        else None
+    )
+    if calendar_interval is not None:
+        if calendar_interval != "day":
+            raise ValueError(f"unsupported calendar interval: {calendar_interval!r}")
+        bucket_count = _calendar_day_bucket_count(start, end, timezone)
+        if bucket_count > MAX_BUCKETS:
+            raise ValueError(
+                "calendar_interval produces too many buckets; shorten the date range"
+            )
+        return _TimeBucketPlan(
+            bucket_count=bucket_count,
+            granularity_seconds=None,
+        )
 
-    bucket_count = _estimated_bucket_count(start, end, granularity_seconds)
-    max_groups = max(1, MAX_AGENT_STATS_RESULT_ROWS // bucket_count)
-    return min(req.group_limit, max_groups)
+    granularity_seconds = _resolve_granularity(req, start, end)
+    return _TimeBucketPlan(
+        bucket_count=_estimated_bucket_count(start, end, granularity_seconds),
+        granularity_seconds=granularity_seconds,
+    )
+
+
+def _calendar_day_bucket_count(
+    start: datetime.datetime,
+    end: datetime.datetime,
+    timezone: str,
+) -> int:
+    if end <= start:
+        return 0
+    zone = ZoneInfo(timezone)
+    first_date = start.astimezone(zone).date()
+    last_date = (end - datetime.timedelta(microseconds=1)).astimezone(zone).date()
+    return (last_date - first_date).days + 1
+
+
+def _effective_group_limit(
+    requested_limit: int,
+    bucket_count: int,
+) -> int:
+    max_groups = max(1, MAX_AGENT_STATS_RESULT_ROWS // max(1, bucket_count))
+    return min(requested_limit, max_groups)
 
 
 def _estimated_bucket_count(
@@ -539,6 +566,8 @@ def _stats_references_identity(req: AgentSpanStatsReq) -> bool:
 def _response_columns(
     group_refs: list[AgentGroupByRef],
     metric_outputs: list[_MetricOutput],
+    *,
+    include_bucket_end: bool = False,
 ) -> tuple[list[str], list[AgentSpanStatsColumn]]:
     """Build the response column order and matching column metadata."""
     columns = [_RESPONSE_TIMESTAMP_COLUMN]
@@ -549,6 +578,16 @@ def _response_columns(
             value_type=_VALUE_TYPE_DATETIME,
         )
     ]
+
+    if include_bucket_end:
+        columns.append(_RESPONSE_BUCKET_END_COLUMN)
+        metadata.append(
+            AgentSpanStatsColumn(
+                name=_RESPONSE_BUCKET_END_COLUMN,
+                role="time_end",
+                value_type=_VALUE_TYPE_DATETIME,
+            )
+        )
 
     for group_ref in group_refs:
         alias = group_by_ref_alias(group_ref)
@@ -806,9 +845,8 @@ def _build_stats_query(
     start_param: str,
     end_param: str,
     tz_param: str,
-    bucket_interval_param: str,
-    bucket_size: int,
-    bucket_unit: str,
+    bucket_interval_param: str | None,
+    bucket_plan: _TimeBucketPlan,
     group_limit_slot: str | None,
     group_filters: list[AgentSpanGroupFilter],
     pb: ParamBuilder,
@@ -822,8 +860,7 @@ def _build_stats_query(
         end_param=end_param,
         tz_param=tz_param,
         bucket_interval_param=bucket_interval_param,
-        bucket_size=bucket_size,
-        bucket_unit=bucket_unit,
+        bucket_plan=bucket_plan,
     )
 
     if not resolved_groups:
@@ -993,26 +1030,39 @@ def _stats_query_sql_parts(
     start_param: str,
     end_param: str,
     tz_param: str,
-    bucket_interval_param: str,
-    bucket_size: int,
-    bucket_unit: str,
+    bucket_interval_param: str | None,
+    bucket_plan: _TimeBucketPlan,
 ) -> _StatsQuerySQLParts:
     """Build SQL fragments shared by every stats query shape."""
-    bucket_expr = (
-        f"toStartOfInterval({_span_col(_COL_STARTED_AT)}, "
-        f"INTERVAL {bucket_size} {bucket_unit.upper()}, "
-        f"{param_slot(tz_param, 'String')})"
-    )
+    tz_slot = param_slot(tz_param, "String")
+    if bucket_plan.is_calendar_day:
+        bucket_expr = (
+            f"toDateTime(toDate({_span_col(_COL_STARTED_AT)}, {tz_slot}), {tz_slot})"
+        )
+        outer_bucket_sql = (
+            f"{_CTE_ALL_BUCKETS}.{_BUCKET_COLUMN} AS {_RESPONSE_TIMESTAMP_COLUMN},\n"
+            f"      {_CTE_ALL_BUCKETS}.{_RESPONSE_BUCKET_END_COLUMN} "
+            f"AS {_RESPONSE_BUCKET_END_COLUMN}"
+        )
+    else:
+        assert bucket_plan.granularity_seconds is not None
+        bucket_expr = (
+            f"toStartOfInterval({_span_col(_COL_STARTED_AT)}, "
+            f"INTERVAL {bucket_plan.granularity_seconds} SECOND, {tz_slot})"
+        )
+        outer_bucket_sql = (
+            f"{_CTE_ALL_BUCKETS}.{_BUCKET_COLUMN} AS {_RESPONSE_TIMESTAMP_COLUMN}"
+        )
     return _StatsQuerySQLParts(
         all_buckets_sql=_all_buckets_sql(
-            start_param,
-            end_param,
-            tz_param,
-            bucket_interval_param,
-            bucket_size,
-            bucket_unit,
+            start_param=start_param,
+            end_param=end_param,
+            tz_param=tz_param,
+            bucket_interval_param=bucket_interval_param,
+            bucket_plan=bucket_plan,
         ),
         bucket_expr=bucket_expr,
+        outer_bucket_sql=outer_bucket_sql,
         metric_select_sql=",\n            ".join(metric_exprs),
         agg_select_sql=",\n          ".join(agg_selects),
         outer_metric_sql=",\n  ".join(outer_metric_selects),
@@ -1051,7 +1101,7 @@ def _build_ungrouped_stats_query(
         GROUP BY {_BUCKET_COLUMN}
       )
     SELECT
-      {_CTE_ALL_BUCKETS}.{_BUCKET_COLUMN} AS {_RESPONSE_TIMESTAMP_COLUMN},
+      {parts.outer_bucket_sql},
       {parts.outer_metric_sql}
     FROM {_CTE_ALL_BUCKETS}
     LEFT JOIN {_CTE_AGGREGATED_DATA}
@@ -1163,7 +1213,7 @@ def _build_grouped_stats_query(
         GROUP BY {_BUCKET_COLUMN}, {group_by_clause}
       )
     SELECT
-      {_CTE_ALL_BUCKETS}.{_BUCKET_COLUMN} AS {_RESPONSE_TIMESTAMP_COLUMN},
+      {parts.outer_bucket_sql},
       {outer_group_select_sql},
       {parts.outer_metric_sql}
     FROM {_CTE_ALL_BUCKETS}
@@ -1176,28 +1226,47 @@ def _build_grouped_stats_query(
 
 
 def _all_buckets_sql(
+    *,
     start_param: str,
     end_param: str,
     tz_param: str,
-    bucket_interval_param: str,
-    bucket_size: int,
-    bucket_unit: str,
+    bucket_interval_param: str | None,
+    bucket_plan: _TimeBucketPlan,
 ) -> str:
     """Render the synthetic bucket table used to fill empty time buckets."""
     start_slot = param_slot(start_param, "Float64")
     end_slot = param_slot(end_param, "Float64")
     tz_slot = param_slot(tz_param, "String")
-    count_slot = param_slot(bucket_interval_param, "Int64")
+    if bucket_plan.is_calendar_day:
+        return f"""
+        WITH toDate(toDateTime({start_slot}, {tz_slot}), {tz_slot}) AS first_bucket_date
+        SELECT
+          toDateTime(addDays(first_bucket_date, toInt64(number)), {tz_slot}) AS {_BUCKET_COLUMN},
+          toDateTime(addDays(first_bucket_date, toInt64(number) + 1), {tz_slot}) AS {_RESPONSE_BUCKET_END_COLUMN}
+        FROM numbers(
+          toUInt64(
+            dateDiff(
+              'day',
+              first_bucket_date,
+              toDate(toDateTime({end_slot}, {tz_slot}), {tz_slot})
+            ) + 1
+          )
+        )
+        WHERE {_BUCKET_COLUMN} < toDateTime({end_slot}, {tz_slot})
+        """
+    assert bucket_interval_param is not None
+    assert bucket_plan.granularity_seconds is not None
+    bucket_step_slot = param_slot(bucket_interval_param, "Int64")
     return f"""
     WITH toStartOfInterval(
-      toDateTime({start_slot}, {tz_slot}), INTERVAL {bucket_size} {bucket_unit.upper()}, {tz_slot}
+      toDateTime({start_slot}, {tz_slot}), INTERVAL {bucket_plan.granularity_seconds} SECOND, {tz_slot}
     ) AS first_bucket
-    SELECT first_bucket + toInterval{bucket_unit.title()}(number * {count_slot}) AS {_BUCKET_COLUMN}
+    SELECT first_bucket + toIntervalSecond(number * {bucket_step_slot}) AS {_BUCKET_COLUMN}
     FROM numbers(
       toUInt64(
         intDiv(
-          dateDiff('{bucket_unit}', first_bucket, toDateTime({end_slot}, {tz_slot}), {tz_slot}),
-          {count_slot}
+          dateDiff('second', first_bucket, toDateTime({end_slot}, {tz_slot}), {tz_slot}),
+          {bucket_step_slot}
         ) + 1
       )
     )

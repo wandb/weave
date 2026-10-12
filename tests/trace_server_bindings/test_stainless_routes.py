@@ -2141,7 +2141,6 @@ def test_list_sends_limit_and_offset(
     assert dict(mock_server.requests[0].url.params) == {"limit": "10", "offset": "5"}
 
 
-@pytest.mark.trace_server
 def test_agent_spans_stats_calendar_interval_reaches_http() -> None:
     response = {
         "start": "2026-03-08T08:00:00Z",
@@ -2151,7 +2150,7 @@ def test_agent_spans_stats_calendar_interval_reaches_http() -> None:
         "bucket_type": "time",
         "columns": [
             {"name": "timestamp", "role": "time", "value_type": "datetime"},
-            {"name": "bucket_end", "role": "time", "value_type": "datetime"},
+            {"name": "bucket_end", "role": "time_end", "value_type": "datetime"},
             {"name": "count_spans", "role": "metric", "value_type": "number"},
         ],
         "rows": [

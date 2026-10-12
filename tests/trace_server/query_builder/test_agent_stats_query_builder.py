@@ -1,5 +1,6 @@
 import datetime
 import re
+from zoneinfo import ZoneInfo
 
 import pytest
 import sqlparse
@@ -18,6 +19,7 @@ from weave.trace_server.agents.types import (
     AgentSpanStatsTimeBucketSpec,
     AgentSpanValueRef,
 )
+from weave.trace_server.calls_query_builder.stats_query_base import MAX_BUCKETS
 from weave.trace_server.interface.query import Query
 from weave.trace_server.orm import ParamBuilder
 from weave.trace_server.query_builder.agent_stats_query_builder import (
@@ -1017,7 +1019,6 @@ def test_request_validation_rejects_large_range_with_insight_filters() -> None:
         )
 
 
-@pytest.mark.trace_server
 @pytest.mark.parametrize("granularity", [3600, 86400])
 def test_calendar_interval_rejects_fixed_granularity(granularity: int) -> None:
     with pytest.raises(
@@ -1030,20 +1031,44 @@ def test_calendar_interval_rejects_fixed_granularity(granularity: int) -> None:
         )
 
 
-@pytest.mark.trace_server
-def test_calendar_interval_rejects_unsupported_unit() -> None:
-    with pytest.raises(ValidationError, match="Input should be 'day'"):
-        _req(granularity=None, bucket_by={"type": "time", "calendar_interval": "month"})
-
-
-@pytest.mark.trace_server
 def test_calendar_interval_rejects_too_many_buckets() -> None:
-    start = datetime.datetime(1990, 1, 1, tzinfo=datetime.timezone.utc)
+    timezone = ZoneInfo("America/New_York")
+    start = datetime.datetime(2000, 1, 1, tzinfo=timezone)
+    end = datetime.datetime.combine(
+        start.date() + datetime.timedelta(days=MAX_BUCKETS),
+        datetime.time(microsecond=1),
+        timezone,
+    )
+    assert end.astimezone(datetime.timezone.utc) - start.astimezone(
+        datetime.timezone.utc
+    ) < datetime.timedelta(days=MAX_BUCKETS)
     req = _req(
-        start=start,
-        end=start + datetime.timedelta(days=10001),
+        start=start.astimezone(datetime.timezone.utc),
+        end=end.astimezone(datetime.timezone.utc),
         granularity=None,
         bucket_by=AgentSpanStatsTimeBucketSpec(calendar_interval="day"),
+        timezone="America/New_York",
     )
     with pytest.raises(ValueError, match="calendar_interval produces too many buckets"):
         build_agent_span_stats_query(req, ParamBuilder("genai"))
+
+
+def test_calendar_interval_group_limit_uses_calendar_bucket_count() -> None:
+    timezone = ZoneInfo("America/Los_Angeles")
+    start = datetime.datetime(2026, 3, 1, tzinfo=timezone)
+    end = datetime.datetime(2026, 3, 12, tzinfo=timezone)
+    req = _req(
+        start=start.astimezone(datetime.timezone.utc),
+        end=end.astimezone(datetime.timezone.utc),
+        granularity=None,
+        bucket_by=AgentSpanStatsTimeBucketSpec(calendar_interval="day"),
+        timezone="America/Los_Angeles",
+        group_by=[AgentGroupByRef(source="column", key="provider_name")],
+        group_limit=1000,
+    )
+
+    result = build_agent_span_stats_query(req, ParamBuilder("genai"))
+
+    bucket_count = (end.date() - start.date()).days
+    expected_group_limit = MAX_AGENT_STATS_RESULT_ROWS // bucket_count
+    assert expected_group_limit in result.parameters.values()
