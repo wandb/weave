@@ -3345,7 +3345,10 @@ def test_tracing_enabled_context(client):
         client.finish_call(call)  # Should not raise any error
 
 
-@pytest.mark.skipif(HTTP_NOT_PORTED, reason="http: not ported yet")
+@pytest.mark.skipif(
+    HTTP_NOT_PORTED,
+    reason="http: the server names the error class once wandb/core#58054 is deployed",
+)
 def test_calls_query_hardcoded_filter_length_validation(client):
     @weave.op
     def test():
@@ -4199,7 +4202,6 @@ def test_filter_calls_by_ref_wildcard_versions(client):
     assert sorted(call.inputs["ref"]["a"] for call in calls) == [1, 2]
 
 
-@pytest.mark.skipif(HTTP_NOT_PORTED, reason="http: not ported yet")
 def test_files_stats(client):
 
     f_bytes = b"0" * 10000005

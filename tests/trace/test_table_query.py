@@ -1,9 +1,6 @@
 import random
 from collections.abc import Iterator
 
-import pytest
-
-from tests.trace.util import HTTP_NOT_PORTED
 from weave.trace.weave_client import WeaveClient
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.common_interface import SortBy
@@ -266,7 +263,6 @@ def test_table_query_multiple_sort_criteria(client: WeaveClient):
     assert result_indices == expected_indices
 
 
-@pytest.mark.skipif(HTTP_NOT_PORTED, reason="http: not ported yet")
 def test_table_query_stats(client: WeaveClient):
     digest, row_digests, data = generate_table_data(client, 10, 10)
 
@@ -280,7 +276,6 @@ def test_table_query_stats(client: WeaveClient):
     assert stats_res.tables[0].count == len(data)
 
 
-@pytest.mark.skipif(HTTP_NOT_PORTED, reason="http: not ported yet")
 def test_table_query_stats_empty(client: WeaveClient):
     digest, row_digests, data = generate_table_data(client, 0, 0)
 
@@ -294,7 +289,6 @@ def test_table_query_stats_empty(client: WeaveClient):
     assert stats_res.tables[0].count == len(data)
 
 
-@pytest.mark.skipif(HTTP_NOT_PORTED, reason="http: not ported yet")
 def test_table_query_stats_missing(client: WeaveClient):
     digest, row_digests, data = generate_table_data(client, 10, 10)
 
@@ -341,7 +335,6 @@ def generate_duplication_simple_table_data(
     return {"digest": digest, "row_digests": row_digests, "data": data}
 
 
-@pytest.mark.skipif(HTTP_NOT_PORTED, reason="http: not ported yet")
 def test_table_query_with_duplicate_row_digests(client: WeaveClient):
     res1 = generate_duplication_simple_table_data(client, 10, 1)
     res2 = generate_duplication_simple_table_data(client, 10, 2)
@@ -469,7 +462,6 @@ def test_duplicate_table_with_identical_rows(client: WeaveClient):
     assert [r.original_index for r in res.rows] == list(range(10))
 
 
-@pytest.mark.skipif(HTTP_NOT_PORTED, reason="http: not ported yet")
 def test_table_query_stats_with_storage_size(client: WeaveClient):
     digest, row_digests, data = generate_table_data(client, 10, 10)
 

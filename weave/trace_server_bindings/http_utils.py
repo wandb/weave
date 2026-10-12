@@ -279,6 +279,9 @@ def handle_response_error(response: httpx.Response, url: str) -> None:
     extracted_message = None
     error_code = None
     try:
+        # A streamed response has no body yet; `json()` would raise
+        # `ResponseNotRead` instead of returning the server's message.
+        response.read()
         error_data = response.json()
         if isinstance(error_data, dict):
             error_code = error_data.get("error_code")
@@ -289,7 +292,7 @@ def handle_response_error(response: httpx.Response, url: str) -> None:
                 or error_data.get("detail")
                 or error_data.get("reason")
             )
-    except (json.JSONDecodeError, ValueError):
+    except (json.JSONDecodeError, ValueError, httpx.StreamError):
         pass
 
     # Handle calls_complete mode requirement for automatic SDK upgrade
