@@ -84,7 +84,7 @@ _Important:_ For OpenAI Codex agents (most likely you!), your environment does n
 
 - `weave/` - Core implementation
   - `weave/` - Python package implementation
-  - `weave/trace_server` - Old copy of the backend server; the one that runs is in wandb/core (see above)
+  - `weave/trace_server` - Backend server implementation
 
 ### Azure file storage authentication
 
@@ -108,7 +108,7 @@ in-process and credential persistence emits one warning per credentials object.
 
 ## Generated Files — Do Not Hand-Edit
 
-`model_providers/model_providers.json` and `costs/cost_checkpoint.json` are generated. Never edit them by hand. Production reads the copies in wandb/core (`services/weave-trace/src/trace_server_backend/`), so regenerate them there with `make update_model_providers` / `make update_costs`.
+`weave/trace_server/model_providers/model_providers.json` and `weave/trace_server/costs/cost_checkpoint.json` are generated. Never edit them by hand — regenerate with `make update_model_providers` / `make update_costs` (see `weave/Makefile`).
 
 Generate implicit cost `created_at` values in UTC because insertion interprets naive checkpoint timestamps as UTC.
 
