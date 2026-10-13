@@ -2,3 +2,10 @@
 /docs/ @wandb/docs-team @wandb/weave-team
 /sdks/node/ @wandb/weave-sdk @wandb/weave-team
 /weave/trace_server/migrations @tssweeney @gtarpenning @neutralino1
+
+# Trace server implementation is moving out of this repo. While the move is in
+# flight, any change under these paths needs sign-off from the people doing the
+# move, so nothing lands here that the new location would silently miss.
+/weave/trace_server/ @ro31337 @andrewtruong @rgao-coreweave
+/tests/trace_server/ @ro31337 @andrewtruong @rgao-coreweave
+/tests/trace_server_migrator/ @ro31337 @andrewtruong @rgao-coreweave
