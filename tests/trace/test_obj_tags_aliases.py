@@ -11,7 +11,6 @@ from weave.trace_server.errors import (
     NotFoundError,
     ObjectDeletedError,
 )
-from weave.trace_server.trace_server_common import digest_is_content_hash
 
 
 def _publish_obj(client: WeaveClient, name: str, val: dict | None = None):
@@ -187,35 +186,6 @@ def test_alias_validation():
             digest="abc123",
             aliases=[valid],
         )
-
-
-@pytest.mark.parametrize(
-    ("digest", "expected"),
-    [
-        # Weave base64url digest (43 alphanumeric chars)
-        ("oioZ7zgsCq4K7tfFQZRubx3ZGPXmFyaeoeWHHd8KUl8", True),
-        # Hex SHA-256 (64 hex chars)
-        ("a" * 64, True),
-        ("abcdef1234567890" * 4, True),
-        # Alias names — not content hashes
-        ("production", False),
-        ("staging", False),
-        ("my-alias", False),
-        # Version-like — not content hashes (shorter than 43)
-        ("v0", False),
-        ("v123", False),
-        # Edge cases
-        ("", False),
-        ("a" * 42, False),
-        ("a" * 44, False),
-        ("a" * 63, False),
-        ("a" * 65, False),
-        # 64 chars but not hex
-        ("g" * 64, False),
-    ],
-)
-def test_digest_is_content_hash(digest: str, expected: bool):
-    assert digest_is_content_hash(digest) == expected
 
 
 # ---------------------------------------------------------------------------

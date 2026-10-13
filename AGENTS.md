@@ -58,7 +58,7 @@ This project uses `uv` for dependency management. Dependencies are organized int
 - Do NOT use `--extra test` — `test` is a dependency-group, not an optional-dependency. Use `--group test`.
 - `ruff` is not installed in any project dependency group. Use `uvx ruff` to run it.
 - Ruff now enforces `PLW` rules. `PLW0602`, `PLW0603`, `PLW1641`, and `PLW3201` are handled with spot-level inline `# noqa` on specific lines (not global/per-file ignore). Prefer fixing code first; if intentional, suppress only the exact line.
-- Be careful with `PLW1514` autofixes on serialization-sensitive code (`weave/type_handlers/Content/content.py`, `weave/type_handlers/Audio/audio.py`) and mocked file I/O (`weave/trace_server/costs/update_costs.py`): adding `encoding=` changed behavior/tests, so these files are explicitly ignored for that rule.
+- Be careful with `PLW1514` autofixes on serialization-sensitive code (`weave/type_handlers/Content/content.py`, `weave/type_handlers/Audio/audio.py`): adding `encoding=` changed behavior/tests, so these files are explicitly ignored for that rule.
 
 ### PyPI release publishing
 
@@ -84,15 +84,8 @@ _Important:_ For OpenAI Codex agents (most likely you!), your environment does n
 
 - `weave/` - Core implementation
   - `weave/` - Python package implementation
-  - `weave/trace_server` - Backend server implementation
-
-### Azure file storage authentication
-
-The trace server preserves explicit Azure connection strings and account keys
-for backward compatibility. When neither is configured, it uses
-`DefaultAzureCredential`, including AKS workload identity. Read-only export
-links use an account-key SAS for explicit credentials and a user-delegation SAS
-for workload identity.
+  - `weave/trace_server` - Deprecated import aliases for `weave.shared`; the
+    trace server itself lives in wandb/core
 
 ### W&B authentication
 
@@ -107,14 +100,6 @@ If the credentials file is not writable, the exchanged token remains cached
 in-process and credential persistence emits one warning per credentials object.
 
 ## Generated Files — Do Not Hand-Edit
-
-`weave/trace_server/model_providers/model_providers.json` and `weave/trace_server/costs/cost_checkpoint.json` are generated. Never edit them by hand — regenerate with `make update_model_providers` / `make update_costs` (see `weave/Makefile`).
-
-Generate implicit cost `created_at` values in UTC because insertion interprets naive checkpoint timestamps as UTC.
-
-Note: the scripts read `modelsBegin.json`/`modelsFinal.json`, which are symlinks
-into wandb/core and only resolve when this repo is checked out as the submodule
-at `services/weave-trace/weave-public`.
 
 `weave/vendor/weave_server_sdk/` is the generated Weave Trace API client, copied
 in from wandb/core rather than depended on because it is not published to PyPI.
@@ -147,26 +132,13 @@ schema and the dependent Core frontend types stay aligned.
 
 ### Trace Server API / Node SDK Schema
 
-Custom Runtime registration is a desired-state facade over the existing
-`Provider` and `ProviderModel` built-in objects. Keep `ProviderModel.provider`
-as the Provider digest and preserve `custom::<provider>::<model>` selectors;
-those representations are consumed by inference and the current UI.
-Inference caches resolved custom-provider configuration per replica, so updates
-may remain stale for up to 60 seconds.
-
 When trace-server request or response models, or route schemas, change, leave
 both vendored clients alone in that PR. The rule is in the vendor paragraph
 above: core has to export the spec before either client can learn the change,
 and the bot does the refresh.
 
-Evaluation result rows merge agent span links from two sources: legacy
-`weave.genai_span_ref` call attributes and OTel spans whose promoted
-`eval_run_id` plus `eval_predict_and_score_call_id` columns identify the
-trial. Keep the promoted-column hydration best-effort so eval results remain
-available during rolling deploys.
-
-`weave.invoking_span` (`{trace_id, span_id}`, hex) points the other way, from a
-call to the OTel span that was current when it started — an agent's
+`weave.invoking_span` (`{trace_id, span_id}`, hex) points from a call to the
+OTel span that was current when it started — an agent's
 `execute_tool` span in the case it is built for, but any ambient instrumentation
 qualifies. `create_call` writes it on _every_ call started inside that span, not
 just the outermost one: skipping when the parent call already carries it marks
@@ -199,8 +171,8 @@ If `sdks/node/node_modules` is missing, run `pnpm install --frozen-lockfile` in 
 
 - **Never create a `_FakeServer`, stub, or mock `TraceServerInterface`** to test
   server-side logic. Use the existing `client` fixture (gives `client.server` +
-  `client.project_id`) or the `trace_server` fixture, which run against a real
-  ClickHouse backend. Build inputs with the real APIs
+  `client.project_id`) or the `trace_server` fixture, which run against core's
+  trace server over HTTP. Build inputs with the real APIs
   (`obj_create`, `table_create`, etc.). Mock only external services we don't own.
 
 ### Current logical calls
@@ -237,16 +209,16 @@ If you only care about one field, pin that field with `==`; if you care about
 the shape, compare the whole dict/object. The same rule applies to SQL: assert
 the complete query string, never `assert "WHERE x" in sql`.
 
-### VCR + ClickHouse isolation (integration tests)
+### VCR isolation (integration tests)
 
-- Integration tests replay provider traffic from VCR cassettes while the weave
-  client concurrently talks to ClickHouse over localhost HTTP. vcrpy is not
-  safe for that concurrency out of the box: its urllib3 passthrough wraps real
-  sends in `force_reset()`, which briefly unpatches httpx/httpcore globally and
-  lets provider calls escape an active cassette to the live API (seen as real
-  OpenAI 429s in CI). `tests/integrations/conftest.py` carries two autouse
-  fixtures that prevent this — read their docstrings before touching VCR
-  config, and keep `tests/integrations/langchain/test_vcr_isolation.py` green.
+- Integration tests replay provider traffic from VCR cassettes while other
+  requests pass through to real servers. vcrpy's urllib3 passthrough (for
+  example `ignore_hosts` traffic) wraps real sends in `force_reset()`, which
+  briefly unpatches httpx/httpcore globally and lets provider calls escape an
+  active cassette to the live API (seen as real OpenAI 429s in CI).
+  `tests/integrations/conftest.py` carries an autouse fixture that prevents
+  this — read its docstring before touching VCR config, and keep
+  `tests/integrations/langchain/test_vcr_isolation.py` green.
 - Corollary: a real provider 4xx during a `record_mode="none"` cassette means
   VCR's patches were absent at request time (an isolation bug), not that the
   cassette failed to match — matching failures raise
@@ -258,23 +230,22 @@ Focus on these primary test shards:
 
 - `tests-3.12(shard='trace')` - Core tracing functionality
 - `tests-3.12(shard='flow')` - Higher level work"flow" objects
-- `tests-3.12(shard='trace_server')` - Server implementation
 - `tests-3.12(shard='trace_server_bindings')` - Server bindings
 
-The Claude Agent SDK shard combines ClickHouse-backed calls tests with
+The Claude Agent SDK shard combines server-backed calls tests with
 no-server OTel tests. PR CI runs `tests-3.10(shard='claude_agent_sdk')` once
-without a marker filter so both tracing paths contribute coverage.
+without a marker filter, so both kinds of test run.
 Calls-based tests must include the integration's intentional text and thinking
 child calls in exact operation-set assertions.
 
 Every other shard, `flow` included, is run by CI with `-m "trace_server"`, and
-that filter comes from the workflow rather than from `noxfile.py`. A test that
-uses no server fixture therefore never runs in CI unless it carries
-`@pytest.mark.trace_server` itself.
+that filter comes from the workflow and `.github/scripts/run_nox_shards.py`
+rather than from `noxfile.py`. A test that uses no server fixture therefore
+never runs in CI unless it carries `@pytest.mark.trace_server` itself.
 
 ### Running Tests
 
-**IMPORTANT**: Any test depending on the `client` fixture runs against ClickHouse, the only trace-server backend. Locally, the test fixtures auto-start a ClickHouse Docker container if one isn't already running, so Docker must be available. Pass `--clickhouse-process=true` to use a local `clickhouse-server` binary instead of Docker.
+**IMPORTANT**: Any test depending on the `client` or `trace_server` fixture runs against core's trace server over HTTP, so that server must be running (see *Trace server* below). Tests without a server fixture need nothing.
 
 #### Basic Test Commands
 
@@ -293,85 +264,45 @@ Examples:
 - ✅ CORRECT: `-- tests/trace/test_dataset.py::test_basic_dataset_lifecycle`
 - ❌ WRONG: `-- trace/test_dataset.py::test_basic_dataset_lifecycle`
 
-#### Backend Selection
+#### Trace server
 
-The `--trace-server` flag selects the backend: `clickhouse` (default),
-`fake` (in-memory) or `http` (a running trace server).
-
-**Fake / in-memory (Fastest for Development):**
-
-```bash
-nox --no-install -e "tests-3.12(shard='trace')" -- tests/trace/test_client_trace.py::test_simple_op --trace-server=fake
-```
-
-The fake backend (`weave/trace_server/in_memory_trace_server.py`,
-`InMemoryTraceServer`) is a pure-Python, dict-backed drop-in replacement that
-lives parallel to the ClickHouse implementation. It replicates **ClickHouse**
-(the production backend) at the interface level: JSON_VALUE string typing for
-dynamic fields, `to*OrNull` cast rules, NULLS-LAST ordering, DateTime64
-comparisons, and computed summary fields. Tests that assert ClickHouse
-_internals_ (SQL, table routing/residence, insert batching, bucket file
-storage) are gated with `client_is_clickhouse` and skip on the fake. No
-files, no SQL, no Docker.
-
-**ClickHouse (the real backend):**
-
-```bash
-nox --no-install -e "tests-3.12(shard='trace')" -- tests/trace/test_client_trace.py::test_simple_op
-```
-
-ClickHouse is the only trace-server backend (`--trace-server` defaults to
-`clickhouse`):
-
-```bash
-nox --no-install -e "tests-3.12(shard='trace')" -- tests/trace/test_client_trace.py::test_simple_op
-```
-
-**Note:** ClickHouse tests require Docker to be running (the fixtures start a
-container automatically), or a local `clickhouse-server` binary with
-`--clickhouse-process=true`. When neither is available, use the in-memory
-fake with `--trace-server=fake`.
-
-**HTTP (core's trace server):**
-
-`--trace-server=http` sends every request to the server at
-`WF_TRACE_SERVER_URL` with `WANDB_API_KEY`, and calls its
+Every request goes to the server at `WF_TRACE_SERVER_URL` with
+`WANDB_API_KEY`, and the `trace_server` fixture calls its
 `POST /testonly/reset` before each test. Only the app in wandb/core's
 `services/weave-trace/src/tests/support/resettable_trace_server.py` has that
-route; the `Start trace server` step in `.github/workflows/weave-trace-tests.yaml`
-shows how to run it. The key must belong to a user named `shawn` (`TEST_ENTITY`).
-The reset is database-wide, so give each test process its own server (`-n0` for
-one):
+route; `.github/scripts/start-trace-server.sh` shows how CI runs it. The key
+must belong to a user named `shawn` (`TEST_ENTITY`). The reset is
+database-wide, so each test process needs its own server. To run xdist
+workers, list one server per worker, comma-separated, in
+`WEAVE_TEST_TRACE_SERVER_URLS`: worker `gwN` takes entry N, counting from 0.
 
 ```bash
-WF_TRACE_SERVER_URL=http://127.0.0.1:6345 WANDB_API_KEY=<shawn-api-key> WANDB_BASE_URL=http://localhost:8080 nox --no-install -e "tests-3.12(shard='trace')" -- tests/trace/test_dataset.py::test_basic_dataset_lifecycle --trace-server=http -n0
+WF_TRACE_SERVER_URL=http://127.0.0.1:6345 WANDB_API_KEY=<shawn-api-key> WANDB_BASE_URL=http://localhost:8080 nox --no-install -e "tests-3.12(shard='trace')" -- tests/trace/test_dataset.py::test_basic_dataset_lifecycle
 ```
 
 `WANDB_BASE_URL` points at the W&B server the trace server uses; the
 `ensure_project` fixture creates extra projects there.
 
-CI runs this in the `Weave client tests over HTTP` job. Tests that do not pass
-over HTTP yet carry `skipif(HTTP_NOT_PORTED, ...)`; porting a test removes its
-marker. Tests that need the in-process server itself (its middleware layers,
-a request the HTTP routes never send, a second user) carry
-`skipif(IN_PROCESS_ONLY, ...)`, which stays. ClickHouse-only gates
-(`NOT_CLICKHOUSE_BACKEND`, `client_is_clickhouse`) skip on HTTP as well.
+CI runs every server-backed shard this way (`trace-tests` in
+`.github/workflows/test.yaml`), on several servers per job; shards that share a
+job run side by side with `.github/scripts/run_nox_shards.py`. A test that
+needs the server's internals (its SQL, storage, middleware layers) belongs in
+wandb/core next to the server.
 
-Writing a test that runs on every backend:
+Writing a test against the server:
 
 - The server stamps the user on every write and rejects a `wb_user_id` in the
   request. Do not send one; compare against the `wb_user_id` fixture, which is
-  the id the backend stamps (`shawn` in-process, the W&B user id over HTTP).
+  the W&B user id the server stamps.
 - Refs and project ids must name a project that exists. Use
   `client.project_id`, or `ensure_project("name")` for a second project.
-- Server errors arrive as the server's exception class on every backend
-  (`NotFoundError`, `InvalidRequest`, `ValueError`, ...). Over HTTP the
-  tests-only `HTTPErrorDecodingTraceServer` rebuilds them from the response
-  body. Production bodies do not name the exception class, on purpose; core's
+- Server errors arrive as the server's exception class (`NotFoundError`,
+  `InvalidRequest`, `ValueError`, ...). The tests-only
+  `HTTPErrorDecodingTraceServer` rebuilds them from the response body.
+  Production bodies do not name the exception class, on purpose; core's
   resettable test server adds `error_type` and the exception's fields.
 - The HTTP route returns only the columns a `CallsQueryReq.columns` asks for
-  (plus ids, names and timestamps). The in-process server returns more, so
-  request every column the test reads.
+  (plus ids, names and timestamps), so request every column the test reads.
 - An object digest covers the refs inside it in their internal form, so it
   depends on the server's project id. Compare with the ref `weave.publish`
   returned, not with a pinned digest.
@@ -408,13 +339,6 @@ unset NO_COLOR FORCE_COLOR && nox --no-install -e "tests-3.12(shard='trace')" --
 
 **Prek stashing behavior:**
 `nox --no-install -e lint` runs `prek`, and prek stashes unstaged changes before running hooks. If you need to validate a fix to one file (for example with `--mypy-only`), stage that file first or run the checker directly, otherwise hooks may run against older content.
-
-**Markdown serialization and MTSAAS env:**
-`weave/type_handlers/Markdown/markdown.py` only stores large markdown payloads in `markup.md` when `is_mtsaas()` is true. If local `WANDB_BASE_URL`/`WF_TRACE_SERVER_URL` differs from CI defaults, `test_serialization_correctness[markdown]` may fail locally with inline markup differences. For CI-like behavior, set:
-
-```bash
-WF_TRACE_SERVER_URL=https://trace.wandb.ai nox --no-install -e "tests-3.12(shard='trace')" -- tests/trace/data_serialization/test_serialization_correctness.py::test_serialization_correctness[markdown]
-```
 
 #### Reinstalling Dependencies
 
@@ -678,11 +602,8 @@ deterministic.
 - Include meaningful error messages
 - Add error handling tests
 
-### LLM Completion Routing
+### OpenAI usage normalization
 
-- Built-in and API-key-authenticated custom providers use LiteLLM.
-- Custom runtimes without an API key use the OpenAI client directly so configured
-  headers and unauthenticated endpoints do not receive a bearer header.
 - OpenAI Responses and Chat Completions report `cache_write_tokens` under
   `usage.input_tokens_details` and `usage.prompt_tokens_details`, respectively.
   Normalize either field when present instead of parsing model names. The
@@ -830,29 +751,6 @@ deterministic.
 
 - `SensitiveDataPolicy` is a closed `off` or `pii-v1` enum. Unknown values
   fail instead of falling back to a policy.
-- `redact_pii_value` walks supported trace values copy-on-write, combines
-  credential-key replacement with PII replacement, and never scans dictionary
-  keys. Clean subtrees retain their identity. Its traversal depth is capped at
-  200, including decoded JSON-string re-entry, and over-nested or cyclic values
-  raise `RequestTooLarge` instead of exhausting the Python stack.
-- Complete Weave refs, valid base64 data URLs, and valid standalone base64
-  payloads pass through unchanged. Malformed lookalikes remain eligible for
-  scanning.
-
-### Credential-shaped fields in client-authored call columns
-
-- The three call converters in `clickhouse/schema_converters.py` run
-  `redact_sensitive_keys` over `inputs` and `attributes` before extracting refs,
-  so a field whose name matches the policy in
-  `weave/trace_server/credential_redaction.py` is stored with its string value
-  replaced. `in_memory_trace_server.py` applies the same function, so both
-  backends read back the same thing.
-- The same converters redact `otel_dump`. It is a raw copy of the client's span,
-  so it carries the attribute values that `attributes_dump` holds a second time,
-  and it is a public field on the insert schemas, so the OTel route is not its
-  only producer.
-- The walk is copy-on-write and replaces only non-empty strings. Both properties
-  are load-bearing — see the module docstring — so keep them if you touch it.
 
 ### Agent PII policy
 
@@ -861,32 +759,6 @@ deterministic.
 - An authorized server route may set `pii-v1` from the owning organization's
   policy. Never populate the field from caller-controlled OTLP content or a
   process environment fallback.
-- Agent OTel ingest parses and redacts every span (each shared resource once)
-  before credential redaction, blob stripping, derived-column extraction, or
-  insertion starts for any of them. A redaction failure rejects the whole
-  request before any Content file write or insert; a value nested too deeply
-  to scan is rejected as `RequestTooLarge` (HTTP 413).
-- PII redaction covers span and event names, all four attribute containers,
-  and the status message. Names feed the `span_name`, `operation_name`, and
-  `agent_name` grouping columns, so a PII-bearing name changes grouping and
-  agent identity; redaction wins that trade-off. IDs, trace state, and
-  timestamps are structural and remain unchanged.
-- `pii-v1` scans strings and never decodes payloads: non-string leaves,
-  including raw bytes (stored base64-encoded in dumps), pass through
-  unchanged, like the preserved data URLs and standalone base64.
-
-### Credential-shaped fields in agent span columns
-- The agents OTel ingest calls `redact_credentials_from_span` before
-  `strip_inline_blobs_from_span`, and outside the file-storage guard around it.
-  Both are load-bearing — see that function's docstring — so keep the order and
-  the placement if you touch it.
-- It redacts all four attribute containers a span carries: its own, its resource,
-  its events and its links. The output columns derive from those too, so on this
-  path a credential-shaped name inside a structured output is replaced as well.
-- The completions path builds a span row without a parsed OTel span, so it never
-  reaches that hook. `build_completion_span` redacts the request once and every
-  column that can carry a client string reads that copy; the provider response is
-  left as the provider sent it, because a response is generated content.
 
 ### Documentation
 

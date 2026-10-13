@@ -1,7 +1,7 @@
 """OpenTelemetry-backed tracing primitives shared by the trace server and the SDK.
 
-This module is the OTel-equivalent of the `ddtrace`-flavored helpers in
-`weave/trace_server/datadog.py`. It exists so call sites can decorate functions
+This module is the OTel-equivalent of the `ddtrace`-flavored helpers in the
+trace server's `datadog.py` (wandb/core). It exists so call sites can decorate functions
 with `@traced(name=...)` without importing `ddtrace` directly.
 
 Contract for `@traced(name)`:
@@ -130,7 +130,7 @@ def traced_generator(
 ]:
     """Wrap a generator function in an OTel span that spans the full iteration.
 
-    Drop-in replacement for `weave.trace_server.datadog.generator_trace`. Use
+    Drop-in replacement for the trace server's `datadog.generator_trace`. Use
     on streaming endpoints where the function `yield`s rows incrementally.
 
     `GeneratorExit` (consumer calling `gen.close()` or HTTP client disconnect)

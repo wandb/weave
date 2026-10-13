@@ -1,6 +1,5 @@
 import dataclasses
 import datetime
-import json
 import platform
 import random
 import sys
@@ -20,21 +19,12 @@ from pydantic import BaseModel, ValidationError
 
 import weave
 import weave.trace.call
-from tests.trace.server_utils import find_server_layer
 from tests.trace.util import (
-    HTTP_NOT_PORTED,
-    IN_PROCESS_ONLY,
-    NOT_CLICKHOUSE_BACKEND,
     AnyIntMatcher,
     DatetimeMatcher,
     FuzzyDateTimeMatcher,
     MaybeStringMatcher,
-    get_info_loglines,
 )
-from tests.trace_server.conftest_lib.trace_server_external_adapter import (
-    DummyIdConverter,
-)
-from tests.trace_server.helpers import force_optimize, force_optimize_if_clickhouse
 from weave import Thread, ThreadPoolExecutor
 from weave.shared.refs_internal import extra_value_quoter
 from weave.shared.trace_server_interface_util import (
@@ -53,17 +43,13 @@ from weave.trace.util import LOG_ONCE_MESSAGE_SUFFIX, logged_messages
 from weave.trace.vals import MissingSelfInstanceError
 from weave.trace.weave_client import sanitize_object_name
 from weave.trace_server import trace_server_interface as tsi
-from weave.trace_server.clickhouse_trace_server_batched import ClickHouseTraceServer
-from weave.trace_server.clickhouse_trace_server_settings import ENTITY_TOO_LARGE_PAYLOAD
 from weave.trace_server.common_interface import SortBy
 from weave.trace_server.errors import (
-    InsertTooLarge,
     InvalidFieldError,
     InvalidRequest,
     ObjectNameTypeCollision,
 )
 from weave.trace_server.ids import generate_id
-from weave.trace_server.token_costs import COST_OBJECT_NAME
 from weave.trace_server.validation_util import CHValidationError
 from weave.utils.project_id import from_project_id, to_project_id
 
@@ -978,50 +964,6 @@ def test_trace_call_query_filter_wb_run_ids(client, no_autoflush):
             )
         )
         assert stats.count == exp_count
-
-
-# Flaky against ClickHouse in CI: read-after-write visibility lag means a
-# calls_query right after flush can miss just-written rows. Rerun to absorb it.
-@pytest.mark.skipif(IN_PROCESS_ONLY, reason="needs a second user")
-@pytest.mark.flaky(reruns=2)
-def test_trace_call_query_filter_wb_user_ids(
-    client, trace_server, no_autoflush, wb_user_id
-):
-    call_spec_1 = simple_line_call_bootstrap()
-    client.flush()
-
-    trace_server.set_user_id("second_user")
-    call_spec_2 = simple_line_call_bootstrap()
-    client.flush()
-
-    trace_server.set_user_id("third_user")
-    call_spec_3 = simple_line_call_bootstrap()
-    client.flush()
-
-    for wb_user_ids, exp_count in [
-        (
-            None,
-            call_spec_1.total_calls + call_spec_2.total_calls + call_spec_3.total_calls,
-        ),
-        (
-            [],
-            call_spec_1.total_calls + call_spec_2.total_calls + call_spec_3.total_calls,
-        ),
-        (["second_user"], call_spec_2.total_calls),
-        (
-            ["second_user", "third_user"],
-            call_spec_2.total_calls + call_spec_3.total_calls,
-        ),
-        (["NOT_A_USER"], 0),
-    ]:
-        inner_res = get_client_trace_server(client).calls_query(
-            tsi.CallsQueryReq(
-                project_id=get_client_project_id(client),
-                filter=tsi.CallsFilter(wb_user_ids=wb_user_ids),
-            )
-        )
-
-        assert len(inner_res.calls) == exp_count
 
 
 def test_trace_call_query_limit(client, no_autoflush):
@@ -2779,10 +2721,6 @@ def test_call_query_stream_columns(client):
     assert calls2[0].output is None
 
 
-@pytest.mark.skipif(
-    HTTP_NOT_PORTED,
-    reason="http: prices added by earlier tests survive the reset until wandb/core#58054 is deployed",
-)
 def test_call_query_stream_columns_with_costs(client):
     @weave.op
     def calculate(a: int, b: int) -> dict[str, Any]:
@@ -2833,129 +2771,6 @@ def test_call_query_stream_columns_with_costs(client):
     assert calls[0].summary["weave"]["status"] == "success"
     assert calls[0].summary["weave"]["latency_ms"] >= 0
     assert "calculate" in calls[0].summary["weave"]["trace_name"]
-
-
-@pytest.mark.skipif(
-    IN_PROCESS_ONLY,
-    reason="the HTTP route keeps only the requested columns; summary_dump is not one",
-)
-def test_call_query_stream_summary_dump_column_with_costs(client):
-    @weave.op
-    def calculate(a: int, b: int) -> dict[str, Any]:
-        return {
-            "result": {"a + b": a + b},
-            "usage": {"prompt_tokens": 10, "completion_tokens": 10},
-            "model": "test_model",
-        }
-
-    for i in range(2):
-        calculate(i, i * i)
-
-    client.add_cost(
-        "test_model",
-        Decimal("0.00001"),
-        Decimal("0.00003"),
-        datetime.datetime.now(tz=datetime.timezone.utc),
-    )
-
-    # This should not happen, users should not request summary_dump
-    # Test that costs are returned if we include the summary_dump field
-    calls = client.server.calls_query_stream(
-        tsi.CallsQueryReq(
-            project_id=client.project_id,
-            columns=["id", "summary_dump"],
-            include_costs=True,
-        )
-    )
-    calls = list(calls)
-    assert len(calls) == 2
-    assert calls[0].summary is not None
-    assert calls[0].summary.get("weave").get("costs") is not None
-
-    # Test that costs are returned if we don't include the summary field
-    calls = client.server.calls_query_stream(
-        tsi.CallsQueryReq(
-            project_id=client.project_id,
-            columns=["id"],
-            include_costs=True,
-        )
-    )
-
-    calls = list(calls)
-    assert len(calls) == 2
-    # Summary should come back even though it wasn't requested, because we include costs
-    assert calls[0].summary.get("weave").get("costs") is not None
-
-    # Test that costs are not returned if we include the summary field, but don't include costs
-    calls = client.server.calls_query_stream(
-        tsi.CallsQueryReq(
-            project_id=client.project_id,
-            columns=["id", "summary"],
-        )
-    )
-
-    calls = list(calls)
-    assert len(calls) == 2
-    assert calls[0].summary is not None
-    assert calls[0].summary.get("weave", {}).get("costs") is None
-
-
-@pytest.mark.skipif(
-    HTTP_NOT_PORTED,
-    reason="the HTTP route drops costs when a nested summary column is requested",
-)
-def test_call_query_stream_trace_name_column_with_costs(client):
-    @weave.op
-    def my_traced_op(x: int) -> dict[str, Any]:
-        return {
-            "result": x * 2,
-            "usage": {"prompt_tokens": 5, "completion_tokens": 3},
-            "model": "cost_trace_name_model",
-        }
-
-    my_traced_op(1)
-
-    client.add_cost(
-        "cost_trace_name_model",
-        Decimal("0.00001"),
-        Decimal("0.00003"),
-        datetime.datetime.now(tz=datetime.timezone.utc),
-    )
-
-    calls = list(
-        client.server.calls_query_stream(
-            tsi.CallsQueryReq(
-                project_id=client.project_id,
-                columns=["id", "summary.weave.trace_name"],
-                include_costs=True,
-            )
-        )
-    )
-
-    assert len(calls) == 1
-    assert calls[0].summary is not None
-    assert calls[0].summary.get("weave", {}).get("costs") is not None
-    assert "my_traced_op" in calls[0].summary["weave"]["trace_name"]
-
-    # Also test sorting by trace_name with costs (regression: sorting by
-    # summary.weave.trace_name with include_costs on calls_complete failed
-    # with UNKNOWN_IDENTIFIER because the computed column wasn't in the
-    # all_calls CTE SELECT).
-    calls = list(
-        client.server.calls_query_stream(
-            tsi.CallsQueryReq(
-                project_id=client.project_id,
-                columns=["id"],
-                include_costs=True,
-                sort_by=[
-                    tsi.SortBy(field="summary.weave.trace_name", direction="desc")
-                ],
-            )
-        )
-    )
-    assert len(calls) == 1
-    assert calls[0].summary is not None
-    assert calls[0].summary.get("weave", {}).get("costs") is not None
 
 
 def test_read_call_start_with_cost(client):
@@ -3020,8 +2835,8 @@ def test_read_call_start_with_cost(client):
         pass
     elif isinstance(summary, dict):
         # Check that the costs object was NOT added
-        assert COST_OBJECT_NAME not in summary.get("weave", {}), (
-            f"Did not expect '{COST_OBJECT_NAME}' key in summary['weave'] when initial summary was null/empty"
+        assert "costs" not in summary.get("weave", {}), (
+            "Did not expect 'costs' key in summary['weave'] when initial summary was null/empty"
         )
     else:
         pytest.fail(f"summary_dump was not None or dict: {type(summary)} {summary}")
@@ -3493,42 +3308,6 @@ def test_calls_stream_column_expansion(client):
     assert call_result.output == nested_ref.uri
 
 
-# Batch size is dynamically increased from 10 to MAX_CALLS_STREAM_BATCH_SIZE (500)
-# in clickhouse_trace_server_settings.py, this test verifies that the dynamic
-# increase works as expected
-@pytest.mark.parametrize("batch_size", [1, 5, 6])
-def test_calls_stream_column_expansion_dynamic_batch_size(
-    client, batch_size, monkeypatch
-):
-    monkeypatch.setattr(
-        "weave.trace_server.clickhouse_trace_server_settings.INITIAL_CALLS_STREAM_BATCH_SIZE",
-        1,
-    )
-    monkeypatch.setattr(
-        "weave.trace_server.clickhouse_trace_server_settings.MAX_CALLS_STREAM_BATCH_SIZE",
-        5,
-    )
-
-    @weave.op
-    def test_op(x):
-        return x
-
-    for i in range(batch_size):
-        test_op(i)
-
-    res = client.server.calls_query_stream(
-        tsi.CallsQueryReq(
-            project_id=client.project_id,
-            columns=["output"],
-            expand_columns=["output"],
-        )
-    )
-    calls = list(res)
-    assert len(calls) == batch_size
-    for i in range(batch_size):
-        assert calls[i].output == i
-
-
 class Custom(weave.Object):
     val: dict
 
@@ -3582,10 +3361,6 @@ def test_object_with_char_limit(client):
     client.server.obj_create(create_req)
 
 
-@pytest.mark.skipif(
-    HTTP_NOT_PORTED,
-    reason="http: the server names the error class once wandb/core#58054 is deployed",
-)
 def test_object_with_char_over_limit(client):
     name = "l" * (CHAR_LIMIT + 1)
     obj = Custom(name=name, val={"1": 1})
@@ -3673,10 +3448,6 @@ def test_object_name_over_limit_warns_after_the_log_level_is_raised(client, capl
 
 
 @pytest.mark.disable_logging_error_check
-@pytest.mark.skipif(
-    HTTP_NOT_PORTED,
-    reason="http: the server names the error class once wandb/core#58054 is deployed",
-)
 def test_names_truncated_to_one_id_are_rejected_with_the_name_that_was_sent(client):
     """Two types cannot share an id (WB-30574). When the id is a truncation, the
     rejection quotes the name that produced it, which is the only part the caller
@@ -3946,154 +3717,6 @@ def test_inline_pydantic_basemodel_generates_no_refs_in_object(client):
         )
     )
     assert len(res.objs) == 1  # Just the weave object, and not the pydantic model
-
-
-@pytest.mark.skipif(
-    NOT_CLICKHOUSE_BACKEND,
-    reason="ClickHouse-only: stripping triggers via patched _insert_call_batch",
-)
-def test_large_keys_are_stripped_call(client, caplog, monkeypatch):
-    original_insert_call_batch = weave.trace_server.clickhouse_trace_server_batched.ClickHouseTraceServer._insert_call_batch
-    max_size = 10 * 1024
-
-    # Patch _insert_call_batch to raise InsertTooLarge
-    def mock_insert_call_batch(self, batch):
-        # mock raise insert error
-        if len(str(batch)) > max_size:
-            raise InsertTooLarge(
-                "Database insertion failed. Record too large. "
-                "A likely cause is that a single row or cell exceeded "
-                "the limit. If logging images, save them as `Image.PIL`."
-            )
-        original_insert_call_batch(self, batch)
-
-    monkeypatch.setattr(
-        weave.trace_server.clickhouse_trace_server_settings,
-        "CLICKHOUSE_SINGLE_ROW_INSERT_BYTES_LIMIT",
-        max_size,
-    )
-    monkeypatch.setattr(
-        weave.trace_server.clickhouse_trace_server_batched.ClickHouseTraceServer,
-        "_insert_call_batch",
-        mock_insert_call_batch,
-    )
-
-    # Use a dictionary that will exceed our new 10KB limit
-    data = {"dictionary": {f"{i}": i for i in range(max_size // 10)}}
-
-    @weave.op
-    def test_op_dict(input_data: dict):
-        return {"output": input_data}
-
-    test_op_dict(data)
-
-    calls = list(test_op_dict.calls())
-    assert len(calls) == 1
-    assert calls[0].output == json.loads(ENTITY_TOO_LARGE_PAYLOAD)
-    assert calls[0].inputs == json.loads(ENTITY_TOO_LARGE_PAYLOAD)
-
-    # now test for inputs/output as raw string
-    @weave.op
-    def test_op_str(input_data: str):
-        return input_data
-
-    test_op_str(json.dumps(data))
-
-    calls = list(test_op_str.calls())
-    assert len(calls) == 1
-    assert calls[0].output == json.loads(ENTITY_TOO_LARGE_PAYLOAD)
-    assert calls[0].inputs == json.loads(ENTITY_TOO_LARGE_PAYLOAD)
-
-    # and now list
-    @weave.op
-    def test_op_list(input_data: list[str]):
-        return input_data
-
-    test_op_list([json.dumps(data)])
-
-    calls = list(test_op_list.calls())
-    assert len(calls) == 1
-    assert calls[0].output == json.loads(ENTITY_TOO_LARGE_PAYLOAD)
-    assert calls[0].inputs == json.loads(ENTITY_TOO_LARGE_PAYLOAD)
-
-    error_messages = [
-        record.message for record in caplog.records if record.levelname == "ERROR"
-    ]
-    for error_message in error_messages:
-        assert "Retrying with large objects stripped" in error_message
-
-    # test that when inputs + output > max_size but input < max_size
-    # we only strip the inputs
-    smaller_data = {"dictionary": {f"{i}": i for i in range(max_size // 16)}}
-
-    @weave.op
-    def test_op_strip_inputs(input_data: dict):
-        # combined output is larger than single row size
-        return {"output1": input_data, "output2": smaller_data}
-
-    def _compare_inputs(inputs, expected):
-        for k, v in expected.items():
-            assert inputs[k] == v
-
-    test_op_strip_inputs(smaller_data)
-
-    calls = list(test_op_strip_inputs.calls())
-    assert len(calls) == 1
-    assert calls[0].output == json.loads(ENTITY_TOO_LARGE_PAYLOAD)
-    _compare_inputs(calls[0].inputs, {"input_data": smaller_data})
-
-    # test when inputs + output + attributes > max_size and attributes is largest
-    # we strip the attributes
-    @weave.op
-    def test_op_strip_summary(input_data: dict):
-        return "really_small"
-
-    with weave.attributes({"slightly_larger_data": smaller_data | {"a": 1}}):
-        test_op_strip_summary(smaller_data)
-
-    call = next(iter(test_op_strip_summary.calls()))
-    assert call.attributes == json.loads(ENTITY_TOO_LARGE_PAYLOAD)
-    assert call.output == "really_small"
-    _compare_inputs(call.inputs, {"input_data": smaller_data})
-
-    # Test case where we have a batch with mixed sizes - some calls need stripping, some don't
-    # This ensures we hit the lines where total_json_bytes <= limit (lines 2355-2357)
-    # for items that don't need stripping within a batch that overall needs stripping
-
-    @weave.op
-    def test_op_mixed_batch_small(input_data: str):
-        return input_data
-
-    @weave.op
-    def test_op_mixed_batch_large(input_data: dict):
-        return {"large_output": input_data}
-
-    # Create a small call that fits under the limit
-    test_op_mixed_batch_small("tiny data")
-
-    # Create a large call that needs stripping
-    large_data = {"dictionary": {f"{i}": i for i in range(max_size // 10)}}
-    test_op_mixed_batch_large(large_data)
-
-    # Create another small call
-    test_op_mixed_batch_small("another tiny piece")
-
-    # Flush to ensure they're in the same batch
-    client.flush()
-
-    # Check that the small calls preserved their data while the large one was stripped
-    small_calls = list(test_op_mixed_batch_small.calls())
-    assert len(small_calls) == 2
-    assert small_calls[0].output == "tiny data"
-    assert small_calls[0].inputs == {"input_data": "tiny data"}
-    assert small_calls[1].output == "another tiny piece"
-    assert small_calls[1].inputs == {"input_data": "another tiny piece"}
-
-    large_calls = list(test_op_mixed_batch_large.calls())
-    assert len(large_calls) == 1
-    # The large call should have been stripped
-    assert large_calls[0].output == json.loads(ENTITY_TOO_LARGE_PAYLOAD)
-    assert large_calls[0].inputs == json.loads(ENTITY_TOO_LARGE_PAYLOAD)
 
 
 def test_weave_finish_unsets_client(client, monkeypatch):
@@ -4438,26 +4061,6 @@ def test_calls_query_multiple_dupe_select_columns(client):
     assert calls[0].output["a"]["b"]["c"]["d"] == 1
 
 
-@pytest.mark.skipif(
-    NOT_CLICKHOUSE_BACKEND, reason="ClickHouse-only: asserts the emitted SQL"
-)
-def test_calls_query_dupe_select_columns_no_duplicate_sql(client, caplog):
-    @weave.op
-    def test():
-        return {"a": {"b": {"c": {"d": 1}}}}
-
-    test()
-
-    # Consume the (lazy) calls iterator so the SELECT actually executes.
-    calls = client.get_calls(columns=["output", "output.a", "output.a.b"])
-    assert len(list(calls)) == 1
-
-    select_query = get_info_loglines(caplog, "clickhouse_stream_query", ["query"])[0]
-    assert (
-        select_query["query"].count("any(calls_merged.output_dump) AS output_dump") == 1
-    )
-
-
 def test_calls_stream_heavy_condition_aggregation_parts(client):
     def _make_query(field: str, value: str) -> tsi.CallsQueryRes:
         query = {
@@ -4624,15 +4227,6 @@ def test_call_stream_query_heavy_query_batch(client):
         assert call.attributes["empty"] == ""
 
 
-@pytest.fixture
-def clickhouse_client(client):
-    try:
-        ch_server = find_server_layer(client.server, ClickHouseTraceServer)
-    except TypeError:
-        return None
-    return ch_server.ch_client
-
-
 def test_calls_query_with_storage_size_clickhouse(client):
     """Test querying calls with storage size information."""
 
@@ -4642,12 +4236,6 @@ def test_calls_query_with_storage_size_clickhouse(client):
 
     # Create a call with some data
     result = test_op({"data": "x" * 1000})
-
-    # This is a best effort to achive consistency in the calls_merged_stats table.
-    # due to some race condition/optimizations in clickhouse, there is a chance
-    # that the calls_merged_stats table is not updated in time for the query below
-    # to return the correct results.
-    force_optimize_if_clickhouse(client, "calls_merged_stats")
 
     # Query with storage size
     calls = list(
@@ -4679,12 +4267,6 @@ def test_calls_query_with_total_storage_size_clickhouse(client):
 
     # Create a call with nested structure
     parent_op({"data": "x" * 1000})
-
-    # This is a best effort to achive consistency in the calls_merged_stats table.
-    # due to some race condition/optimizations in clickhouse, there is a chance
-    # that the calls_merged_stats table is not updated in time for the query below
-    # to return the correct results.
-    force_optimize_if_clickhouse(client, "calls_merged_stats")
 
     # Query with total storage size
     calls = list(
@@ -4730,12 +4312,6 @@ def test_calls_query_with_both_storage_sizes_clickhouse(client):
 
     # Create a call with nested structure
     parent_op({"data": "x" * 1000})
-
-    # This is a best effort to achive consistency in the calls_merged_stats table.
-    # due to some race condition/optimizations in clickhouse, there is a chance
-    # that the calls_merged_stats table is not updated in time for the query below
-    # to return the correct results.
-    force_optimize_if_clickhouse(client, "calls_merged_stats")
 
     # Query with total storage size
     calls = list(
@@ -4801,8 +4377,6 @@ def test_total_storage_size_is_project_scoped(client):
             )
         )
 
-    force_optimize_if_clickhouse(client, "calls_merged_stats")
-
     calls = client.server.calls_query(
         tsi.CallsQueryReq(
             project_id=project_id,
@@ -4856,59 +4430,6 @@ def test_calls_hydrated(client):
     assert calls[2].inputs["input_ref"]["hi"]["there"]["foo"] == "bar"
 
 
-@pytest.mark.skipif(
-    IN_PROCESS_ONLY,
-    reason="the size counts internal refs, whose length depends on the server's project id",
-)
-def test_obj_query_with_storage_size_clickhouse(client):
-    """Test querying objects with storage size information."""
-    # Create a test object with some data to ensure it has size
-    dataset = weave.Dataset(name="test_dataset", rows=[{"key": "value" * 1000}])
-    weave.publish(dataset)
-
-    # Query the object with storage size included
-    res = client.server.objs_query(
-        tsi.ObjQueryReq(
-            project_id=get_client_project_id(client),
-            include_storage_size=True,
-            filter={"object_ids": ["test_dataset"]},
-        )
-    )
-
-    assert len(res.objs) == 1
-    queried_obj = res.objs[0]
-
-    # Verify that storage size is present
-    assert queried_obj.size_bytes is not None
-    assert queried_obj.size_bytes == 257  # Should have some size due to the test data
-
-    # Test that a table is created and its size is correct
-    table_ref = TableRef.parse_uri(queried_obj.val["rows"])
-    res = client.server.table_query_stats_batch(
-        tsi.TableQueryStatsBatchReq(
-            project_id=client.project_id,
-            digests=[table_ref.digest],
-            include_storage_size=True,
-        )
-    )
-
-    assert res.tables[0].storage_size_bytes == 5011
-
-    # Query without storage size (default behavior)
-    res_without_size = client.server.objs_query(
-        tsi.ObjQueryReq(
-            project_id=get_client_project_id(client),
-            filter={"object_ids": ["test_dataset"]},
-        )
-    )
-
-    assert len(res_without_size.objs) == 1
-    queried_obj_without_size = res_without_size.objs[0]
-
-    # Verify that storage size is not included when not requested
-    assert queried_obj_without_size.size_bytes is None
-
-
 def test_call_query_stream_with_costs_and_storage_size(client):
     @weave.op
     def child_op(a: int, b: int) -> dict[str, Any]:
@@ -4924,13 +4445,6 @@ def test_call_query_stream_with_costs_and_storage_size(client):
         return child_op(x["a"], x["b"])  # Call child op to create a trace
 
     parent_op({"a": 1, "b": 2})
-
-    # This is a best effort to achive consistency in the calls_merged_stats table.
-    # due to some race condition/optimizations in clickhouse, there is a chance
-    # that the calls_merged_stats table is not updated in time for the query below
-    # to return the correct results.
-    force_optimize_if_clickhouse(client, "calls_merged")
-    force_optimize_if_clickhouse(client, "calls_merged_stats")
 
     # Test that "include_costs" and "include_total_storage_size" can be used together
     calls = list(
@@ -5099,10 +4613,6 @@ def test_dedupe_ref_in_calls_stream(client):
     }
 
 
-@pytest.mark.skipif(
-    HTTP_NOT_PORTED,
-    reason="http: the server names the error class once wandb/core#58054 is deployed",
-)
 def test_calls_query_stats_with_limit(client):
     def calls_stats(limit=None, filter=None, include_total_storage_size=False):
         return client.server.calls_query_stats(
@@ -5145,74 +4655,6 @@ def test_calls_query_stats_with_limit(client):
     result = calls_stats(limit=1, include_total_storage_size=True)
     assert result.count == 1
     assert result.total_storage_size_bytes is not None
-
-
-def test_calls_query_stats_unfiltered_storage_counts_deleted_bytes(
-    client, clickhouse_client
-):
-    """Unfiltered storage stats: count drops soft-deleted, storage keeps their bytes."""
-    if clickhouse_client is None:
-        pytest.skip("Skipping test for sqlite clients")
-
-    @weave.op
-    def child(x: dict):
-        return x
-
-    @weave.op
-    def parent(x: dict):
-        return child(x)
-
-    for _ in range(3):
-        parent({"data": "x" * 2000})
-
-    project_id = get_client_project_id(client)
-
-    def optimize():
-        # Optimize both residences' tables so the test is deterministic under
-        # the calls_merged and calls_complete (WEAVE_USE_CALLS_COMPLETE) shards.
-        for table in (
-            "calls_merged",
-            "calls_merged_stats",
-            "calls_complete",
-            "calls_complete_stats",
-        ):
-            force_optimize(clickhouse_client, table)
-
-    optimize()
-
-    def stats():
-        res = client.server.calls_query_stats(
-            tsi.CallsQueryStatsReq(
-                project_id=project_id, include_total_storage_size=True
-            )
-        )
-        return res.count, res.total_storage_size_bytes
-
-    count_before, storage_before = stats()
-    assert count_before == 6
-    assert storage_before > 0
-
-    roots = [c for c in client.get_calls() if c.parent_id is None]
-    client.server.calls_delete(
-        tsi.CallsDeleteReq(project_id=project_id, call_ids=[roots[0].id])
-    )
-    optimize()
-
-    count_after, storage_after = stats()
-    assert count_after == 4
-    assert storage_after == storage_before
-
-    # Divergence: a filter routes through the GROUP BY + JOIN path, which DOES
-    # exclude the soft-deleted trace's bytes (unlike the unfiltered flat sum).
-    live_op_names = sorted({c.op_name for c in client.get_calls()})
-    filtered = client.server.calls_query_stats(
-        tsi.CallsQueryStatsReq(
-            project_id=project_id,
-            include_total_storage_size=True,
-            filter=tsi.CallsFilter(op_names=live_op_names),
-        )
-    )
-    assert filtered.total_storage_size_bytes < storage_before
 
 
 def test_calls_query_stats_started_at_window_excludes_deletes(client):
@@ -5388,12 +4830,6 @@ def test_calls_query_stats_total_storage_size_clickhouse(client):
     # Create a call with nested structure
     parent_op({"data": "x" * 1000})
 
-    # This is a best effort to achive consistency in the calls_merged_stats table.
-    # due to some race condition/optimizations in clickhouse, there is a chance
-    # that the calls_merged_stats table is not updated in time for the query below
-    # to return the correct results.
-    force_optimize_if_clickhouse(client, "calls_merged_stats")
-
     # Query with total storage size
     result = client.server.calls_query_stats(
         tsi.CallsQueryStatsReq(
@@ -5408,75 +4844,6 @@ def test_calls_query_stats_total_storage_size_clickhouse(client):
     # Unfortunate that we can't assert the exact value here, because of the
     # uncertainty of the clickhouse materialized view merging moment.
     assert result.total_storage_size_bytes is not None
-
-
-@pytest.mark.skipif(
-    NOT_CLICKHOUSE_BACKEND, reason="ClickHouse-only: requires raw stats-table inserts"
-)
-def test_project_stats_clickhouse(client, clickhouse_client):
-    project_id = get_client_project_id(client)
-    internal_project_id = DummyIdConverter().ext_to_int_project_id(project_id)
-
-    # Insert test data directly into stats tables
-    attr_size = 100
-    inputs_size = 200
-    output_size = 300
-    summary_size = 400
-    trace_size = attr_size + inputs_size + output_size + summary_size
-    object_size = 5678
-    file_size = 4321
-    table_size = 1234  # New test data for table storage size
-
-    # Insert a row into calls_merged to establish project data residence
-    # This ensures the table routing resolver routes to calls_merged_stats
-    clickhouse_client.command(
-        f"""
-        INSERT INTO calls_merged (project_id, id, op_name, started_at, trace_id,
-                                  parent_id, attributes_dump, inputs_dump, output_dump, summary_dump)
-        VALUES ('{internal_project_id}', '{uuid.uuid4()}', 'test_op', now(), '{uuid.uuid4()}',
-                '', '{{}}', '{{}}', 'null', '{{}}')
-        """
-    )
-
-    # directly insert into stats tables to avoid materialized views's consistency issue
-    # Insert into calls_merged_stats
-    clickhouse_client.command(
-        f"INSERT INTO calls_merged_stats (project_id, attributes_size_bytes, inputs_size_bytes, output_size_bytes, summary_size_bytes) "
-        f"VALUES ('{internal_project_id}', {attr_size}, {inputs_size}, {output_size}, {summary_size})"
-    )
-    # Insert into object_versions_stats
-    clickhouse_client.command(
-        f"INSERT INTO object_versions_stats (project_id, size_bytes) VALUES ('{internal_project_id}', {object_size})"
-    )
-    # Insert into files_stats
-    clickhouse_client.command(
-        f"INSERT INTO files_stats (project_id, size_bytes) VALUES ('{internal_project_id}', {file_size})"
-    )
-    # Insert into table_rows_stats
-    clickhouse_client.command(
-        f"INSERT INTO table_rows_stats (project_id, size_bytes) VALUES ('{internal_project_id}', {table_size})"
-    )
-
-    # Query project stats with all storage sizes included
-    res = client.server.project_stats(tsi.ProjectStatsReq(project_id=project_id))
-
-    # Assert the result fields match the inserted values
-    assert res.trace_storage_size_bytes == trace_size
-    assert res.objects_storage_size_bytes == object_size
-    assert res.tables_storage_size_bytes == table_size
-    assert res.files_storage_size_bytes == file_size
-
-    # test that requesting with none of the include_* params returns an error
-    with pytest.raises(ValueError, match="At least one of"):
-        client.server.project_stats(
-            tsi.ProjectStatsReq(
-                project_id=project_id,
-                include_trace_storage_size=False,
-                include_object_storage_size=False,
-                include_table_storage_size=False,
-                include_file_storage_size=False,
-            )
-        )
 
 
 def test_calls_query_with_descendant_error(client):

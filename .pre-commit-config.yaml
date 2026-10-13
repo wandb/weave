@@ -12,7 +12,7 @@ repos:
         pass_filenames: false
         priority: 0
       - id: import-linter
-        name: import-linter (trace_server / client / workers boundaries)
+        name: import-linter (trace_server / client boundaries)
         entry: uv run lint-imports
         language: python
         always_run: true

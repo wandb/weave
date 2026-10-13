@@ -16,23 +16,14 @@ import weave
 import weave.trace.call
 import weave.trace_server.trace_server_interface as tsi
 from tests.conftest import TestOnlyFlushingWeaveClient
-from tests.trace.server_utils import find_server_layer
+from tests.trace.server_utils import TEST_ENTITY
 from tests.trace.testutil import ObjectRefStrMatcher
-from tests.trace.util import (
-    HTTP_NOT_PORTED,
-    IN_PROCESS_ONLY,
-    AnyIntMatcher,
-    DatetimeMatcher,
-    RegexStringMatcher,
-)
-from tests.trace_server.conftest_lib.trace_server_external_adapter import (
-    UserInjectingExternalTraceServer,
-)
-from tests.trace_server.helpers import force_optimize
+from tests.trace.util import AnyIntMatcher, DatetimeMatcher, RegexStringMatcher
 from weave import Evaluation
 from weave.flow.llm_structured_model import LLMStructuredCompletionModel
 from weave.integrations.integration_utilities import op_name_from_call
 from weave.prompt.prompt import MessagesPrompt
+from weave.shared.errors import NotFoundError
 from weave.shared.interface.builtin_object_classes.llm_structured_model import (
     LLMStructuredCompletionModelDefaultParams,
 )
@@ -57,10 +48,6 @@ from weave.trace.serialization.serializer import (
     register_serializer,
 )
 from weave.trace.wandb_run_context import WandbRunContext
-from weave.trace_server.clickhouse_trace_server_batched import (
-    ClickHouseTraceServer,
-    NotFoundError,
-)
 from weave.trace_server.common_interface import SortBy
 from weave.trace_server.constants import MAX_DISPLAY_NAME_LENGTH
 from weave.trace_server.ids import generate_id
@@ -1378,10 +1365,6 @@ def test_refs_read_batch_multi_project(client):
     assert res.vals[2] == {"ab": [3, 4, 5]}
 
 
-@pytest.mark.skipif(
-    HTTP_NOT_PORTED,
-    reason="http: the server names the error class once wandb/core#58054 is deployed",
-)
 def test_refs_read_batch_call_ref(client):
     call_ref = refs.CallRef(entity="shawn", project="test-project", id="my-call")
     with pytest.raises(ValueError, match="Call refs not supported"):
@@ -1968,25 +1951,9 @@ def test_get_calls_storage_size_with_limit(client):
     assert len(calls_limited) == 2
 
 
-@pytest.fixture
-def clickhouse_client(client):
-    try:
-        ch_server = find_server_layer(client.server, ClickHouseTraceServer)
-    except TypeError:
-        return None
-    return ch_server.ch_client
-
-
-def test_get_calls_storage_size_values(client, clickhouse_client):
+def test_get_calls_storage_size_values(client):
     """Test that storage size values are correctly included when parameters are set."""
     _setup_calls_for_storage_size_test(client)
-
-    # This is a best effort to achieve consistency in the calls_merged_stats table.
-    # calls_merged_stats is an AggregatingMergeTree table populated by a materialized view.
-    # ClickHouse merges data asynchronously, so queries may see unmerged data.
-    # OPTIMIZE TABLE ... FINAL forces an immediate merge to ensure consistency for tests.
-    if clickhouse_client:
-        force_optimize(clickhouse_client, "calls_merged_stats")
 
     # Get calls via get_calls with storage size parameters
     client_calls = list(
@@ -2238,10 +2205,6 @@ def test_long_display_names_are_elided(weave_active):
     assert len(call.display_name) <= MAX_DISPLAY_NAME_LENGTH
 
 
-@pytest.mark.skipif(
-    HTTP_NOT_PORTED,
-    reason="http: the server names the error class once wandb/core#58054 is deployed",
-)
 def test_object_deletion(client):
     # Simple case, delete a single version of an object
     obj = {"a": 5}
@@ -2297,10 +2260,6 @@ def test_object_deletion(client):
     assert len(versions.objs) == 0
 
 
-@pytest.mark.skipif(
-    HTTP_NOT_PORTED,
-    reason="http: the server names the error class once wandb/core#58054 is deployed",
-)
 def test_recursive_object_deletion(weave_active):
     # Create a bunch of objects that refer to each other
     obj1 = {"a": 5}
@@ -2331,10 +2290,6 @@ def test_recursive_object_deletion(weave_active):
     assert obj3_ref.get() == {"c": obj2}
 
 
-@pytest.mark.skipif(
-    HTTP_NOT_PORTED,
-    reason="http: the server names the error class once wandb/core#58054 is deployed",
-)
 def test_delete_op_version(weave_active):
     @weave.op
     def my_op(a: int) -> int:
@@ -3345,10 +3300,6 @@ def test_tracing_enabled_context(client):
         client.finish_call(call)  # Should not raise any error
 
 
-@pytest.mark.skipif(
-    HTTP_NOT_PORTED,
-    reason="http: the server names the error class once wandb/core#58054 is deployed",
-)
 def test_calls_query_hardcoded_filter_length_validation(client):
     @weave.op
     def test():
@@ -3403,10 +3354,6 @@ def test_calls_query_hardcoded_filter_length_validation(client):
         calls = client.get_calls(filter={"trace_ids": ["11111"] * 1001})[0]
 
 
-@pytest.mark.skipif(
-    HTTP_NOT_PORTED,
-    reason="http: the ClickHouse condition cache returns wrong rows until wandb/core#58054 is deployed",
-)
 def test_calls_query_datetime_optimization_with_gt_operation(client):
     """Test that datetime optimization works correctly with GT operations on started_at and ended_at fields."""
     # Use a unique test ID to identify these calls
@@ -4656,18 +4603,7 @@ def test_get_calls_columns_wb_run_id(client, monkeypatch):
     assert calls[0].wb_run_id == mock_run_id
 
 
-@pytest.mark.skipif(IN_PROCESS_ONLY, reason="stubs the in-process username resolver")
-def test_get_calls_include_usernames(client, monkeypatch, wb_user_id):
-    external_server = find_server_layer(client.server, UserInjectingExternalTraceServer)
-    internal_user_id = external_server._idc.ext_to_int_user_id(client.entity)
-
-    # Username resolution happens in the external adapter after wb_user_id has
-    # been translated to the internal id, so stub that resolver directly.
-    def resolve_username(user_id: str) -> str | None:
-        return "resolved-user" if user_id == internal_user_id else None
-
-    monkeypatch.setattr(external_server, "_username_resolver", resolve_username)
-
+def test_get_calls_include_usernames(client, wb_user_id):
     @weave.op
     def test_op(x: int) -> int:
         return x * 5
@@ -4681,7 +4617,7 @@ def test_get_calls_include_usernames(client, monkeypatch, wb_user_id):
         )
     )
     assert len(calls_without_usernames) == 1
-    assert calls_without_usernames[0].wb_user_id == client.entity
+    assert calls_without_usernames[0].wb_user_id == wb_user_id
     assert calls_without_usernames[0].wb_username is None
 
     calls_with_usernames = list(
@@ -4691,8 +4627,8 @@ def test_get_calls_include_usernames(client, monkeypatch, wb_user_id):
         )
     )
     assert len(calls_with_usernames) == 1
-    assert calls_with_usernames[0].wb_user_id == client.entity
-    assert calls_with_usernames[0].wb_username == "resolved-user"
+    assert calls_with_usernames[0].wb_user_id == wb_user_id
+    assert calls_with_usernames[0].wb_username == TEST_ENTITY
 
 
 def test_calls_query_with_dotted_field_keys(client):

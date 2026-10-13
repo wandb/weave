@@ -55,9 +55,7 @@ SHARDS_WITHOUT_EXTRAS = {
     "trace",
     "trace_calls_merged_only",
     "trace_no_server",
-    "trace_server",
     "trace_server_bindings",
-    "trace_server_migrator",
     "openai_realtime",
     "stainless",
     "autogen_tests",
@@ -83,9 +81,7 @@ SHARDS_WITHOUT_EXTRAS = {
         #   nox -e "tests-3.12(shard='custom')" -- test_your_thing.py
         "custom",
         "flow",
-        "trace_server",
         "trace_server_bindings",
-        "trace_server_migrator",
         "anthropic",
         "cerebras",
         "cohere",
@@ -137,9 +133,6 @@ def tests(session: nox.Session, shard: str):
         sync_args.extend(["--extra", shard])
     elif shard in {"autogen_tests", "verifiers_test", "pandas_test"}:
         sync_args.extend(["--group", shard])
-    elif shard in {"trace_server", "trace_server_migrator"}:
-        # The trace_server deps arrive via `weave[trace_server]` in the test group.
-        sync_args.extend(["--group", "trace_server_tests"])
     elif shard == "scorers":
         # scorer tests include a few that hit W&B Artifacts directly, so install
         # both extras to cover the full suite.
@@ -189,7 +182,6 @@ def tests(session: nox.Session, shard: str):
             "WEAVE_SENTRY_ENV",
             "CI",
             "WB_SERVER_HOST",
-            "WF_CLICKHOUSE_HOST",
             "WEAVE_SERVER_DISABLE_ECOSYSTEM",
             "DD_TRACE_ENABLED",
         ]
@@ -220,9 +212,7 @@ def tests(session: nox.Session, shard: str):
     test_dirs_dict = {
         "custom": [],
         "flow": ["tests/flow/"],
-        "trace_server": ["tests/trace_server/", "tests/shared/"],
         "trace_server_bindings": ["tests/trace_server_bindings/"],
-        "trace_server_migrator": ["tests/trace_server_migrator/"],
         "stainless": ["tests/trace_server_bindings/"],
         "scorers": ["tests/scorers/"],
         "autogen_tests": ["tests/integrations/autogen/"],
@@ -233,6 +223,7 @@ def tests(session: nox.Session, shard: str):
             "tests/utils/",
             "tests/wandb_interface/",
             "tests/conversation/",
+            "tests/shared/",
         ],
         "trace_calls_merged_only": [
             "tests/trace/",
@@ -257,15 +248,6 @@ def tests(session: nox.Session, shard: str):
     for test_dir in test_dirs:
         if not os.path.exists(test_dir):
             raise ValueError(f"Test directory {test_dir} does not exist")
-
-    # Each worker gets its own isolated database namespace, so these shards are
-    # safe to run in parallel when we have more than 1 CPU core. The migrator
-    # shard is dominated by round-trip DDL latency rather than CPU, so it gains
-    # the most: every test builds its own uniquely-named databases.
-    if shard in {"trace", "trace_calls_merged_only", "trace_server_migrator"}:
-        cpu_count = os.cpu_count()
-        if cpu_count is not None and cpu_count > 1:
-            session.posargs.insert(0, f"-n{cpu_count}")
 
     # Add sharding logic for trace1, trace2, trace3
     pytest_args = [

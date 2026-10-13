@@ -67,4 +67,4 @@ Same HTTP contract, language-agnostic. Spawn `python -m trace_server_mock --port
 
 - `/calls/stream_query` is a minimal stub — returns all calls for a project as NDJSON, ignoring filter/order/limit. Future tests that need real query semantics can grow the implementation.
 - Auth headers are accepted without validation. Mock is for tests; real auth lives in production.
-- No persistence. No Kafka. No ClickHouse. If your test needs production-fidelity behavior beyond what's listed here, use the real `services/weave-trace` server (see [`tests/trace_server/`](../tests/trace_server) for the existing in-process fixture pattern).
+- No persistence. No Kafka. No ClickHouse. If your test needs production-fidelity behavior beyond what's listed here, use the real `services/weave-trace` server (see [`tests/conftest_lib/http_trace_server.py`](../tests/conftest_lib/http_trace_server.py) for how weave's tests reach it).

@@ -3,10 +3,6 @@ import datetime
 import pytest
 
 import weave
-from tests.trace.util import HTTP_NOT_PORTED, NOT_CLICKHOUSE_BACKEND
-from tests.trace_server.conftest_lib.trace_server_external_adapter import (
-    DummyIdConverter,
-)
 from weave import AnnotationSpec
 from weave.trace.weave_client import WeaveClient, get_ref
 from weave.trace_server import trace_server_interface as tsi
@@ -15,11 +11,7 @@ from weave.trace_server.errors import (
     InvalidRequest,
     QueryIllegalTypeofArgumentError,
 )
-from weave.trace_server.feedback_agg_query_builder import (
-    build_feedback_aggregate_query,
-)
 from weave.trace_server.interface.query import Query
-from weave.trace_server.orm import ParamBuilder
 from weave.trace_server.trace_server_interface import (
     FeedbackAggregateBucket,
     FeedbackAggregateReq,
@@ -1423,87 +1415,13 @@ async def test_filter_by_feedback(client: WeaveClient, no_autoflush) -> None:
         )
 
 
-@pytest.mark.skipif(
-    NOT_CLICKHOUSE_BACKEND,
-    reason="ClickHouse-only: executes the built SQL directly via server._query",
-)
-def test_feedback_aggregate_filter_matching_functional(client: WeaveClient) -> None:
-    """Functional checks (ClickHouse-only) that the WHERE filters match precisely.
-
-    The aggregate endpoint lands separately, so this executes the built query
-    directly. Guards against over-broad matching that string assertions miss:
-    object-id filters match the id exactly (a trailing '*' opts into prefix), and
-    span_types matches the ref's span-type segment, not an arbitrary substring.
-    """
-    project_id = client.project_id
-    now_ms = int(datetime.datetime.now(datetime.timezone.utc).timestamp() * 1000)
-    after_ms = now_ms - 3_600_000
-    before_ms = now_ms + 3_600_000
-
-    def _monitor(suffix: str, monitor_id: str, weave_ref: str) -> None:
-        client.server.feedback_create(
-            tsi.FeedbackCreateReq(
-                project_id=project_id,
-                weave_ref=weave_ref,
-                feedback_type="wandb.agent_monitor",
-                payload={"value": []},
-                runnable_ref=f"weave:///{project_id}/object/scorer_{suffix}:obj_{suffix}",
-                call_ref=f"weave:///{project_id}/call/{suffix}",
-                trigger_ref=f"weave:///{project_id}/object/{monitor_id}:trig_{suffix}",
-            )
-        )
-
-    # Two monitors whose ids share a prefix ("mon" vs "monday"), one scoring an
-    # agent_turn ref and one an agent_conversation ref.
-    _monitor("t1", "mon", f"weave:///{project_id}/agent_turn/trace_t1")
-    _monitor("c1", "monday", f"weave:///{project_id}/agent_conversation/conv_c1")
-
-    # feedback_create (via the external adapter) stores the internal project_id and
-    # internalized refs; query against that internal id, not the external one.
-    internal_project_id = DummyIdConverter().ext_to_int_project_id(project_id)
-
-    def _total(**filters) -> int:
-        """Run the aggregate (global rollup) and return the total matched rows."""
-        pb = ParamBuilder()
-        built = build_feedback_aggregate_query(
-            FeedbackAggregateReq(
-                project_id=internal_project_id,
-                after_ms=after_ms,
-                before_ms=before_ms,
-                feedback_types=["wandb.agent_monitor"],
-                **filters,
-            ),
-            pb,
-        )
-        result = client.server._query(built.sql, built.parameters)
-        rows = [
-            dict(zip(built.columns, row, strict=True)) for row in result.result_rows
-        ]
-        return sum(int(r["total_count"]) for r in rows)
-
-    # Sanity: both rows are present absent any id/type filter.
-    assert _total() == 2
-
-    # monitor_ids: exact by default, so "mon" must NOT match "monday".
-    assert _total(monitor_ids=["mon"]) == 1
-    assert _total(monitor_ids=["monday"]) == 1
-    assert _total(monitor_ids=["mond"]) == 0  # no partial match without '*'
-    # A trailing '*' opts into prefix matching -> matches both ids.
-    assert _total(monitor_ids=["mon*"]) == 2
-
-    # span_types: matches the exact span-type segment of the ref, not a substring.
-    assert _total(span_types=["agent_turn"]) == 1
-    assert _total(span_types=["agent_conversation"]) == 1
-    assert _total(span_types=["agent_turn", "agent_conversation"]) == 2
-
-
 class MatchAnyDatetime:  # noqa: PLW1641
     """Matches a datetime, or the ISO string a datetime becomes on the wire."""
 
     def __eq__(self, other):
         if isinstance(other, str):
             try:
-                other = datetime.datetime.fromisoformat(other)
+                other = datetime.datetime.fromisoformat(other.replace("Z", "+00:00"))
             except ValueError:
                 return False
         return isinstance(other, datetime.datetime)
@@ -1838,10 +1756,6 @@ def test_get_feedback_with_dict_query(client) -> None:
     assert len(list(no_results)) == 0
 
 
-@pytest.mark.skipif(
-    HTTP_NOT_PORTED,
-    reason="http: the server names the error class once wandb/core#58054 is deployed",
-)
 def test_feedback_query_bad_json_path(client) -> None:
     """Test that querying for nonexistent JSON paths raises appropriate error."""
     # Create some test feedback
@@ -1876,10 +1790,6 @@ def test_feedback_query_bad_json_path(client) -> None:
 
 
 @pytest.mark.disable_logging_error_check
-@pytest.mark.skipif(
-    HTTP_NOT_PORTED,
-    reason="http: the server names the error class once wandb/core#58054 is deployed",
-)
 def test_feedback_query_contains_numeric_literal(client) -> None:
     """$contains with a numeric literal raises a guided error; string substr works."""
     project_id = client.project_id
@@ -2365,7 +2275,7 @@ def test_feedback_query_returns_tz_aware_created_at(client: WeaveClient) -> None
     created_at = res.result[0]["created_at"]
     # Over HTTP the row is plain JSON, so the timestamp arrives as a string.
     if isinstance(created_at, str):
-        created_at = datetime.datetime.fromisoformat(created_at)
+        created_at = datetime.datetime.fromisoformat(created_at.replace("Z", "+00:00"))
     assert isinstance(created_at, datetime.datetime)
     assert created_at.tzinfo is not None, (
         "feedback_query returned a naive datetime; browsers will misinterpret it"

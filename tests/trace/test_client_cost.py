@@ -3,16 +3,11 @@ import uuid
 
 import pytest
 
-from tests.trace.util import HTTP_NOT_PORTED
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.errors import InvalidRequest
 from weave.trace_server.interface.query import Query
 
 
-@pytest.mark.skipif(
-    HTTP_NOT_PORTED,
-    reason="http: prices added by earlier tests survive the reset until wandb/core#58054 is deployed",
-)
 def test_cost_apis(client):
     project_id = client.project_id
 

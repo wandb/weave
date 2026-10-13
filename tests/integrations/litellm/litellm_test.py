@@ -1,7 +1,6 @@
 import os
 from collections.abc import Generator
 from importlib.metadata import version
-from typing import Any
 
 import litellm
 import pytest
@@ -29,16 +28,7 @@ class Nearly:  # noqa: PLW1641
 
 
 @pytest.fixture(scope="package")
-def patch_litellm(request: Any) -> Generator[None, None, None]:
-    # This little hack is to allow us to run the tests in prod mode
-    # For some reason pytest's import procedure causes the patching
-    # to fail in prod mode. Specifically, the patches get run twice
-    # despite the fact that the patcher is a singleton.
-    weave_server_flag = request.config.getoption("--trace-server")
-    if weave_server_flag == ("prod"):
-        yield
-        return
-
+def patch_litellm() -> Generator[None, None, None]:
     # Patch both LiteLLM and OpenAI since LiteLLM uses OpenAI as backend
     litellm_patcher = get_litellm_patcher()
     openai_patcher = get_openai_patcher()
