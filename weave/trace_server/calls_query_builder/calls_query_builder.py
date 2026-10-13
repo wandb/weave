@@ -82,7 +82,10 @@ from weave.trace_server.orm import (
     timestamp_to_datetime_str,
 )
 from weave.trace_server.project_version.types import ReadTable, TableConfig
-from weave.trace_server.token_costs import build_cost_ctes, get_cost_final_select
+from weave.trace_server.token_costs import (
+    build_cost_ctes,
+    get_cost_final_select,
+)
 from weave.trace_server.trace_server_common import assert_parameter_length_less_than_max
 
 logger = logging.getLogger(__name__)
@@ -891,6 +894,7 @@ class CallsQuery(BaseModel):
     offset: int | None = None
     expand_columns: list[str] = Field(default_factory=list)
     include_costs: bool = False
+    costs_have_unique_call_keys: bool = False
     include_storage_size: bool = False
     include_total_storage_size: bool = False
     read_table: ReadTable = ReadTable.CALLS_MERGED
@@ -1358,10 +1362,29 @@ class CallsQuery(BaseModel):
                 return safely_format_sql(raw_sql, logger)
             return base_sql
 
-        ctes.add_cte(CTE_ALL_CALLS, base_sql)
-        self._add_cost_ctes_to_builder(ctes, pb)
-
         select_fields = [field.field for field in self.select_fields]
+        compact_costs = (
+            self.costs_have_unique_call_keys
+            and not object_ref_conditions
+            and (
+                (self.limit is None and self.offset is None)
+                or (
+                    any(of.field.field == "id" for of in self.order_fields)
+                    and (
+                        self.read_table == ReadTable.CALLS_MERGED
+                        or any(
+                            of.field.field == "started_at" for of in self.order_fields
+                        )
+                    )
+                )
+            )
+            and not any(
+                isinstance(of.field, CallsMergedFeedbackPayloadField)
+                for of in self.order_fields
+            )
+        )
+        ctes.add_cte(CTE_ALL_CALLS, base_sql)
+        self._add_cost_ctes_to_builder(ctes, pb, compact=compact_costs)
         final_select = get_cost_final_select(
             pb, select_fields, self.order_fields, self.project_id
         )
@@ -1369,8 +1392,12 @@ class CallsQuery(BaseModel):
         raw_sql = ctes.to_sql() + "\n" + final_select
         return safely_format_sql(raw_sql, logger)
 
-    def _add_cost_ctes_to_builder(self, ctes: CTECollection, pb: ParamBuilder) -> None:
-        cost_cte_list = build_cost_ctes(pb, CTE_ALL_CALLS, self.project_id)
+    def _add_cost_ctes_to_builder(
+        self, ctes: CTECollection, pb: ParamBuilder, compact: bool = False
+    ) -> None:
+        cost_cte_list = build_cost_ctes(
+            pb, CTE_ALL_CALLS, self.project_id, preselect_prices=compact
+        )
         for cte in cost_cte_list:
             ctes.add_cte(cte.name, cte.sql)
 
