@@ -1,3 +1,10 @@
 * @wandb/weave-team
 /docs/ @wandb/docs-team @wandb/weave-team
 /sdks/node/ @wandb/weave-sdk @wandb/weave-team
+
+# The trace server implementation moved to wandb/core. These owners stay so
+# that a PR adding files under the old paths needs their review and does not
+# quietly recreate the deleted code.
+/weave/trace_server/ @ro31337 @andrewtruong @rgao-coreweave
+/tests/trace_server/ @ro31337 @andrewtruong @rgao-coreweave
+/tests/trace_server_migrator/ @ro31337 @andrewtruong @rgao-coreweave
