@@ -8,6 +8,10 @@
 - Document any significant architectural decisions or changes.
 - Prefer no code comments; when needed, use one line for a non-obvious invariant.
 
+## The trace server moved to wandb/core (2026-10-13)
+
+Since 2026-10-13 the trace server runs from wandb/core, in `services/weave-trace/src/trace_server_backend/` (wandb/core#58291). Send changes to the server, its migrations and its tests there, not to `weave/trace_server/`, `tests/trace_server/` or `tests/trace_server_migrator/` in this repo: that copy no longer runs, and wandb/weave#8018 deletes it. PRs that touch those paths need a review from their code owners. The request and response models shared with the SDK stay in `weave/shared/`; change them here, and core picks them up through its submodule sync.
+
 ## Python Import Rules
 
 **IMPORTANT: Always place imports at the top of Python files.**
@@ -80,7 +84,7 @@ _Important:_ For OpenAI Codex agents (most likely you!), your environment does n
 
 - `weave/` - Core implementation
   - `weave/` - Python package implementation
-  - `weave/trace_server` - Backend server implementation
+  - `weave/trace_server` - Old copy of the backend server; the one that runs is in wandb/core (see above)
 
 ### Azure file storage authentication
 
@@ -104,7 +108,7 @@ in-process and credential persistence emits one warning per credentials object.
 
 ## Generated Files — Do Not Hand-Edit
 
-`weave/trace_server/model_providers/model_providers.json` and `weave/trace_server/costs/cost_checkpoint.json` are generated. Never edit them by hand — regenerate with `make update_model_providers` / `make update_costs` (see `weave/Makefile`).
+`model_providers/model_providers.json` and `costs/cost_checkpoint.json` are generated. Never edit them by hand. Production reads the copies in wandb/core (`services/weave-trace/src/trace_server_backend/`), so regenerate them there with `make update_model_providers` / `make update_costs`.
 
 Generate implicit cost `created_at` values in UTC because insertion interprets naive checkpoint timestamps as UTC.
 
