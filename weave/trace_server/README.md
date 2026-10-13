@@ -80,3 +80,13 @@ export API. Legacy workers do not participate in Redis admission, so a mixed
 rollout cannot guarantee one job. Reverting to an unguarded exporter also
 removes this guarantee. Per-query memory, thread, and I/O limits remain separate
 controls; one export can still contend with application traffic.
+
+### Request-scoped export storage
+
+The ClickHouse backend's export start/status methods accept an optional
+`storage_client` keyword for deployment-resolved export storage. This client
+is passed into the job without modifying shared file/media storage. Callers
+must authorize the project and ensure the ClickHouse writer destination matches
+the supplied client. `storage_client_from_uri` constructs a client without
+changing process environment and rejects URIs containing object prefixes.
+S3 downloads use SigV4 without requiring an AWS_CONFIG_FILE override.
