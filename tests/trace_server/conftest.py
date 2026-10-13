@@ -41,7 +41,10 @@ from weave.trace_server_bindings.remote_http_trace_server import RemoteHTTPTrace
 from weave.wandb_interface import project_creator
 from weave.wandb_interface.auth import ApiKeyCredentials
 
-pytest_plugins = ["tests.trace_server.conftest_lib.clickhouse_server"]
+pytest_plugins = [
+    "tests.trace_server.conftest_lib.clickhouse_server",
+    "tests.trace_server.conftest_lib.export_redis",
+]
 
 
 @dataclass(frozen=True)

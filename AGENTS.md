@@ -84,6 +84,15 @@ _Important:_ For OpenAI Codex agents (most likely you!), your environment does n
 
 ### Azure file storage authentication
 
+### Bulk export admission
+
+The export admission contract and recovery limits are documented in
+`weave/trace_server/README.md`. Keep the persistent submission-intent record
+separate from the expiring worker lease; never treat missing process-list rows
+or lease expiry alone as proof that a previously submitted query ended.
+
+### Azure file storage authentication
+
 The trace server preserves explicit Azure connection strings and account keys
 for backward compatibility. When neither is configured, it uses
 `DefaultAzureCredential`, including AKS workload identity. Read-only export

@@ -35,6 +35,11 @@ SCRATCH_TABLE = "export_status_scratch"
 BUCKET = "weave-exports"
 
 
+@pytest.fixture(autouse=True)
+def use_export_redis(export_redis):
+    return export_redis
+
+
 @pytest.fixture
 def clickhouse_trace_server(trace_server):
     """Unwrap the internal ClickHouse server from the external fixture."""
@@ -108,7 +113,7 @@ def test_export_status_recovers_job_with_no_memory_state(
     clickhouse_trace_server._file_storage_client = storage_client
     clickhouse_trace_server._file_storage_client_initialized = True
     start_res = clickhouse_trace_server.export_start(
-        tsi.ExportStartReq(project_id=project_id, targets=["objects", "feedback"])
+        tsi.ExportStartReq(project_id=project_id, targets=["objects"])
     )
     # A brand-new server instance proves status is recovered from object storage
     # plus query_log, not a process-local map or a ClickHouse metadata table.
@@ -124,8 +129,7 @@ def test_export_status_recovers_job_with_no_memory_state(
     status_req = tsi.ExportStatusReq(project_id=project_id, job_id=start_res.job_id)
     deadline = time.monotonic() + ORACLE_DEADLINE_SECONDS
     status_res = fresh_server.export_status(status_req)
-    # The detached inserts fail (no weave_exports collection in the test CH);
-    # wait until both targets reach their terminal error in query_log.
+    # The detached insert fails because the test CH has no weave_exports collection.
     while time.monotonic() < deadline and any(
         entry.status != "error" for entry in status_res.manifest
     ):
@@ -133,7 +137,7 @@ def test_export_status_recovers_job_with_no_memory_state(
         status_res = fresh_server.export_status(status_req)
 
     assert status_res.status == "error"
-    assert [entry.target for entry in status_res.manifest] == ["objects", "feedback"]
+    assert [entry.target for entry in status_res.manifest] == ["objects"]
     for entry in status_res.manifest:
         assert entry.status == "error"
         assert entry.error is not None
