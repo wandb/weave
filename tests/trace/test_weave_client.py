@@ -557,6 +557,7 @@ def test_get_calls_complete(client):
                 sort_by=[SortBy(field="started_at", direction="desc")],
                 query=query,
                 include_costs=True,
+                limit=1000,
                 include_feedback=True,
                 columns=["inputs", "summary", "display_name", "parent_id"],
                 expand_columns=["inputs.dataset"],

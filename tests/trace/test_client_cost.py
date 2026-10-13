@@ -301,6 +301,7 @@ def test_costs_streamed_with_all_fields(client):
             tsi.CallsQueryReq(
                 project_id=project_id,
                 include_costs=True,
+                limit=1000,
             )
         )
     )
@@ -387,6 +388,7 @@ def test_calls_query_bool_filter_with_costs_does_not_collide(client):
                     }
                 ),
                 include_costs=True,
+                limit=1000,
             )
         )
     )

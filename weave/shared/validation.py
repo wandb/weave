@@ -1,9 +1,29 @@
 import re
-from typing import Any, Literal
+from typing import TYPE_CHECKING, Any, Literal
 
 from weave.shared import refs_internal, validation_util
-from weave.shared.constants import MAX_DISPLAY_NAME_LENGTH, MAX_OP_NAME_LENGTH
+from weave.shared.constants import (
+    MAX_COST_QUERY_LIMIT,
+    MAX_DISPLAY_NAME_LENGTH,
+    MAX_OP_NAME_LENGTH,
+)
 from weave.shared.errors import InvalidFieldError, InvalidRequest
+
+if TYPE_CHECKING:
+    from weave.shared import trace_server_interface as tsi
+
+
+def validate_calls_query_costs_limit(req: "tsi.CallsQueryReq") -> None:
+    if req.include_costs is not True or (
+        req.filter is not None and req.filter.call_ids
+    ):
+        return
+    if req.limit is None or req.limit > MAX_COST_QUERY_LIMIT:
+        raise InvalidRequest(
+            "Calls queries with include_costs=true require a limit of at most "
+            f"{MAX_COST_QUERY_LIMIT} unless non-empty call_ids are provided. "
+            "Read larger result sets in pages; 1000 is the recommended page size."
+        )
 
 
 def project_id_validator(s: str) -> str:

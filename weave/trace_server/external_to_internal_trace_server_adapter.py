@@ -5,6 +5,7 @@ from typing import Any, TypeVar
 
 from opentelemetry.proto.common.v1.common_pb2 import AnyValue, KeyValue
 
+from weave.shared.validation import validate_calls_query_costs_limit
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.async_clickhouse_trace_server import AsyncClickHouseTraceServer
 from weave.trace_server.trace_server_converter import (
@@ -409,6 +410,7 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
         return int_run_ids
 
     def calls_query(self, req: tsi.CallsQueryReq) -> tsi.CallsQueryRes:
+        validate_calls_query_costs_limit(req)
         req = req.model_copy(deep=True)
         original_project_id = req.project_id
         req.project_id = self._idc.ext_to_int_project_id(original_project_id)
@@ -447,6 +449,7 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
         return res
 
     def calls_query_stream(self, req: tsi.CallsQueryReq) -> Iterator[tsi.CallSchema]:
+        validate_calls_query_costs_limit(req)
         req = req.model_copy(deep=True)
         original_project_id = req.project_id
         req.project_id = self._idc.ext_to_int_project_id(original_project_id)
