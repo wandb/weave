@@ -8,6 +8,10 @@
 - Document any significant architectural decisions or changes.
 - Prefer no code comments; when needed, use one line for a non-obvious invariant.
 
+## The trace server moved to wandb/core (2026-10-13)
+
+Since 2026-10-13 the trace server runs from wandb/core, in `services/weave-trace/src/trace_server_backend/` (wandb/core#58291). Send changes to the server, its migrations and its tests there, not to `weave/trace_server/`, `tests/trace_server/` or `tests/trace_server_migrator/` in this repo: that copy no longer runs, and wandb/weave#8018 deletes it. PRs that touch those paths need a review from their code owners. The request and response models shared with the SDK stay in `weave/shared/`; change them here, and core picks them up through its submodule sync. The generated model provider and cost files are regenerated in core too, with `make update_model_providers` and `make update_costs` in `services/weave-trace`.
+
 ## Python Import Rules
 
 **IMPORTANT: Always place imports at the top of Python files.**
