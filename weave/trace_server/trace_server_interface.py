@@ -6,11 +6,10 @@ import warnings
 from weave.shared import trace_server_interface as _canonical
 from weave.shared.trace_server_interface import *  # noqa: F403
 
-# TODO: delete this alias after weave 0.53.13.
+# TODO: delete this alias together with weave.shared.
 warnings.warn(
     "weave.trace_server.trace_server_interface is deprecated since weave 0.53.13 "
-    "and will be removed after weave 0.53.13; import "
-    "weave.shared.trace_server_interface instead.",
+    "and will be removed in a future release.",
     FutureWarning,
     stacklevel=2,
 )

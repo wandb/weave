@@ -68,15 +68,41 @@ def _trace_server_modules() -> list[str]:
     ]
 
 
+# Server API type modules leave the client together with weave.shared, so their
+# warnings name no replacement path.
+_SERVER_TYPE_MODULES = {
+    "weave.trace_server.trace_server_interface",
+    "weave.trace_server.common_interface",
+    "weave.trace_server.service_interface",
+    "weave.trace_server.http_service_interface",
+    "weave.trace_server.interface.query",
+    "weave.trace_server.interface.feedback_types",
+    "weave.trace_server.agents.types",
+    "weave.trace_server.agents.semconv",
+    "weave.trace_server.agents.constants",
+    "weave.trace_server.sensitive_data.policy",
+    "weave.trace_server.validation",
+}
+
+
+def _expected_warning(name: str) -> str:
+    if name in _SERVER_TYPE_MODULES:
+        return (
+            f"{name} is deprecated since weave 0.53.13 and will be removed in a "
+            "future release."
+        )
+    new_name = name.replace("weave.trace_server", "weave.shared", 1)
+    return (
+        f"{name} is deprecated since weave 0.53.13 and will be removed after "
+        f"weave 0.53.13; import {new_name} instead."
+    )
+
+
 @pytest.mark.parametrize("name", _trace_server_modules())
 def test_trace_server_paths_warn_with_the_new_path(
     name: str, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     monkeypatch.delitem(sys.modules, name, raising=False)
-    new_name = name.replace("weave.trace_server", "weave.shared", 1)
     with pytest.warns(FutureWarning) as record:
         importlib.import_module(name)
-    assert [str(w.message) for w in record] == [
-        f"{name} is deprecated since weave 0.53.13 and will be removed after "
-        f"weave 0.53.13; import {new_name} instead."
-    ]
+    assert [str(w.message) for w in record] == [_expected_warning(name)]
