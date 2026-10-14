@@ -11,6 +11,8 @@ class StringMatchScorer(weave.Scorer):
 
     @weave.op
     def score(self, *, output: str, target: str, **kwargs: Any) -> dict:
+        if not output.strip():
+            return {"string_in_input": False}
         string_in_input = output.lower() in target.lower()
         return {"string_in_input": string_in_input}
 
