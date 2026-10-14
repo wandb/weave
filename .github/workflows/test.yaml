@@ -214,7 +214,7 @@ jobs:
             for shard in ${INTEGRATION_SHARDS}; do
               [[ " ${SKIP_SHARDS} " == *" ${shard} "* ]] || shards+=("${shard}")
             done
-            # One argument. The script splits it. A second word is rejected.
+            # One argument, because the script splits it and a second word is rejected.
             python .github/scripts/run_nox_shards.py "${PYTHON_VERSION}" "${shards[@]}" \
               --unfiltered "claude_agent_sdk typesafe" --log-dir "${RUNNER_TEMP}/nox"
           else

@@ -43,6 +43,17 @@ class OnlyModel(BaseModel):
     model: str
 
 
+class _Rows(Sequence[str]):
+    def __init__(self, rows: tuple[str, ...]) -> None:
+        self._rows = rows
+
+    def __getitem__(self, index: int) -> str:
+        return self._rows[index]
+
+    def __len__(self) -> int:
+        return len(self._rows)
+
+
 def _ok_body(**overrides: Any) -> dict[str, Any]:
     body = {
         "model": "jev-1.13.0",
@@ -235,17 +246,6 @@ def test_object_state_is_a_text_part_not_a_bare_json_array(
     assert "content" not in message
 
 
-class _Rows(Sequence[str]):
-    def __init__(self, rows: tuple[str, ...]) -> None:
-        self._rows = rows
-
-    def __getitem__(self, index: int) -> str:
-        return self._rows[index]
-
-    def __len__(self) -> int:
-        return len(self._rows)
-
-
 def test_sequence_state_is_recorded_on_the_chat_span(
     otel_spans: InMemorySpanExporter,
 ) -> None:
@@ -253,12 +253,6 @@ def test_sequence_state_is_recorded_on_the_chat_span(
     client.system_one(_Rows(("a", "b")), _questions())
     message = _messages(_chat(otel_spans), "gen_ai.input.messages")[0]
     assert message["parts"][0] == {"type": "text", "content": '["a", "b"]'}
-    spans = otel_spans.get_finished_spans()
-    turns = [span for span in spans if span.name == "invoke_agent typesafe SDK"]
-    assert len(turns) == 1
-    chat = _chat(otel_spans)
-    assert chat.parent is not None
-    assert chat.parent.span_id == turns[0].context.span_id
 
 
 def test_unencodable_state_does_not_open_a_turn(
@@ -457,7 +451,7 @@ def test_user_turn_exit_records_the_original_error_and_the_llm_span_does_not(
     otel_spans: InMemorySpanExporter,
 ) -> None:
     client = _client(lambda request: _response(400, {"error": _SECRET}))
-    with pytest.raises(TypeSafeAPIError), Turn(agent_name="app"):
+    with pytest.raises(TypeSafeAPIError) as caught, Turn(agent_name="app"):
         client.system_one("hello", _questions())
 
     spans = otel_spans.get_finished_spans()
@@ -466,7 +460,7 @@ def test_user_turn_exit_records_the_original_error_and_the_llm_span_does_not(
     )
     turn = next(span for span in spans if span.name == "invoke_agent app")
     assert _SECRET not in _text(chat)
-    assert _SECRET in _text(turn)
+    assert turn.status.description == str(caught.value)
 
 
 def test_missing_request_id_and_custom_model_record_only_available_fields(

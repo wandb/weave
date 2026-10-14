@@ -14,6 +14,8 @@
 import {type Attributes} from '@opentelemetry/api';
 
 import {
+  type Conversation,
+  getCurrentConversation,
   getCurrentTurn,
   type LLM,
   type Message,
@@ -109,6 +111,11 @@ function sortValue(value: unknown): unknown {
   }
   if (!value || typeof value !== 'object') {
     return value;
+  }
+  // JSON.stringify calls toJSON. A Date otherwise becomes {}.
+  const toJSON = (value as {toJSON?: unknown}).toJSON;
+  if (typeof toJSON === 'function') {
+    return sortValue(toJSON.call(value));
   }
   const sorted: Record<string, unknown> = {};
   for (const key of Object.keys(value as Record<string, unknown>).sort()) {
@@ -290,7 +297,8 @@ function safeEnd(span: {end?: () => void} | null): void {
 function openTrace(
   client: object,
   request: any,
-  parent: Turn | undefined
+  parent: Turn | undefined,
+  conversation: Conversation | undefined
 ): Trace | null {
   let turn: Turn | null = null;
   let ownsTurn = false;
@@ -298,26 +306,30 @@ function openTrace(
   try {
     const capture = captureFor(client);
     const model = modelName(client, request);
+    // Encode before any span opens, so a rejected state leaves no turn.
+    const state = capture ? stateMessage(request?.state) : undefined;
+    const questions = capture ? questionsJson(request?.questions) : undefined;
     if (parent) {
       turn = parent;
       llm = parent.startLLM({model, providerName: PROVIDER_NAME});
+    } else if (conversation) {
+      turn = conversation.startTurn({agentName: AGENT_NAME});
+      ownsTurn = true;
+      llm = turn.startLLM({model, providerName: PROVIDER_NAME});
     } else {
       turn = Turn.create({agentName: AGENT_NAME});
       ownsTurn = true;
       llm = turn.startLLM({model, providerName: PROVIDER_NAME});
     }
-    if (capture) {
-      llm.inputMessages = [stateMessage(request?.state)];
+    if (state) {
+      llm.inputMessages = [state];
     }
     stampProvenance(llm);
     if (ownsTurn) {
       stampProvenance(turn);
     }
-    if (capture) {
-      const questions = questionsJson(request?.questions);
-      if (questions !== undefined) {
-        llm.setAttributes({[QUESTIONS_ATTR]: questions});
-      }
+    if (questions !== undefined) {
+      llm.setAttributes({[QUESTIONS_ATTR]: questions});
     }
     return {llm, turn, ownsTurn, capture, closed: false};
   } catch {
@@ -504,8 +516,10 @@ function traceCall(
   options: unknown
 ): unknown {
   const parent = activeTurn();
+  // runIsolated clears the conversation. Read it first.
+  const conversation = parent ? undefined : getCurrentConversation();
   return runIsolated(() => {
-    const trace = openTrace(client, request, parent);
+    const trace = openTrace(client, request, parent, conversation);
     if (!trace) {
       return Reflect.apply(original, client, [request, options]);
     }
@@ -570,9 +584,6 @@ export function wrapTypeSafe<T extends object>(
   }
   const proto = Object.getPrototypeOf(client);
   if (proto?.[PATCHED] || (client as any)[PATCHED]) {
-    if (!(client as any)[PATCHED]) {
-      Object.defineProperty(client, PATCHED, {value: true, configurable: true});
-    }
     return client;
   }
   patchSystemOne(client);

@@ -303,8 +303,7 @@ def _open_trace(
         model_name = body.get("model")
         if not isinstance(model_name, str):
             model_name = ""
-        # Build the messages before any span. A state the encoder rejects
-        # must not leave an empty turn behind.
+        # Encode before any span opens, so a rejected state leaves no turn.
         state_message = _state_message(body.get("state")) if capture else None
         questions_json = _questions_json(body.get("questions")) if capture else None
         turn = _started_turn()
