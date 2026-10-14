@@ -184,7 +184,8 @@ def _jsonable(value: Any) -> Any:
         return value.model_dump(mode="json")
     if isinstance(value, Mapping):
         return {str(key): _jsonable(item) for key, item in value.items()}
-    if isinstance(value, list):
+    # The SDK accepts any Sequence and encodes it as a JSON array.
+    if isinstance(value, Sequence) and not isinstance(value, (str, bytes, bytearray)):
         return [_jsonable(item) for item in value]
     return value
 
@@ -302,6 +303,10 @@ def _open_trace(
         model_name = body.get("model")
         if not isinstance(model_name, str):
             model_name = ""
+        # Build the messages before any span. A state the encoder rejects
+        # must not leave an empty turn behind.
+        state_message = _state_message(body.get("state")) if capture else None
+        questions_json = _questions_json(body.get("questions")) if capture else None
         turn = _started_turn()
         parent = None if turn is not None else _ambient_parent()
         if turn is None and parent is None:
@@ -315,17 +320,15 @@ def _open_trace(
             llm = LLM(model=model_name, provider_name=_PROVIDER_NAME)
             # No Turn to thread through start_llm. The ambient span is the parent.
             llm._parent_otel_context = parent
-        if capture:
-            llm.input_messages = [_state_message(body.get("state"))]
+        if state_message is not None:
+            llm.input_messages = [state_message]
         # Same as the turn: leave the span with end(), not __exit__.
         llm.__enter__()  # noqa: PLC2801
         _stamp_provenance(llm)
         if owns_turn and turn is not None:
             _stamp_provenance(turn)
-        if capture:
-            questions_json = _questions_json(body.get("questions"))
-            if questions_json is not None:
-                llm.set_attributes({_QUESTIONS_ATTR: questions_json})
+        if questions_json is not None:
+            llm.set_attributes({_QUESTIONS_ATTR: questions_json})
         return _Trace(llm=llm, turn=turn, owns_turn=owns_turn, capture=capture)
     except Exception:
         logger.warning("TypeSafe span setup failed", exc_info=True)

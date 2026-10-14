@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import json
-from collections.abc import Callable, Generator
+from collections.abc import Awaitable, Callable, Generator, Sequence
 from typing import Any
 
 import httpx2
@@ -109,7 +109,7 @@ def _client(handler: Callable[[httpx2.Request], httpx2.Response]) -> TypeSafeCli
 
 
 def _async_client(
-    handler: Callable[[httpx2.Request], httpx2.Response],
+    handler: Callable[[httpx2.Request], httpx2.Response | Awaitable[httpx2.Response]],
 ) -> AsyncTypeSafeClient:
     return AsyncTypeSafeClient(
         api_key="test-key",
@@ -233,6 +233,42 @@ def test_object_state_is_a_text_part_not_a_bare_json_array(
     message = _messages(_chat(otel_spans), "gen_ai.input.messages")[0]
     assert message["parts"][0] == {"type": "text", "content": '["a", "b"]'}
     assert "content" not in message
+
+
+class _Rows(Sequence[str]):
+    def __init__(self, rows: tuple[str, ...]) -> None:
+        self._rows = rows
+
+    def __getitem__(self, index: int) -> str:
+        return self._rows[index]
+
+    def __len__(self) -> int:
+        return len(self._rows)
+
+
+def test_sequence_state_is_recorded_on_the_chat_span(
+    otel_spans: InMemorySpanExporter,
+) -> None:
+    client = _client(lambda request: _response())
+    client.system_one(_Rows(("a", "b")), _questions())
+    message = _messages(_chat(otel_spans), "gen_ai.input.messages")[0]
+    assert message["parts"][0] == {"type": "text", "content": '["a", "b"]'}
+    spans = otel_spans.get_finished_spans()
+    turns = [span for span in spans if span.name == "invoke_agent typesafe SDK"]
+    assert len(turns) == 1
+    chat = _chat(otel_spans)
+    assert chat.parent is not None
+    assert chat.parent.span_id == turns[0].context.span_id
+
+
+def test_unencodable_state_does_not_open_a_turn(
+    otel_spans: InMemorySpanExporter,
+) -> None:
+    client = _client(lambda request: _response())
+    with pytest.raises(TypeSafeError) as caught:
+        client.system_one(object(), _questions())
+    assert str(caught.value) == "The request body could not be encoded as JSON"
+    assert otel_spans.get_finished_spans() == ()
 
 
 def test_content_off_omits_state_questions_and_answers(
@@ -413,7 +449,7 @@ def test_error_span_keeps_status_and_drops_the_body(
     attrs = _attrs(chat)
     assert attrs["http.response.status_code"] == 400
     assert attrs["gen_ai.response.id"] == "req_err"
-    assert "TypeSafe" in attrs["error.type"]
+    assert attrs["error.type"] == "typesafe_sdk._core.errors.TypeSafeBadRequestError"
     assert "gen_ai.output.messages" not in attrs
 
 
@@ -488,8 +524,19 @@ def test_pii_redaction_applies_to_messages_and_questions(
     chat = _chat(otel_spans)
     attrs = _attrs(chat)
     assert _EMAIL not in _text(chat)
-    assert "<EMAIL>" in attrs["gen_ai.input.messages"]
-    assert "<EMAIL>" in attrs["typesafe.questions"]
+    assert _messages(chat, "gen_ai.input.messages") == [
+        {
+            "role": "user",
+            "parts": [{"type": "text", "content": "contact <EMAIL>"}],
+        }
+    ]
+    assert json.loads(attrs["typesafe.questions"]) == [
+        {
+            "id": "billing",
+            "type": "noul",
+            "instructions": "Email <EMAIL>?",
+        }
+    ]
 
 
 def test_models_list_is_not_instrumented(otel_spans: InMemorySpanExporter) -> None:
@@ -544,12 +591,25 @@ def test_import_mapping_patches_an_already_imported_sdk() -> None:
 async def test_async_parallel_calls_do_not_share_a_turn(
     otel_spans: InMemorySpanExporter,
 ) -> None:
-    client = _async_client(lambda request: _response())
+    started = 0
+    release = asyncio.Event()
+
+    async def handler(request: httpx2.Request) -> httpx2.Response:
+        nonlocal started
+        started += 1
+        if started < 2:
+            await release.wait()
+        else:
+            release.set()
+        return _response()
+
+    client = _async_client(handler)
 
     async def one(state: str) -> None:
         await client.system_one(state, _questions())
 
     await asyncio.gather(one("left"), one("right"))
+    assert started == 2
     spans = otel_spans.get_finished_spans()
     chats = _by_op(spans, "chat")
     turns = [span for span in spans if span.name == "invoke_agent typesafe SDK"]
@@ -557,3 +617,8 @@ async def test_async_parallel_calls_do_not_share_a_turn(
     assert len(turns) == 2
     parents = {chat.parent.span_id for chat in chats if chat.parent is not None}
     assert parents == {turn.context.span_id for turn in turns}
+    recorded = {
+        _messages(chat, "gen_ai.input.messages")[0]["parts"][0]["content"]
+        for chat in chats
+    }
+    assert recorded == {"left", "right"}
