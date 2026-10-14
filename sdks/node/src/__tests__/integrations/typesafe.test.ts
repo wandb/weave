@@ -68,8 +68,7 @@ function spanText(
   );
 }
 
-// `@opentelemetry/context-async-hooks` is not a dependency. Same stand-in as
-// invokingSpan.test.ts, so an outer span is actually active.
+// context-async-hooks is not a dependency, so copy invokingSpan.test.ts.
 class TestContextManager implements ContextManager {
   private readonly storage = new AsyncLocalStorage<Context>();
 
@@ -296,7 +295,6 @@ describe('TypeSafe systemOne spans', () => {
     });
     const client = wrapTypeSafe(clientWith(async () => jsonResponse(okBody())));
     await client.systemOne({state: 'hello', questions, model: 'jev-latest'});
-    conversation.end();
     const chat = findSpan(spans(), 'chat jev-latest');
     const turn = findSpan(spans(), 'invoke_agent typesafe SDK');
     expect(chat.parentSpanId).toBe(turn.spanContext().spanId);
@@ -311,6 +309,7 @@ describe('TypeSafe systemOne spans', () => {
     expect(turn.attributes['gen_ai.request.model']).toBeUndefined();
     expect(spans().some(span => span.name === 'invoke_agent app')).toBe(false);
     expect(getCurrentTurn()).toBeUndefined();
+    conversation.end();
   });
 
   test('an outer span does not replace the synthetic turn', async () => {
