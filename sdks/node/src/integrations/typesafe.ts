@@ -312,12 +312,17 @@ function openTrace(
     if (parent) {
       turn = parent;
       llm = parent.startLLM({model, providerName: PROVIDER_NAME});
-    } else if (conversation) {
-      turn = conversation.startTurn({agentName: AGENT_NAME});
-      ownsTurn = true;
-      llm = turn.startLLM({model, providerName: PROVIDER_NAME});
     } else {
-      turn = Turn.create({agentName: AGENT_NAME});
+      // startTurn also copies the conversation model and agent fields.
+      turn = Turn.create({
+        agentName: AGENT_NAME,
+        ...(conversation
+          ? {
+              conversationId: conversation.conversationId,
+              attributes: conversation.attributes,
+            }
+          : {}),
+      });
       ownsTurn = true;
       llm = turn.startLLM({model, providerName: PROVIDER_NAME});
     }
@@ -516,7 +521,7 @@ function traceCall(
   options: unknown
 ): unknown {
   const parent = activeTurn();
-  // runIsolated clears the conversation. Read it first.
+  // runIsolated clears the conversation, so read it before that call.
   const conversation = parent ? undefined : getCurrentConversation();
   return runIsolated(() => {
     const trace = openTrace(client, request, parent, conversation);

@@ -1,4 +1,11 @@
-import {trace} from '@opentelemetry/api';
+import {AsyncLocalStorage} from 'async_hooks';
+import {
+  context,
+  type Context,
+  type ContextManager,
+  ROOT_CONTEXT,
+} from '@opentelemetry/api';
+import {BasicTracerProvider} from '@opentelemetry/sdk-trace-base';
 import {noul, TypeSafeClient, TypeSafeError} from '@typesafe-ai/sdk';
 
 import {Conversation, getCurrentTurn, Turn} from '../../genai';
@@ -59,6 +66,38 @@ function spanText(
       status: span.status,
     }))
   );
+}
+
+// `@opentelemetry/context-async-hooks` is not a dependency. Same stand-in as
+// invokingSpan.test.ts, so an outer span is actually active.
+class TestContextManager implements ContextManager {
+  private readonly storage = new AsyncLocalStorage<Context>();
+
+  active(): Context {
+    return this.storage.getStore() ?? ROOT_CONTEXT;
+  }
+
+  with<A extends unknown[], F extends (...args: A) => ReturnType<F>>(
+    ctx: Context,
+    fn: F,
+    thisArg?: ThisParameterType<F>,
+    ...args: A
+  ): ReturnType<F> {
+    return this.storage.run(ctx, () => fn.call(thisArg, ...args));
+  }
+
+  bind<T>(_ctx: Context, target: T): T {
+    return target;
+  }
+
+  enable(): this {
+    return this;
+  }
+
+  disable(): this {
+    this.storage.disable();
+    return this;
+  }
 }
 
 describe('TypeSafe systemOne spans', () => {
@@ -181,9 +220,9 @@ describe('TypeSafe systemOne spans', () => {
     );
     await on.systemOne({state: 'visible', questions});
     const shown = findSpan(spans(), 'chat jev-latest');
-    expect(String(shown.attributes['gen_ai.input.messages'])).toContain(
-      'visible'
-    );
+    expect(
+      JSON.parse(String(shown.attributes['gen_ai.input.messages']))
+    ).toEqual([{role: 'user', content: 'visible'}]);
   });
 
   test('a later wrap updates capture for the same client', async () => {
@@ -218,7 +257,7 @@ describe('TypeSafe systemOne spans', () => {
   test('a date in state is stored as its json text', async () => {
     const client = wrapTypeSafe(clientWith(async () => jsonResponse(okBody())));
     await client.systemOne({
-      state: {when: new Date('2026-01-02T00:00:00.000Z')} as never,
+      state: {when: new Date('2026-01-02T00:00:00.000Z')} as any,
       questions,
       model: 'jev-latest',
     });
@@ -239,49 +278,68 @@ describe('TypeSafe systemOne spans', () => {
     const fetch = jest.fn(async () => jsonResponse(okBody()));
     const client = wrapTypeSafe(clientWith(fetch));
     await expect(
-      client.systemOne({state: {n: BigInt(1)} as never, questions})
+      client.systemOne({state: {n: BigInt(1)} as any, questions})
     ).rejects.toThrow(TypeError);
     expect(spans()).toHaveLength(0);
-    expect(fetch).not.toHaveBeenCalled();
+    expect(fetch).toHaveBeenCalledTimes(0);
   });
 
   test('a conversation without a turn keeps its id', async () => {
     const conversation = Conversation.create({
       conversationId: 'c-1',
       agentName: 'app',
+      agentId: 'app-prod',
+      agentDescription: 'The app agent',
+      agentVersion: '9.9.9',
+      model: 'not-the-typesafe-model',
       attributes: {'customer.tier': 'gold'},
     });
-    try {
-      const client = wrapTypeSafe(
-        clientWith(async () => jsonResponse(okBody()))
-      );
-      await client.systemOne({state: 'hello', questions, model: 'jev-latest'});
-      const chat = findSpan(spans(), 'chat jev-latest');
-      const turn = findSpan(spans(), 'invoke_agent typesafe SDK');
-      expect(chat.parentSpanId).toBe(turn.spanContext().spanId);
-      expect(turn.attributes['gen_ai.conversation.id']).toBe('c-1');
-      expect(chat.attributes['gen_ai.conversation.id']).toBe('c-1');
-      expect(turn.attributes['customer.tier']).toBe('gold');
-      expect(chat.attributes['customer.tier']).toBe('gold');
-      expect(turn.attributes['gen_ai.agent.name']).toBe('typesafe SDK');
-      expect(spans().some(span => span.name === 'invoke_agent app')).toBe(
-        false
-      );
-      expect(getCurrentTurn()).toBeUndefined();
-    } finally {
-      conversation.end();
-    }
-  });
-
-  test('an outer span does not replace the synthetic turn', async () => {
     const client = wrapTypeSafe(clientWith(async () => jsonResponse(okBody())));
-    await trace.getTracer('test').startActiveSpan('outer', async span => {
-      await client.systemOne({state: 'hello', questions, model: 'jev-latest'});
-      span.end();
-    });
+    await client.systemOne({state: 'hello', questions, model: 'jev-latest'});
+    conversation.end();
     const chat = findSpan(spans(), 'chat jev-latest');
     const turn = findSpan(spans(), 'invoke_agent typesafe SDK');
     expect(chat.parentSpanId).toBe(turn.spanContext().spanId);
+    expect(turn.attributes['gen_ai.conversation.id']).toBe('c-1');
+    expect(chat.attributes['gen_ai.conversation.id']).toBe('c-1');
+    expect(turn.attributes['customer.tier']).toBe('gold');
+    expect(chat.attributes['customer.tier']).toBe('gold');
+    expect(turn.attributes['gen_ai.agent.name']).toBe('typesafe SDK');
+    expect(turn.attributes['gen_ai.agent.id']).toBeUndefined();
+    expect(turn.attributes['gen_ai.agent.description']).toBeUndefined();
+    expect(turn.attributes['gen_ai.agent.version']).toBeUndefined();
+    expect(turn.attributes['gen_ai.request.model']).toBeUndefined();
+    expect(spans().some(span => span.name === 'invoke_agent app')).toBe(false);
+    expect(getCurrentTurn()).toBeUndefined();
+  });
+
+  test('an outer span does not replace the synthetic turn', async () => {
+    context.setGlobalContextManager(new TestContextManager());
+    try {
+      const outerTracer = new BasicTracerProvider().getTracer('test');
+      const client = wrapTypeSafe(
+        clientWith(async () => jsonResponse(okBody()))
+      );
+      let outerId = '';
+      await outerTracer.startActiveSpan('outer', async span => {
+        outerId = span.spanContext().spanId;
+        await client.systemOne({
+          state: 'hello',
+          questions,
+          model: 'jev-latest',
+        });
+        const child = outerTracer.startSpan('child');
+        expect((child as any).parentSpanId).toBe(outerId);
+        child.end();
+        span.end();
+      });
+      const chat = findSpan(spans(), 'chat jev-latest');
+      const turn = findSpan(spans(), 'invoke_agent typesafe SDK');
+      expect(chat.parentSpanId).toBe(turn.spanContext().spanId);
+      expect(turn.parentSpanId).toBeUndefined();
+    } finally {
+      context.disable();
+    }
   });
 
   test('http errors do not copy the response body onto the span', async () => {
