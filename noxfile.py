@@ -110,6 +110,7 @@ SHARDS_WITHOUT_EXTRAS = {
         "fastmcp",
         "verdict",
         "claude_agent_sdk",
+        "typesafe",
         "verifiers_test",
         "autogen_tests",
         "trace",
