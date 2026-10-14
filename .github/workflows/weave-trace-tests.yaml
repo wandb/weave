@@ -4,6 +4,11 @@ on:
   push:
   workflow_dispatch:
 
+# Cancel a superseded run of the same branch, but let every master run finish.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/master' }}
+
 permissions:
   contents: read
   id-token: write
