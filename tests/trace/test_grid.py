@@ -1,6 +1,65 @@
+import locale
+import subprocess
+import sys
+
 import pytest
 
-from weave.trace.display.grid import Grid, Row
+from weave.trace.display.grid import Grid, Row, display_value
+
+
+@pytest.mark.parametrize("environment_locale", ["C", "weave_invalid_locale"])
+def test_import_preserves_locale(environment_locale):
+    code = """
+import importlib
+import locale
+import os
+import sys
+from unittest.mock import Mock
+
+locale.setlocale(locale.LC_ALL, "C")
+original_setlocale = locale.setlocale
+before = original_setlocale(locale.LC_ALL)
+os.environ["LC_ALL"] = sys.argv[1]
+setter = Mock(wraps=original_setlocale)
+locale.setlocale = setter
+
+importlib.import_module("weave")
+
+assert original_setlocale(locale.LC_ALL) == before
+mutations = [
+    call for call in setter.call_args_list
+    if (len(call.args) > 1 and call.args[1] is not None)
+    or call.kwargs.get("locale") is not None
+]
+assert mutations == [], mutations
+"""
+    completed = subprocess.run(
+        [sys.executable, "-c", code, environment_locale],
+        capture_output=True,
+        text=True,
+        timeout=30,
+        check=False,
+    )
+    assert completed.returncode == 0, completed.stderr
+
+
+@pytest.mark.parametrize(
+    ("separator", "grouping", "value", "expected"),
+    [
+        (",", [3, 0], 1234567, "1,234,567"),
+        (".", [3, 0], -1234567, "-1.234.567"),
+        (",", [3, 2, 0], 1234567, "12,34,567"),
+        ("", [], 1234567, "1234567"),
+    ],
+)
+def test_display_integer_uses_current_locale(
+    monkeypatch, separator, grouping, value, expected
+):
+    conventions = locale.localeconv()
+    conventions.update(thousands_sep=separator, grouping=grouping)
+    monkeypatch.setattr(locale, "localeconv", lambda: conventions)
+
+    assert display_value(value) == expected
 
 
 def test_grid_creation():
