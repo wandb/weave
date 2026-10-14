@@ -19,13 +19,6 @@ if TYPE_CHECKING:
     import pandas as pd
 
 
-# Set locale to user's default setting
-try:
-    locale.setlocale(locale.LC_ALL, "")
-except locale.Error:
-    # Fall back to default C locale if user's locale is not supported
-    locale.setlocale(locale.LC_ALL, "C")
-
 # TODO: Add support for other types, e.g. float, datetime, etc.
 ColumnType = Literal["str", "int", "bool"]
 ColumnValues = list[Any]
