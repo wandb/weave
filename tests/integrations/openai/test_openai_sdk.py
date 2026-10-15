@@ -12,6 +12,7 @@ from weave.integrations.openai.openai_sdk import (
     openai_on_finish,
     openai_on_input_handler,
     serverless_inference_call_display_name,
+    should_use_accumulator,
 )
 from weave.trace.autopatch import OpSettings
 from weave.trace.weave_client import WeaveClient
@@ -462,3 +463,14 @@ async def test_stream_options_not_injected_for_non_openai_base_url_async() -> No
     await wrapped(DummyCompletion("https://api.mistral.ai"), stream=True)
 
     assert "stream_options" not in captured
+
+
+def test_should_use_accumulator_handles_none_extra_headers() -> None:
+    assert should_use_accumulator({"stream": True, "extra_headers": None}) is True
+    assert (
+        should_use_accumulator(
+            {"stream": True, "extra_headers": {"X-Stainless-Raw-Response": "true"}}
+        )
+        is False
+    )
+
