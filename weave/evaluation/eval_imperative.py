@@ -31,7 +31,6 @@ from weave.flow.scorer import Scorer
 from weave.flow.scorer import _auto_summarize as auto_summarize_fn
 from weave.flow.util import make_memorable_name
 from weave.object.obj import Object
-from weave.shared.digest import compute_row_digest
 from weave.trace.api import attributes
 from weave.trace.call import Call
 from weave.trace.context import call_context
@@ -44,6 +43,7 @@ from weave.trace.op import (
     op,
     placeholder_call,
 )
+from weave.trace.serialization.digest import compute_row_digest
 from weave.trace.table import Table
 from weave.trace.util import Thread
 from weave.trace.view_utils import set_call_view

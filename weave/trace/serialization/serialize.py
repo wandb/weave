@@ -7,7 +7,6 @@ from typing import TYPE_CHECKING, Any, Literal, Protocol, TypeAlias, TypedDict
 
 from pydantic import BaseModel
 
-from weave.shared.digest import bytes_digest
 from weave.shared.trace_server_interface import (
     FileCreateReq,
     TraceServerInterface,
@@ -16,6 +15,7 @@ from weave.trace.object_record import ObjectRecord
 from weave.trace.refs import ObjectRef, Ref, TableRef
 from weave.trace.serialization import custom_objs
 from weave.trace.serialization.dictifiable import try_to_dict
+from weave.trace.serialization.digest import bytes_digest
 from weave.utils.sanitize import (
     REDACTED_VALUE,
     should_redact,
