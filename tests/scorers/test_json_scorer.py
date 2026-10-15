@@ -13,6 +13,13 @@ from weave.scorers import ValidJSONScorer
         ('{"person": {"name": "John", "age": 30}, "city": "New York"}', True),
         ("{}", True),
         ("[]", True),
+        # Non-string outputs must score False, not raise TypeError.
+        # A timed-out model, a content filter, or a structured-output adapter
+        # can all produce None or a non-string value.
+        (None, False),
+        ({}, False),
+        ([], False),
+        (42, False),
     ],
 )
 def test_json_scorer(output, expected_result):
