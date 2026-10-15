@@ -54,7 +54,7 @@ jobs:
       fail-fast: false
     steps:
       - name: Checkout
-        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
       - name: Filter shards if specified
         id: filter_shards
         env:
@@ -82,7 +82,7 @@ jobs:
       - name: Create GitHub App token
         id: app-token
         if: steps.filter_shards.outputs.skip != 'true'
-        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3
         with:
           app-id: ${{ vars.WANDBOT_3000_APP_ID }}
           private-key: ${{ secrets.WANDBOT_3000_PRIVATE_KEY }}
@@ -91,7 +91,7 @@ jobs:
           permission-contents: read
       - name: Checkout core
         if: steps.filter_shards.outputs.skip != 'true'
-        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
           repository: wandb/core
           ref: master
@@ -103,7 +103,7 @@ jobs:
         run: rm -rf "${CORE_DIR}/services/weave-trace/weave-public"
       - name: Checkout current weave commit into core
         if: steps.filter_shards.outputs.skip != 'true'
-        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
           path: ${{ env.CORE_DIR }}/services/weave-trace/weave-public
           persist-credentials: false
@@ -223,7 +223,7 @@ jobs:
 
       - name: Send Slack Notification on Failure
         if: steps.result.outputs.status == 'failure'
-        uses: slackapi/slack-github-action@6c661ce58804a1a20f6dc5fbee7f0381b469e001 # v1.25.0
+        uses: slackapi/slack-github-action@fcfb566f8b0aab22203f066d80ca1d7e4b5d05b3 # v1.27.1
         with:
           channel-id: "C09CE03J867"
           slack-message: |
@@ -237,7 +237,7 @@ jobs:
 
       - name: Send Slack Notification on Success
         if: steps.result.outputs.status == 'success'
-        uses: slackapi/slack-github-action@6c661ce58804a1a20f6dc5fbee7f0381b469e001 # v1.25.0
+        uses: slackapi/slack-github-action@fcfb566f8b0aab22203f066d80ca1d7e4b5d05b3 # v1.27.1
         with:
           channel-id: "C09CE03J867"
           slack-message: |
