@@ -15,6 +15,7 @@ from opentelemetry.trace import NonRecordingSpan, Span, SpanContext, TraceFlags
 
 import weave
 from weave.trace.call import Call
+from weave.trace.otel_context_keys import WEAVE_SERVER_SPAN_KEY
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server import tracing as server_tracing
 from weave.trace_server.constants import INVOKING_SPAN_ATTR_KEY
@@ -405,3 +406,8 @@ def test_survives_the_round_trip_and_is_queryable(client, install_otel_spans):
 
     assert [c.id for c in calls] == [call.id]
     assert calls[0].attributes["weave"][INVOKING_SPAN_ATTR_KEY] == expected
+
+
+def test_server_span_key_is_the_name_the_trace_server_uses() -> None:
+    """The trace server's copy of `otel_context_keys` in wandb/core defines the same string."""
+    assert WEAVE_SERVER_SPAN_KEY == "weave.trace_server.span"

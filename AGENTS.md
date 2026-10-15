@@ -84,8 +84,9 @@ _Important:_ For OpenAI Codex agents (most likely you!), your environment does n
 
 - `weave/` - Core implementation
   - `weave/` - Python package implementation
-  - `weave/trace_server` - Deprecated import aliases for `weave.shared`; the
-    trace server itself lives in wandb/core
+  - `weave/trace_server` - Deprecated import aliases for `weave.shared` and for
+    the modules that moved from it into the client; the trace server itself
+    lives in wandb/core
 
 ### W&B authentication
 
@@ -145,7 +146,8 @@ just the outermost one: skipping when the parent call already carries it marks
 every other level, because the check reads the parent's recorded state and the
 parent may itself have skipped. A reader must treat a missing key and a pair
 that matches no span as normal — the write does not check that the span reaches
-our backend. Spans opened by `trace_server.tracing` are the one exclusion, and
+our backend. Spans opened by `weave.trace.server_tracing` (and by its copy in
+the trace server in wandb/core) are the one exclusion, and
 they are recognised through `WEAVE_SERVER_SPAN_KEY` on the context rather than
 off the span object, which under the OTel→DD bridge is not an SDK span.
 
