@@ -28,11 +28,11 @@ from typing import TYPE_CHECKING
 
 from opentelemetry.sdk.trace import Span, SpanProcessor
 
-from weave.shared.otel_span_attrs import (
+from weave.trace.context import call_context
+from weave.trace.otel_span_attrs import (
     PARENT_CALL_ID_SPAN_ATTR,
     PARENT_CALL_TRACE_ID_SPAN_ATTR,
 )
-from weave.trace.context import call_context
 
 if TYPE_CHECKING:
     from opentelemetry.context import Context

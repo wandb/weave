@@ -12,15 +12,14 @@ from weave.shared import (
     service_interface,
     trace_server_converter,
     trace_server_interface,
-    tracing,
     validation,
 )
 from weave.shared.agents import constants, semconv
 from weave.shared.agents import types as agent_types
 from weave.shared.helpers import url_safety
-from weave.shared.ids import generate_id
 from weave.shared.interface import feedback_types
 from weave.shared.sensitive_data import policy
+from weave.trace import server_tracing
 from weave.trace_server import common_interface as common_interface_legacy
 from weave.trace_server import errors as errors_legacy
 from weave.trace_server import http_service_interface as http_service_interface_legacy
@@ -36,6 +35,7 @@ from weave.trace_server.helpers import url_safety as url_safety_legacy
 from weave.trace_server.ids import generate_id as generate_id_legacy
 from weave.trace_server.interface import feedback_types as feedback_types_legacy
 from weave.trace_server.sensitive_data import policy as policy_legacy
+from weave.utils.ids import generate_id
 
 pytestmark = pytest.mark.trace_server
 
@@ -54,7 +54,7 @@ def test_trace_server_paths_are_the_shared_modules() -> None:
     assert policy is policy_legacy
     assert url_safety is url_safety_legacy
     assert errors is errors_legacy
-    assert tracing is tracing_legacy
+    assert server_tracing is tracing_legacy
     assert generate_id is generate_id_legacy
 
 
@@ -85,11 +85,23 @@ _SERVER_TYPE_MODULES = {
 }
 
 
+# Modules that already left weave.shared for the client.
+_MOVED_MODULES = {
+    "weave.trace_server.ids": "weave.utils.ids",
+    "weave.trace_server.tracing": "weave.trace.server_tracing",
+}
+
+
 def _expected_warning(name: str) -> str:
     if name in _SERVER_TYPE_MODULES:
         return (
             f"{name} is deprecated since weave 0.53.13 and will be removed in a "
             "future release."
+        )
+    if name in _MOVED_MODULES:
+        return (
+            f"{name} is deprecated since weave 0.53.13 and will be removed in a "
+            f"future release; import {_MOVED_MODULES[name]} instead."
         )
     new_name = name.replace("weave.trace_server", "weave.shared", 1)
     return (

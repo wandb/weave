@@ -547,12 +547,15 @@ not-iterable = "ignore"
 # Goal: the trace server (`weave.trace_server`) and the Weave client SDK
 # (everything else under `weave`) must not import each other. `weave.shared`
 # is the intentional neutral zone that both sides may import, and it imports
-# neither. `weave.trace_server` now only holds deprecated aliases for
-# `weave.shared`. TODO: drop it from these contracts when the last aliases are
-# deleted, which happens together with `weave.shared`.
+# neither, apart from the aliases for modules that moved from it into the
+# client. `weave.trace_server` now only holds deprecated aliases for
+# `weave.shared` and for those modules. TODO: drop it from these contracts
+# when the last aliases are deleted, which happens together with
+# `weave.shared`.
 #
-# No contract has an `ignore_imports` list: the direct cross-boundary imports
-# are gone. Fix a new violation in the code rather than adding an ignore.
+# The only `ignore_imports` entries are the deprecated aliases for modules that
+# moved from `weave.shared` into the client: each alias imports its new home.
+# Fix any other violation in the code rather than adding an ignore.
 #
 # `allow_indirect_imports = true` keeps each contract focused on *direct*
 # imports, so every violation maps to a concrete `import` statement to fix.
@@ -588,6 +591,10 @@ forbidden_modules = [
   "weave.type_wrappers",
   "weave.utils",
   "weave.wandb_interface",
+]
+ignore_imports = [
+  "weave.trace_server.ids -> weave.utils.ids",
+  "weave.trace_server.tracing -> weave.trace.server_tracing",
 ]
 allow_indirect_imports = true
 # NOTE: bare `from weave import ...` / `import weave` (the root package) is not
@@ -651,5 +658,15 @@ forbidden_modules = [
   "weave.type_wrappers",
   "weave.utils",
   "weave.wandb_interface",
+]
+ignore_imports = [
+  "weave.shared -> weave.trace.serialization.digest",
+  "weave.shared.digest -> weave.trace.serialization.digest",
+  "weave.shared.ids -> weave.utils.ids",
+  "weave.shared.object_class_util -> weave.trace.serialization.object_class_util",
+  "weave.shared.otel_context_keys -> weave.trace.otel_context_keys",
+  "weave.shared.otel_span_attrs -> weave.trace.otel_span_attrs",
+  "weave.shared.pydantic_util -> weave.utils.pydantic_util",
+  "weave.shared.tracing -> weave.trace.server_tracing",
 ]
 allow_indirect_imports = false
