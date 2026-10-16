@@ -1,9 +1,25 @@
+import asyncio
+import warnings
 from collections.abc import AsyncGenerator, Generator
+from contextvars import ContextVar, copy_context
 
 import pytest
 
 import weave
+from weave.trace import op as op_module
 from weave.trace.context import call_context
+from weave.trace.context.call_context import get_tracing_enabled
+
+_caller_state = ContextVar("caller_state", default="unset")
+
+
+def _sampling_allowed() -> bool:
+    return not get_tracing_enabled()
+
+
+@pytest.fixture
+def sampled_ops(monkeypatch):
+    monkeypatch.setattr(op_module, "is_tracing_setting_disabled", _sampling_allowed)
 
 
 @weave.op
@@ -249,6 +265,274 @@ def test_nested_generator_multiple_iterations(client):
         children = list(outer_call.children())
         assert len(children) == 1
         assert "inner_gen" in children[0].op_name
+
+
+@pytest.mark.trace_server
+def test_sampled_sync_generator_restores_caller_context_and_protocol(sampled_ops):
+    body_states = []
+
+    @weave.op(tracing_sample_rate=0)
+    def sampled():
+        body_states.append((get_tracing_enabled(), _caller_state.get()))
+        received = yield 1
+        body_states.append((get_tracing_enabled(), _caller_state.get(), received))
+        try:
+            yield 2
+        finally:
+            body_states.append((get_tracing_enabled(), _caller_state.get(), "cleanup"))
+        return "done"  # noqa: B901
+
+    caller_token = _caller_state.set("left")
+    try:
+        gen = sampled()
+        assert get_tracing_enabled()
+        assert next(gen) == 1
+        assert get_tracing_enabled()
+        assert _caller_state.get() == "left"
+
+        _caller_state.set("right")
+        assert gen.send("sent") == 2
+        assert get_tracing_enabled()
+        assert _caller_state.get() == "right"
+
+        with pytest.raises(StopIteration) as stop:
+            next(gen)
+        assert stop.value.value == "done"
+        assert get_tracing_enabled()
+        assert body_states == [
+            (False, "left"),
+            (False, "right", "sent"),
+            (False, "right", "cleanup"),
+        ]
+    finally:
+        _caller_state.reset(caller_token)
+
+
+@pytest.mark.trace_server
+def test_sampled_sync_generator_throw_and_close_restore_context(sampled_ops):
+    body_states = []
+    caught = []
+
+    @weave.op(tracing_sample_rate=0)
+    def sampled():
+        try:
+            body_states.append(get_tracing_enabled())
+            yield 1
+        except ValueError as error:
+            body_states.append(get_tracing_enabled())
+            caught.append(error)
+            yield 2
+        finally:
+            body_states.append(get_tracing_enabled())
+
+    gen = sampled()
+    assert next(gen) == 1
+    injected = ValueError("bad")
+    with warnings.catch_warnings(record=True) as warning_records:
+        warnings.simplefilter("always", DeprecationWarning)
+        assert gen.throw(injected) == 2
+    assert not [
+        warning
+        for warning in warning_records
+        if issubclass(warning.category, DeprecationWarning)
+    ]
+    assert caught == [injected]
+    gen.close()
+    assert get_tracing_enabled()
+    assert body_states == [False, False, False]
+
+
+@pytest.mark.trace_server
+def test_sampled_sync_generator_can_resume_in_another_context(sampled_ops):
+    @weave.op(tracing_sample_rate=0)
+    def sampled():
+        yield 1
+        yield 2
+
+    left_context = copy_context()
+    right_context = copy_context()
+    gen = left_context.run(sampled)
+    assert left_context.run(lambda: next(gen)) == 1
+    assert right_context.run(lambda: next(gen)) == 2
+    assert left_context.run(get_tracing_enabled)
+    assert right_context.run(get_tracing_enabled)
+    with pytest.raises(StopIteration):
+        right_context.run(lambda: next(gen))
+    assert right_context.run(get_tracing_enabled)
+
+
+@pytest.mark.trace_server
+def test_sampled_sync_generator_restores_context_when_close_fails(sampled_ops):
+    body_states = []
+
+    @weave.op(tracing_sample_rate=0)
+    def sampled():
+        try:
+            yield 1
+        finally:
+            body_states.append(get_tracing_enabled())
+            raise RuntimeError("cleanup failed")
+
+    gen = sampled()
+    assert next(gen) == 1
+    with pytest.raises(RuntimeError, match="cleanup failed"):
+        gen.close()
+    assert get_tracing_enabled()
+    assert body_states == [False]
+
+
+@pytest.mark.asyncio
+@pytest.mark.trace_server
+async def test_sampled_async_generator_restores_caller_context_and_nested_tracing(
+    sampled_ops,
+):
+    body_states = []
+
+    @weave.op
+    def nested():
+        body_states.append(("nested", get_tracing_enabled()))
+        return 1
+
+    @weave.op(tracing_sample_rate=0)
+    async def sampled() -> AsyncGenerator[int, None]:
+        body_states.append(("body", get_tracing_enabled(), _caller_state.get()))
+        yield nested()
+        body_states.append(("body", get_tracing_enabled(), _caller_state.get()))
+
+    caller_token = _caller_state.set("left")
+    try:
+        gen = sampled()
+        assert get_tracing_enabled()
+        assert await anext(gen) == 1
+        assert get_tracing_enabled()
+        assert _caller_state.get() == "left"
+
+        _caller_state.set("right")
+        with pytest.raises(StopAsyncIteration):
+            await anext(gen)
+        assert get_tracing_enabled()
+        assert _caller_state.get() == "right"
+        assert body_states == [
+            ("body", False, "left"),
+            ("nested", False),
+            ("body", False, "right"),
+        ]
+    finally:
+        _caller_state.reset(caller_token)
+
+
+@pytest.mark.asyncio
+@pytest.mark.trace_server
+async def test_sampled_async_generator_can_resume_in_another_task(sampled_ops):
+    body_states = []
+
+    @weave.op(tracing_sample_rate=0)
+    async def sampled() -> AsyncGenerator[int, None]:
+        try:
+            body_states.append((get_tracing_enabled(), _caller_state.get()))
+            yield 1
+            body_states.append((get_tracing_enabled(), _caller_state.get()))
+            yield 2
+        finally:
+            body_states.append((get_tracing_enabled(), _caller_state.get(), "cleanup"))
+
+    gen = sampled()
+    task_states = []
+
+    async def advance(label: str) -> int | None:
+        caller_token = _caller_state.set(label)
+        try:
+            before = get_tracing_enabled()
+            try:
+                value = await anext(gen)
+            except StopAsyncIteration:
+                value = None
+            task_states.append((label, before, get_tracing_enabled()))
+            return value
+        finally:
+            _caller_state.reset(caller_token)
+
+    first_task = asyncio.create_task(advance("left"))
+    assert await first_task == 1
+    second_task = asyncio.create_task(advance("right"))
+    assert await second_task == 2
+    exhaustion_task = asyncio.create_task(advance("exhaustion"))
+    assert await exhaustion_task is None
+    assert get_tracing_enabled()
+    assert task_states == [
+        ("left", True, True),
+        ("right", True, True),
+        ("exhaustion", True, True),
+    ]
+    assert body_states == [
+        (False, "left"),
+        (False, "right"),
+        (False, "exhaustion", "cleanup"),
+    ]
+
+
+@pytest.mark.asyncio
+@pytest.mark.trace_server
+async def test_sampled_async_generator_error_restores_caller_context(sampled_ops):
+    @weave.op(tracing_sample_rate=0)
+    async def sampled() -> AsyncGenerator[int, None]:
+        yield 1
+        raise ValueError("bad")
+
+    gen = sampled()
+    assert await anext(gen) == 1
+    with pytest.raises(ValueError, match="bad"):
+        await anext(gen)
+    assert get_tracing_enabled()
+
+
+@pytest.mark.asyncio
+@pytest.mark.trace_server
+async def test_sampled_async_generator_close_and_cancellation_cleanup(sampled_ops):
+    cleanup = []
+    underlying_started = asyncio.Event()
+    release_underlying = asyncio.Event()
+
+    @weave.op(tracing_sample_rate=0)
+    async def sampled() -> AsyncGenerator[int, None]:
+        try:
+            yield 1
+            underlying_started.set()
+            await release_underlying.wait()
+        finally:
+            cleanup.append((get_tracing_enabled(), _caller_state.get()))
+
+    caller_token = _caller_state.set("close")
+    try:
+        gen = sampled()
+        assert await anext(gen) == 1
+        await gen.aclose()
+        assert get_tracing_enabled()
+        assert _caller_state.get() == "close"
+    finally:
+        _caller_state.reset(caller_token)
+    assert cleanup == [(False, "close")]
+    assert get_tracing_enabled()
+
+    consumer_states = []
+
+    async def consume() -> None:
+        caller_token = _caller_state.set("cancel")
+        try:
+            async for _ in sampled():
+                await asyncio.sleep(0)
+        finally:
+            consumer_states.append((get_tracing_enabled(), _caller_state.get()))
+            _caller_state.reset(caller_token)
+
+    task = asyncio.create_task(consume())
+    await underlying_started.wait()
+    task.cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await task
+    assert get_tracing_enabled()
+    assert consumer_states == [(True, "cancel")]
+    assert cleanup == [(False, "close"), (False, "cancel")]
 
 
 @pytest.mark.asyncio
