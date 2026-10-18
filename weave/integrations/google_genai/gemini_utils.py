@@ -152,13 +152,28 @@ def google_genai_gemini_accumulator(
     for i, value_candidate in enumerate(value_candidates):
         if i >= len(acc_candidates):
             break
+        acc_candidate = acc_candidates[i]
+
+        # Gemini sends finish_reason on the last chunk, so keep the latest one.
+        if value_candidate.finish_reason is not None:
+            acc_candidate.finish_reason = value_candidate.finish_reason
+
+        # A chunk can carry only metadata (e.g. the final chunk of a blocked
+        # response has a finish_reason but no content).
+        if value_candidate.content is None:
+            continue
+        if acc_candidate.content is None:
+            acc_candidate.content = value_candidate.content
+            continue
+        if acc_candidate.content.parts is None:
+            acc_candidate.content.parts = []
 
         value_parts = value_candidate.content.parts or []
         for value_part in value_parts:
             if value_part.text is None:
                 # Preserve non-text parts (e.g. inline_data images) in the
                 # accumulated response instead of silently dropping them.
-                acc.candidates[i].content.parts.append(value_part)
+                acc_candidate.content.parts.append(value_part)
                 continue
 
             # Check if this part is thinking content (thought=True)
@@ -166,7 +181,7 @@ def google_genai_gemini_accumulator(
 
             # Stop at structured parts so later text is not moved before them.
             matched = False
-            for acc_part in reversed(acc.candidates[i].content.parts):
+            for acc_part in reversed(acc_candidate.content.parts):
                 if acc_part.text is None:
                     break
                 acc_part_is_thought = getattr(acc_part, "thought", False)
@@ -177,32 +192,30 @@ def google_genai_gemini_accumulator(
 
             # If no matching part found, append as new part
             if not matched:
-                acc.candidates[i].content.parts.append(value_part)
+                acc_candidate.content.parts.append(value_part)
 
     # Replace token counts with latest non-None values (Gemini returns cumulative counts)
     # Per Google docs: "When streaming output, the usageMetadata attribute only appears
     # on the last chunk of the stream."
-    if value.usage_metadata.prompt_token_count is not None:
-        acc.usage_metadata.prompt_token_count = value.usage_metadata.prompt_token_count
+    value_usage = value.usage_metadata
+    if value_usage is None:
+        return acc
+    if acc.usage_metadata is None:
+        acc.usage_metadata = value_usage
+        return acc
+    acc_usage = acc.usage_metadata
 
-    if value.usage_metadata.candidates_token_count is not None:
-        acc.usage_metadata.candidates_token_count = (
-            value.usage_metadata.candidates_token_count
-        )
-
-    if value.usage_metadata.total_token_count is not None:
-        acc.usage_metadata.total_token_count = value.usage_metadata.total_token_count
-
-    if value.usage_metadata.cached_content_token_count is not None:
-        acc.usage_metadata.cached_content_token_count = (
-            value.usage_metadata.cached_content_token_count
-        )
-
-    # Also handle thoughts_token_count for thinking models
-    if getattr(value.usage_metadata, "thoughts_token_count", None) is not None:
-        acc.usage_metadata.thoughts_token_count = (
-            value.usage_metadata.thoughts_token_count
-        )
+    for field in (
+        "prompt_token_count",
+        "candidates_token_count",
+        "total_token_count",
+        "cached_content_token_count",
+        # thoughts_token_count is reported by thinking models
+        "thoughts_token_count",
+    ):
+        field_value = getattr(value_usage, field, None)
+        if field_value is not None:
+            setattr(acc_usage, field, field_value)
 
     return acc
 
