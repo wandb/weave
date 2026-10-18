@@ -34,10 +34,10 @@ This Contribution License Agreement ("Agreement") is agreed to by the party sign
 
 By Signing, You accept and agree to the terms of this Contribution License Agreement for Your present and future Submissions to W&B.
 
-Name ("You"): \_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_
+Name ("You"): Paul 
 
-Signature: \_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_
+Signature: Paul
 
-Date: \_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_
+Date: 18-10-2026
 
-GitHub Username: \_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_
+GitHub Username: AlphaRex-pixel
