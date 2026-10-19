@@ -457,7 +457,6 @@ def test_response_span_emits_chat_with_messages(
         {
             "role": "assistant",
             "parts": [{"type": "text", "content": "Hi!"}],
-            "finish_reason": "stop",
         }
     ]
 
