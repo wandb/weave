@@ -226,9 +226,12 @@ class TestExtractors:
 
         # Output envelope mirrors the request side's role mapping.
         output_messages = json.loads(a["gen_ai.output.messages"])
-        assert output_messages[0]["role"] == "assistant"
-        assert output_messages[0]["parts"][0]["content"] == "cool answer"
-        assert "finish_reason" not in output_messages[0]
+        assert output_messages == [
+            {
+                "role": "assistant",
+                "parts": [{"type": "text", "content": "cool answer"}],
+            }
+        ]
         assert a["gen_ai.response.finish_reasons"] == ["stop"]
 
     def test_set_llm_response_attributes_skips_empty_fields(self) -> None:
