@@ -8,3 +8,7 @@
 /weave/trace_server/ @ro31337 @andrewtruong @rgao-coreweave
 /tests/trace_server/ @ro31337 @andrewtruong @rgao-coreweave
 /tests/trace_server_migrator/ @ro31337 @andrewtruong @rgao-coreweave
+
+# The trace server has its own copy of weave/shared in wandb/core. These owners
+# make sure that a change here that the server needs is made in core too.
+/weave/shared/ @ro31337 @andrewtruong @rgao-coreweave
