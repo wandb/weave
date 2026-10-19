@@ -67,7 +67,7 @@ import {
   ATTR_GEN_AI_TOOL_CALL_ID,
   ATTR_GEN_AI_TOOL_CALL_RESULT,
   ATTR_GEN_AI_TOOL_NAME,
-  ATTR_GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS,
+  ATTR_GEN_AI_USAGE_CACHE_WRITE_INPUT_TOKENS,
   ATTR_GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS,
   ATTR_GEN_AI_USAGE_INPUT_TOKENS,
   ATTR_GEN_AI_USAGE_OUTPUT_TOKENS,
@@ -136,7 +136,6 @@ interface WeaveMessage {
   role: string;
   content?: string;
   parts?: WeaveMessagePart[];
-  finish_reason?: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -198,7 +197,6 @@ function mapPiMessage(msg: PiAgentMessage): WeaveMessage {
     return {
       role: 'assistant',
       parts: mapAssistantParts(msg.content),
-      finish_reason: msg.stopReason,
     };
   }
   const content = msg.content;
@@ -381,14 +379,16 @@ export class PiCodingAgentOtelAdapter {
       this.invokeAgentSpan &&
       event.messages.length > 0
     ) {
-      const assistantMessages = event.messages
-        .filter(m => m.role === 'assistant')
-        .map(mapPiMessage);
+      const assistantMessages = event.messages.filter(isAssistant);
       if (assistantMessages.length > 0) {
-        this.invokeAgentSpan.setAttribute(
-          ATTR_GEN_AI_OUTPUT_MESSAGES,
-          JSON.stringify(assistantMessages)
-        );
+        this.invokeAgentSpan.setAttributes({
+          [ATTR_GEN_AI_OUTPUT_MESSAGES]: JSON.stringify(
+            assistantMessages.map(mapPiMessage)
+          ),
+          [ATTR_GEN_AI_RESPONSE_FINISH_REASONS]: assistantMessages.map(
+            msg => msg.stopReason
+          ),
+        });
       }
     }
     this.endInvokeAgentSpan();
@@ -476,7 +476,7 @@ export class PiCodingAgentOtelAdapter {
           [ATTR_GEN_AI_USAGE_OUTPUT_TOKENS]: usage.output,
           [ATTR_GEN_AI_USAGE_TOTAL_TOKENS]: usage.totalTokens,
           [ATTR_GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS]: usage.cacheRead,
-          [ATTR_GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS]: usage.cacheWrite,
+          [ATTR_GEN_AI_USAGE_CACHE_WRITE_INPUT_TOKENS]: usage.cacheWrite,
           [ATTR_PI_USAGE_COST_USD]: usage.cost.total,
         });
 

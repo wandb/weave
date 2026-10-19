@@ -280,7 +280,7 @@ class TestLLMAttributes:
         assert attrs["gen_ai.usage.input_tokens"] == 100
         assert attrs["gen_ai.usage.output_tokens"] == 50
         assert attrs["gen_ai.usage.total_tokens"] == 170
-        assert attrs["gen_ai.usage.reasoning_tokens"] == 20
+        assert attrs["gen_ai.usage.reasoning.output_tokens"] == 20
         # system_instructions: array of TextParts per semconv
         assert json.loads(attrs["gen_ai.system_instructions"]) == [
             {"type": "text", "content": "Be helpful"},
@@ -290,13 +290,9 @@ class TestLLMAttributes:
         assert json.loads(attrs["gen_ai.input.messages"]) == [
             {"role": "user", "parts": [{"type": "text", "content": "Hello"}]}
         ]
-        # output messages: parts model + finish_reason on the last message
+        # output messages: parts model; finish reason lives on the span
         assert json.loads(attrs["gen_ai.output.messages"]) == [
-            {
-                "role": "assistant",
-                "parts": [{"type": "text", "content": "Hi!"}],
-                "finish_reason": "stop",
-            }
+            {"role": "assistant", "parts": [{"type": "text", "content": "Hi!"}]}
         ]
 
     def test_conversation_id(self) -> None:
@@ -325,14 +321,14 @@ class TestLLMAttributes:
         assert "gen_ai.usage.input_tokens" not in attrs
         assert "gen_ai.usage.output_tokens" not in attrs
         assert "gen_ai.usage.total_tokens" not in attrs
-        assert "gen_ai.usage.reasoning_tokens" not in attrs
+        assert "gen_ai.usage.reasoning.output_tokens" not in attrs
 
     def test_none_usage_omitted(self) -> None:
         attrs = llm_attributes(model="gpt-4o", usage=None)
         assert "gen_ai.usage.input_tokens" not in attrs
         assert "gen_ai.usage.output_tokens" not in attrs
         assert "gen_ai.usage.total_tokens" not in attrs
-        assert "gen_ai.usage.reasoning_tokens" not in attrs
+        assert "gen_ai.usage.reasoning.output_tokens" not in attrs
 
     def test_partial_usage_only_includes_nonzero(self) -> None:
         attrs = llm_attributes(
@@ -342,7 +338,7 @@ class TestLLMAttributes:
         assert attrs["gen_ai.usage.input_tokens"] == 100
         assert "gen_ai.usage.output_tokens" not in attrs
         assert "gen_ai.usage.total_tokens" not in attrs
-        assert "gen_ai.usage.reasoning_tokens" not in attrs
+        assert "gen_ai.usage.reasoning.output_tokens" not in attrs
 
     def test_empty_system_instructions_omitted(self) -> None:
         attrs = llm_attributes(model="gpt-4o", system_instructions=[])
@@ -408,18 +404,18 @@ class TestLLMAttributes:
         attrs = llm_attributes(model="gpt-4o", reasoning=Reasoning(content=""))
         assert "gen_ai.output.messages" not in attrs
 
-    def test_finish_reason_attached_to_last_output_message(self) -> None:
+    def test_finish_reasons_not_written_per_message(self) -> None:
         attrs = llm_attributes(
             model="gpt-4o",
             output_messages=[
                 Message(role="assistant", content="first"),
-                Message(role="assistant", content="last"),
+                Message(role="assistant", parts=[TextPart(content="last")]),
             ],
             finish_reasons=["length"],
         )
         raw = json.loads(attrs["gen_ai.output.messages"])
-        assert "finish_reason" not in raw[0]
-        assert raw[1]["finish_reason"] == "length"
+        assert attrs["gen_ai.response.finish_reasons"] == ["length"]
+        assert all("finish_reason" not in message for message in raw)
 
     def test_attach_media_serialized_as_uri_part(self) -> None:
         ref = "weave:///test/project/object/img:v1"
@@ -711,7 +707,7 @@ class TestUsageCacheTokens:
             cache_read_input_tokens=50,
         )
         attrs = llm_attributes(model="gpt-4o", usage=usage)
-        assert attrs["gen_ai.usage.cache_creation.input_tokens"] == 200
+        assert attrs["gen_ai.usage.cache_write.input_tokens"] == 200
         assert attrs["gen_ai.usage.cache_read.input_tokens"] == 50
 
     def test_zero_cache_tokens_omitted(self) -> None:
@@ -721,7 +717,7 @@ class TestUsageCacheTokens:
             cache_read_input_tokens=0,
         )
         attrs = llm_attributes(model="gpt-4o", usage=usage)
-        assert "gen_ai.usage.cache_creation.input_tokens" not in attrs
+        assert "gen_ai.usage.cache_write.input_tokens" not in attrs
         assert "gen_ai.usage.cache_read.input_tokens" not in attrs
 
 
@@ -872,14 +868,6 @@ class TestExplicitMessageParts:
                 ],
             }
         ]
-
-    def test_finish_reason_attached_with_explicit_parts(self) -> None:
-        msg = Message(role="assistant", parts=[TextPart(content="done")])
-        attrs = llm_attributes(
-            model="gpt-4o", output_messages=[msg], finish_reasons=["stop"]
-        )
-        raw = json.loads(attrs["gen_ai.output.messages"])
-        assert raw[0]["finish_reason"] == "stop"
 
 
 # ---------------------------------------------------------------------------
@@ -2439,9 +2427,9 @@ class TestUsageFromOpenAIResponses:
         )
         assert "gen_ai.usage.input_tokens" not in attrs
         assert "gen_ai.usage.output_tokens" not in attrs
-        assert "gen_ai.usage.reasoning_tokens" not in attrs
+        assert "gen_ai.usage.reasoning.output_tokens" not in attrs
         assert "gen_ai.usage.cache_read.input_tokens" not in attrs
-        assert "gen_ai.usage.cache_creation.input_tokens" not in attrs
+        assert "gen_ai.usage.cache_write.input_tokens" not in attrs
 
     def test_full_usage_lands_on_span(self, otel_spans: InMemorySpanExporter) -> None:
         usage = self._usage(
@@ -2455,9 +2443,9 @@ class TestUsageFromOpenAIResponses:
         )
         assert attrs["gen_ai.usage.input_tokens"] == 10
         assert attrs["gen_ai.usage.output_tokens"] == 20
-        assert attrs["gen_ai.usage.reasoning_tokens"] == 5
+        assert attrs["gen_ai.usage.reasoning.output_tokens"] == 5
         assert attrs["gen_ai.usage.cache_read.input_tokens"] == 3
-        assert attrs["gen_ai.usage.cache_creation.input_tokens"] == 7
+        assert attrs["gen_ai.usage.cache_write.input_tokens"] == 7
 
     @pytest.mark.parametrize(
         (
@@ -2498,14 +2486,14 @@ class TestUsageFromOpenAIResponses:
         assert attrs["gen_ai.usage.input_tokens"] == 10
         assert attrs["gen_ai.usage.output_tokens"] == 20
         if expected_reasoning is None:
-            assert "gen_ai.usage.reasoning_tokens" not in attrs
+            assert "gen_ai.usage.reasoning.output_tokens" not in attrs
         else:
-            assert attrs["gen_ai.usage.reasoning_tokens"] == expected_reasoning
+            assert attrs["gen_ai.usage.reasoning.output_tokens"] == expected_reasoning
         if expected_cache is None:
             assert "gen_ai.usage.cache_read.input_tokens" not in attrs
         else:
             assert attrs["gen_ai.usage.cache_read.input_tokens"] == expected_cache
-        assert "gen_ai.usage.cache_creation.input_tokens" not in attrs
+        assert "gen_ai.usage.cache_write.input_tokens" not in attrs
 
 
 class TestMessageFromOpenAIResponsesInput:
