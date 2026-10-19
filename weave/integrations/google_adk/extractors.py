@@ -178,8 +178,8 @@ def _finish_reason_str(llm_response: LlmResponse) -> str:
     finish_reason = llm_response.finish_reason
     if finish_reason is None:
         return ""
-    # ``FinishReason`` is an Enum; ``.value`` is the wire form, fall
-    # back to ``.name`` for older enum styles.
+    # `FinishReason` is an Enum; `.value` is the wire form, with `.name`
+    # as the fallback for older enum styles.
     return str(finish_reason.value or finish_reason.name).lower()
 
 
@@ -289,12 +289,8 @@ def set_llm_response_attributes(span: Span, llm_response: LlmResponse) -> None:
     usage = llm_response.usage_metadata
     if usage is None:
         return
-    # ADK emits prompt / candidates tokens via the canonical keys; we add
-    # the two Gemini-specific usage fields Weave exposes that ADK leaves
-    # in the experimental namespace or omits. We do NOT emit
-    # ``gen_ai.usage.cache_write.input_tokens`` here — that's an
-    # Anthropic-style "tokens written to cache" metric with no equivalent
-    # field on ``google-genai``'s ``GenerateContentResponseUsageMetadata``.
+    # `google-genai` usage metadata has no cache-write counter, so
+    # `gen_ai.usage.cache_write.input_tokens` is never emitted here.
     if usage.thoughts_token_count is not None:
         span.set_attribute(
             GEN_AI_USAGE_REASONING_OUTPUT_TOKENS, int(usage.thoughts_token_count)
