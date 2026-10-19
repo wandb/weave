@@ -6,11 +6,10 @@ import warnings
 from weave.shared.interface import feedback_types as _canonical
 from weave.shared.interface.feedback_types import *  # noqa: F403
 
-# TODO: delete this alias after weave 0.53.13.
+# TODO: delete this alias together with weave.shared.
 warnings.warn(
-    "weave.trace_server.interface.feedback_types is deprecated since weave "
-    "0.53.13 and will be removed after weave 0.53.13; import "
-    "weave.shared.interface.feedback_types instead.",
+    "weave.trace_server.interface.feedback_types is deprecated since weave 0.53.13 "
+    "and will be removed in a future release.",
     FutureWarning,
     stacklevel=2,
 )
