@@ -57,6 +57,9 @@ from weave.trace.weave_client import WeaveClient
 from weave.trace_server.agents import semconv as server_semconv
 from weave.trace_server.constants import INVOKING_SPAN_ATTR_KEY
 
+# CI runs this shard with `-m trace_server`; unmarked tests would be deselected.
+pytestmark = pytest.mark.trace_server
+
 # The mocks below mirror the duck-typed surface our extractors inspect on
 # ``google.genai.types.*`` objects and ADK's ``LlmRequest`` / ``LlmResponse``
 # wrappers. Using real pydantic objects would be heavier (full
