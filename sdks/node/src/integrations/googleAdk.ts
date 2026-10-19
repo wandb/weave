@@ -366,14 +366,10 @@ function finishReasonString(finishReason: string | null | undefined): string {
   return finishReason.toLowerCase();
 }
 
-function contentToOutputMessage(
-  content: AdkContent,
-  finishReason: string | null | undefined
-): Record<string, unknown> {
+function contentToOutputMessage(content: AdkContent): Record<string, unknown> {
   return {
     role: adkRoleToGenAi(content.role) || 'assistant',
     parts: contentToParts(content),
-    finish_reason: finishReasonString(finishReason),
   };
 }
 
@@ -515,9 +511,7 @@ function setLlmResponseAttributes(
   if (captureMessageContent() && llmResponse.content != null) {
     span.setAttribute(
       ATTR_GEN_AI_OUTPUT_MESSAGES,
-      jsonAttr([
-        contentToOutputMessage(llmResponse.content, llmResponse.finishReason),
-      ])
+      jsonAttr([contentToOutputMessage(llmResponse.content)])
     );
     span.setAttribute(ATTR_GEN_AI_OUTPUT_TYPE, OUTPUT_TYPE_TEXT);
   }
@@ -769,7 +763,7 @@ export class WeaveAdkPlugin implements AdkBasePlugin {
     if (captureMessageContent() && state.finalContent) {
       state.rootSpan.setAttribute(
         ATTR_GEN_AI_OUTPUT_MESSAGES,
-        jsonAttr([contentToOutputMessage(state.finalContent, null)])
+        jsonAttr([contentToOutputMessage(state.finalContent)])
       );
       state.rootSpan.setAttribute(ATTR_GEN_AI_OUTPUT_TYPE, OUTPUT_TYPE_TEXT);
     }
@@ -1181,7 +1175,7 @@ export class WeaveAdkPlugin implements AdkBasePlugin {
     if (event.content != null && captureMessageContent()) {
       span.setAttribute(
         ATTR_GEN_AI_OUTPUT_MESSAGES,
-        jsonAttr([contentToOutputMessage(event.content, null)])
+        jsonAttr([contentToOutputMessage(event.content)])
       );
       span.setAttribute(ATTR_GEN_AI_OUTPUT_TYPE, OUTPUT_TYPE_TEXT);
     }
