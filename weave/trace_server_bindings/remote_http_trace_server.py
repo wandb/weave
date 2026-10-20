@@ -23,7 +23,6 @@ from weave.trace.settings import (
 )
 from weave.trace_server_bindings.async_batch_processor import AsyncBatchProcessor
 from weave.trace_server_bindings.call_batch_processor import CallBatchProcessor
-from weave.trace_server_bindings.client_interface import TraceServerClientInterface
 from weave.trace_server_bindings.http_utils import (
     CLIENT_CAPABILITIES,
     CLIENT_CAPABILITIES_HEADER,
@@ -57,7 +56,7 @@ logger = logging.getLogger(__name__)
 # DEFAULT_TIMEOUT = (DEFAULT_CONNECT_TIMEOUT, DEFAULT_READ_TIMEOUT)
 
 
-class RemoteHTTPTraceServer(TraceServerClientInterface):
+class RemoteHTTPTraceServer:
     trace_server_url: str
 
     # My current batching is not safe in notebooks, disable it for now
