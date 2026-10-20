@@ -11,16 +11,31 @@ from weave.shared.service_interface import (
     ProjectsInfoRes,
     ServerInfoRes,
 )
+from weave.trace_server_bindings.models import CallsQueryRes
 from weave.vendor.weave_server_sdk.types import (
     CallDeleteParams,
     CallDeleteResponse,
     CallEndParams,
+    CallQueryStatsParams,
+    CallQueryStatsResponse,
+    CallReadParams,
+    CallReadResponse,
     CallStartParams,
     CallStartResponse,
+    CallStatsParams,
+    CallStatsResponse,
+    CallStreamQueryParams,
     CallUpdateParams,
     CallUpsertBatchParams,
     CallUpsertBatchResponse,
+    CallUsageParams,
+    CallUsageResponse,
+    ThreadStreamQueryParams,
+    ThreadStreamQueryResponse,
+    TraceUsageParams,
+    TraceUsageResponse,
 )
+from weave.vendor.weave_server_sdk.types.call_read_response import Call
 
 
 class TraceServerClientInterface(Protocol):
@@ -74,20 +89,28 @@ class TraceServerClientInterface(Protocol):
         self, req: CallStartParams | tsi.CallStartReq
     ) -> CallStartResponse: ...
     def call_end(self, req: CallEndParams | tsi.CallEndReq) -> object: ...
-    def call_read(self, req: tsi.CallReadReq) -> tsi.CallReadRes: ...
-    def calls_query(self, req: tsi.CallsQueryReq) -> tsi.CallsQueryRes: ...
+    def call_read(self, req: CallReadParams | tsi.CallReadReq) -> CallReadResponse: ...
+    def calls_query(
+        self, req: CallStreamQueryParams | tsi.CallsQueryReq
+    ) -> CallsQueryRes: ...
     def calls_query_stream(
-        self, req: tsi.CallsQueryReq
-    ) -> Iterator[tsi.CallSchema]: ...
+        self, req: CallStreamQueryParams | tsi.CallsQueryReq
+    ) -> Iterator[Call]: ...
     def calls_delete(
         self, req: CallDeleteParams | tsi.CallsDeleteReq
     ) -> CallDeleteResponse: ...
     def calls_query_stats(
-        self, req: tsi.CallsQueryStatsReq
-    ) -> tsi.CallsQueryStatsRes: ...
-    def call_stats(self, req: tsi.CallStatsReq) -> tsi.CallStatsRes: ...
-    def trace_usage(self, req: tsi.TraceUsageReq) -> tsi.TraceUsageRes: ...
-    def calls_usage(self, req: tsi.CallsUsageReq) -> tsi.CallsUsageRes: ...
+        self, req: CallQueryStatsParams | tsi.CallsQueryStatsReq
+    ) -> CallQueryStatsResponse: ...
+    def call_stats(
+        self, req: CallStatsParams | tsi.CallStatsReq
+    ) -> CallStatsResponse: ...
+    def trace_usage(
+        self, req: TraceUsageParams | tsi.TraceUsageReq
+    ) -> TraceUsageResponse: ...
+    def calls_usage(
+        self, req: CallUsageParams | tsi.CallsUsageReq
+    ) -> CallUsageResponse: ...
     def call_update(self, req: CallUpdateParams | tsi.CallUpdateReq) -> object: ...
     def call_start_batch(
         self, req: CallUpsertBatchParams | tsi.CallCreateBatchReq
@@ -197,8 +220,8 @@ class TraceServerClientInterface(Protocol):
 
     # Thread API
     def threads_query_stream(
-        self, req: tsi.ThreadsQueryReq
-    ) -> Iterator[tsi.ThreadSchema]: ...
+        self, req: ThreadStreamQueryParams | tsi.ThreadsQueryReq
+    ) -> Iterator[ThreadStreamQueryResponse]: ...
 
     # Annotation Queue API
     def annotation_queue_create(

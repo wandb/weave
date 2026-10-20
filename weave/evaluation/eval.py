@@ -32,7 +32,6 @@ from weave.flow.scorer import (
 from weave.flow.util import make_memorable_name, transpose
 from weave.integrations.integration_utilities import _uniquely_truncate_str
 from weave.object.obj import Object
-from weave.shared.trace_server_interface import CallsFilter
 from weave.trace import constants
 from weave.trace.api import attributes
 from weave.trace.call import Call, CallsIter
@@ -435,10 +434,10 @@ class Evaluation(Object):
         evaluate_op_name = "Evaluation.evaluate"
         eval_op_ref = f"weave:///{client.project_id}/op/{evaluate_op_name}:*"
         return client.get_calls(
-            filter=CallsFilter(
-                input_refs=[self.ref.uri],
-                op_names=[eval_op_ref],
-            ),
+            filter={
+                "input_refs": [self.ref.uri],
+                "op_names": [eval_op_ref],
+            },
         )
 
     def get_score_calls(self) -> dict[str, list[Call]]:

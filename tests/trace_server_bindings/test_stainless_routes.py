@@ -33,10 +33,19 @@ from weave.vendor.weave_server_sdk import Client as StainlessClient
 from weave.vendor.weave_server_sdk.types import (
     CallDeleteParams,
     CallEndParams,
+    CallQueryStatsParams,
+    CallReadParams,
     CallStartParams,
+    CallStatsParams,
+    CallStatsResponse,
+    CallStreamQueryParams,
     CallUpdateParams,
     CallUpsertBatchParams,
     CallUpsertBatchResponse,
+    CallUsageParams,
+    ThreadStreamQueryParams,
+    ThreadStreamQueryResponse,
+    TraceUsageParams,
 )
 from weave.vendor.weave_server_sdk.types.call_upsert_batch_response import (
     ReCallStartRes,
@@ -525,7 +534,7 @@ def test_v2_method_reaches_its_flat_route(
             tsi.CallStatsReq(project_id=PROJECT, start=START, end=END),
             "POST",
             "/calls/stats",
-            tsi.CallStatsRes,
+            CallStatsResponse,
             id="call_stats",
         ),
         pytest.param(
@@ -1718,6 +1727,28 @@ def _leaves(value: Any, here: str = "") -> Iterator[tuple[str, Any]]:
         ),
         pytest.param("call_update", CallUpdateParams, "POST", "/call/update"),
         pytest.param("calls_delete", CallDeleteParams, "POST", "/calls/delete"),
+        pytest.param("call_read", CallReadParams, "POST", "/call/read"),
+        pytest.param(
+            "calls_query", CallStreamQueryParams, "POST", "/calls/stream_query"
+        ),
+        pytest.param(
+            "calls_query_stream",
+            CallStreamQueryParams,
+            "POST",
+            "/calls/stream_query",
+        ),
+        pytest.param(
+            "calls_query_stats", CallQueryStatsParams, "POST", "/calls/query_stats"
+        ),
+        pytest.param("call_stats", CallStatsParams, "POST", "/calls/stats"),
+        pytest.param("trace_usage", TraceUsageParams, "POST", "/trace/usage"),
+        pytest.param("calls_usage", CallUsageParams, "POST", "/calls/usage"),
+        pytest.param(
+            "threads_query_stream",
+            ThreadStreamQueryParams,
+            "POST",
+            "/threads/stream_query",
+        ),
     ],
 )
 def test_every_params_key_reaches_the_request(
@@ -1731,14 +1762,23 @@ def test_every_params_key_reaches_the_request(
     )
     params = _sentinel_params(params_type)
 
-    getattr(mock_server.server, method_name)(params)
+    res = getattr(mock_server.server, method_name)(params)
+    if isinstance(res, Iterator):
+        list(res)
 
     assert len(mock_server.requests) == 1
     request = mock_server.requests[0]
     assert (request.method, request.url.path) == (expected_method, expected_path)
     body = dict(_leaves(json.loads(request.content)))
+    # A header parameter (the stream's `accept`) joins the generated default.
+    headers = [v for h in request.headers.values() for v in h.split(", ")]
     sent = sorted(
-        [*body.values(), *request.url.params.values(), *request.url.path.split("/")]
+        [
+            *body.values(),
+            *request.url.params.values(),
+            *request.url.path.split("/"),
+            *headers,
+        ]
     )
     assert [s for s in sent if s.startswith("<")] == sorted(
         value for _, value in _leaves(params)
@@ -1833,7 +1873,7 @@ def test_call_records_written_from_models_replay(should_batch: bool, monkeypatch
                 },
             ],
             [
-                tsi.ThreadSchema(
+                ThreadStreamQueryResponse(
                     thread_id="t1",
                     turn_count=1,
                     start_time="2026-08-20T00:00:00Z",
@@ -1843,7 +1883,7 @@ def test_call_records_written_from_models_replay(should_batch: bool, monkeypatch
                     p50_turn_duration_ms=None,
                     p99_turn_duration_ms=None,
                 ),
-                tsi.ThreadSchema(
+                ThreadStreamQueryResponse(
                     thread_id="t2",
                     turn_count=2,
                     start_time="2026-08-20T00:00:00Z",

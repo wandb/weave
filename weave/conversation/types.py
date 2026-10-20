@@ -52,7 +52,7 @@ def _parse_data_url(url: str) -> tuple[str, str]:
 # JSON-serializable input and coerces via ``_to_json_string`` before
 # validation. Use this anywhere the GenAI semconv (or any other wire
 # spec) requires a string but the in-memory ergonomic input is structured
-# data. Same pattern as ``CallsFilterLike`` in ``weave/trace/casting.py``.
+# data.
 JSONString = Annotated[str, BeforeValidator(_to_json_string)]
 
 
