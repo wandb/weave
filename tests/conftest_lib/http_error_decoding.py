@@ -1,9 +1,10 @@
 """Turn the trace server's HTTP error responses back into its exceptions.
 
 The server turns its exceptions into a status code and a JSON body
-(`weave.shared.errors`), and `RemoteHTTPTraceServer` raises
-`httpx.HTTPStatusError`. This wrapper is the inverse of the server's error
-registry, so a test can expect the exception the server raised.
+(`weave.shared.errors`). The generated client raises `APIStatusError` and
+`RemoteHTTPTraceServer` raises `httpx.HTTPStatusError`. This wrapper is the
+inverse of the server's error registry, so a test can expect the exception the
+server raised.
 
 Production error bodies do not name the exception class, on purpose: the
 public API should not change for tests. Core's resettable test server adds
@@ -24,6 +25,7 @@ import httpx
 from weave.shared import errors
 from weave.shared import trace_server_interface as tsi
 from weave.shared.refs_internal import InvalidInternalRef
+from weave.vendor.weave_server_sdk import APIStatusError
 
 # Registered error classes that do not live in weave.shared.errors.
 _OTHER_ERRORS: dict[str, type[Exception]] = {
@@ -41,7 +43,7 @@ _STATUS_TO_ERROR: dict[int, type[Exception]] = {
 }
 
 
-def decode_http_error(exc: httpx.HTTPStatusError) -> Exception:
+def decode_http_error(exc: httpx.HTTPStatusError | APIStatusError) -> Exception:
     """Return the exception the server raised, rebuilt from its response."""
     response = exc.response
     try:
@@ -99,7 +101,7 @@ def decode_http_error(exc: httpx.HTTPStatusError) -> Exception:
 def _decoding_iterator(it: Iterator[Any]) -> Iterator[Any]:
     try:
         yield from it
-    except httpx.HTTPStatusError as e:
+    except (httpx.HTTPStatusError, APIStatusError) as e:
         raise decode_http_error(e) from e
 
 
@@ -129,7 +131,7 @@ class HTTPErrorDecodingTraceServer:
         def wrapper(*args: Any, **kwargs: Any) -> Any:
             try:
                 res = fn(*args, **kwargs)
-            except httpx.HTTPStatusError as e:
+            except (httpx.HTTPStatusError, APIStatusError) as e:
                 raise decode_http_error(e) from e
             if isinstance(res, Iterator):
                 return _decoding_iterator(res)
