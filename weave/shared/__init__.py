@@ -19,13 +19,17 @@ __all__ = [
 
 # Submodules that moved into the client, by new path. Their weave.shared paths are aliases that warn.
 _MOVED_MODULES = {
+    "constants": "weave.trace.constants",
     "digest": "weave.trace.serialization.digest",
     "ids": "weave.utils.ids",
     "object_class_util": "weave.trace.serialization.object_class_util",
     "otel_context_keys": "weave.trace.otel_context_keys",
     "otel_span_attrs": "weave.trace.otel_span_attrs",
     "pydantic_util": "weave.utils.pydantic_util",
+    "refs": "weave.trace.refs_base",
+    "refs_internal": "weave.trace.refs_internal",
     "serialization_metadata": "weave.trace.serialization.serialization_metadata",
+    "trace_server_converter": "weave.trace.trace_server_converter",
     "tracing": "weave.trace.server_tracing",
 }
 
@@ -35,6 +39,19 @@ def __getattr__(name: str) -> Any:
     if name == "helpers":
         # Its only module moved, so nothing imports it; its own __getattr__ warns.
         return importlib.import_module(f"{__name__}.helpers")
+    if name == "errors":
+        # Nothing imports it any more. It warns when imported; warn here instead, so
+        # the warning points at the caller and not at importlib.
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", FutureWarning)
+            value = importlib.import_module(f"{__name__}.errors")
+        warnings.warn(
+            "weave.shared.errors is deprecated and will be removed in a future "
+            "release; import the error classes from weave.trace.errors instead.",
+            FutureWarning,
+            stacklevel=2,
+        )
+        return value
     if name in _MOVED_MODULES:
         new_path = _MOVED_MODULES[name]
         value = importlib.import_module(new_path)

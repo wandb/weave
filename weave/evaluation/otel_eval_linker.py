@@ -22,7 +22,7 @@ from weave.evaluation.eval import (
     _find_current_evaluate_call,
     _find_current_predict_and_score_call,
 )
-from weave.shared import constants
+from weave.trace import constants
 
 if TYPE_CHECKING:
     from opentelemetry.context import Context

@@ -15,8 +15,8 @@ from typing import TYPE_CHECKING, Any
 
 from httpx import HTTPStatusError as HTTPError
 
-from weave.shared.errors import DigestMismatchError
 from weave.shared.trace_server_interface import ProjectsInfoReq
+from weave.trace.errors import DigestMismatchError
 from weave.trace.settings import should_enable_client_side_digests
 
 if TYPE_CHECKING:

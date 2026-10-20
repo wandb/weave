@@ -19,17 +19,11 @@ from weave.chat.chat import Chat
 from weave.chat.inference_models import InferenceModels
 from weave.durability.wal_manager import WALManager
 from weave.shared.common_interface import AnnotationQueueItemsFilter, SortBy
-from weave.shared.constants import (
-    INVOKING_SPAN_ATTR_KEY,
-    MAX_OBJECT_NAME_LENGTH,
-)
-from weave.shared.errors import DigestMismatchError, InvalidExternalRef
 from weave.shared.interface.feedback_types import (
     RUNNABLE_FEEDBACK_TYPE_PREFIX,
     runnable_feedback_output_selector,
     runnable_feedback_runnable_ref_selector,
 )
-from weave.shared.trace_server_converter import universal_ext_to_int_ref_converter
 from weave.shared.trace_server_interface import (
     AliasesListReq,
     AnnotationQueueAddCallsReq,
@@ -102,9 +96,17 @@ from weave.trace.call import (
 )
 from weave.trace.casting import CallsFilterLike, QueryLike, SortByLike
 from weave.trace.concurrent.futures import FutureExecutor
-from weave.trace.constants import TRACE_CALL_EMOJI
+from weave.trace.constants import (
+    INVOKING_SPAN_ATTR_KEY,
+    MAX_OBJECT_NAME_LENGTH,
+    TRACE_CALL_EMOJI,
+)
 from weave.trace.context import call_context
-from weave.trace.errors import format_http_error
+from weave.trace.errors import (
+    DigestMismatchError,
+    InvalidExternalRef,
+    format_http_error,
+)
 from weave.trace.feedback import FeedbackQuery, RefFeedbackQuery
 from weave.trace.interface_query_builder import (
     exists_expr,
@@ -172,6 +174,7 @@ from weave.trace.settings import (
 )
 from weave.trace.table import Table
 from weave.trace.table_upload_chunking import ChunkingConfig, TableChunkManager
+from weave.trace.trace_server_converter import universal_ext_to_int_ref_converter
 from weave.trace.urls import redirect_call
 from weave.trace.util import log_once
 from weave.trace.vals import WeaveObject, WeaveTable, make_trace_obj

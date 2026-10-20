@@ -3,8 +3,8 @@ from typing import Annotated, Any, ClassVar, Literal
 
 from pydantic import BaseModel, BeforeValidator, ConfigDict, Field, model_validator
 
-from weave.shared.refs import ObjectRef
 from weave.trace.builtin_object_classes import base_object_def
+from weave.trace.refs_base import ObjectRef
 from weave.trace.serialization import serialization_metadata
 
 ResponseFormat = Literal["json_object", "json_schema", "text"]

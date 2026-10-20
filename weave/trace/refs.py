@@ -8,11 +8,11 @@ from typing import TYPE_CHECKING, Any, cast
 
 from typing_extensions import Self
 
-from weave.shared import refs, refs_internal
-from weave.shared.refs_internal import CallableProperty
+from weave.trace import refs_base, refs_internal
+from weave.trace.refs_internal import CallableProperty
 
 if TYPE_CHECKING:
-    from weave.shared.errors import ObjectDeletedError
+    from weave.trace.errors import ObjectDeletedError
 
 DICT_KEY_EDGE_NAME = refs_internal.DICT_KEY_EDGE_NAME
 LIST_INDEX_EDGE_NAME = refs_internal.LIST_INDEX_EDGE_NAME
@@ -181,7 +181,7 @@ class RefWithExtra(Ref):
 
 
 @dataclass(frozen=True)
-class ObjectRef(RefWithExtra, refs.ObjectRef):
+class ObjectRef(RefWithExtra, refs_base.ObjectRef):
     def as_param_dict(self) -> dict:
         return {
             "entity": self.entity,

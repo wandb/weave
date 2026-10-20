@@ -7,7 +7,16 @@ import warnings
 import pytest
 
 import weave.shared
-from weave.trace import otel_context_keys, otel_span_attrs, server_tracing
+from weave.trace import (
+    constants,
+    errors,
+    otel_context_keys,
+    otel_span_attrs,
+    refs_base,
+    refs_internal,
+    server_tracing,
+    trace_server_converter,
+)
 from weave.trace.builtin_object_classes import (
     agent_dashboard,
     alert_spec,
@@ -39,6 +48,10 @@ _MOVED_MODULES = {
     "weave.shared.digest": digest,
     "weave.shared.object_class_util": object_class_util,
     "weave.shared.serialization_metadata": serialization_metadata,
+    "weave.shared.constants": constants,
+    "weave.shared.refs": refs_base,
+    "weave.shared.refs_internal": refs_internal,
+    "weave.shared.trace_server_converter": trace_server_converter,
     "weave.shared.helpers.url_safety": url_safety,
     "weave.shared.interface.builtin_object_classes.agent_dashboard": agent_dashboard,
     "weave.shared.interface.builtin_object_classes.alert_spec": alert_spec,
@@ -207,3 +220,61 @@ def test_emptied_packages_star_import_the_moved_modules(
     assert _future_warnings(record) == [
         _expected_module_warning(f"{package}.{name}") for name in names
     ]
+
+
+# The error classes that moved from weave.shared.errors to weave.trace.errors.
+_MOVED_ERROR_CLASSES = [
+    "BadQueryParameterError",
+    "CallsCompleteModeRequired",
+    "DigestMismatchError",
+    "Error",
+    "ErrorCode",
+    "InsertTooLarge",
+    "InvalidExternalRef",
+    "InvalidFieldError",
+    "InvalidIdFormat",
+    "InvalidRequest",
+    "LightweightUpdateNotAllowedError",
+    "MissingLLMApiKeyError",
+    "NotFoundError",
+    "ObjectDeletedError",
+    "ObjectNameTypeCollision",
+    "ProjectNotFound",
+    "QueryEstimatedTimeoutExceededError",
+    "QueryIllegalTypeofArgumentError",
+    "QueryMemoryLimitExceededError",
+    "QueryNoCommonTypeError",
+    "QueryTimeoutExceededError",
+    "RefObjectsNotFoundError",
+    "RequestTooLarge",
+    "RunNotFound",
+]
+
+_SHARED_ERRORS_WARNING = (
+    "weave.shared.errors is deprecated and will be removed in a future release; "
+    "import the error classes from weave.trace.errors instead."
+)
+
+
+@pytest.mark.parametrize("access", ["import", "attribute"])
+def test_shared_errors_warns_once_and_reexports_the_moved_classes(
+    access: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.delitem(sys.modules, "weave.shared.errors", raising=False)
+    monkeypatch.delitem(vars(weave.shared), "errors", raising=False)
+    with warnings.catch_warnings(record=True) as record:
+        warnings.simplefilter("always")
+        if access == "import":
+            shared_errors = importlib.import_module("weave.shared.errors")
+        else:
+            shared_errors = weave.shared.errors
+
+    assert _future_warnings(record) == [_SHARED_ERRORS_WARNING]
+    if access == "attribute":
+        # The warning points at the caller, not at importlib.
+        future = [w for w in record if issubclass(w.category, FutureWarning)]
+        assert future[0].filename == __file__
+    assert all(
+        getattr(shared_errors, name) is getattr(errors, name)
+        for name in _MOVED_ERROR_CLASSES
+    )

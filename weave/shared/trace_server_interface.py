@@ -32,11 +32,6 @@ from weave.shared.common_interface import (
     BaseModelStrict,
     SortBy,
 )
-from weave.shared.constants import (
-    DEFAULT_CUSTOM_RUNTIME_MAX_TOKENS,
-    MAX_OBJECT_NAME_LENGTH,
-)
-from weave.shared.errors import InvalidRequest
 from weave.shared.interface.query import Query
 
 # Re-exported from service_interface for backwards compatibility.
@@ -46,6 +41,11 @@ from weave.shared.service_interface import (  # noqa: F401
     ProjectsInfoReq,
     ProjectsInfoRes,
 )
+from weave.trace.constants import (
+    DEFAULT_CUSTOM_RUNTIME_MAX_TOKENS,
+    MAX_OBJECT_NAME_LENGTH,
+)
+from weave.trace.errors import InvalidRequest
 
 DEFAULT_FEEDBACK_SAMPLE_LIMIT = 2000
 MAX_FEEDBACK_SAMPLE_LIMIT = 5000

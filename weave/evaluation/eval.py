@@ -32,8 +32,8 @@ from weave.flow.scorer import (
 from weave.flow.util import make_memorable_name, transpose
 from weave.integrations.integration_utilities import _uniquely_truncate_str
 from weave.object.obj import Object
-from weave.shared import constants
 from weave.shared.trace_server_interface import CallsFilter
+from weave.trace import constants
 from weave.trace.api import attributes
 from weave.trace.call import Call, CallsIter
 from weave.trace.context import call_context
