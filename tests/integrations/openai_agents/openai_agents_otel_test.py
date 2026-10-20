@@ -53,13 +53,13 @@ from weave.integrations.openai_agents.otel_processor import (
     WeaveOtelTracingProcessor,
     _iso_to_ns,
 )
+from weave.trace.constants import INVOKING_SPAN_ATTR_KEY
 from weave.trace.otel_op_linker import OpLinkSpanProcessor
 from weave.trace.otel_span_attrs import (
     PARENT_CALL_ID_SPAN_ATTR,
     PARENT_CALL_TRACE_ID_SPAN_ATTR,
 )
 from weave.trace.weave_client import WeaveClient
-from weave.trace_server.constants import INVOKING_SPAN_ATTR_KEY
 
 
 @pytest.fixture

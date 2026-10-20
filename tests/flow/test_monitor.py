@@ -4,7 +4,7 @@ from pydantic import ValidationError
 from weave.flow.monitor import Monitor
 from weave.scorers import ValidJSONScorer
 from weave.trace.api import publish
-from weave.trace_server.interface.query import Query
+from weave.trace.builtin_object_classes.query import Query
 
 
 def test_init_pass():

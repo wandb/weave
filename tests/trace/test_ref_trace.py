@@ -73,7 +73,7 @@ def test_leaderboard_column_accepts_str_of_ref():
     # LeaderboardColumn.evaluation_object_ref is typed as RefStr (= str), so
     # pydantic accepts any string. str(ref) now produces a URI, so a column
     # built from str(ref) matches calls keyed by ref.uri() downstream.
-    from weave.trace_server.interface.builtin_object_classes.leaderboard import (
+    from weave.trace.builtin_object_classes.leaderboard import (
         LeaderboardColumn,
     )
 

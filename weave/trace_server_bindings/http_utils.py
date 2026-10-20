@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING, Any, TypeVar
 
 import httpx
 import tenacity
-from pydantic import BaseModel, ValidationError
+from pydantic import BaseModel
 from typing_extensions import ParamSpec
 
 from weave.trace.errors import NotFoundError, ObjectDeletedError
@@ -13,7 +13,6 @@ from weave.trace_server_bindings.async_batch_processor import AsyncBatchProcesso
 from weave.utils.retry import _http_response, _is_retryable_exception, with_retry
 
 if TYPE_CHECKING:
-    from weave.shared import trace_server_interface as tsi
     from weave.trace_server_bindings.models import EndBatchItem, StartBatchItem
 
 logger = logging.getLogger(__name__)
@@ -94,9 +93,7 @@ def log_dropped_call_batch(
         logger.error("error: %s", e)
 
 
-def log_dropped_feedback_batch(
-    batch: "list[Mapping[str, Any] | tsi.FeedbackCreateReq]", e: Exception
-) -> None:
+def log_dropped_feedback_batch(batch: list[Mapping[str, Any]], e: Exception) -> None:
     """Log details about a dropped feedback batch for debugging purposes."""
     logger.error("Error sending batch of %s feedback events to server", len(batch))
     dropped_feedback_types = []
@@ -193,30 +190,7 @@ def process_batch_with_retry(
     if len(batch) == 0:
         return
 
-    try:
-        encoded_data = encode_batch_fn(batch)
-    except ValidationError as e:
-        # The hand-written binding builds its batch request model here, so an
-        # item that model rejects fails before anything is sent.
-        if len(batch) > 1:
-            logger.warning(
-                "%s batch of %s items failed validation, splitting and retrying",
-                batch_name.capitalize(),
-                len(batch),
-            )
-            _split_and_process_halves(
-                batch,
-                batch_name=batch_name,
-                remote_request_bytes_limit=remote_request_bytes_limit,
-                send_batch_fn=send_batch_fn,
-                processor_obj=processor_obj,
-                get_item_id_fn=get_item_id_fn,
-                log_dropped_fn=log_dropped_fn,
-                encode_batch_fn=encode_batch_fn,
-            )
-        else:
-            _log_dropped_batch(batch, e, batch_name, log_dropped_fn)
-        return
+    encoded_data = encode_batch_fn(batch)
     encoded_bytes = len(encoded_data)
 
     # Update target batch size dynamically based on actual data size

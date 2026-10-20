@@ -10,9 +10,8 @@ import weave
 from weave import Evaluation
 from weave.conversation import start_conversation
 from weave.evaluation.otel_eval_linker import EvalLinkSpanProcessor
+from weave.trace import constants
 from weave.trace.serialization.digest import compute_row_digest
-from weave.trace_server import constants
-from weave.trace_server import trace_server_interface as tsi
 
 
 @pytest.fixture
@@ -84,11 +83,11 @@ async def test_genai_span_ref_not_written_for_eval_spans(client, otel_setup):
     # eval traces by querying spans with the stamped eval columns.
     evaluate_call = next(iter(evaluation.evaluate.calls()))
     res = client.server.eval_results_query(
-        tsi.EvalResultsQueryReq(
-            project_id=client.project_id,
-            evaluation_call_ids=[evaluate_call.id],
-            include_predict_and_score_children=False,
-        )
+        {
+            "project_id": client.project_id,
+            "evaluation_call_ids": [evaluate_call.id],
+            "include_predict_and_score_children": False,
+        }
     )
 
     trial = res.rows[0].evaluations[0].trials[0]
@@ -126,11 +125,11 @@ async def test_multiple_genai_spans_get_eval_metadata_without_refs(client, otel_
 
     evaluate_call = next(iter(evaluation.evaluate.calls()))
     res = client.server.eval_results_query(
-        tsi.EvalResultsQueryReq(
-            project_id=client.project_id,
-            evaluation_call_ids=[evaluate_call.id],
-            include_predict_and_score_children=False,
-        )
+        {
+            "project_id": client.project_id,
+            "evaluation_call_ids": [evaluate_call.id],
+            "include_predict_and_score_children": False,
+        }
     )
 
     trial = res.rows[0].evaluations[0].trials[0]
@@ -193,11 +192,11 @@ async def test_non_genai_span_gets_eval_metadata_but_no_span_ref(client, otel_se
     # Eval results should NOT have a GenAISpanRef.
     evaluate_call = next(iter(evaluation.evaluate.calls()))
     res = client.server.eval_results_query(
-        tsi.EvalResultsQueryReq(
-            project_id=client.project_id,
-            evaluation_call_ids=[evaluate_call.id],
-            include_predict_and_score_children=False,
-        )
+        {
+            "project_id": client.project_id,
+            "evaluation_call_ids": [evaluate_call.id],
+            "include_predict_and_score_children": False,
+        }
     )
 
     trial = res.rows[0].evaluations[0].trials[0]
@@ -252,11 +251,11 @@ def test_imperative_eval_logger_stamps_explicit_eval_metadata(
 
     client.flush()
     res = client.server.eval_results_query(
-        tsi.EvalResultsQueryReq(
-            project_id=client.project_id,
-            evaluation_call_ids=[ev._evaluate_call.id],
-            include_predict_and_score_children=False,
-        )
+        {
+            "project_id": client.project_id,
+            "evaluation_call_ids": [ev._evaluate_call.id],
+            "include_predict_and_score_children": False,
+        }
     )
     trial = res.rows[0].evaluations[0].trials[0]
     assert trial.genai_span_ref is None
@@ -335,11 +334,11 @@ def test_imperative_eval_logger_stamps_conversation_sdk_spans(
         assert attrs[constants.EVAL_TRIAL_INDEX_SPAN_ATTR] == 0
 
     res = client.server.eval_results_query(
-        tsi.EvalResultsQueryReq(
-            project_id=client.project_id,
-            evaluation_call_ids=[ev._evaluate_call.id],
-            include_predict_and_score_children=False,
-        )
+        {
+            "project_id": client.project_id,
+            "evaluation_call_ids": [ev._evaluate_call.id],
+            "include_predict_and_score_children": False,
+        }
     )
     trial = res.rows[0].evaluations[0].trials[0]
     assert trial.genai_span_ref is None
@@ -363,11 +362,11 @@ def test_imperative_eval_logger_stamps_weave_operation_spans(client, otel_setup)
     assert attrs[constants.EVAL_KIND_SPAN_ATTR] == "agent"
 
     res = client.server.eval_results_query(
-        tsi.EvalResultsQueryReq(
-            project_id=client.project_id,
-            evaluation_call_ids=[ev._evaluate_call.id],
-            include_predict_and_score_children=False,
-        )
+        {
+            "project_id": client.project_id,
+            "evaluation_call_ids": [ev._evaluate_call.id],
+            "include_predict_and_score_children": False,
+        }
     )
     trial = res.rows[0].evaluations[0].trials[0]
     assert trial.genai_span_ref is None

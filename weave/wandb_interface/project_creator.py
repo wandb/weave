@@ -118,7 +118,7 @@ def _raise_project_access_error(
 def _ensure_project_exists(entity_name: str, project_name: str) -> dict[str, str]:
     """Ensures that a W&B project exists by trying to access it, returns the project_name,
     which is not guaranteed to be the same if the provided project_name contains invalid
-    characters. Adheres to trace_server_interface.EnsureProjectExistsRes.
+    characters. Adheres to EnsureProjectExistsRes in trace_server_bindings.models.
     """
     wandb_logging_disabled()
     api = wandb.Api()

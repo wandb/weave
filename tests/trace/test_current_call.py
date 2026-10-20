@@ -1,10 +1,10 @@
 import pytest
 
 import weave
+from weave.trace.constants import TraceStatus
 from weave.trace.context import call_context
 from weave.trace.serialization.serialize import to_json
 from weave.trace.weave_client import RESERVED_SUMMARY_STATUS_COUNTS_KEY
-from weave.trace_server import trace_server_interface as tsi
 
 
 def test_call_attributes_read_only(client):
@@ -35,7 +35,7 @@ def test_call_summary_editable(client):
     summary = calls[0].summary
     assert summary["foo"] == 1
     assert summary["bar"] == 2
-    assert summary[RESERVED_SUMMARY_STATUS_COUNTS_KEY][tsi.TraceStatus.SUCCESS] == 1
+    assert summary[RESERVED_SUMMARY_STATUS_COUNTS_KEY][TraceStatus.SUCCESS] == 1
 
 
 def test_call_attributes_update_and_delete_forbidden(client):
@@ -69,7 +69,7 @@ def test_call_summary_deep_merge(client):
     assert len(calls) == 1
     summary = calls[0].summary
     assert summary["nested"]["foo"] == 1
-    assert summary[RESERVED_SUMMARY_STATUS_COUNTS_KEY][tsi.TraceStatus.SUCCESS] == 1
+    assert summary[RESERVED_SUMMARY_STATUS_COUNTS_KEY][TraceStatus.SUCCESS] == 1
 
 
 def test_set_view_inside_op(client):

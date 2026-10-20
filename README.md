@@ -176,6 +176,6 @@ Interested in pulling back the hood or contributing? Awesome, before you dive in
 
 We're in the process of 🧹 cleaning up 🧹. This codebase contains a large amount code for the "Weave engine" and "Weave boards", which we've put on pause as we focus on Tracing and Evaluations.
 
-The Weave Tracing code is mostly in `weave/trace`. The trace server it talks to is developed in wandb/core; `weave/trace_server` only keeps deprecated import aliases for `weave.shared`.
+The Weave Tracing code is mostly in `weave/trace`. The trace server it talks to is developed in wandb/core.
 
 The Weave Evaluations code is mostly in `weave/flow`.

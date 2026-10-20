@@ -15,22 +15,52 @@ from __future__ import annotations
 import datetime
 import json
 
+import pydantic
 import pytest
 
+from weave.trace.builtin_object_classes.query import Query
+from weave.trace.constants import (
+    DEFAULT_AGENT_CUSTOM_ATTR_SCHEMA_LIMIT,
+    DEFAULT_SEARCH_LIMIT,
+)
 from weave.trace.weave_client import WeaveClient
-from weave.trace_server.interface.query import Query
-from weave.trace_server.trace_server_interface import agent_types
+from weave.vendor.weave_server_sdk.types import (
+    AgentQueryResponse,
+    AgentSearchResponse,
+    AgentTraceChatRes,
+)
+from weave.vendor.weave_server_sdk.types.agent_query_response import Agent
+from weave.vendor.weave_server_sdk.types.agents import (
+    AgentVersionQueryResponse,
+    ConversationChatResponse,
+    SpanCustomAttrsSchemaResponse,
+    SpanQueryResponse,
+    SpanStatsResponse,
+)
+from weave.vendor.weave_server_sdk.types.agents.agent_version_query_response import (
+    Version,
+)
+from weave.vendor.weave_server_sdk.types.agents.span_query_response import Span
 
 AGENT_NAME_EXPR = {"$eq": [{"$getField": "agent_name"}, {"$literal": "my-agent"}]}
 GT_EXPR = {"$gt": [{"$getField": "input_tokens"}, {"$literal": 100}]}
 
-SORT_BY = [agent_types.AgentSortBy(field="last_seen", direction="desc")]
-METRIC = agent_types.AgentSpanStatsMetricSpec(
-    alias="input_tokens",
-    value_type="number",
-    value=agent_types.AgentSpanValueRef(source="field", key="usage.input_tokens"),
-    aggregations=["sum"],
-)
+SORT_BY = [{"field": "last_seen", "direction": "desc"}]
+
+
+class SortByModel(pydantic.BaseModel):
+    """A caller's own sort model; the client sends its dump."""
+
+    field: str
+    direction: str = "desc"
+
+
+METRIC = {
+    "alias": "input_tokens",
+    "value_type": "number",
+    "value": {"source": "field", "key": "usage.input_tokens"},
+    "aggregations": ["sum"],
+}
 START = datetime.datetime(2024, 1, 1, tzinfo=datetime.timezone.utc)
 
 
@@ -44,15 +74,16 @@ class FakeAgentReadServer:
 
     def __init__(self) -> None:
         self.requests: dict = {}
-        self.turn_res = agent_types.AgentTraceChatRes(trace_id="trace-123")
-        self.turns_res = agent_types.AgentConversationChatRes(
+        # The tests only check that the client returns these, so no field is required.
+        self.turn_res = AgentTraceChatRes.model_construct(trace_id="trace-123")
+        self.turns_res = ConversationChatResponse.model_construct(
             conversation_id="conv-123"
         )
-        self.stats_res = agent_types.AgentSpanStatsRes(
+        self.stats_res = SpanStatsResponse.model_construct(
             start=START, end=START + datetime.timedelta(hours=1), timezone="UTC"
         )
-        self.schema_res = agent_types.AgentCustomAttrsSchemaRes()
-        self.search_res = agent_types.AgentSearchRes(results=[])
+        self.schema_res = SpanCustomAttrsSchemaResponse.model_construct()
+        self.search_res = AgentSearchResponse.model_construct(results=[])
 
     def agent_traces_chat(self, req):
         self.requests["turn"] = req
@@ -120,7 +151,7 @@ def _make_client(server: FakeAgentReadServer | FakePagingAgentServer) -> WeaveCl
             "stats_res",
             {
                 "start": START,
-                "metrics": [METRIC.model_dump(by_alias=True)],
+                "metrics": [METRIC],
                 "granularity": 3600,
                 "timezone": "UTC",
             },
@@ -139,7 +170,7 @@ def _make_client(server: FakeAgentReadServer | FakePagingAgentServer) -> WeaveCl
             {},
             "schema",
             "schema_res",
-            {"limit": agent_types.DEFAULT_AGENT_CUSTOM_ATTR_SCHEMA_LIMIT, "offset": 0},
+            {"limit": DEFAULT_AGENT_CUSTOM_ATTR_SCHEMA_LIMIT, "offset": 0},
             id="get_agent_custom_attributes_defaults",
         ),
         pytest.param(
@@ -155,7 +186,7 @@ def _make_client(server: FakeAgentReadServer | FakePagingAgentServer) -> WeaveCl
             {},
             "search",
             "search_res",
-            {"query": "", "limit": agent_types.DEFAULT_SEARCH_LIMIT, "offset": 0},
+            {"query": "", "limit": DEFAULT_SEARCH_LIMIT, "offset": 0},
             id="search_agents_defaults",
         ),
     ],
@@ -178,8 +209,8 @@ def test_method_builds_request(method, kwargs, key, res_attr, expected):
 # ---------------------------------------------------------------------------
 
 
-def _agent(i: int) -> agent_types.AgentSchema:
-    return agent_types.AgentSchema(
+def _agent(i: int) -> Agent:
+    return Agent(
         project_id="entity/project",
         agent_name=f"agent-{i}",
         invocation_count=0,
@@ -193,8 +224,8 @@ def _agent(i: int) -> agent_types.AgentSchema:
     )
 
 
-def _agent_version(i: int) -> agent_types.AgentVersionSchema:
-    return agent_types.AgentVersionSchema(
+def _agent_version(i: int) -> Version:
+    return Version(
         project_id="entity/project",
         agent_name="agent-0",
         agent_version=f"v{i}",
@@ -209,8 +240,9 @@ def _agent_version(i: int) -> agent_types.AgentVersionSchema:
     )
 
 
-def _agent_span(i: int) -> agent_types.AgentSpanSchema:
-    return agent_types.AgentSpanSchema(
+def _agent_span(i: int) -> Span:
+    # The client reads only the ids, so the span's other fields are left out.
+    return Span.model_construct(
         project_id="entity/project",
         trace_id="trace-0",
         span_id=f"span-{i}",
@@ -237,23 +269,19 @@ class FakePagingAgentServer:
         self.requests["agents"] = req
         self.fetches.append((req["offset"], req["limit"]))
         page = self._agents[req["offset"] : req["offset"] + req["limit"]]
-        return agent_types.AgentsQueryRes(agents=page, total_count=len(self._agents))
+        return AgentQueryResponse(agents=page, total_count=len(self._agents))
 
     def agent_versions_query(self, req):
         self.requests["versions"] = req
         self.fetches.append((req["offset"], req["limit"]))
         page = self._versions[req["offset"] : req["offset"] + req["limit"]]
-        return agent_types.AgentVersionsQueryRes(
-            versions=page, total_count=len(self._versions)
-        )
+        return AgentVersionQueryResponse(versions=page, total_count=len(self._versions))
 
     def agent_spans_query(self, req):
         self.requests["spans"] = req
         self.fetches.append((req["offset"], req["limit"]))
         page = self._spans[req["offset"] : req["offset"] + req["limit"]]
-        return agent_types.AgentSpansQueryRes(
-            spans=page, groups=[], total_count=len(self._spans)
-        )
+        return SpanQueryResponse(spans=page, groups=[], total_count=len(self._spans))
 
 
 @pytest.mark.parametrize(
@@ -326,7 +354,7 @@ def test_get_agents_respects_offset():
             "get_agents",
             "agents",
             _agent,
-            {"agent_name": "agent-0", "sort_by": SORT_BY},
+            {"agent_name": "agent-0", "sort_by": [SortByModel(field="last_seen")]},
             {
                 "filters": {"agent_name": "agent-0"},
                 "sort_by": [{"field": "last_seen", "direction": "desc"}],

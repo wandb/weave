@@ -15,9 +15,8 @@ class CallStore:
     Calls are stored in a per-project dict keyed by call id; start/end events
     for the same call_id are merged on `add_end()`. The captured shape mirrors
     the production CallSchema closely enough for assertion purposes — the SDK
-    sends real `tsi.StartedCallSchemaForInsert` / `tsi.EndedCallSchemaForInsert`
-    payloads via the production wrapper types, and we project the relevant
-    fields into a single dict per call.
+    sends call start and end payloads in the shape the generated client's
+    request types describe, and we merge them into a single dict per call.
     """
 
     def __init__(self) -> None:

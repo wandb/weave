@@ -10,13 +10,6 @@ from test_cases import cases
 
 import weave
 from weave.trace.refs import ObjectRef
-from weave.trace_server.trace_server_interface import (
-    CallReadReq,
-    FileContentReadReq,
-    FileCreateReq,
-    ObjCreateReq,
-    ObjReadReq,
-)
 from weave.type_handlers.Markdown import markdown
 from weave.utils.project_id import to_project_id
 
@@ -121,11 +114,11 @@ def test_serialization_correctness(
                     break
             else:
                 possible_obj = client.server.obj_read(
-                    ObjReadReq(
-                        project_id=project_id,
-                        object_id=name,
-                        digest=digest,
-                    )
+                    {
+                        "project_id": project_id,
+                        "object_id": name,
+                        "digest": digest,
+                    }
                 )
                 possible_val = possible_obj.obj.val
                 exp_obj_dict = {
@@ -144,10 +137,10 @@ def test_serialization_correctness(
                     break
             else:
                 possible_file = client.server.file_content_read(
-                    FileContentReadReq(
-                        project_id=project_id,
-                        digest=found_file,
-                    )
+                    {
+                        "project_id": project_id,
+                        "digest": found_file,
+                    }
                 )
                 possible_content = possible_file.content
                 print(f"""Possible file:
@@ -170,13 +163,13 @@ def test_serialization_correctness(
         if case.exp_objects:
             for obj in case.exp_objects:
                 obj_res = client.server.obj_create(
-                    ObjCreateReq(
-                        obj={
+                    {
+                        "obj": {
                             "project_id": project_id,
                             "object_id": obj["object_id"],
                             "val": obj["exp_val"],
                         }
-                    )
+                    }
                 )
 
                 # Assert that the generated digest matches the one provided in the test case
@@ -188,11 +181,10 @@ def test_serialization_correctness(
         if case.exp_files:
             for file in case.exp_files:
                 file_res = client.server.file_create(
-                    FileCreateReq(
-                        project_id=project_id,
-                        name="name",
-                        content=file["exp_content"],
-                    )
+                    {
+                        "project_id": project_id,
+                        "file": ("name", file["exp_content"]),
+                    }
                 )
                 assert file_res.digest == file["digest"]
 
@@ -215,11 +207,11 @@ def test_serialization_correctness(
 
         # Verify the correct JSON is stored in the database.
         res = client.server.obj_read(
-            ObjReadReq(
-                project_id=project_id,
-                object_id=published_obj.name,
-                digest=published_obj.digest,
-            )
+            {
+                "project_id": project_id,
+                "object_id": published_obj.name,
+                "digest": published_obj.digest,
+            }
         )
         val = res.obj.val
         print(f"Found object json:\n{json.dumps(val, indent=2)}")
@@ -229,21 +221,21 @@ def test_serialization_correctness(
         if case.exp_objects:
             for obj in case.exp_objects:
                 obj_res = client.server.obj_read(
-                    ObjReadReq(
-                        project_id=project_id,
-                        object_id=obj["object_id"],
-                        digest=obj["digest"],
-                    )
+                    {
+                        "project_id": project_id,
+                        "object_id": obj["object_id"],
+                        "digest": obj["digest"],
+                    }
                 )
                 assert obj_res.obj.val == obj["exp_val"]
 
         if case.exp_files:
             for file in case.exp_files:
                 file_res = client.server.file_content_read(
-                    FileContentReadReq(
-                        project_id=project_id,
-                        digest=file["digest"],
-                    )
+                    {
+                        "project_id": project_id,
+                        "digest": file["digest"],
+                    }
                 )
                 assert file_res.content == file["exp_content"]
 
@@ -277,10 +269,10 @@ def test_serialization_correctness(
 
         # Verify the correct JSON is stored in the database
         res = client.server.call_read(
-            CallReadReq(
-                project_id=project_id,
-                id=call_id,
-            )
+            {
+                "project_id": project_id,
+                "id": call_id,
+            }
         )
 
         # If we are not inline, then the value is expected to be a Ref
@@ -288,11 +280,11 @@ def test_serialization_correctness(
         if not case.inline_call_param and not is_legacy:
             ref = ObjectRef.parse_uri(res.call.inputs["val"])
             res = client.server.obj_read(
-                ObjReadReq(
-                    project_id=project_id,
-                    object_id=ref.name,
-                    digest=ref.digest,
-                )
+                {
+                    "project_id": project_id,
+                    "object_id": ref.name,
+                    "digest": ref.digest,
+                }
             )
             val = res.obj.val
         else:

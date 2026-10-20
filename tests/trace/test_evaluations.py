@@ -16,19 +16,19 @@ from weave import Evaluation, Model
 from weave.evaluation.eval_imperative import EvaluationLogger
 from weave.trace.ref_util import get_ref
 from weave.trace.refs import CallRef
-from weave.trace_server import trace_server_interface as tsi
+from weave.vendor.weave_server_sdk.types.call_read_response import Call
 
 
 def flatten_calls(
-    calls: list[tsi.CallSchema], parent_id: str | None = None, depth: int = 0
-) -> list[tuple[tsi.CallSchema, int]]:
+    calls: list[Call], parent_id: str | None = None, depth: int = 0
+) -> list[tuple[Call, int]]:
     """Flatten calls is a technique we use in the integration tests to assert the correct
     ordering of calls. This is used to assert that the calls are in the correct order
     as well as nested in the correct way. The returned list is the ordered list of calls
     with the depth of each call.
     """
 
-    def children_of_parent_id(id: str | None) -> list[tsi.CallSchema]:
+    def children_of_parent_id(id: str | None) -> list[Call]:
         return [call for call in calls if call.parent_id == id]
 
     children = children_of_parent_id(parent_id)
@@ -41,10 +41,10 @@ def flatten_calls(
 
 
 def normalize_scorers_in_flattened(
-    flattened: list[tuple[tsi.CallSchema, int]],
+    flattened: list[tuple[Call, int]],
     scorer_block_start_ndxs: list[int],
     scorer_order: list[str],
-) -> list[tuple[tsi.CallSchema, int]]:
+) -> list[tuple[Call, int]]:
     num_scorer_calls = len(scorer_order)
     res = [*flattened]
     for start_ndx in scorer_block_start_ndxs:
@@ -102,9 +102,9 @@ async def test_basic_evaluation(client):
     assert res["match_score2"] == {"match": {"true_count": 0, "true_fraction": 0.0}}
 
     calls = client.server.calls_query(
-        tsi.CallsQueryReq(
-            project_id=client.project_id,
-        )
+        {
+            "project_id": client.project_id,
+        }
     )
 
     flattened_calls = flatten_calls(calls.calls)
@@ -171,10 +171,10 @@ async def test_basic_evaluation(client):
         )
 
     objs = client.server.objs_query(
-        tsi.ObjQueryReq(
-            project_id=client.project_id,
-            filter=tsi.ObjectVersionFilter(base_object_classes=["Model"]),
-        )
+        {
+            "project_id": client.project_id,
+            "filter": {"base_object_classes": ["Model"]},
+        }
     )
     assert len(objs.objs) == 1
     model_obj = objs.objs[0]
@@ -215,9 +215,7 @@ async def test_declarative_eval_marks_child_calls_with_eval_meta(client):
     evaluation = Evaluation(dataset=examples, scorers=[match_score], trials=2)
     await evaluation.evaluate(model)
 
-    calls = client.server.calls_query(
-        tsi.CallsQueryReq(project_id=client.project_id)
-    ).calls
+    calls = client.server.calls_query({"project_id": client.project_id}).calls
 
     by_op: dict[str, list] = defaultdict(list)
     for c in calls:
@@ -263,9 +261,7 @@ async def test_declarative_eval_meta_merges_with_existing(client):
     with weave.attributes({"_weave_eval_meta": {"evaluate_model_worker": True}}):
         await evaluation.evaluate(model)
 
-    calls = client.server.calls_query(
-        tsi.CallsQueryReq(project_id=client.project_id)
-    ).calls
+    calls = client.server.calls_query({"project_id": client.project_id}).calls
 
     by_op: dict[str, list] = defaultdict(list)
     for c in calls:
@@ -457,10 +453,10 @@ async def test_evaluation_data_topology(client):
     await evaluation.evaluate(model2)
 
     calls = client.server.calls_query(
-        tsi.CallsQueryReq(
-            project_id=client.project_id,
-            include_feedback=True,
-        )
+        {
+            "project_id": client.project_id,
+            "include_feedback": True,
+        }
     )
     flattened = flatten_calls(calls.calls)
     assert len(flattened) == 50
@@ -785,9 +781,9 @@ async def test_eval_supports_non_op_funcs(weave_active):
     # assert res["function_score"] == {"correct": {"true_count": 0, "true_fraction": 0.0}}
 
     # calls = client.server.calls_query(
-    #     tsi.CallsQueryReq(
-    #         project_id=client.project_id,
-    #     )
+    #     {
+    #         "project_id": client.project_id,
+    #     }
     # )
     # assert len(calls.calls) == 4
     # shouldBeEvalRef = calls.calls[0].inputs["self"]
@@ -1107,11 +1103,11 @@ async def test_feedback_is_correctly_linked(client):
     )
     res = await eval.evaluate(predict)
     calls = client.server.calls_query(
-        tsi.CallsQueryReq(
-            project_id=client.project_id,
-            include_feedback=True,
-            filter=tsi.CallsFilter(op_names=[get_ref(predict).uri]),
-        )
+        {
+            "project_id": client.project_id,
+            "include_feedback": True,
+            "filter": {"op_names": [get_ref(predict).uri]},
+        }
     )
     assert len(calls.calls) == 1
     assert calls.calls[0].summary["weave"]["feedback"]
@@ -1149,11 +1145,11 @@ async def test_feedback_is_correctly_linked_with_scorer_subclass(client):
     )
     res = await eval.evaluate(predict)
     calls = client.server.calls_query(
-        tsi.CallsQueryReq(
-            project_id=client.project_id,
-            include_feedback=True,
-            filter=tsi.CallsFilter(op_names=[get_ref(predict).uri]),
-        )
+        {
+            "project_id": client.project_id,
+            "include_feedback": True,
+            "filter": {"op_names": [get_ref(predict).uri]},
+        }
     )
     assert len(calls.calls) == 1
     assert calls.calls[0].summary["weave"]["feedback"]
@@ -1204,7 +1200,7 @@ async def test_evaluation_with_custom_name(client):
 
     await evaluation.evaluate(model)
 
-    calls = list(client.get_calls(filter=tsi.CallsFilter(trace_roots_only=True)))
+    calls = list(client.get_calls(filter={"trace_roots_only": True}))
     assert len(calls) == 1
 
     call = calls[0]
@@ -1316,9 +1312,7 @@ async def test_declarative_eval_sets_is_eval_on_call_ends(client):
         plain_op(1)
         client.flush()
 
-    calls = client.server.calls_query(
-        tsi.CallsQueryReq(project_id=client.project_id)
-    ).calls
+    calls = client.server.calls_query({"project_id": client.project_id}).calls
     op_by_id = {c.id: op_name_from_ref(c.op_name) for c in calls}
 
     is_eval_by_op: dict[str, list] = defaultdict(list)
@@ -1346,9 +1340,7 @@ def test_imperative_eval_sets_is_eval_on_call_ends(client):
         ev.log_summary({"avg_score": 1.0})
         client.flush()
 
-    calls = client.server.calls_query(
-        tsi.CallsQueryReq(project_id=client.project_id)
-    ).calls
+    calls = client.server.calls_query({"project_id": client.project_id}).calls
     root_id = next(
         c.id for c in calls if op_name_from_ref(c.op_name) == "Evaluation.evaluate"
     )

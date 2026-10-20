@@ -1,6 +1,5 @@
 """The top-level functions and classes for working with Weave."""
 
-import importlib
 import sys
 import warnings
 from typing import Any
@@ -198,7 +197,4 @@ def __getattr__(name: str) -> Any:
         from weave.trace.otel_op_linker import OpLinkSpanProcessor
 
         return OpLinkSpanProcessor
-    if name == "shared":
-        # `import weave` no longer loads it; its deprecated modules warn when loaded.
-        return importlib.import_module("weave.shared")
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

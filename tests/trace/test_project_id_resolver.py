@@ -8,8 +8,8 @@ from unittest.mock import MagicMock
 
 import pytest
 
+from weave.trace.errors import DigestMismatchError
 from weave.trace.project_id_resolver import ProjectIdResolver, ResolverDisabledError
-from weave.trace_server.errors import DigestMismatchError
 
 
 @pytest.fixture(autouse=True)

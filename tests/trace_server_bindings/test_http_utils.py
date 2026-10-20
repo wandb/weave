@@ -6,7 +6,7 @@ from unittest.mock import Mock
 import httpx
 import pytest
 
-from weave.trace_server.errors import NotFoundError, ObjectDeletedError
+from weave.trace.errors import NotFoundError, ObjectDeletedError
 from weave.trace_server_bindings import http_utils
 from weave.trace_server_bindings.http_utils import (
     CallsCompleteModeRequired,
@@ -29,7 +29,7 @@ def _make_response(status_code: int, body: dict | None) -> httpx.Response:
 def _make_httpx_error(
     status_code: int, body: dict | None = None
 ) -> httpx.HTTPStatusError:
-    """Build the error the hand-written client raises for a non-2xx response."""
+    """Build the httpx error for a non-2xx response."""
     response = _make_response(status_code, body)
     return httpx.HTTPStatusError(
         str(status_code), request=response.request, response=response

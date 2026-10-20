@@ -113,12 +113,6 @@ CATEGORIES = [
         matcher=lambda path: "test" in path,
     ),
     CategoryRule(
-        name="Server",
-        column_header="Server",
-        emoji="🤖",
-        matcher=re.compile(r"^weave/trace_server/"),
-    ),
-    CategoryRule(
         name="TypeScript SDK",
         column_header="TS",
         emoji="📦",
@@ -128,9 +122,7 @@ CATEGORIES = [
         name="Python SDK",
         column_header="Py",
         emoji="🐍",
-        matcher=lambda path: (
-            path.startswith("weave/") and not path.startswith("weave/trace_server/")
-        ),
+        matcher=lambda path: path.startswith("weave/"),
     ),
 ]
 

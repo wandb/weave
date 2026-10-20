@@ -1,8 +1,6 @@
-"""Tests for RemoteHTTPTraceServer and StainlessRemoteHTTPTraceServer bindings.
+"""Tests for the StainlessRemoteHTTPTraceServer binding.
 
-These tests verify the batching, splitting, and retry behavior of both server
-implementations. The --remote-http-trace-server flag controls which implementation
-is tested (default: "remote", or "stainless").
+These tests verify the batching, splitting, and retry behavior of the binding.
 """
 
 from __future__ import annotations
@@ -18,36 +16,28 @@ from unittest.mock import MagicMock
 import httpx
 import pytest
 import requests
+from pydantic_core import to_json
 
 from tests.trace_server_bindings.conftest import (
     generate_call_start_end_pair,
     generate_end,
     generate_start,
 )
-from weave.trace_server import common_interface
-from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server_bindings.call_batch_processor import CallBatchProcessor
 from weave.trace_server_bindings.models import (
     CompleteBatchItem,
     EndBatchItem,
     StartBatchItem,
 )
-from weave.trace_server_bindings.remote_http_trace_server import (
-    RemoteHTTPTraceServer,
+from weave.trace_server_bindings.stainless_remote_http_trace_server import (
+    StainlessRemoteHTTPTraceServer,
 )
-from weave.utils import http_requests
 
 
 def _upsert_batch_json(batch: list[StartBatchItem | EndBatchItem]) -> str:
-    """The /call/upsert_batch body for `batch`, as the request models dump it."""
-    return tsi.CallCreateBatchReq(
-        batch=[
-            tsi.CallBatchStartMode(req=item.req)
-            if isinstance(item, StartBatchItem)
-            else tsi.CallBatchEndMode(req=item.req)
-            for item in batch
-        ]
-    ).model_dump_json()
+    """The /call/upsert_batch body for `batch`, as the binding encodes it."""
+    body = {"batch": [{"mode": item.mode, "req": item.req} for item in batch]}
+    return to_json(body, inf_nan_mode="null").decode()
 
 
 @pytest.mark.parametrize("server", ["small_limit"], indirect=True)
@@ -111,10 +101,10 @@ def test_oversized_item_will_log_warning_and_send(server, caplog):
 
     # Create a single item with a very large payload
     start = generate_start()
-    start.attributes = {
+    start["attributes"] = {
         "large_data": "x" * server.remote_request_bytes_limit,
     }
-    batch = [StartBatchItem(req=tsi.CallStartReq(start=start))]
+    batch = [StartBatchItem(req={"start": start})]
 
     # Verify the single item is actually large enough to trigger the error message
     data = _upsert_batch_json(batch)
@@ -142,9 +132,9 @@ def test_multi_level_recursive_splitting(server):
         start = generate_start()
         end = generate_end()
         if i % 5 == 0:
-            start.attributes = {"data": "x" * 500}
-        batch.append(StartBatchItem(req=tsi.CallStartReq(start=start)))
-        batch.append(EndBatchItem(req=tsi.CallEndReq(end=end)))
+            start["attributes"] = {"data": "x" * 500}
+        batch.append(StartBatchItem(req={"start": start}))
+        batch.append(EndBatchItem(req={"end": end}))
 
     # Process the batch
     server._flush_calls(batch)
@@ -203,15 +193,15 @@ def test_non_uniform_batch_items(server):
 
     # Add one medium item
     start = generate_start()
-    start.attributes = {"medium_data": "y" * 300}
-    batch.append(StartBatchItem(req=tsi.CallStartReq(start=start)))
+    start["attributes"] = {"medium_data": "y" * 300}
+    batch.append(StartBatchItem(req={"start": start}))
 
     # Add one large item (but still under the limit)
     start = generate_start()
-    start.attributes = {
+    start["attributes"] = {
         "large_data": "z" * (server.remote_request_bytes_limit // 2),
     }
-    batch.append(StartBatchItem(req=tsi.CallStartReq(start=start)))
+    batch.append(StartBatchItem(req={"start": start}))
 
     # Process the batch
     server._flush_calls(batch)
@@ -232,12 +222,11 @@ def test_non_uniform_batch_items(server):
 @pytest.mark.disable_logging_error_check
 @pytest.mark.parametrize("server", ["normal"], indirect=True)
 @pytest.mark.parametrize("log_collector", ["warning"], indirect=True)
-def test_drop_data_when_queue_is_full(server, server_class, log_collector):
+def test_drop_data_when_queue_is_full(server, log_collector):
     """Test that items are dropped when the queue is full."""
-    # For StainlessRemoteHTTPTraceServer, set _dropped_item_count to 0
-    # so the next drop (1st) will log (logging happens at 1, 1001, 2001, etc.)
-    if server_class.__name__ == "StainlessRemoteHTTPTraceServer":
-        server.call_processor._dropped_item_count = 0
+    # Set _dropped_item_count to 0 so the next drop (1st) will log
+    # (logging happens at 1, 1001, 2001, etc.)
+    server.call_processor._dropped_item_count = 0
 
     # Replace the real queue with a mock that raises Full when put_nowait is called
     mock_queue = MagicMock()
@@ -264,7 +253,7 @@ def test_drop_data_when_queue_is_full(server, server_class, log_collector):
 
 @pytest.mark.disable_logging_error_check
 @pytest.mark.parametrize("server", ["normal"], indirect=True)
-def test_requeue_after_max_retries(server, server_class, caplog):
+def test_requeue_after_max_retries(server, caplog):
     """Test that batches are requeued after max retries."""
     caplog.set_level(logging.WARNING)
 
@@ -274,15 +263,9 @@ def test_requeue_after_max_retries(server, server_class, caplog):
     # Mock enqueue to verify it gets called, and _send_batch_to_server to throw an exception
     server.call_processor.enqueue = MagicMock()
 
-    # Use the appropriate exception type for each implementation
-    if server_class == RemoteHTTPTraceServer:
-        server._send_batch_to_server = MagicMock(
-            side_effect=httpx.ConnectError("Connection error")
-        )
-    else:
-        server._send_batch_to_server = MagicMock(
-            side_effect=requests.ConnectionError("Connection error")
-        )
+    server._send_batch_to_server = MagicMock(
+        side_effect=requests.ConnectionError("Connection error")
+    )
 
     # Create a batch
     start, end = generate_call_start_end_pair()
@@ -299,12 +282,9 @@ def test_requeue_after_max_retries(server, server_class, caplog):
 
 
 @pytest.mark.parametrize("server", ["normal"], indirect=True)
-def test_mixed_batch_encodes_without_extra_field_warnings(server, caplog, monkeypatch):
+def test_mixed_batch_encodes_without_extra_field_warnings(server, caplog):
     """Encoding a mixed batch must not try an end as a start."""
     start, end = generate_call_start_end_pair()
-    # The warning is emitted once per process, so an earlier test in the same
-    # session would otherwise make this assertion vacuous.
-    monkeypatch.setattr(common_interface, "_warned_field_sets", set())
 
     caplog.set_level(logging.WARNING)
     server._flush_calls([StartBatchItem(req=start), EndBatchItem(req=end)])
@@ -320,9 +300,8 @@ def test_mixed_batch_encodes_without_extra_field_warnings(server, caplog, monkey
 # A batch rejected because of one item in it
 #
 # The client sends call writes as dicts, so a field of the wrong type is only
-# caught by the server's request model (a 422 for the whole batch) or, in the
-# hand-written binding, by the batch request model it builds while encoding.
-# Either way only that item may be lost.
+# caught by the server's request model, a 422 for the whole batch. Only that
+# item may be lost.
 # =============================================================================
 
 PROJECT = "entity/project"
@@ -331,9 +310,9 @@ BatchItem = StartBatchItem | EndBatchItem | CompleteBatchItem
 
 def _call_items(server: Any, call_id: str, thread_id: Any = None) -> list[BatchItem]:
     """The dict batch items the client's processor sends for one finished call."""
-    start = StartBatchItem(req={"start": generate_start(call_id, PROJECT).model_dump()})
+    start = StartBatchItem(req={"start": generate_start(call_id, PROJECT)})
     start.req["start"]["thread_id"] = thread_id
-    end = EndBatchItem(req={"end": generate_end(call_id, PROJECT).model_dump()})
+    end = EndBatchItem(req={"end": generate_end(call_id, PROJECT)})
     if isinstance(server.call_processor, CallBatchProcessor):
         return [server.call_processor._create_complete(start, end)]
     return [start, end]
@@ -364,7 +343,6 @@ def _rejects_non_string_thread_id(request: httpx.Request) -> int | None:
 
 @contextmanager
 def _server_over_transport(
-    server_class: type,
     path: str,
     reject: Callable[[httpx.Request], int | None],
     monkeypatch: pytest.MonkeyPatch,
@@ -388,13 +366,8 @@ def _server_over_transport(
         return httpx.Response(200, json={}, request=request)
 
     http_client = httpx.Client(transport=httpx.MockTransport(handle))
-    server = server_class("http://example.com", should_batch=True)
-    if server_class is RemoteHTTPTraceServer:
-        monkeypatch.setattr(http_requests, "_get_client", lambda: http_client)
-    else:
-        server._stainless_client = server._stainless_client.copy(
-            http_client=http_client
-        )
+    server = StainlessRemoteHTTPTraceServer("http://example.com", should_batch=True)
+    server._stainless_client = server._stainless_client.copy(http_client=http_client)
     try:
         yield server, requests_seen, stored
     finally:
@@ -421,11 +394,13 @@ def _dropped_batch_sizes(caplog: pytest.LogCaptureFixture) -> list[int]:
 
 @pytest.mark.disable_logging_error_check
 @pytest.mark.parametrize("path", ["calls_complete", "upsert_batch"])
-def test_invalid_item_is_dropped_alone(server_class, path, monkeypatch, caplog):
+def test_invalid_item_is_dropped_alone(path, monkeypatch, caplog):
     """One call the server's model rejects costs only that call's item."""
-    with _server_over_transport(
-        server_class, path, _rejects_non_string_thread_id, monkeypatch
-    ) as (server, _, stored):
+    with _server_over_transport(path, _rejects_non_string_thread_id, monkeypatch) as (
+        server,
+        _,
+        stored,
+    ):
         good = [_call_items(server, f"good-{i}") for i in range(6)]
         bad = _call_items(server, "bad", thread_id=123)
         batch = [item for items in good[:3] + [bad] + good[3:] for item in items]
@@ -441,26 +416,20 @@ def test_invalid_item_is_dropped_alone(server_class, path, monkeypatch, caplog):
 
 @pytest.mark.disable_logging_error_check
 @pytest.mark.parametrize("path", ["calls_complete", "upsert_batch"])
-@pytest.mark.parametrize("thread_id", [None, 123], ids=["server_rejects", "all_bad"])
 def test_batch_invalid_in_every_item_is_dropped_without_looping(
-    server_class, path, thread_id, monkeypatch, caplog
+    path, monkeypatch, caplog
 ):
     """Splitting stops at single items: 2n-1 requests, then every item dropped."""
-    with _server_over_transport(server_class, path, lambda _: 422, monkeypatch) as (
+    with _server_over_transport(path, lambda _: 422, monkeypatch) as (
         server,
         requests_seen,
         stored,
     ):
-        # Start (or complete) items only, so a bad thread_id makes every item bad.
-        batch = [_call_items(server, f"call-{i}", thread_id)[0] for i in range(8)]
+        batch = [_call_items(server, f"call-{i}")[0] for i in range(8)]
         server.call_processor.enqueue = MagicMock()
         _flush(server, batch)
 
-    # The hand-written binding rejects a bad item while encoding, before sending.
-    rejected_before_sending = thread_id is not None and (
-        server_class is RemoteHTTPTraceServer
-    )
-    assert len(requests_seen) == (0 if rejected_before_sending else 2 * len(batch) - 1)
+    assert len(requests_seen) == 2 * len(batch) - 1
     assert stored == []
     assert _dropped_batch_sizes(caplog) == [1] * len(batch)
     server.call_processor.enqueue.assert_not_called()
@@ -469,11 +438,9 @@ def test_batch_invalid_in_every_item_is_dropped_without_looping(
 @pytest.mark.disable_logging_error_check
 @pytest.mark.parametrize("path", ["calls_complete", "upsert_batch"])
 @pytest.mark.parametrize("status", [400, 401, 403, 404])
-def test_other_4xx_drops_the_batch_without_splitting(
-    server_class, path, status, monkeypatch, caplog
-):
+def test_other_4xx_drops_the_batch_without_splitting(path, status, monkeypatch, caplog):
     """A rejection that applies to every item is not split into more requests."""
-    with _server_over_transport(server_class, path, lambda _: status, monkeypatch) as (
+    with _server_over_transport(path, lambda _: status, monkeypatch) as (
         server,
         requests_seen,
         stored,

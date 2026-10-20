@@ -8,23 +8,17 @@ from typing import Any
 from unittest.mock import MagicMock
 
 import PIL
+import pydantic
 import pytest
 
 import weave
 from tests.conftest import CachingMiddlewareTraceServer
 from tests.trace.server_utils import find_server_layer
 from weave.trace import weave_client
-from weave.trace_server.service_interface import EnsureProjectExistsRes
-from weave.trace_server.trace_server_interface import (
-    FileContentReadReq,
-    FileCreateReq,
-    ObjCreateReq,
-    ObjReadReq,
-    ObjReadRes,
-    ObjSchema,
-    ObjSchemaForInsert,
-    TraceServerInterface,
-)
+from weave.trace_server_bindings.client_interface import TraceServerClientInterface
+from weave.trace_server_bindings.models import EnsureProjectExistsRes
+from weave.vendor.weave_server_sdk.types import ObjectReadParams, ObjectReadResponse
+from weave.vendor.weave_server_sdk.types.object_read_response import Obj
 
 
 def create_random_pil_image():
@@ -137,18 +131,18 @@ def test_server_caching(client):
     }
 
 
-class MockServer(TraceServerInterface):
+class MockServer(TraceServerClientInterface):
     def __init__(self, mock_val: Any):
         self.mock_val = mock_val
 
-    def obj_read(self, req: ObjReadReq) -> ObjReadRes:
-        return ObjReadRes(
-            obj=ObjSchema(
-                project_id=req.project_id,
-                object_id=req.object_id,
+    def obj_read(self, req: ObjectReadParams) -> ObjectReadResponse:
+        return ObjectReadResponse(
+            obj=Obj(
+                project_id=req["project_id"],
+                object_id=req["object_id"],
                 created_at=datetime.datetime.now(),
                 deleted_at=None,
-                digest=req.digest,
+                digest=req["digest"],
                 version_index=0,
                 is_latest=1,
                 kind="object",
@@ -183,7 +177,7 @@ def test_server_cache_size_limit():
 
         for i in range(count):
             caching_server.obj_read(
-                ObjReadReq(project_id="test", object_id="test", digest=f"test_{i}")
+                {"project_id": "test", "object_id": "test", "digest": f"test_{i}"}
             )
 
             # Internally, the cache estimates its own size
@@ -221,11 +215,11 @@ def test_server_cache_latency():
     base_server = MockServer("a" * 1000)
     caching_server = CachingMiddlewareTraceServer(next_trace_server=base_server)
 
-    def get_latency_for_server(server: TraceServerInterface, count: int):
+    def get_latency_for_server(server: TraceServerClientInterface, count: int):
         start = time.perf_counter()
         for i in range(count):
             server.obj_read(
-                ObjReadReq(project_id="test", object_id="test", digest=f"test_{i}")
+                {"project_id": "test", "object_id": "test", "digest": f"test_{i}"}
             )
         end = time.perf_counter()
         return (end - start) / count
@@ -247,11 +241,10 @@ def test_file_create_caching(client):
     file_bytes = b"hello"
     caching_server.reset_cache_recorder()
     create_0 = client.server.file_create(
-        FileCreateReq(
-            project_id=client.project_id,
-            name="test",
-            content=file_bytes,
-        )
+        {
+            "project_id": client.project_id,
+            "file": ("test", file_bytes),
+        }
     )
     assert caching_server.get_cache_recorder() == {
         "hits": 0,
@@ -260,11 +253,10 @@ def test_file_create_caching(client):
     }
     caching_server.reset_cache_recorder()
     create_1 = client.server.file_create(
-        FileCreateReq(
-            project_id=client.project_id,
-            name="test",
-            content=file_bytes,
-        )
+        {
+            "project_id": client.project_id,
+            "file": ("test", file_bytes),
+        }
     )
     assert caching_server.get_cache_recorder() == {
         "hits": 1,
@@ -277,10 +269,10 @@ def test_file_create_caching(client):
 
     caching_server.reset_cache_recorder()
     read_0 = client.server.file_content_read(
-        FileContentReadReq(
-            project_id=client.project_id,
-            digest=create_0.digest,
-        )
+        {
+            "project_id": client.project_id,
+            "digest": create_0.digest,
+        }
     )
     assert caching_server.get_cache_recorder() == {
         "hits": 0,
@@ -289,10 +281,10 @@ def test_file_create_caching(client):
     }
     caching_server.reset_cache_recorder()
     read_1 = client.server.file_content_read(
-        FileContentReadReq(
-            project_id=client.project_id,
-            digest=create_0.digest,
-        )
+        {
+            "project_id": client.project_id,
+            "digest": create_0.digest,
+        }
     )
     assert caching_server.get_cache_recorder() == {
         "hits": 1,
@@ -307,13 +299,13 @@ def test_obj_create_caching(client):
     val = {"hello": "world"}
     caching_server.reset_cache_recorder()
     create_0 = client.server.obj_create(
-        ObjCreateReq(
-            obj=ObjSchemaForInsert(
-                project_id=client.project_id,
-                object_id="test",
-                val=val,
-            )
-        )
+        {
+            "obj": {
+                "project_id": client.project_id,
+                "object_id": "test",
+                "val": val,
+            }
+        }
     )
     assert caching_server.get_cache_recorder() == {
         "hits": 0,
@@ -322,13 +314,13 @@ def test_obj_create_caching(client):
     }
     caching_server.reset_cache_recorder()
     create_1 = client.server.obj_create(
-        ObjCreateReq(
-            obj=ObjSchemaForInsert(
-                project_id=client.project_id,
-                object_id="test",
-                val=val,
-            )
-        )
+        {
+            "obj": {
+                "project_id": client.project_id,
+                "object_id": "test",
+                "val": val,
+            }
+        }
     )
     assert caching_server.get_cache_recorder() == {
         "hits": 1,
@@ -341,11 +333,11 @@ def test_obj_create_caching(client):
 
     caching_server.reset_cache_recorder()
     read_0 = client.server.obj_read(
-        ObjReadReq(
-            project_id=client.project_id,
-            object_id="test",
-            digest=create_0.digest,
-        )
+        {
+            "project_id": client.project_id,
+            "object_id": "test",
+            "digest": create_0.digest,
+        }
     )
     assert caching_server.get_cache_recorder() == {
         "hits": 0,
@@ -354,11 +346,11 @@ def test_obj_create_caching(client):
     }
     caching_server.reset_cache_recorder()
     read_1 = client.server.obj_read(
-        ObjReadReq(
-            project_id=client.project_id,
-            object_id="test",
-            digest=create_0.digest,
-        )
+        {
+            "project_id": client.project_id,
+            "object_id": "test",
+            "digest": create_0.digest,
+        }
     )
     assert caching_server.get_cache_recorder() == {
         "hits": 1,
@@ -570,12 +562,12 @@ def test_cache_invalidation_on_add_tags(client):
     # Prime the cache with an obj_read that includes tags
     caching_server.reset_cache_recorder()
     res1 = client.server.obj_read(
-        ObjReadReq(
-            project_id=client.project_id,
-            object_id=ref.name,
-            digest=ref.digest,
-            include_tags_and_aliases=True,
-        )
+        {
+            "project_id": client.project_id,
+            "object_id": ref.name,
+            "digest": ref.digest,
+            "include_tags_and_aliases": True,
+        }
     )
     assert caching_server.get_cache_recorder()["misses"] == 1
     assert res1.obj.tags == []
@@ -583,12 +575,12 @@ def test_cache_invalidation_on_add_tags(client):
     # Second read should hit cache
     caching_server.reset_cache_recorder()
     client.server.obj_read(
-        ObjReadReq(
-            project_id=client.project_id,
-            object_id=ref.name,
-            digest=ref.digest,
-            include_tags_and_aliases=True,
-        )
+        {
+            "project_id": client.project_id,
+            "object_id": ref.name,
+            "digest": ref.digest,
+            "include_tags_and_aliases": True,
+        }
     )
     assert caching_server.get_cache_recorder()["hits"] == 1
 
@@ -598,12 +590,12 @@ def test_cache_invalidation_on_add_tags(client):
     # Next read should miss (cache was invalidated)
     caching_server.reset_cache_recorder()
     res2 = client.server.obj_read(
-        ObjReadReq(
-            project_id=client.project_id,
-            object_id=ref.name,
-            digest=ref.digest,
-            include_tags_and_aliases=True,
-        )
+        {
+            "project_id": client.project_id,
+            "object_id": ref.name,
+            "digest": ref.digest,
+            "include_tags_and_aliases": True,
+        }
     )
     assert caching_server.get_cache_recorder()["misses"] == 1
     assert res2.obj.tags == ["new-tag"]
@@ -618,12 +610,12 @@ def test_cache_invalidation_on_remove_tags(client):
     # Prime cache
     caching_server.reset_cache_recorder()
     res1 = client.server.obj_read(
-        ObjReadReq(
-            project_id=client.project_id,
-            object_id=ref.name,
-            digest=ref.digest,
-            include_tags_and_aliases=True,
-        )
+        {
+            "project_id": client.project_id,
+            "object_id": ref.name,
+            "digest": ref.digest,
+            "include_tags_and_aliases": True,
+        }
     )
     assert res1.obj.tags == ["removable"]
     assert caching_server.get_cache_recorder()["misses"] == 1
@@ -634,12 +626,12 @@ def test_cache_invalidation_on_remove_tags(client):
     # Next read should miss
     caching_server.reset_cache_recorder()
     res2 = client.server.obj_read(
-        ObjReadReq(
-            project_id=client.project_id,
-            object_id=ref.name,
-            digest=ref.digest,
-            include_tags_and_aliases=True,
-        )
+        {
+            "project_id": client.project_id,
+            "object_id": ref.name,
+            "digest": ref.digest,
+            "include_tags_and_aliases": True,
+        }
     )
     assert caching_server.get_cache_recorder()["misses"] == 1
     assert res2.obj.tags == []
@@ -653,12 +645,12 @@ def test_cache_invalidation_on_set_alias(client):
     # Prime cache
     caching_server.reset_cache_recorder()
     res1 = client.server.obj_read(
-        ObjReadReq(
-            project_id=client.project_id,
-            object_id=ref.name,
-            digest=ref.digest,
-            include_tags_and_aliases=True,
-        )
+        {
+            "project_id": client.project_id,
+            "object_id": ref.name,
+            "digest": ref.digest,
+            "include_tags_and_aliases": True,
+        }
     )
     assert caching_server.get_cache_recorder()["misses"] == 1
     assert res1.obj.aliases == ["latest"]
@@ -669,12 +661,12 @@ def test_cache_invalidation_on_set_alias(client):
     # Next read should miss
     caching_server.reset_cache_recorder()
     res2 = client.server.obj_read(
-        ObjReadReq(
-            project_id=client.project_id,
-            object_id=ref.name,
-            digest=ref.digest,
-            include_tags_and_aliases=True,
-        )
+        {
+            "project_id": client.project_id,
+            "object_id": ref.name,
+            "digest": ref.digest,
+            "include_tags_and_aliases": True,
+        }
     )
     assert caching_server.get_cache_recorder()["misses"] == 1
     assert "prod" in res2.obj.aliases
@@ -689,12 +681,12 @@ def test_cache_invalidation_on_remove_aliases(client):
     # Prime cache
     caching_server.reset_cache_recorder()
     res1 = client.server.obj_read(
-        ObjReadReq(
-            project_id=client.project_id,
-            object_id=ref.name,
-            digest=ref.digest,
-            include_tags_and_aliases=True,
-        )
+        {
+            "project_id": client.project_id,
+            "object_id": ref.name,
+            "digest": ref.digest,
+            "include_tags_and_aliases": True,
+        }
     )
     assert "staging" in res1.obj.aliases
     assert caching_server.get_cache_recorder()["misses"] == 1
@@ -705,12 +697,12 @@ def test_cache_invalidation_on_remove_aliases(client):
     # Next read should miss
     caching_server.reset_cache_recorder()
     res2 = client.server.obj_read(
-        ObjReadReq(
-            project_id=client.project_id,
-            object_id=ref.name,
-            digest=ref.digest,
-            include_tags_and_aliases=True,
-        )
+        {
+            "project_id": client.project_id,
+            "object_id": ref.name,
+            "digest": ref.digest,
+            "include_tags_and_aliases": True,
+        }
     )
     assert caching_server.get_cache_recorder()["misses"] == 1
     assert "staging" not in res2.obj.aliases
@@ -718,6 +710,11 @@ def test_cache_invalidation_on_remove_aliases(client):
 
 def _reversed_dict(params: dict) -> dict:
     return dict(reversed(list(params.items())))
+
+
+def _request_model(name: str, fields: dict[str, Any]) -> pydantic.BaseModel:
+    """A pydantic request model with these fields, in this order, as a caller may pass."""
+    return pydantic.create_model(name, **{k: (Any, v) for k, v in fields.items()})()
 
 
 @pytest.mark.parametrize("form", ["model", "dict", "dict_in_another_order"])
@@ -738,17 +735,19 @@ def test_invalidation_prefix_is_prefix_of_cache_key(form):
     )
 
     # --- ObjReadReq: version-specific invalidation (project_id, object_id, digest) ---
-    model = ObjReadReq(
-        project_id="test/proj",
-        object_id="my-obj",
-        digest="abc123",
-        metadata_only=False,
-        include_tags_and_aliases=True,
-    )
+    # The fields of the old ObjReadReq, in its order.
+    read_fields = {
+        "project_id": "test/proj",
+        "object_id": "my-obj",
+        "digest": "abc123",
+        "metadata_only": False,
+        "include_tags_and_aliases": True,
+    }
+    model = _request_model("ObjReadReq", read_fields)
     req = {
         "model": model,
-        "dict": model.model_dump(),
-        "dict_in_another_order": _reversed_dict(model.model_dump()),
+        "dict": read_fields,
+        "dict_in_another_order": _reversed_dict(read_fields),
     }[form]
     full_key = f"obj_read_{_obj_read_cache_key(req)}"
     if form != "dict_in_another_order":
@@ -778,19 +777,22 @@ def test_invalidation_prefix_is_prefix_of_cache_key(form):
     assert len(prefix_all) < len(prefix_version)
 
     # --- ObjCreateReq: invalidation uses nested obj dict ---
-    create_model = ObjCreateReq(
-        obj=ObjSchemaForInsert(
-            project_id="test/proj",
-            object_id="my-obj",
-            val={"hello": "world"},
-        )
-    )
+    # What the old ObjCreateReq dumped, defaults included, in its order.
+    create_fields = {
+        "obj": {
+            "project_id": "test/proj",
+            "object_id": "my-obj",
+            "val": {"hello": "world"},
+            "builtin_object_class": None,
+            "expected_digest": None,
+            "wb_user_id": None,
+        }
+    }
+    create_model = _request_model("ObjCreateReq", create_fields)
     create_req = {
         "model": create_model,
-        "dict": create_model.model_dump(),
-        "dict_in_another_order": {
-            "obj": _reversed_dict(create_model.model_dump()["obj"])
-        },
+        "dict": create_fields,
+        "dict_in_another_order": {"obj": _reversed_dict(create_fields["obj"])},
     }[form]
     create_full_key = f"obj_create_{_obj_create_cache_key(create_req)}"
     if form != "dict_in_another_order":

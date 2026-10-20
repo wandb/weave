@@ -15,7 +15,6 @@ from weave.integrations.openai.openai_sdk import (
 )
 from weave.trace.autopatch import OpSettings
 from weave.trace.weave_client import WeaveClient
-from weave.trace_server.trace_server_interface import CallsFilter, CostCreateReq
 
 
 @dataclass
@@ -155,9 +154,9 @@ def test_openai_cache_write_tokens_follow_model_pricing(
     completion_token_cost = 30e-6
     cache_read_input_token_cost = 0.5e-6
     client.server.cost_create(
-        CostCreateReq(
-            project_id=client.project_id,
-            costs={
+        {
+            "project_id": client.project_id,
+            "costs": {
                 model: {
                     "prompt_token_cost": prompt_token_cost,
                     "completion_token_cost": completion_token_cost,
@@ -166,7 +165,7 @@ def test_openai_cache_write_tokens_follow_model_pricing(
                     "provider_id": "openai",
                 }
             },
-        )
+        }
     )
     input_tokens = 1_000_000
     cached_tokens = 200_000
@@ -207,7 +206,7 @@ def test_openai_cache_write_tokens_follow_model_pricing(
 
     priced_calls = list(
         client.get_calls(
-            filter=CallsFilter(call_ids=[call.id]),
+            filter={"call_ids": [call.id]},
             include_costs=True,
         )
     )

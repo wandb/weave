@@ -1,5 +1,4 @@
 from weave.trace import weave_client
-from weave.trace_server.trace_server_interface import CallsQueryReq
 
 
 def test_anonymous_op(client: weave_client.WeaveClient) -> str:
@@ -7,9 +6,9 @@ def test_anonymous_op(client: weave_client.WeaveClient) -> str:
     client.finish_call(call, {"c": 3}, None)
 
     call_res = client.server.calls_query(
-        CallsQueryReq(
-            project_id=client.project_id,
-        )
+        {
+            "project_id": client.project_id,
+        }
     )
     calls = call_res.calls
 
@@ -32,9 +31,9 @@ def test_anonymous_op_with_config(client: weave_client.WeaveClient) -> str:
     client.finish_call(call, {"c": 3}, None)
 
     call_res = client.server.calls_query(
-        CallsQueryReq(
-            project_id=client.project_id,
-        )
+        {
+            "project_id": client.project_id,
+        }
     )
     calls = call_res.calls
 

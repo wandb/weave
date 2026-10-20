@@ -47,7 +47,7 @@ from typing import Any
 
 import weave
 from weave.trace.weave_client import WeaveClient
-from weave.trace_server import trace_server_interface as tsi
+from weave.vendor.weave_server_sdk.types import TableCreateParams
 
 SMALL_TIGHT_ITERATIONS = 500
 WIDE_DICT_KEYS = 1000
@@ -226,14 +226,12 @@ def run_table_create_direct(
         )
         # Warm-up.
         client.server.table_create(
-            tsi.TableCreateReq(
-                table=tsi.TableSchemaForInsert(project_id=project_id, rows=payload)
-            )
+            {"table": {"project_id": project_id, "rows": payload}}
         )
         for _ in range(iterations):
-            req = tsi.TableCreateReq(
-                table=tsi.TableSchemaForInsert(project_id=project_id, rows=payload)
-            )
+            req: TableCreateParams = {
+                "table": {"project_id": project_id, "rows": payload}
+            }
             t0 = time.perf_counter()
             client.server.table_create(req)
             r.times_ms.append((time.perf_counter() - t0) * 1000.0)

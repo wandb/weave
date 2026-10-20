@@ -21,11 +21,6 @@ from weave.integrations.integration_utilities import (
     op_name_from_ref,
 )
 from weave.trace.weave_client import WeaveClient
-from weave.trace_server.trace_server_interface import (
-    CallsFilter,
-    ObjectVersionFilter,
-    ObjQueryReq,
-)
 
 
 @pytest.fixture(autouse=True)
@@ -137,7 +132,7 @@ def test_gepa_optimize_traces_lifecycle(client: WeaveClient) -> None:
     # Evaluation.evaluate call via EvaluationLogger; those come out as sibling
     # root traces (EvaluationLogger intentionally detaches from the caller's
     # stack so evals show up in the Evaluations tab).
-    all_roots = list(client.get_calls(filter=CallsFilter(trace_roots_only=True)))
+    all_roots = list(client.get_calls(filter={"trace_roots_only": True}))
     optimize_roots = [
         r for r in all_roots if op_name_from_ref(r.op_name) == "gepa.optimize"
     ]
@@ -204,7 +199,7 @@ def test_reflection_lm_call_nests_under_propose(client: WeaveClient) -> None:
         skip_perfect_score=False,
     )
 
-    roots = list(client.get_calls(filter=CallsFilter(trace_roots_only=True)))
+    roots = list(client.get_calls(filter={"trace_roots_only": True}))
     optimize_roots = [
         r for r in roots if op_name_from_ref(r.op_name) == "gepa.optimize"
     ]
@@ -345,7 +340,7 @@ def test_gepa_optimize_end_to_end_with_reflection_lm(client: WeaveClient) -> Non
     assert getattr(result, "num_candidates", 0) >= 2
 
     # Reflection LM should nest under gepa.propose (LM-call cost attribution).
-    roots = list(client.get_calls(filter=CallsFilter(trace_roots_only=True)))
+    roots = list(client.get_calls(filter={"trace_roots_only": True}))
     optimize_roots = [
         r for r in roots if op_name_from_ref(r.op_name) == "gepa.optimize"
     ]
@@ -366,10 +361,10 @@ def test_gepa_optimize_end_to_end_with_reflection_lm(client: WeaveClient) -> Non
 
     # At least two `gepa_candidate` versions: seed and the accepted shorter one.
     resp = client.server.objs_query(
-        ObjQueryReq(
-            project_id=client.project_id,
-            filter=ObjectVersionFilter(object_ids=["gepa_candidate"]),
-        )
+        {
+            "project_id": client.project_id,
+            "filter": {"object_ids": ["gepa_candidate"]},
+        }
     )
     instructions = {
         o.val.get("instructions")

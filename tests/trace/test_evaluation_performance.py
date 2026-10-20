@@ -11,16 +11,16 @@ import weave
 from tests.trace.util import DummyTestException
 from weave.trace.context.tests_context import raise_on_captured_errors
 from weave.trace.weave_client import WeaveClient
-from weave.trace_server import trace_server_interface as tsi
+from weave.trace_server_bindings.client_interface import TraceServerClientInterface
 
 
-class BlockingTraceServer(tsi.TraceServerInterface):
+class BlockingTraceServer(TraceServerClientInterface):
     """This class is used to simulate a long running operation in the trace server."""
 
-    internal_trace_server: tsi.TraceServerInterface
+    internal_trace_server: TraceServerClientInterface
     lock: Lock
 
-    def __init__(self, internal_trace_server: tsi.TraceServerInterface):
+    def __init__(self, internal_trace_server: TraceServerClientInterface):
         self.internal_trace_server = internal_trace_server
         self.lock = Lock()
 

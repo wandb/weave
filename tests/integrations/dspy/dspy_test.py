@@ -17,7 +17,6 @@ from weave.integrations.litellm.litellm import get_litellm_patcher
 from weave.integrations.openai import openai_sdk
 from weave.integrations.openai.openai_sdk import get_openai_patcher
 from weave.trace.weave_client import WeaveClient
-from weave.trace_server.trace_server_interface import CallsFilter
 
 
 @pytest.fixture(autouse=True)
@@ -322,7 +321,7 @@ def test_dspy_evaluate(client: WeaveClient) -> None:
     accuracy = evaluate(module)
     assert accuracy.score > 30
 
-    calls = list(client.get_calls(filter=CallsFilter(trace_roots_only=True)))
+    calls = list(client.get_calls(filter={"trace_roots_only": True}))
     assert len(calls) == 1
     flattened_calls = flatten_calls(calls)
 
@@ -417,7 +416,7 @@ def test_dspy_evaluate_with_pydantic_prediction(client: WeaveClient) -> None:
     result = evaluate(NoLMPydanticModule())
     assert 0 <= result.score <= 100
 
-    calls = list(client.get_calls(filter=CallsFilter(trace_roots_only=True)))
+    calls = list(client.get_calls(filter={"trace_roots_only": True}))
     assert len(calls) == 1
     call = calls[0]
     assert call.started_at < call.ended_at

@@ -35,8 +35,18 @@ from typing import NamedTuple
 import pytest
 
 import weave
-from weave.trace_server import trace_server_interface as tsi
-from weave.trace_server.errors import Error as TraceServerError
+from weave.trace.errors import Error as TraceServerError
+from weave.vendor.weave_server_sdk.types import (
+    DatasetSourceLinkParams,
+    DatasetSourceQueryResponse,
+    DatasetSourceSourceDatasetsQueryResponse,
+    dataset_source_link_params,
+    dataset_source_source_datasets_query_params,
+)
+
+# The server's limits on a link request and on the row digests per membership.
+MAX_DATASET_SOURCE_LINKS_PER_REQUEST = 1000
+MAX_ROW_DIGESTS_PER_RESULT = 100
 
 
 class CallsFixture(NamedTuple):
@@ -71,44 +81,44 @@ def create_test_calls(
     )
 
 
-def call_source(call) -> tsi.SourceRef:
+def call_source(call) -> dataset_source_link_params.LinkSource:
     """Build a call SourceRef from a Call object."""
-    return tsi.SourceRef(
-        source_kind=tsi.SourceKind.CALL,
-        source_id=call.id,
-        source_trace_id=call.trace_id,
-    )
+    return {
+        "source_kind": "call",
+        "source_id": call.id,
+        "source_trace_id": call.trace_id,
+    }
 
 
-def conversation_source(conversation_id: str) -> tsi.SourceRef:
+def conversation_source(conversation_id: str) -> dataset_source_link_params.LinkSource:
     """Build a conversation SourceRef.
 
     Conversations span traces, so source_trace_id is '' (conversation_id is the
     self-sufficient identity) and conversation links are asserted (no backing
     table to validate against).
     """
-    return tsi.SourceRef(
-        source_kind=tsi.SourceKind.CONVERSATION,
-        source_id=conversation_id,
-        source_trace_id="",
-    )
+    return {
+        "source_kind": "conversation",
+        "source_id": conversation_id,
+        "source_trace_id": "",
+    }
 
 
 def link_req(
     client,
     *,
     dataset_object_id: str,
-    links: list[tsi.DatasetSourceLinkPayload],
+    links: list[dataset_source_link_params.Link],
     dataset_digest: str = "v0",
     include_created_status: bool = False,
-) -> tsi.DatasetSourcesLinkReq:
-    return tsi.DatasetSourcesLinkReq(
-        project_id=client.project_id,
-        dataset_object_id=dataset_object_id,
-        dataset_digest=dataset_digest,
-        links=links,
-        include_created_status=include_created_status,
-    )
+) -> DatasetSourceLinkParams:
+    return {
+        "project_id": client.project_id,
+        "dataset_object_id": dataset_object_id,
+        "dataset_digest": dataset_digest,
+        "links": links,
+        "include_created_status": include_created_status,
+    }
 
 
 def forward_query(
@@ -116,33 +126,36 @@ def forward_query(
     *,
     dataset_object_id: str,
     row_digests: list[str] | None = None,
-    source_kinds: list[tsi.SourceKind] | None = None,
+    source_kinds: list[str] | None = None,
     include_deleted: bool = False,
     limit: int | None = None,
     offset: int | None = None,
-) -> tsi.DatasetSourcesQueryRes:
+) -> DatasetSourceQueryResponse:
     return client.server.dataset_sources_query(
-        tsi.DatasetSourcesQueryReq(
-            project_id=client.project_id,
-            dataset_object_id=dataset_object_id,
-            row_digests=row_digests,
-            source_kinds=source_kinds,
-            include_deleted=include_deleted,
-            limit=limit,
-            offset=offset,
-        )
+        {
+            "project_id": client.project_id,
+            "dataset_object_id": dataset_object_id,
+            "row_digests": row_digests,
+            "source_kinds": source_kinds,
+            "include_deleted": include_deleted,
+            "limit": limit,
+            "offset": offset,
+        }
     )
 
 
 def reverse_query(
-    client, *, sources: list[tsi.SourceRef], include_deleted: bool = False
-) -> tsi.SourceDatasetsQueryRes:
+    client,
+    *,
+    sources: list[dataset_source_source_datasets_query_params.Source],
+    include_deleted: bool = False,
+) -> DatasetSourceSourceDatasetsQueryResponse:
     return client.server.source_datasets_query(
-        tsi.SourceDatasetsQueryReq(
-            project_id=client.project_id,
-            sources=sources,
-            include_deleted=include_deleted,
-        )
+        {
+            "project_id": client.project_id,
+            "sources": sources,
+            "include_deleted": include_deleted,
+        }
     )
 
 
@@ -167,11 +180,11 @@ def test_dataset_sources_link_metadata_empty_dict_round_trips(client):
             client,
             dataset_object_id=ds_obj,
             links=[
-                tsi.DatasetSourceLinkPayload(
-                    row_digest=digest,
-                    sources=[call_source(calls.calls[0])],
-                    link_metadata={},
-                )
+                {
+                    "row_digest": digest,
+                    "sources": [call_source(calls.calls[0])],
+                    "link_metadata": {},
+                }
             ],
         )
     )
@@ -186,19 +199,19 @@ def test_dataset_sources_call_link_uses_authoritative_trace_id(client):
     """
     calls = create_test_calls(client, 1)
     real_source = call_source(calls.calls[0])
-    real_trace_id = real_source.source_trace_id
+    real_trace_id = real_source["source_trace_id"]
     assert real_trace_id  # sanity: the real call has a trace
 
     ds_obj = "authoritative_trace_id_dataset"
 
     # (a) client sends a WRONG trace_id -> server overrides with the real one.
-    wrong = real_source.model_copy(update={"source_trace_id": "deadbeef-wrong"})
+    wrong = {**real_source, "source_trace_id": "deadbeef-wrong"}
     digest_a = new_digest("a")
     link_a = client.server.dataset_sources_link(
         link_req(
             client,
             dataset_object_id=ds_obj,
-            links=[tsi.DatasetSourceLinkPayload(row_digest=digest_a, sources=[wrong])],
+            links=[{"row_digest": digest_a, "sources": [wrong]}],
         )
     )
     res_a = forward_query(client, dataset_object_id=ds_obj, row_digests=[digest_a])
@@ -211,9 +224,7 @@ def test_dataset_sources_call_link_uses_authoritative_trace_id(client):
         link_req(
             client,
             dataset_object_id=ds_obj,
-            links=[
-                tsi.DatasetSourceLinkPayload(row_digest=digest_a, sources=[real_source])
-            ],
+            links=[{"row_digest": digest_a, "sources": [real_source]}],
         )
     )
     assert relink_a.entries[0].link_id == link_a.entries[0].link_id
@@ -223,13 +234,13 @@ def test_dataset_sources_call_link_uses_authoritative_trace_id(client):
     assert len(res_a_relink.links) == 1
 
     # (b) client sends an EMPTY trace_id for a call -> accepted, real one stored.
-    empty = real_source.model_copy(update={"source_trace_id": ""})
+    empty = {**real_source, "source_trace_id": ""}
     digest_b = new_digest("b")
     client.server.dataset_sources_link(
         link_req(
             client,
             dataset_object_id=ds_obj,
-            links=[tsi.DatasetSourceLinkPayload(row_digest=digest_b, sources=[empty])],
+            links=[{"row_digest": digest_b, "sources": [empty]}],
         )
     )
     res_b = forward_query(client, dataset_object_id=ds_obj, row_digests=[digest_b])
@@ -251,11 +262,7 @@ def test_dataset_sources_link_single_call_source_appears_in_forward_query(client
         link_req(
             client,
             dataset_object_id=ds_obj,
-            links=[
-                tsi.DatasetSourceLinkPayload(
-                    row_digest=digest, sources=[call_source(call)]
-                )
-            ],
+            links=[{"row_digest": digest, "sources": [call_source(call)]}],
         )
     )
 
@@ -269,7 +276,7 @@ def test_dataset_sources_link_single_call_source_appears_in_forward_query(client
     link = fq.links[0]
     assert link.id == res.entries[0].link_id
     assert link.row_digest == digest
-    assert link.source_kind == tsi.SourceKind.CALL
+    assert link.source_kind == "call"
     assert link.source_id == call.id
     assert link.source_trace_id == call.trace_id
     # Cached fields are snapshotted from the source call at link time.
@@ -285,9 +292,7 @@ def test_dataset_sources_relink_same_tuple_yields_same_id_and_no_duplicate_rows(
     call = calls.calls[0]
     ds_obj = "dedup_dataset"
     digest = new_digest()
-    payload = tsi.DatasetSourceLinkPayload(
-        row_digest=digest, sources=[call_source(call)]
-    )
+    payload = {"row_digest": digest, "sources": [call_source(call)]}
 
     res1 = client.server.dataset_sources_link(
         link_req(client, dataset_object_id=ds_obj, links=[payload])
@@ -314,9 +319,7 @@ def test_dataset_sources_include_created_status_new_then_relink_then_default(cli
     call = calls.calls[0]
     ds_obj = "created_status_dataset"
     digest = new_digest()
-    payload = tsi.DatasetSourceLinkPayload(
-        row_digest=digest, sources=[call_source(call)]
-    )
+    payload = {"row_digest": digest, "sources": [call_source(call)]}
 
     # Brand new logical key with status requested -> created=True.
     res_new = client.server.dataset_sources_link(
@@ -359,11 +362,11 @@ def test_dataset_sources_link_missing_call_id_errors_and_writes_nothing(client):
     good_digest = new_digest("good")
     bad_digest = new_digest("bad")
 
-    bad_source = tsi.SourceRef(
-        source_kind=tsi.SourceKind.CALL,
-        source_id="nonexistent-call-" + uuid.uuid4().hex,
-        source_trace_id="nonexistent-trace",
-    )
+    bad_source = {
+        "source_kind": "call",
+        "source_id": "nonexistent-call-" + uuid.uuid4().hex,
+        "source_trace_id": "nonexistent-trace",
+    }
 
     # One good tuple and one tuple referencing a non-existent call in the
     # same batch. The whole request must fail with NO partial writes.
@@ -373,12 +376,8 @@ def test_dataset_sources_link_missing_call_id_errors_and_writes_nothing(client):
                 client,
                 dataset_object_id=ds_obj,
                 links=[
-                    tsi.DatasetSourceLinkPayload(
-                        row_digest=good_digest, sources=[call_source(good_call)]
-                    ),
-                    tsi.DatasetSourceLinkPayload(
-                        row_digest=bad_digest, sources=[bad_source]
-                    ),
+                    {"row_digest": good_digest, "sources": [call_source(good_call)]},
+                    {"row_digest": bad_digest, "sources": [bad_source]},
                 ],
             )
         )
@@ -395,11 +394,9 @@ def test_dataset_sources_link_batch_cap_exceeded_errors_and_writes_nothing(clien
 
     # Flatten to MAX + 1 (row_digest, source) tuples: 1 source per row_digest,
     # 1001 distinct row_digests -> 1001 flattened tuples.
-    cap = tsi.MAX_DATASET_SOURCE_LINKS_PER_REQUEST
+    cap = MAX_DATASET_SOURCE_LINKS_PER_REQUEST
     links = [
-        tsi.DatasetSourceLinkPayload(
-            row_digest=new_digest(f"cap{i}"), sources=[call_source(call)]
-        )
+        {"row_digest": new_digest(f"cap{i}"), "sources": [call_source(call)]}
         for i in range(cap + 1)
     ]
 
@@ -428,11 +425,7 @@ def test_dataset_sources_soft_delete_removes_from_forward_and_reverse(client):
         link_req(
             client,
             dataset_object_id=ds_obj,
-            links=[
-                tsi.DatasetSourceLinkPayload(
-                    row_digest=digest, sources=[call_source(call)]
-                )
-            ],
+            links=[{"row_digest": digest, "sources": [call_source(call)]}],
         )
     )
     link_id = link_res.entries[0].link_id
@@ -442,10 +435,10 @@ def test_dataset_sources_soft_delete_removes_from_forward_and_reverse(client):
     assert len(reverse_query(client, sources=[call_source(call)]).memberships) == 1
 
     del_res = client.server.dataset_sources_link_delete(
-        tsi.DatasetSourcesLinkDeleteReq(
-            project_id=client.project_id,
-            link_ids=[link_id],
-        )
+        {
+            "project_id": client.project_id,
+            "link_ids": [link_id],
+        }
     )
     assert len(del_res.entries) == 1
     assert del_res.entries[0].link_id == link_id
@@ -480,11 +473,7 @@ def test_dataset_sources_delete_edge_cases(client, scenario):
         link_req(
             client,
             dataset_object_id=ds_obj,
-            links=[
-                tsi.DatasetSourceLinkPayload(
-                    row_digest=digest, sources=[call_source(call)]
-                )
-            ],
+            links=[{"row_digest": digest, "sources": [call_source(call)]}],
         )
     )
     link_id = link_res.entries[0].link_id
@@ -493,27 +482,23 @@ def test_dataset_sources_delete_edge_cases(client, scenario):
         # Batch with one real id and one unknown id -> error, no partial deletes.
         with pytest.raises(TraceServerError):
             client.server.dataset_sources_link_delete(
-                tsi.DatasetSourcesLinkDeleteReq(
-                    project_id=client.project_id,
-                    link_ids=[link_id, "unknown-link-" + uuid.uuid4().hex],
-                )
+                {
+                    "project_id": client.project_id,
+                    "link_ids": [link_id, "unknown-link-" + uuid.uuid4().hex],
+                }
             )
 
         # The real link must still be present (not partially deleted).
         assert len(forward_query(client, dataset_object_id=ds_obj).links) == 1
     else:
         first = client.server.dataset_sources_link_delete(
-            tsi.DatasetSourcesLinkDeleteReq(
-                project_id=client.project_id, link_ids=[link_id]
-            )
+            {"project_id": client.project_id, "link_ids": [link_id]}
         )
         assert first.entries[0].deleted is True
 
         # Deleting an already-soft-deleted id is idempotent-ish: deleted=False.
         second = client.server.dataset_sources_link_delete(
-            tsi.DatasetSourcesLinkDeleteReq(
-                project_id=client.project_id, link_ids=[link_id]
-            )
+            {"project_id": client.project_id, "link_ids": [link_id]}
         )
         assert second.entries[0].link_id == link_id
         assert second.entries[0].deleted is False
@@ -524,9 +509,7 @@ def test_dataset_sources_relink_after_delete_restores_with_same_id(client):
     call = calls.calls[0]
     ds_obj = "restore_dataset"
     digest = new_digest()
-    payload = tsi.DatasetSourceLinkPayload(
-        row_digest=digest, sources=[call_source(call)]
-    )
+    payload = {"row_digest": digest, "sources": [call_source(call)]}
 
     link_res = client.server.dataset_sources_link(
         link_req(client, dataset_object_id=ds_obj, links=[payload])
@@ -534,9 +517,7 @@ def test_dataset_sources_relink_after_delete_restores_with_same_id(client):
     link_id = link_res.entries[0].link_id
 
     client.server.dataset_sources_link_delete(
-        tsi.DatasetSourcesLinkDeleteReq(
-            project_id=client.project_id, link_ids=[link_id]
-        )
+        {"project_id": client.project_id, "link_ids": [link_id]}
     )
     assert len(forward_query(client, dataset_object_id=ds_obj).links) == 0
 
@@ -574,7 +555,7 @@ def test_dataset_sources_conversation_five_calls_one_row_digest(client):
         link_req(
             client,
             dataset_object_id=ds_obj,
-            links=[tsi.DatasetSourceLinkPayload(row_digest=digest, sources=sources)],
+            links=[{"row_digest": digest, "sources": sources}],
         )
     )
     # 5 flattened (row_digest, source) tuples -> 5 entries.
@@ -611,7 +592,7 @@ def test_dataset_sources_reverse_query_row_digests_truncation(client):
 
     # Link the single call to 101 distinct row_digests (101 link calls, each
     # well under the per-request cap of 1000).
-    total = tsi.MAX_ROW_DIGESTS_PER_RESULT + 1  # 101
+    total = MAX_ROW_DIGESTS_PER_RESULT + 1  # 101
     digests = [new_digest(f"trunc{i}") for i in range(total)]
     for digest in digests:
         client.server.dataset_sources_link(
@@ -619,10 +600,10 @@ def test_dataset_sources_reverse_query_row_digests_truncation(client):
                 client,
                 dataset_object_id=ds_obj,
                 links=[
-                    tsi.DatasetSourceLinkPayload(
-                        row_digest=digest,
-                        sources=[call_source(call)],
-                    )
+                    {
+                        "row_digest": digest,
+                        "sources": [call_source(call)],
+                    }
                 ],
             )
         )
@@ -634,7 +615,7 @@ def test_dataset_sources_reverse_query_row_digests_truncation(client):
     assert membership.row_digests_truncated is True
     # Truncation is deterministic: the MAX_ROW_DIGESTS_PER_RESULT
     # lexicographically-smallest digests (groupArraySorted), in sorted order.
-    assert membership.row_digests == sorted(digests)[: tsi.MAX_ROW_DIGESTS_PER_RESULT]
+    assert membership.row_digests == sorted(digests)[:MAX_ROW_DIGESTS_PER_RESULT]
 
 
 def test_dataset_sources_reverse_query_mixed_kinds_batch_no_span_error(client):
@@ -651,19 +632,15 @@ def test_dataset_sources_reverse_query_mixed_kinds_batch_no_span_error(client):
         link_req(
             client,
             dataset_object_id=ds_obj,
-            links=[
-                tsi.DatasetSourceLinkPayload(
-                    row_digest=digest, sources=[call_source(call)]
-                )
-            ],
+            links=[{"row_digest": digest, "sources": [call_source(call)]}],
         )
     )
 
-    span_source = tsi.SourceRef(
-        source_kind=tsi.SourceKind.SPAN,
-        source_id="span-with-no-links-" + uuid.uuid4().hex,
-        source_trace_id="trace-" + uuid.uuid4().hex,
-    )
+    span_source = {
+        "source_kind": "span",
+        "source_id": "span-with-no-links-" + uuid.uuid4().hex,
+        "source_trace_id": "trace-" + uuid.uuid4().hex,
+    }
     rq = reverse_query(client, sources=[call_source(call), span_source])
     # Only the call has a membership; the unlinked span contributes nothing.
     assert len(rq.memberships) == 1
@@ -685,11 +662,7 @@ def test_dataset_sources_forward_query_filter_by_row_digests(client):
             link_req(
                 client,
                 dataset_object_id=ds_obj,
-                links=[
-                    tsi.DatasetSourceLinkPayload(
-                        row_digest=digest, sources=[call_source(call)]
-                    )
-                ],
+                links=[{"row_digest": digest, "sources": [call_source(call)]}],
             )
         )
 
@@ -710,25 +683,17 @@ def test_dataset_sources_forward_query_filter_by_source_kinds(client):
         link_req(
             client,
             dataset_object_id=ds_obj,
-            links=[
-                tsi.DatasetSourceLinkPayload(
-                    row_digest=digest, sources=[call_source(call)]
-                )
-            ],
+            links=[{"row_digest": digest, "sources": [call_source(call)]}],
         )
     )
 
     # Filtering for 'call' kind returns the call link.
-    fq_call = forward_query(
-        client, dataset_object_id=ds_obj, source_kinds=[tsi.SourceKind.CALL]
-    )
+    fq_call = forward_query(client, dataset_object_id=ds_obj, source_kinds=["call"])
     assert len(fq_call.links) == 1
-    assert fq_call.links[0].source_kind == tsi.SourceKind.CALL
+    assert fq_call.links[0].source_kind == "call"
 
     # Filtering for 'span' only returns nothing (no span links present).
-    fq_span = forward_query(
-        client, dataset_object_id=ds_obj, source_kinds=[tsi.SourceKind.SPAN]
-    )
+    fq_span = forward_query(client, dataset_object_id=ds_obj, source_kinds=["span"])
     assert len(fq_span.links) == 0
 
 
@@ -743,10 +708,10 @@ def test_dataset_sources_forward_query_limit_offset_and_ordering(client):
                 client,
                 dataset_object_id=ds_obj,
                 links=[
-                    tsi.DatasetSourceLinkPayload(
-                        row_digest=new_digest(f"page{i}"),
-                        sources=[call_source(call)],
-                    )
+                    {
+                        "row_digest": new_digest(f"page{i}"),
+                        "sources": [call_source(call)],
+                    }
                 ],
             )
         )
@@ -779,9 +744,7 @@ def test_dataset_sources_forward_query_include_deleted_flag(client):
             client,
             dataset_object_id=ds_obj,
             links=[
-                tsi.DatasetSourceLinkPayload(
-                    row_digest=keep_digest, sources=[call_source(calls.calls[0])]
-                )
+                {"row_digest": keep_digest, "sources": [call_source(calls.calls[0])]}
             ],
         )
     )
@@ -790,18 +753,16 @@ def test_dataset_sources_forward_query_include_deleted_flag(client):
             client,
             dataset_object_id=ds_obj,
             links=[
-                tsi.DatasetSourceLinkPayload(
-                    row_digest=drop_digest, sources=[call_source(calls.calls[1])]
-                )
+                {"row_digest": drop_digest, "sources": [call_source(calls.calls[1])]}
             ],
         )
     )
 
     client.server.dataset_sources_link_delete(
-        tsi.DatasetSourcesLinkDeleteReq(
-            project_id=client.project_id,
-            link_ids=[drop_res.entries[0].link_id],
-        )
+        {
+            "project_id": client.project_id,
+            "link_ids": [drop_res.entries[0].link_id],
+        }
     )
 
     # Default excludes deleted.
@@ -839,11 +800,7 @@ def test_dataset_sources_links_span_dataset_versions(client):
             client,
             dataset_object_id=ds_obj,
             dataset_digest="dataset_v1",
-            links=[
-                tsi.DatasetSourceLinkPayload(
-                    row_digest=digest_a, sources=[call_source(calls.calls[0])]
-                )
-            ],
+            links=[{"row_digest": digest_a, "sources": [call_source(calls.calls[0])]}],
         )
     )
     # "Version 2" of the same dataset object (different dataset_digest).
@@ -852,11 +809,7 @@ def test_dataset_sources_links_span_dataset_versions(client):
             client,
             dataset_object_id=ds_obj,
             dataset_digest="dataset_v2",
-            links=[
-                tsi.DatasetSourceLinkPayload(
-                    row_digest=digest_b, sources=[call_source(calls.calls[1])]
-                )
-            ],
+            links=[{"row_digest": digest_b, "sources": [call_source(calls.calls[1])]}],
         )
     )
 
@@ -876,22 +829,18 @@ def test_dataset_sources_link_missing_span_errors(client):
     """
     ds_obj = "missing_span_dataset"
     digest = new_digest("missingspan")
-    span_source = tsi.SourceRef(
-        source_kind=tsi.SourceKind.SPAN,
-        source_id="nonexistent-span-" + uuid.uuid4().hex,
-        source_trace_id="nonexistent-trace-" + uuid.uuid4().hex,
-    )
+    span_source = {
+        "source_kind": "span",
+        "source_id": "nonexistent-span-" + uuid.uuid4().hex,
+        "source_trace_id": "nonexistent-trace-" + uuid.uuid4().hex,
+    }
 
     with pytest.raises(TraceServerError):
         client.server.dataset_sources_link(
             link_req(
                 client,
                 dataset_object_id=ds_obj,
-                links=[
-                    tsi.DatasetSourceLinkPayload(
-                        row_digest=digest, sources=[span_source]
-                    )
-                ],
+                links=[{"row_digest": digest, "sources": [span_source]}],
             )
         )
 
@@ -923,17 +872,15 @@ def test_dataset_sources_conversation_link_round_trip_both_directions(client):
         link_req(
             client,
             dataset_object_id=ds_obj,
-            links=[tsi.DatasetSourceLinkPayload(row_digest=digest, sources=[conv_src])],
+            links=[{"row_digest": digest, "sources": [conv_src]}],
         )
     )
     assert len(res.entries) == 1
 
     # Forward: dataset -> sources, filtered to the conversation kind.
-    fq = forward_query(
-        client, dataset_object_id=ds_obj, source_kinds=[tsi.SourceKind.CONVERSATION]
-    )
+    fq = forward_query(client, dataset_object_id=ds_obj, source_kinds=["conversation"])
     assert len(fq.links) == 1
-    assert fq.links[0].source_kind == tsi.SourceKind.CONVERSATION
+    assert fq.links[0].source_kind == "conversation"
     assert fq.links[0].source_id == conv_id
     # Conversations carry no trace (D4 invariant).
     assert fq.links[0].source_trace_id == ""
@@ -942,7 +889,7 @@ def test_dataset_sources_conversation_link_round_trip_both_directions(client):
     rq = reverse_query(client, sources=[conv_src])
     assert len(rq.memberships) == 1
     membership = rq.memberships[0]
-    assert membership.source_kind == tsi.SourceKind.CONVERSATION
+    assert membership.source_kind == "conversation"
     assert membership.source_id == conv_id
     assert membership.dataset_object_id == ds_obj
     assert membership.row_digests == [digest]
@@ -952,11 +899,11 @@ def test_dataset_sources_conversation_link_rejects_non_empty_trace(client):
     """D4: conversation links must carry source_trace_id='' (a conversation spans
     traces). A non-empty trace is rejected with no writes.
     """
-    bad_conv = tsi.SourceRef(
-        source_kind=tsi.SourceKind.CONVERSATION,
-        source_id="conv-" + uuid.uuid4().hex,
-        source_trace_id="should-not-be-set",
-    )
+    bad_conv = {
+        "source_kind": "conversation",
+        "source_id": "conv-" + uuid.uuid4().hex,
+        "source_trace_id": "should-not-be-set",
+    }
     ds_obj = "conversation_bad_trace_dataset"
     digest = new_digest("convbad")
 
@@ -965,9 +912,7 @@ def test_dataset_sources_conversation_link_rejects_non_empty_trace(client):
             link_req(
                 client,
                 dataset_object_id=ds_obj,
-                links=[
-                    tsi.DatasetSourceLinkPayload(row_digest=digest, sources=[bad_conv])
-                ],
+                links=[{"row_digest": digest, "sources": [bad_conv]}],
             )
         )
 
@@ -994,11 +939,7 @@ def test_dataset_sources_forward_query_added_by_is_external(client, wb_user_id):
     req = link_req(
         client,
         dataset_object_id=ds_obj,
-        links=[
-            tsi.DatasetSourceLinkPayload(
-                row_digest=digest, sources=[call_source(calls.calls[0])]
-            )
-        ],
+        links=[{"row_digest": digest, "sources": [call_source(calls.calls[0])]}],
     )
     client.server.dataset_sources_link(req)
     res = forward_query(client, dataset_object_id=ds_obj, row_digests=[digest])

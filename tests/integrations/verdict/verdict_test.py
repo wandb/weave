@@ -7,7 +7,6 @@ from weave.integrations.integration_utilities import (
 )
 from weave.trace.call import Call
 from weave.trace.weave_client import WeaveClient
-from weave.trace_server import trace_server_interface as tsi
 
 
 def assert_ends_and_errors(calls: list[tuple[Call, int]]) -> None:
@@ -41,7 +40,7 @@ def test_simple_verdict_pipeline(client: WeaveClient) -> None:
     response = pipeline.run(test_data)
 
     # Get calls from Weave client
-    calls = list(client.get_calls(filter=tsi.CallsFilter(trace_roots_only=True)))
+    calls = list(client.get_calls(filter={"trace_roots_only": True}))
 
     # Assert that we got some calls
     assert len(calls) > 0
@@ -103,7 +102,7 @@ def test_verdict_layer_tracing(client: WeaveClient) -> None:
     response = pipeline.run(test_data)
 
     # Get calls from Weave client
-    calls = list(client.get_calls(filter=tsi.CallsFilter(trace_roots_only=True)))
+    calls = list(client.get_calls(filter={"trace_roots_only": True}))
     assert len(calls) > 0
 
     flattened = flatten_calls(calls)
@@ -158,7 +157,7 @@ def test_verdict_custom_unit_tracing(client: WeaveClient) -> None:
     response = pipeline.run(test_data)
 
     # Get calls from Weave client
-    calls = list(client.get_calls(filter=tsi.CallsFilter(trace_roots_only=True)))
+    calls = list(client.get_calls(filter={"trace_roots_only": True}))
     assert len(calls) > 0
 
     flattened = flatten_calls(calls)
@@ -202,7 +201,7 @@ def test_verdict_block_tracing(client: WeaveClient) -> None:
     response = pipeline.run(test_data)
 
     # Get calls from Weave client
-    calls = list(client.get_calls(filter=tsi.CallsFilter(trace_roots_only=True)))
+    calls = list(client.get_calls(filter={"trace_roots_only": True}))
     assert len(calls) > 0
 
     flattened = flatten_calls(calls)
@@ -249,7 +248,7 @@ def test_verdict_dataset_execution_tracing(client: WeaveClient) -> None:
     )
 
     # Get calls from Weave client
-    calls = list(client.get_calls(filter=tsi.CallsFilter(trace_roots_only=True)))
+    calls = list(client.get_calls(filter={"trace_roots_only": True}))
     assert len(calls) > 0
 
     flattened = flatten_calls(calls)
@@ -296,7 +295,7 @@ def test_verdict_layer_configurations_tracing(client: WeaveClient) -> None:
     response = pipeline.run(test_data)
 
     # Get calls from Weave client
-    calls = list(client.get_calls(filter=tsi.CallsFilter(trace_roots_only=True)))
+    calls = list(client.get_calls(filter={"trace_roots_only": True}))
     assert len(calls) > 0
 
     flattened = flatten_calls(calls)
@@ -345,7 +344,7 @@ def test_verdict_complex_pipeline_tracing(client: WeaveClient) -> None:
     response = pipeline.run(test_data)
 
     # Get calls from Weave client
-    calls = list(client.get_calls(filter=tsi.CallsFilter(trace_roots_only=True)))
+    calls = list(client.get_calls(filter={"trace_roots_only": True}))
     assert len(calls) > 0
 
     flattened = flatten_calls(calls)
@@ -401,7 +400,7 @@ def test_verdict_error_handling_tracing(client: WeaveClient) -> None:
         pass  # Expected to fail
 
     # Get calls from Weave client
-    calls = list(client.get_calls(filter=tsi.CallsFilter(trace_roots_only=True)))
+    calls = list(client.get_calls(filter={"trace_roots_only": True}))
 
     # Even with errors, we should have trace calls
     assert len(calls) > 0
@@ -439,7 +438,7 @@ def test_verdict_tracer_inheritance(client: WeaveClient) -> None:
     response = pipeline.run(test_data)
 
     # Get calls from Weave client
-    calls = list(client.get_calls(filter=tsi.CallsFilter(trace_roots_only=True)))
+    calls = list(client.get_calls(filter={"trace_roots_only": True}))
     assert len(calls) > 0
 
     flattened = flatten_calls(calls)

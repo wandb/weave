@@ -1,13 +1,13 @@
 """FastAPI app for the mock Weave trace server.
 
 The mock implements a small subset of the production trace-server endpoints
-plus a few /test/* endpoints for assertion. Request/response shapes are
-validated against the production Pydantic models from
-`weave.trace_server.trace_server_interface` (and the batch wrapper types
-from production trace_server.py, redefined here because they live outside
-the tsi module). When production renames a model or adds a required field,
-this module either fails to import or rejects an incoming request via
-Pydantic — drift is loud and immediate.
+plus a few /test/* endpoints for assertion. Request bodies are validated
+against the generated client's request types in
+`weave.vendor.weave_server_sdk.types`, which are generated from the trace
+server's OpenAPI spec. When the API renames, retypes or adds a required
+field, the regenerated types reject what the SDK under test still sends —
+drift is loud and immediate. Call timestamps must parse as datetimes, and a
+calls query is checked with the client's query model.
 
 Endpoints implemented (production-shaped):
   * POST /call/upsert_batch     — record start/end events (legacy calls_merged)
@@ -31,44 +31,88 @@ Test-only endpoints (not in production):
 
 from __future__ import annotations
 
+import datetime
 import json
+from collections.abc import Iterator
 from typing import Any
 
+import typing_extensions
 from fastapi import FastAPI, Query
+from fastapi.exceptions import RequestValidationError
 from fastapi.responses import StreamingResponse
-from pydantic import BaseModel
+from pydantic import TypeAdapter, ValidationError
 
-from weave.trace_server import trace_server_interface as tsi
+from weave.trace.builtin_object_classes.query import Query as CallsQuery
 
 # UUIDv7 generator from production weave. Time-ordered IDs sort by creation
 # time, matching the format the real trace server emits (and avoiding a new
 # dependency on `uuid_utils`, which the production code intentionally
-# avoids per `weave/trace_server/ids.py`'s header comment).
-from weave.trace_server.ids import generate_id
+# avoids per `weave/utils/ids.py`'s header comment).
+from weave.utils.ids import generate_id
+from weave.vendor.weave_server_sdk.types import (
+    CallEndParams,
+    CallStartParams,
+    CallUpsertBatchParams,
+    V2CallCompleteParams,
+    call_stream_query_params,
+)
 
 from .store import CallStore
 
+_UPSERT_BATCH = TypeAdapter(CallUpsertBatchParams)
+_CALLS_COMPLETE = TypeAdapter(V2CallCompleteParams)
+# The hidden v2 start and end routes take the same body as /call/start and
+# /call/end, which the spec describes.
+_CALL_START = TypeAdapter(CallStartParams)
+_CALL_END = TypeAdapter(CallEndParams)
+# The generated stream query type without `query`: the generated `Query` names
+# its key `expr`, so it cannot check a query in wire form ({"$expr": ...}). The
+# client's own query model checks the query instead. mypy cannot type a
+# TypedDict whose fields are only known at runtime.
+_STREAM_QUERY = TypeAdapter(
+    typing_extensions.TypedDict(  # type: ignore[operator]
+        "StreamQueryParams",
+        {
+            key: hint
+            for key, hint in typing_extensions.get_type_hints(
+                call_stream_query_params.CallStreamQueryParams, include_extras=True
+            ).items()
+            if key != "query"
+        },
+        total=False,
+    )
+)
+_QUERY = TypeAdapter(CallsQuery)
+# The generated types take any string as a timestamp, which the server parses.
+_TIMESTAMP = TypeAdapter(datetime.datetime)
 
-# Batch wrapper types from the production trace_server.py. Redefined here
-# because they live outside the `tsi` module; their fields are simple
-# shells around `tsi.CallStartReq` / `tsi.CallEndReq` so any meaningful
-# drift surfaces at the inner-type level via Pydantic validation.
-class CallBatchStartMode(BaseModel):
-    mode: str = "start"
-    req: tsi.CallStartReq
+
+def _validated(adapter: TypeAdapter[Any], body: Any, loc: tuple[Any, ...] = ()) -> Any:
+    """Return `body` validated by `adapter`, or answer 422 as FastAPI does.
+
+    Pydantic validates an `Iterable` field lazily, so the iterators it returns
+    are consumed here, which validates every item.
+    """
+
+    def consume(value: Any) -> Any:
+        if isinstance(value, dict):
+            return {k: consume(v) for k, v in value.items()}
+        if isinstance(value, (list, Iterator)):
+            return [consume(v) for v in value]
+        return value
+
+    try:
+        return consume(adapter.validate_python(body))
+    except ValidationError as e:
+        errors = [{**error, "loc": (*loc, *error["loc"])} for error in e.errors()]
+        raise RequestValidationError(errors) from e
 
 
-class CallBatchEndMode(BaseModel):
-    mode: str = "end"
-    req: tsi.CallEndReq
-
-
-class CallCreateBatchReq(BaseModel):
-    batch: list[CallBatchStartMode | CallBatchEndMode]
-
-
-class CallCreateBatchRes(BaseModel):
-    res: list[tsi.CallStartRes | tsi.CallEndRes]
+def _check_timestamps(call: dict[str, Any], loc: tuple[Any, ...]) -> None:
+    """Reject a call start or end whose timestamps are not datetimes."""
+    for key in ("started_at", "ended_at"):
+        if call.get(key) is not None:
+            _validated(_TIMESTAMP, call[key], (*loc, key))
 
 
 def create_app() -> FastAPI:
@@ -80,57 +124,66 @@ def create_app() -> FastAPI:
     # ----- Production-shaped endpoints -----
 
     @app.post("/call/upsert_batch")
-    def upsert_batch(req: CallCreateBatchReq) -> CallCreateBatchRes:
-        results: list[tsi.CallStartRes | tsi.CallEndRes] = []
-        for item in req.batch:
-            if item.mode == "start":
-                payload = item.req.start.model_dump(mode="json")
+    def upsert_batch(body: dict[str, Any]) -> dict[str, Any]:
+        req = _validated(_UPSERT_BATCH, body)
+        results: list[dict[str, Any]] = []
+        for i, item in enumerate(req["batch"]):
+            if "start" in item["req"]:
+                payload = item["req"]["start"]
+                _check_timestamps(payload, ("batch", i, "req", "start"))
                 store.add_start(payload)
                 results.append(
-                    tsi.CallStartRes(
-                        id=payload.get("id") or generate_id(),
-                        trace_id=payload.get("trace_id") or generate_id(),
-                    )
+                    {
+                        "id": payload.get("id") or generate_id(),
+                        "trace_id": payload.get("trace_id") or generate_id(),
+                    }
                 )
             else:
-                payload = item.req.end.model_dump(mode="json")
-                store.add_end(payload)
-                # CallEndRes has no fields; an empty instance is the right return.
-                results.append(tsi.CallEndRes())
-        return CallCreateBatchRes(res=results)
+                _check_timestamps(item["req"]["end"], ("batch", i, "req", "end"))
+                store.add_end(item["req"]["end"])
+                # An end has an empty response.
+                results.append({})
+        return {"res": results}
 
     @app.post("/v2/{entity}/{project}/calls/complete")
     def calls_complete(
-        entity: str, project: str, req: tsi.CallsUpsertCompleteReq
-    ) -> tsi.CallsUpsertCompleteRes:
-        for item in req.batch:
-            store.add_complete(item.model_dump(mode="json"))
-        return tsi.CallsUpsertCompleteRes()
+        entity: str, project: str, body: dict[str, Any]
+    ) -> dict[str, Any]:
+        req = _validated(_CALLS_COMPLETE, {**body, "entity": entity})
+        for i, item in enumerate(req["batch"]):
+            _check_timestamps(item, ("batch", i))
+        for item in req["batch"]:
+            store.add_complete(item)
+        return {}
 
     @app.post("/v2/{entity}/{project}/call/start")
     def call_start_v2(
-        entity: str, project: str, req: tsi.CallStartV2Req
-    ) -> tsi.CallStartV2Res:
-        payload = req.start.model_dump(mode="json")
+        entity: str, project: str, body: dict[str, Any]
+    ) -> dict[str, Any]:
+        payload = _validated(_CALL_START, body)["start"]
+        _check_timestamps(payload, ("start",))
         store.add_start(payload)
-        return tsi.CallStartV2Res(
-            id=payload.get("id") or generate_id(),
-            trace_id=payload.get("trace_id") or generate_id(),
-        )
+        return {
+            "id": payload.get("id") or generate_id(),
+            "trace_id": payload.get("trace_id") or generate_id(),
+        }
 
     @app.post("/v2/{entity}/{project}/call/end")
-    def call_end_v2(
-        entity: str, project: str, req: tsi.CallEndV2Req
-    ) -> tsi.CallEndV2Res:
-        store.add_end(req.end.model_dump(mode="json"))
-        return tsi.CallEndV2Res()
+    def call_end_v2(entity: str, project: str, body: dict[str, Any]) -> dict[str, Any]:
+        payload = _validated(_CALL_END, body)["end"]
+        _check_timestamps(payload, ("end",))
+        store.add_end(payload)
+        return {}
 
     @app.post("/calls/stream_query")
-    def stream_query(req: tsi.CallsQueryReq) -> StreamingResponse:
+    def stream_query(body: dict[str, Any]) -> StreamingResponse:
+        req = _validated(_STREAM_QUERY, {k: v for k, v in body.items() if k != "query"})
+        if body.get("query") is not None:
+            _validated(_QUERY, body["query"], ("query",))
         # Minimal implementation: return all calls for the project as NDJSON.
         # Filter/order/limit semantics are stubbed; future tests can grow this
         # as needed.
-        calls = store.get_calls(req.project_id)
+        calls = store.get_calls(req["project_id"])
 
         def _gen():
             for c in calls:

@@ -11,7 +11,7 @@ on:
         value: ${{ jobs.check.outputs.weave_ts_sdk_tests }}
 
 env:
-  TRACE_SERVER_PATHS: "weave/trace_server/ weave/shared/ weave/utils/ids.py weave/utils/pydantic_util.py weave/trace/serialization/digest.py weave/trace/serialization/object_class_util.py weave/trace/server_tracing.py weave/trace/otel_context_keys.py weave/trace/otel_span_attrs.py weave/trace/isolated_client_executor.py weave/evaluation/evaluate_model_worker.py weave/flow/llm_structured_model.py"
+  TRACE_SERVER_PATHS: "weave/utils/ids.py weave/utils/pydantic_util.py weave/trace/serialization/digest.py weave/trace/serialization/object_class_util.py weave/trace/server_tracing.py weave/trace/otel_context_keys.py weave/trace/otel_span_attrs.py weave/trace/isolated_client_executor.py weave/evaluation/evaluate_model_worker.py weave/flow/llm_structured_model.py"
   WEAVE_TS_SDK_PATHS: "sdks/node/"
   # Everything else is implicitly trace SDK
 

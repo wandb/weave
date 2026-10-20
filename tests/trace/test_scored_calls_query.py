@@ -1,23 +1,20 @@
 from __future__ import annotations
 
+from typing import Any
+
 import pytest
 
 import weave
 from weave import Scorer
 from weave.trace.op_protocol import Op
 from weave.trace.weave_client import WeaveClient
-from weave.trace_server.trace_server_interface import (
-    CallsQueryReq,
-    CallsQueryStatsReq,
-    Query,
-)
 
 
 def assert_number_of_calls(client: WeaveClient, count: int):
     stats = client.server.calls_query_stats(
-        CallsQueryStatsReq(
-            project_id=client.project_id,
-        )
+        {
+            "project_id": client.project_id,
+        }
     )
     assert stats.count == count
 
@@ -42,9 +39,9 @@ def call_ids(calls: list[weave.Call]) -> list[str]:
     return [c.id for c in calls]
 
 
-def stats_query(client: WeaveClient, query: Query) -> CallsQueryStatsReq:
+def stats_query(client: WeaveClient, query: dict[str, Any]) -> int:
     return client.server.calls_query_stats(
-        CallsQueryStatsReq(project_id=client.project_id, query=query)
+        {"project_id": client.project_id, "query": query}
     ).count
 
 
@@ -127,7 +124,7 @@ async def perform_scorer_tests(
     )
     query = {"$expr": exists_expr(output_field_for_name(s0_name))}
     calls_low_level = client.server.calls_query(
-        CallsQueryReq(project_id=client.project_id, query=query)
+        {"project_id": client.project_id, "query": query}
     ).calls
     calls_high_level = client.get_calls(scored_by=[s0_name])
     assert call_ids(calls_low_level) == expected_ids
@@ -139,7 +136,7 @@ async def perform_scorer_tests(
     expected_ids = call_ids([call_scored_by_s0_v0, call_scored_by_s0_v0_and_s1_v0])
     query = {"$expr": eq_expr(runnable_ref_field_for_name(s0_name), s0_v0_uri)}
     calls_low_level = client.server.calls_query(
-        CallsQueryReq(project_id=client.project_id, query=query)
+        {"project_id": client.project_id, "query": query}
     ).calls
     calls_high_level = client.get_calls(scored_by=[s0_v0_uri])
     assert call_ids(calls_low_level) == expected_ids
@@ -151,7 +148,7 @@ async def perform_scorer_tests(
     expected_ids = call_ids([call_scored_by_s0_v1])
     query = {"$expr": eq_expr(runnable_ref_field_for_name(s0_name), s0_v1_uri)}
     calls_low_level = client.server.calls_query(
-        CallsQueryReq(project_id=client.project_id, query=query)
+        {"project_id": client.project_id, "query": query}
     ).calls
     calls_high_level = client.get_calls(scored_by=[s0_v1_uri])
     assert call_ids(calls_low_level) == expected_ids
@@ -163,7 +160,7 @@ async def perform_scorer_tests(
     expected_ids = call_ids([call_scored_by_s1_v0, call_scored_by_s0_v0_and_s1_v0])
     query = {"$expr": exists_expr(output_field_for_name(s1_name))}
     calls_low_level = client.server.calls_query(
-        CallsQueryReq(project_id=client.project_id, query=query)
+        {"project_id": client.project_id, "query": query}
     ).calls
     calls_high_level = client.get_calls(scored_by=[s1_name])
     assert call_ids(calls_low_level) == expected_ids
@@ -175,7 +172,7 @@ async def perform_scorer_tests(
     expected_ids = call_ids([call_scored_by_s1_v0, call_scored_by_s0_v0_and_s1_v0])
     query = {"$expr": eq_expr(runnable_ref_field_for_name(s1_name), s1_v0_uri)}
     calls_low_level = client.server.calls_query(
-        CallsQueryReq(project_id=client.project_id, query=query)
+        {"project_id": client.project_id, "query": query}
     ).calls
     calls_high_level = client.get_calls(scored_by=[s1_v0_uri])
     assert call_ids(calls_low_level) == expected_ids

@@ -29,7 +29,7 @@ export const EVAL_EVALUATION_NAME_SPAN_ATTR = 'weave.eval.evaluation_name';
 
 /**
  * Span-attribute keys carrying the enclosing op call. Spelled the same as
- * `weave/shared/otel_span_attrs.py`; the server's semconv promotes these keys
+ * `weave/trace/otel_span_attrs.py`; the server's semconv promotes these keys
  * into the `parent_call_id` / `parent_call_trace_id` span columns.
  */
 export const PARENT_CALL_ID_SPAN_ATTR = 'weave.parent_call.id';
@@ -38,7 +38,7 @@ export const PARENT_CALL_TRACE_ID_SPAN_ATTR = 'weave.parent_call.trace_id';
 /**
  * Call-attribute key, under the reserved `weave` namespace, holding the OTel
  * span that was current when the call started as `{trace_id, span_id}` hex.
- * Spelled the same as `weave/trace_server/constants.py`: the two SDKs write one
+ * Spelled the same as `weave/trace/constants.py`: the two SDKs write one
  * field and a mismatch shows up as an empty filter result, not as an error.
  */
 export const INVOKING_SPAN_ATTR_KEY = 'invoking_span';

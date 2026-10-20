@@ -119,7 +119,8 @@ const TRACER_NAME = 'pi-coding-agent';
 
 // ---------------------------------------------------------------------------
 // Message shape understood by the Weave GenAI extractor
-// (see weave/trace_server/opentelemetry/genai_extraction.py)
+// (see services/weave-trace/src/trace_server_backend/opentelemetry/genai_extraction.py
+// in wandb/core)
 // ---------------------------------------------------------------------------
 
 type WeaveMessagePart =

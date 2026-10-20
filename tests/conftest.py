@@ -1,32 +1,23 @@
 import contextlib
-import json
 import logging
 import os
 import sys
-from datetime import datetime
 from typing import Any
 from unittest.mock import MagicMock, patch
 
 import pytest
-from fastapi import FastAPI
-from fastapi.responses import StreamingResponse
-from fastapi.testclient import TestClient
 
 import weave
 from tests.trace.server_utils import TEST_ENTITY
 from tests.trace.util import DummyTestException
-from weave.shared import trace_server_interface as tsi
 from weave.trace import weave_client
 from weave.trace.context import weave_client_context
 from weave.trace.context.call_context import set_call_stack
 from weave.trace.settings import replace_settings
-from weave.trace_server_bindings import remote_http_trace_server
-from weave.trace_server_bindings.async_batch_processor import AsyncBatchProcessor
 from weave.trace_server_bindings.caching_middleware_trace_server import (
     CachingMiddlewareTraceServer,
 )
-from weave.trace_server_bindings.call_batch_processor import CallBatchProcessor
-from weave.trace_server_bindings.remote_http_trace_server import RemoteHTTPTraceServer
+from weave.trace_server_bindings.client_interface import TraceServerClientInterface
 
 pytest_plugins = ["tests.conftest_lib.http_trace_server"]
 
@@ -131,14 +122,13 @@ def pytest_sessionfinish(session, exitstatus):
 _TRACE_SERVER_METHOD_NAMES = frozenset(
     {
         name
-        for interface in (tsi.TraceServerInterface, tsi.ObjectInterface)
-        for name, value in vars(interface).items()
+        for name, value in vars(TraceServerClientInterface).items()
         if callable(value) and not name.startswith("_")
     }
 )
 
 
-class ThrowingServer(tsi.TraceServerInterface):
+class ThrowingServer(TraceServerClientInterface):
     def __getattribute__(self, name: str) -> Any:
         if name in _TRACE_SERVER_METHOD_NAMES:
 
@@ -328,7 +318,7 @@ class TestOnlyFlushingTraceServer:
     def __init__(
         self,
         client: TestOnlyFlushingWeaveClient,
-        server: tsi.TraceServerInterface,
+        server: TraceServerClientInterface,
     ) -> None:
         object.__setattr__(self, "_client", client)
         object.__setattr__(self, "_server", server)
@@ -375,7 +365,7 @@ class TestOnlyFlushingTraceServer:
         weave_client.WeaveClient._flush(client)
 
 
-def make_server_recorder(server: tsi.TraceServerInterface):  # type: ignore
+def make_server_recorder(server: TraceServerClientInterface):  # type: ignore
     """A wrapper around a trace server that records all attribute access.
 
     This is extremely helpful for tests to assert that a certain series of
@@ -397,7 +387,7 @@ def make_server_recorder(server: tsi.TraceServerInterface):  # type: ignore
     class ServerRecorder(type(server)):  # type: ignore
         attribute_access_log: list[str]
 
-        def __init__(self, server: tsi.TraceServerInterface):
+        def __init__(self, server: TraceServerClientInterface):
             self.server = server
             self.attribute_access_log = []
 
@@ -552,154 +542,6 @@ def client_creator(zero_stack, trace_server, caching_client_isolation):
             _teardown_test_client(client, reset_settings=True, close_cache_only=True)
 
     return client
-
-
-@pytest.fixture
-def network_proxy_client(client, monkeypatch):
-    """This fixture is used to test the `RemoteHTTPTraceServer` class. There is
-    almost no logic in this class, other than a little batching, so we typically
-    skip it for simplicity. However, we can use this fixture to test such logic.
-    It initializes a mini FastAPI app that proxies requests from the
-    `RemoteHTTPTraceServer` to the underlying `client.server` object.
-
-    We probably will want to flesh this out more in the future, but this is a
-    starting point.
-    """
-    app = FastAPI()
-
-    records = []
-
-    @app.post("/calls/stream_query")
-    def calls_stream_query(req: tsi.CallsQueryReq):
-        records.append(
-            (
-                "calls_stream_query",
-                req,
-            )
-        )
-
-        def generate():
-            calls = client.server.calls_query_stream(req)
-            for call in calls:
-                # Convert datetime objects to ISO format for JSON serialization
-                call_dict = call.model_dump()
-                for key, value in call_dict.items():
-                    if isinstance(value, datetime):
-                        call_dict[key] = value.isoformat()
-                yield f"{json.dumps(call_dict)}\n"
-
-        return StreamingResponse(generate(), media_type="application/x-ndjson")
-
-    @app.post("/table/create")
-    def table_create(req: tsi.TableCreateReq) -> tsi.TableCreateRes:
-        records.append(
-            (
-                "table_create",
-                req,
-            )
-        )
-        return client.server.table_create(req)
-
-    @app.post("/table/create_from_digests")
-    def table_create_from_digests(
-        req: tsi.TableCreateFromDigestsReq,
-    ) -> tsi.TableCreateFromDigestsRes:
-        records.append(
-            (
-                "table_create_from_digests",
-                req,
-            )
-        )
-        return client.server.table_create_from_digests(req)
-
-    @app.post("/table/update")
-    def table_update(req: tsi.TableUpdateReq) -> tsi.TableUpdateRes:
-        records.append(
-            (
-                "table_update",
-                req,
-            )
-        )
-        return client.server.table_update(req)
-
-    @app.post("/feedback/create")
-    def feedback_create(req: tsi.FeedbackCreateReq) -> tsi.FeedbackCreateRes:
-        records.append(
-            (
-                "feedback_create",
-                req,
-            )
-        )
-        return client.server.feedback_create(req)
-
-    @app.post("/feedback/batch/create")
-    def feedback_create_batch(
-        req: tsi.FeedbackCreateBatchReq,
-    ) -> tsi.FeedbackCreateBatchRes:
-        records.append(
-            (
-                "feedback_create_batch",
-                req,
-            )
-        )
-        return client.server.feedback_create_batch(req)
-
-    @app.post("/obj/create")
-    def obj_create(req: tsi.ObjCreateReq) -> tsi.ObjCreateRes:
-        records.append(
-            (
-                "obj_create",
-                req,
-            )
-        )
-        return client.server.obj_create(req)
-
-    @app.post("/obj/read")
-    def obj_read(req: tsi.ObjReadReq) -> tsi.ObjReadRes:
-        records.append(
-            (
-                "obj_read",
-                req,
-            )
-        )
-        return client.server.obj_read(req)
-
-    with TestClient(app) as c:
-
-        def post(url, *args, trace_id=None, **kwargs):
-            kwargs.pop("stream", None)
-            headers = remote_client._build_dynamic_request_headers(trace_id=trace_id)
-            return c.post(url, *args, headers=headers, **kwargs)
-
-        def make_fast_async_batch_processor(*args, **kwargs):
-            kwargs.setdefault("min_batch_interval", 0)
-            return AsyncBatchProcessor(*args, **kwargs)
-
-        def make_fast_call_batch_processor(*args, **kwargs):
-            kwargs.setdefault("min_batch_interval", 0)
-            return CallBatchProcessor(*args, **kwargs)
-
-        monkeypatch.setattr(
-            remote_http_trace_server,
-            "AsyncBatchProcessor",
-            make_fast_async_batch_processor,
-        )
-        monkeypatch.setattr(
-            remote_http_trace_server,
-            "CallBatchProcessor",
-            make_fast_call_batch_processor,
-        )
-
-        remote_client = RemoteHTTPTraceServer(
-            trace_server_url="",
-            should_batch=True,
-        )
-        # Route this instance's requests into the app above. Patching the
-        # module-level `http_requests.post` instead would also catch the
-        # requests `client.server` makes when it is itself an HTTP server, and
-        # the app would call back into itself.
-        remote_client.post = post
-        yield (client, remote_client, records)
 
 
 @pytest.fixture(autouse=True)

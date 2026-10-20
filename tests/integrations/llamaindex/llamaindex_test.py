@@ -32,7 +32,6 @@ from weave.integrations.integration_utilities import (
 from weave.integrations.llamaindex.llamaindex import llamaindex_patcher
 from weave.integrations.openai.openai_sdk import get_openai_patcher
 from weave.trace.weave_client import WeaveClient
-from weave.trace_server.trace_server_interface import CallsFilter
 
 
 @pytest.fixture(autouse=True)
@@ -59,7 +58,7 @@ def test_llamaindex_llm_complete_sync(client: WeaveClient) -> None:
     llm = OpenAI(model="gpt-4o-mini", api_key=api_key)
     response = llm.complete("William Shakespeare is ")
 
-    calls = list(client.get_calls(filter=CallsFilter(trace_roots_only=True)))
+    calls = list(client.get_calls(filter={"trace_roots_only": True}))
     flattened_calls = flatten_calls(calls)
 
     # Integration-tracking metadata is stamped on the integration's patched calls.
@@ -137,7 +136,7 @@ async def test_llamaindex_llm_complete_async(client: WeaveClient) -> None:
     llm = OpenAI(model="gpt-4o-mini", api_key=api_key)
     response = await llm.acomplete("William Shakespeare is ")
 
-    calls = list(client.get_calls(filter=CallsFilter(trace_roots_only=True)))
+    calls = list(client.get_calls(filter={"trace_roots_only": True}))
     flattened_calls = flatten_calls(calls)
 
     exp = [
@@ -204,7 +203,7 @@ def test_llamaindex_llm_stream_complete_sync(client: WeaveClient) -> None:
         if token.delta:
             all_content += token.delta
 
-    calls = list(client.get_calls(filter=CallsFilter(trace_roots_only=True)))
+    calls = list(client.get_calls(filter={"trace_roots_only": True}))
     flattened_calls = flatten_calls(calls)
 
     exp = [
@@ -282,7 +281,7 @@ async def test_llamaindex_llm_stream_complete_async(client: WeaveClient) -> None
         if token.delta:
             all_content += token.delta
 
-    calls = list(client.get_calls(filter=CallsFilter(trace_roots_only=True)))
+    calls = list(client.get_calls(filter={"trace_roots_only": True}))
     flattened_calls = flatten_calls(calls)
 
     exp = [
@@ -352,7 +351,7 @@ def test_llamaindex_llm_chat_sync(client: WeaveClient) -> None:
 
     response = llm.chat(messages)
 
-    calls = list(client.get_calls(filter=CallsFilter(trace_roots_only=True)))
+    calls = list(client.get_calls(filter={"trace_roots_only": True}))
     flattened_calls = flatten_calls(calls)
 
     exp = [
@@ -434,7 +433,7 @@ async def test_llamaindex_llm_chat_async(client: WeaveClient) -> None:
 
     response = await llm.achat(messages)
 
-    calls = list(client.get_calls(filter=CallsFilter(trace_roots_only=True)))
+    calls = list(client.get_calls(filter={"trace_roots_only": True}))
     flattened_calls = flatten_calls(calls)
 
     exp = [
@@ -520,7 +519,7 @@ def test_llamaindex_llm_stream_chat_sync(client: WeaveClient) -> None:
         if token.delta:
             all_content += token.delta
 
-    calls = list(client.get_calls(filter=CallsFilter(trace_roots_only=True)))
+    calls = list(client.get_calls(filter={"trace_roots_only": True}))
     flattened_calls = flatten_calls(calls)
 
     exp = [
@@ -628,7 +627,7 @@ async def test_llamaindex_llm_stream_chat_async(client: WeaveClient) -> None:
         if token.delta:
             all_content += token.delta
 
-    calls = list(client.get_calls(filter=CallsFilter(trace_roots_only=True)))
+    calls = list(client.get_calls(filter={"trace_roots_only": True}))
     flattened_calls = flatten_calls(calls)
 
     exp = [
@@ -737,7 +736,7 @@ def test_llamaindex_tool_calling_sync(client: WeaveClient) -> None:
 
     response = llm.predict_and_call([tool], "Pick a random song for me")
 
-    calls = list(client.get_calls(filter=CallsFilter(trace_roots_only=True)))
+    calls = list(client.get_calls(filter={"trace_roots_only": True}))
     flattened_calls = flatten_calls(calls)
 
     # Verify we have the expected call structure
@@ -821,7 +820,7 @@ async def test_llamaindex_workflow(client: WeaveClient) -> None:
     assert result == "Workflow complete."
 
     # Check the captured calls
-    calls = list(client.get_calls(filter=CallsFilter(trace_roots_only=True)))
+    calls = list(client.get_calls(filter={"trace_roots_only": True}))
     flattened_calls = flatten_calls(calls)
     print(flattened_calls_to_names(flattened_calls))
 
@@ -879,7 +878,7 @@ async def test_llamaindex_quick_start(client: WeaveClient) -> None:
     # Now we can ask questions about the documents or do calculations
     response = await agent.run("What did the author do in college? Also, what's 7 * 8?")
 
-    calls = list(client.get_calls(filter=CallsFilter(trace_roots_only=True)))
+    calls = list(client.get_calls(filter={"trace_roots_only": True}))
     flattened_calls = flatten_calls(calls)
 
     # LlamaIndex 0.14.1+ no longer emits FunctionAgent-done span and SpanDrop event

@@ -4,8 +4,6 @@ import pytest
 
 import weave
 from weave.trace.weave_client import WeaveClient
-from weave.trace_server import trace_server_interface as tsi
-from weave.trace_server.common_interface import SortBy
 
 
 def generate_objects(weave_client: WeaveClient, obj_count: int, version_count: int):
@@ -18,9 +16,9 @@ def test_objs_query_all(client: WeaveClient):
     generate_objects(client, 10, 10)
 
     res = client.server.objs_query(
-        tsi.ObjQueryReq(
-            project_id=client.project_id,
-        )
+        {
+            "project_id": client.project_id,
+        }
     )
     assert len(res.objs) == 100
 
@@ -29,10 +27,10 @@ def test_objs_query_filter_object_ids(client: WeaveClient):
     generate_objects(client, 10, 10)
 
     res = client.server.objs_query(
-        tsi.ObjQueryReq(
-            project_id=client.project_id,
-            filter=tsi.ObjectVersionFilter(object_ids=["obj_0", "obj_1"]),
-        )
+        {
+            "project_id": client.project_id,
+            "filter": {"object_ids": ["obj_0", "obj_1"]},
+        }
     )
     assert len(res.objs) == 20
     assert all(obj.object_id in {"obj_0", "obj_1"} for obj in res.objs)
@@ -42,15 +40,11 @@ def test_objs_query_filter_is_op(client: WeaveClient):
     generate_objects(client, 10, 10)
 
     res = client.server.objs_query(
-        tsi.ObjQueryReq(
-            project_id=client.project_id, filter=tsi.ObjectVersionFilter(is_op=True)
-        )
+        {"project_id": client.project_id, "filter": {"is_op": True}}
     )
     assert len(res.objs) == 0
     res = client.server.objs_query(
-        tsi.ObjQueryReq(
-            project_id=client.project_id, filter=tsi.ObjectVersionFilter(is_op=False)
-        )
+        {"project_id": client.project_id, "filter": {"is_op": False}}
     )
     assert len(res.objs) == 100
 
@@ -59,10 +53,10 @@ def test_objs_query_filter_latest_only(client: WeaveClient):
     generate_objects(client, 10, 10)
 
     res = client.server.objs_query(
-        tsi.ObjQueryReq(
-            project_id=client.project_id,
-            filter=tsi.ObjectVersionFilter(latest_only=True),
-        )
+        {
+            "project_id": client.project_id,
+            "filter": {"latest_only": True},
+        }
     )
     assert len(res.objs) == 10
     assert all(obj.is_latest for obj in res.objs)
@@ -73,13 +67,13 @@ def test_objs_query_filter_limit_offset_sort_by_created_at(client: WeaveClient):
     generate_objects(client, 10, 10)
 
     res = client.server.objs_query(
-        tsi.ObjQueryReq(
-            project_id=client.project_id,
-            filter=tsi.ObjectVersionFilter(latest_only=True),
-            limit=3,
-            offset=5,
-            sort_by=[SortBy(field="created_at", direction="desc")],
-        )
+        {
+            "project_id": client.project_id,
+            "filter": {"latest_only": True},
+            "limit": 3,
+            "offset": 5,
+            "sort_by": [{"field": "created_at", "direction": "desc"}],
+        }
     )
     assert len(res.objs) == 3
     assert all(obj.is_latest for obj in res.objs)
@@ -91,13 +85,13 @@ def test_objs_query_filter_limit_offset_sort_by_created_at(client: WeaveClient):
     assert res.objs[2].val["i"] == 2
 
     res = client.server.objs_query(
-        tsi.ObjQueryReq(
-            project_id=client.project_id,
-            filter=tsi.ObjectVersionFilter(latest_only=True),
-            limit=3,
-            offset=5,
-            sort_by=[SortBy(field="created_at", direction="asc")],
-        )
+        {
+            "project_id": client.project_id,
+            "filter": {"latest_only": True},
+            "limit": 3,
+            "offset": 5,
+            "sort_by": [{"field": "created_at", "direction": "asc"}],
+        }
     )
     assert len(res.objs) == 3
     assert all(obj.is_latest for obj in res.objs)
@@ -113,13 +107,13 @@ def test_objs_query_filter_limit_offset_sort_by_object_id(client: WeaveClient):
     generate_objects(client, 10, 10)
 
     res = client.server.objs_query(
-        tsi.ObjQueryReq(
-            project_id=client.project_id,
-            filter=tsi.ObjectVersionFilter(latest_only=True),
-            limit=3,
-            offset=5,
-            sort_by=[SortBy(field="object_id", direction="desc")],
-        )
+        {
+            "project_id": client.project_id,
+            "filter": {"latest_only": True},
+            "limit": 3,
+            "offset": 5,
+            "sort_by": [{"field": "object_id", "direction": "desc"}],
+        }
     )
     assert len(res.objs) == 3
     assert all(obj.is_latest for obj in res.objs)
@@ -131,13 +125,13 @@ def test_objs_query_filter_limit_offset_sort_by_object_id(client: WeaveClient):
     assert res.objs[2].val["i"] == 2
 
     res = client.server.objs_query(
-        tsi.ObjQueryReq(
-            project_id=client.project_id,
-            filter=tsi.ObjectVersionFilter(latest_only=True),
-            limit=3,
-            offset=5,
-            sort_by=[SortBy(field="object_id", direction="asc")],
-        )
+        {
+            "project_id": client.project_id,
+            "filter": {"latest_only": True},
+            "limit": 3,
+            "offset": 5,
+            "sort_by": [{"field": "object_id", "direction": "asc"}],
+        }
     )
     assert len(res.objs) == 3
     assert all(obj.is_latest for obj in res.objs)
@@ -153,11 +147,11 @@ def test_objs_query_filter_metadata_only(client: WeaveClient):
     generate_objects(client, 10, 10)
 
     res = client.server.objs_query(
-        tsi.ObjQueryReq(
-            project_id=client.project_id,
-            filter=tsi.ObjectVersionFilter(latest_only=True),
-            metadata_only=True,
-        )
+        {
+            "project_id": client.project_id,
+            "filter": {"latest_only": True},
+            "metadata_only": True,
+        }
     )
     assert len(res.objs) == 10
     for obj in res.objs:
@@ -165,11 +159,11 @@ def test_objs_query_filter_metadata_only(client: WeaveClient):
 
     # sanity check that we get the full object when we don't ask for metadata only
     res = client.server.objs_query(
-        tsi.ObjQueryReq(
-            project_id=client.project_id,
-            filter=tsi.ObjectVersionFilter(latest_only=True),
-            metadata_only=False,
-        )
+        {
+            "project_id": client.project_id,
+            "filter": {"latest_only": True},
+            "metadata_only": False,
+        }
     )
     assert len(res.objs) == 10
     for obj in res.objs:
@@ -193,20 +187,20 @@ def test_objs_query_deleted_interaction(client: WeaveClient):
     weave.publish({"i": 3}, name="obj_1")
 
     res = client.server.objs_query(
-        tsi.ObjQueryReq(
-            project_id=client.project_id,
-            filter=tsi.ObjectVersionFilter(latest_only=False),
-        )
+        {
+            "project_id": client.project_id,
+            "filter": {"latest_only": False},
+        }
     )
     assert len(res.objs) == 3
     assert all(obj.val["i"] in {1, 2, 3} for obj in res.objs)
 
     res = client.server.obj_delete(
-        tsi.ObjDeleteReq(
-            project_id=client.project_id,
-            object_id="obj_1",
-            digests=[res.objs[0].digest],
-        )
+        {
+            "project_id": client.project_id,
+            "object_id": "obj_1",
+            "digests": [res.objs[0].digest],
+        }
     )
 
     assert res.num_deleted == 1
@@ -215,21 +209,21 @@ def test_objs_query_deleted_interaction(client: WeaveClient):
     time.sleep(0.2)
 
     res = client.server.objs_query(
-        tsi.ObjQueryReq(
-            project_id=client.project_id,
-            filter=tsi.ObjectVersionFilter(latest_only=False),
-        )
+        {
+            "project_id": client.project_id,
+            "filter": {"latest_only": False},
+        }
     )
     assert len(res.objs) == 2
     assert all(obj.val["i"] in {2, 3} for obj in res.objs)
 
     # Delete the remaining objects
     res = client.server.obj_delete(
-        tsi.ObjDeleteReq(
-            project_id=client.project_id,
-            object_id="obj_1",
-            digests=[res.objs[0].digest, res.objs[1].digest],
-        )
+        {
+            "project_id": client.project_id,
+            "object_id": "obj_1",
+            "digests": [res.objs[0].digest, res.objs[1].digest],
+        }
     )
     assert res.num_deleted == 2
 
@@ -237,10 +231,10 @@ def test_objs_query_deleted_interaction(client: WeaveClient):
     time.sleep(0.2)
 
     res = client.server.objs_query(
-        tsi.ObjQueryReq(
-            project_id=client.project_id,
-            filter=tsi.ObjectVersionFilter(latest_only=False),
-        )
+        {
+            "project_id": client.project_id,
+            "filter": {"latest_only": False},
+        }
     )
     assert len(res.objs) == 0
 
@@ -252,20 +246,20 @@ def test_objs_query_delete_and_recreate(client: WeaveClient):
     weave.publish({"i": 3}, name="obj_1")
 
     res = client.server.objs_query(
-        tsi.ObjQueryReq(
-            project_id=client.project_id,
-            filter=tsi.ObjectVersionFilter(latest_only=False),
-        )
+        {
+            "project_id": client.project_id,
+            "filter": {"latest_only": False},
+        }
     )
     assert len(res.objs) == 3
 
     original_created_at = res.objs[0].created_at
 
     res = client.server.obj_delete(
-        tsi.ObjDeleteReq(
-            project_id=client.project_id,
-            object_id="obj_1",
-        )
+        {
+            "project_id": client.project_id,
+            "object_id": "obj_1",
+        }
     )
     assert res.num_deleted == 3
 
@@ -275,10 +269,10 @@ def test_objs_query_delete_and_recreate(client: WeaveClient):
     time.sleep(0.2)
 
     res = client.server.objs_query(
-        tsi.ObjQueryReq(
-            project_id=client.project_id,
-            filter=tsi.ObjectVersionFilter(latest_only=False),
-        )
+        {
+            "project_id": client.project_id,
+            "filter": {"latest_only": False},
+        }
     )
     assert len(res.objs) == 1
     assert res.objs[0].val["i"] == 1
@@ -291,10 +285,10 @@ def test_objs_query_delete_and_recreate(client: WeaveClient):
     time.sleep(0.2)
 
     res = client.server.objs_query(
-        tsi.ObjQueryReq(
-            project_id=client.project_id,
-            filter=tsi.ObjectVersionFilter(latest_only=False),
-        )
+        {
+            "project_id": client.project_id,
+            "filter": {"latest_only": False},
+        }
     )
     assert len(res.objs) == 3
 
@@ -309,18 +303,18 @@ def test_objs_query_delete_and_add_new_versions(client: WeaveClient):
     weave.publish({"i": 3}, name="obj_1")
 
     res = client.server.objs_query(
-        tsi.ObjQueryReq(
-            project_id=client.project_id,
-            filter=tsi.ObjectVersionFilter(latest_only=False),
-        )
+        {
+            "project_id": client.project_id,
+            "filter": {"latest_only": False},
+        }
     )
     assert len(res.objs) == 3
 
     res = client.server.obj_delete(
-        tsi.ObjDeleteReq(
-            project_id=client.project_id,
-            object_id="obj_1",
-        )
+        {
+            "project_id": client.project_id,
+            "object_id": "obj_1",
+        }
     )
 
     weave.publish({"i": 4}, name="obj_1")
@@ -331,10 +325,10 @@ def test_objs_query_delete_and_add_new_versions(client: WeaveClient):
     time.sleep(0.2)
 
     res = client.server.objs_query(
-        tsi.ObjQueryReq(
-            project_id=client.project_id,
-            filter=tsi.ObjectVersionFilter(latest_only=False),
-        )
+        {
+            "project_id": client.project_id,
+            "filter": {"latest_only": False},
+        }
     )
     assert len(res.objs) == 3
     assert all(obj.val["i"] in {4, 5, 6} for obj in res.objs)
@@ -349,12 +343,10 @@ def test_publish_model_query_no_ref(client: WeaveClient):
     model = MyModel()
     ref = weave.publish(model)
     res = client.server.objs_query(
-        tsi.ObjQueryReq.model_validate(
-            {
-                "project_id": client.project_id,
-                "filter": {"object_ids": [ref.name]},
-            }
-        )
+        {
+            "project_id": client.project_id,
+            "filter": {"object_ids": [ref.name]},
+        }
     )
     assert len(res.objs) == 1
     assert "ref" not in res.objs[0].val

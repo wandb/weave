@@ -56,8 +56,10 @@ from weave.durability.wal_directory_manager import FileWALDirectoryManager
 from weave.durability.wal_lock import is_writer_alive
 from weave.telemetry.trace_sentry import log_error
 from weave.trace_server_bindings.client_interface import TraceServerClientInterface
+from weave.trace_server_bindings.stainless_remote_http_trace_server import (
+    StainlessRemoteHTTPTraceServer,
+)
 from weave.vendor.weave_server_sdk.types import FileCreateParams
-from weave.wandb_interface.auth import ApiKeyCredentials
 
 logger = logging.getLogger(__name__)
 
@@ -452,16 +454,8 @@ def main(argv: list[str] | None = None) -> None:
 
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
 
-    # Imported here: it loads weave.shared, which `import weave` must not load.
-    from weave.trace_server_bindings.remote_http_trace_server import (
-        RemoteHTTPTraceServer,
-    )
-
-    # RemoteHTTPTraceServer is missing a few protocol methods that the
-    # WAL sender doesn't use.  Suppress via Any intermediate.
-    remote_cls: Any = RemoteHTTPTraceServer
-    server: TraceServerClientInterface = remote_cls(
-        args.trace_server_url, auth=ApiKeyCredentials(args.api_key)
+    server: TraceServerClientInterface = StainlessRemoteHTTPTraceServer(
+        args.trace_server_url, password=args.api_key
     )
     sender = create_sender(wal_dir, server, poll_interval=args.poll_interval)
 

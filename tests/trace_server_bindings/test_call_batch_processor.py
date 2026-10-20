@@ -8,7 +8,7 @@ from unittest.mock import MagicMock, patch
 import httpx
 import pytest
 
-from weave.trace_server import trace_server_interface as tsi
+from tests.trace_server_bindings.conftest import request_model
 from weave.trace_server_bindings.call_batch_processor import CallBatchProcessor
 from weave.trace_server_bindings.models import (
     CompleteBatchItem,
@@ -32,20 +32,20 @@ def _make_start_item(
 
     Examples:
         >>> item = _make_start_item("call-1", "trace-1")
-        >>> item.req.start.id
+        >>> item.req["start"]["id"]
         'call-1'
     """
     started_at = datetime.datetime.now(datetime.timezone.utc)
-    start = tsi.StartedCallSchemaForInsert(
-        project_id=project_id,
-        id=call_id,
-        trace_id=trace_id,
-        op_name="op",
-        started_at=started_at,
-        attributes={},
-        inputs={},
-    )
-    return StartBatchItem(req=tsi.CallStartReq(start=start))
+    start = {
+        "project_id": project_id,
+        "id": call_id,
+        "trace_id": trace_id,
+        "op_name": "op",
+        "started_at": started_at,
+        "attributes": {},
+        "inputs": {},
+    }
+    return StartBatchItem(req={"start": start})
 
 
 def _make_end_item(call_id: str, *, project_id: str = "proj") -> EndBatchItem:
@@ -60,17 +60,17 @@ def _make_end_item(call_id: str, *, project_id: str = "proj") -> EndBatchItem:
 
     Examples:
         >>> item = _make_end_item("call-1")
-        >>> item.req.end.id
+        >>> item.req["end"]["id"]
         'call-1'
     """
     ended_at = datetime.datetime.now(datetime.timezone.utc)
-    end = tsi.EndedCallSchemaForInsert(
-        project_id=project_id,
-        id=call_id,
-        ended_at=ended_at,
-        summary={},
-    )
-    return EndBatchItem(req=tsi.CallEndReq(end=end))
+    end = {
+        "project_id": project_id,
+        "id": call_id,
+        "ended_at": ended_at,
+        "summary": {},
+    }
+    return EndBatchItem(req={"end": end})
 
 
 def _make_complete_item(
@@ -88,22 +88,22 @@ def _make_complete_item(
 
     Examples:
         >>> item = _make_complete_item("call-1", "trace-1")
-        >>> item.req.id
+        >>> item.req["id"]
         'call-1'
     """
     started_at = datetime.datetime.now(datetime.timezone.utc)
     ended_at = started_at + datetime.timedelta(seconds=1)
-    complete = tsi.CompletedCallSchemaForInsert(
-        project_id=project_id,
-        id=call_id,
-        trace_id=trace_id,
-        op_name="op",
-        started_at=started_at,
-        ended_at=ended_at,
-        attributes={},
-        inputs={},
-        summary={},
-    )
+    complete = {
+        "project_id": project_id,
+        "id": call_id,
+        "trace_id": trace_id,
+        "op_name": "op",
+        "started_at": started_at,
+        "ended_at": ended_at,
+        "attributes": {},
+        "inputs": {},
+        "summary": {},
+    }
     return CompleteBatchItem(req=complete)
 
 
@@ -143,70 +143,72 @@ def test_paired_call_has_every_field_in_model_order(
     """Pairing a start and an end, given as models or dicts, builds the model's dump."""
     started_at = datetime.datetime(2026, 1, 2, tzinfo=datetime.timezone.utc)
     ended_at = started_at + datetime.timedelta(seconds=1)
-    start_req = tsi.CallStartReq(
-        start=tsi.StartedCallSchemaForInsert(
-            project_id="proj",
-            id="call-1",
-            trace_id="trace-1",
-            op_name="op",
-            display_name="name",
-            parent_id="parent",
-            thread_id="thread",
-            turn_id="turn",
-            started_at=started_at,
-            attributes={"a": 1},
-            inputs={"b": 2},
-            otel_dump={"c": 3},
-            wb_user_id="user",
-            wb_run_id="run",
-            wb_run_step=1,
-        )
-    )
-    end_req = tsi.CallEndReq(
-        end=tsi.EndedCallSchemaForInsert(
-            project_id="proj",
-            id="call-1",
-            trace_id="trace-1",
-            ended_at=ended_at,
-            exception="boom",
-            output={"d": 4},
-            summary={"usage": {}},
-            wb_run_step_end=2,
-        )
-    )
+    start_req = {
+        "start": {
+            "project_id": "proj",
+            "id": "call-1",
+            "trace_id": "trace-1",
+            "op_name": "op",
+            "display_name": "name",
+            "parent_id": "parent",
+            "thread_id": "thread",
+            "turn_id": "turn",
+            "started_at": started_at,
+            "attributes": {"a": 1},
+            "inputs": {"b": 2},
+            "otel_dump": {"c": 3},
+            "wb_user_id": "user",
+            "wb_run_id": "run",
+            "wb_run_step": 1,
+        }
+    }
+    end_req = {
+        "end": {
+            "project_id": "proj",
+            "id": "call-1",
+            "trace_id": "trace-1",
+            "ended_at": ended_at,
+            "exception": "boom",
+            "output": {"d": 4},
+            "summary": {"usage": {}},
+            "wb_run_step_end": 2,
+        }
+    }
     complete_fn = MagicMock()
     processor = CallBatchProcessor(complete_fn, MagicMock(), min_batch_interval=0.01)
 
     processor.enqueue(
         [
-            StartBatchItem(req=start_req.model_dump() if start_as_dict else start_req),
-            EndBatchItem(req=end_req.model_dump() if end_as_dict else end_req),
+            StartBatchItem(
+                req=start_req if start_as_dict else request_model(start_req)
+            ),
+            EndBatchItem(req=end_req if end_as_dict else request_model(end_req)),
         ]
     )
     processor.stop_accepting_new_work_and_flush_queue()
 
-    expected = tsi.CompletedCallSchemaForInsert(
-        project_id="proj",
-        id="call-1",
-        trace_id="trace-1",
-        op_name="op",
-        started_at=started_at,
-        ended_at=ended_at,
-        display_name="name",
-        parent_id="parent",
-        thread_id="thread",
-        turn_id="turn",
-        attributes={"a": 1},
-        inputs={"b": 2},
-        output={"d": 4},
-        summary={"usage": {}},
-        otel_dump={"c": 3},
-        exception="boom",
-        wb_user_id="user",
-        wb_run_id="run",
-        wb_run_step=1,
-        wb_run_step_end=2,
-    ).model_dump()
+    expected = {
+        "project_id": "proj",
+        "id": "call-1",
+        "trace_id": "trace-1",
+        "op_name": "op",
+        "started_at": started_at,
+        "ended_at": ended_at,
+        "display_name": "name",
+        "parent_id": "parent",
+        "thread_id": "thread",
+        "turn_id": "turn",
+        "attributes": {"a": 1},
+        "inputs": {"b": 2},
+        "output": {"d": 4},
+        "summary": {"usage": {}},
+        "otel_dump": {"c": 3},
+        "exception": "boom",
+        "wb_user_id": "user",
+        "wb_run_id": "run",
+        "wb_run_step": 1,
+        "wb_run_step_end": 2,
+    }
     complete_fn.assert_called_once()
     (item,) = complete_fn.call_args[0][0]
     assert item.req == expected
@@ -275,16 +277,16 @@ def test_missing_trace_id_raises_value_error() -> None:
     processor = CallBatchProcessor(complete_fn, eager_fn, min_batch_interval=0.01)
 
     started_at = datetime.datetime.now(datetime.timezone.utc)
-    start = tsi.StartedCallSchemaForInsert(
-        project_id="proj",
-        id="call-1",
-        trace_id=None,
-        op_name="op",
-        started_at=started_at,
-        attributes={},
-        inputs={},
-    )
-    start_item = StartBatchItem(req=tsi.CallStartReq(start=start))
+    start = {
+        "project_id": "proj",
+        "id": "call-1",
+        "trace_id": None,
+        "op_name": "op",
+        "started_at": started_at,
+        "attributes": {},
+        "inputs": {},
+    }
+    start_item = StartBatchItem(req={"start": start})
     end_item = _make_end_item("call-1")
 
     processor.enqueue([start_item])
@@ -355,7 +357,7 @@ def test_flush_does_not_stall_on_eager_end_after_intermediate_flush() -> None:
     assert time.monotonic() - start < timeout
     assert processor._pending_ends == {}
     sent_end_ids = {
-        item.req.end.id
+        item.req["end"]["id"]
         for call in eager_fn.call_args_list
         for item in call.args[0]
         if isinstance(item, EndBatchItem)

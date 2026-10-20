@@ -4,10 +4,9 @@ import datetime
 import json
 import logging
 from collections.abc import Iterator, Mapping
-from typing import TYPE_CHECKING, Any, cast
+from typing import Any, cast
 from zoneinfo import ZoneInfo
 
-from pydantic import BaseModel
 from pydantic_core import to_json, to_jsonable_python
 from typing_extensions import Self
 
@@ -240,16 +239,10 @@ from weave.wandb_interface.auth import (
     WandbCredentials,
 )
 
-if TYPE_CHECKING:
-    from weave.shared import trace_server_interface as tsi
-    from weave.shared.agents import types as agent_types
-
 logger = logging.getLogger(__name__)
 
 
-def _feedback_body(
-    req: Mapping[str, Any] | BaseModel,
-) -> feedback_batch_create_params.Batch:
+def _feedback_body(req: Mapping[str, Any]) -> feedback_batch_create_params.Batch:
     """The feedback fields this binding sends: those set, but not id or created_at."""
     body = {
         key: value
@@ -260,11 +253,7 @@ def _feedback_body(
 
 
 class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
-    """Drop-in replacement for RemoteHTTPTraceServer using the stainless client.
-
-    This implementation uses the stainless-generated client instead of manual HTTP requests.
-    It maintains the same interface and behavior as RemoteHTTPTraceServer.
-    """
+    """The client's trace server binding, built on the stainless-generated client."""
 
     trace_server_url: str
 
@@ -357,9 +346,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
                 default_headers=headers
             )
 
-    def _prepare_v2_request(
-        self, req: Mapping[str, Any] | BaseModel
-    ) -> tuple[str, str]:
+    def _prepare_v2_request(self, req: Mapping[str, Any]) -> tuple[str, str]:
         """Prepare v2 API request by updating headers and splitting project_id.
 
         Args:
@@ -374,7 +361,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         self._update_client_headers()
         return from_project_id(as_params(req)["project_id"])
 
-    def _v2_params(self, req: Mapping[str, Any] | BaseModel) -> dict[str, Any]:
+    def _v2_params(self, req: Mapping[str, Any]) -> dict[str, Any]:
         """Return a v2 request as the keyword arguments of its generated method.
 
         The project goes in the route's `entity` and `project` path parameters,
@@ -679,12 +666,12 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         return self._stainless_client.services.server_info()
 
     def projects_info(
-        self, req: ServiceProjectsInfoParams | tsi.ProjectsInfoReq
+        self, req: ServiceProjectsInfoParams
     ) -> ServiceProjectsInfoResponse:
         self._update_client_headers()
         return self._stainless_client.services.projects_info(**as_params(req))
 
-    def otel_export(self, req: tsi.OTelExportReq) -> tsi.OTelExportRes:
+    def otel_export(self, req: Mapping[str, Any]) -> Any:
         """Export OTEL traces.
 
         Args:
@@ -699,9 +686,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         raise NotImplementedError("Sending otel traces directly is not yet supported.")
 
     # Agent Observability API
-    def agent_spans_query(
-        self, req: SpanQueryParams | agent_types.AgentSpansQueryReq
-    ) -> SpanQueryResponse:
+    def agent_spans_query(self, req: SpanQueryParams) -> SpanQueryResponse:
         """Query agent spans, either as raw rows or grouped aggregates.
 
         Args:
@@ -714,9 +699,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
             extra_headers=self._compose_headers(), **as_params(req)
         )
 
-    def agent_traces_chat(
-        self, req: TraceChatParams | agent_types.AgentTraceChatReq
-    ) -> AgentTraceChatRes:
+    def agent_traces_chat(self, req: TraceChatParams) -> AgentTraceChatRes:
         """Read an agent trace as a chat transcript.
 
         Args:
@@ -737,7 +720,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         )
 
     def agent_conversation_chat(
-        self, req: ConversationChatParams | agent_types.AgentConversationChatReq
+        self, req: ConversationChatParams
     ) -> ConversationChatResponse:
         """Read a conversation as a chat transcript.
 
@@ -759,7 +742,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         )
 
     def agent_conversation_spans(
-        self, req: ConversationSpansParams | agent_types.AgentConversationSpansReq
+        self, req: ConversationSpansParams
     ) -> ConversationSpansResponse:
         """Read the spans of one or more conversations.
 
@@ -773,9 +756,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
             extra_headers=self._compose_headers(), **as_params(req)
         )
 
-    def agent_agents_query(
-        self, req: AgentQueryParams | agent_types.AgentsQueryReq
-    ) -> AgentQueryResponse:
+    def agent_agents_query(self, req: AgentQueryParams) -> AgentQueryResponse:
         """Query agents.
 
         Args:
@@ -789,7 +770,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         )
 
     def agent_versions_query(
-        self, req: AgentVersionQueryParams | agent_types.AgentVersionsQueryReq
+        self, req: AgentVersionQueryParams
     ) -> AgentVersionQueryResponse:
         """Query the versions of an agent.
 
@@ -803,9 +784,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
             extra_headers=self._compose_headers(), **as_params(req)
         )
 
-    def agent_spans_stats(
-        self, req: SpanStatsParams | agent_types.AgentSpanStatsReq
-    ) -> SpanStatsResponse:
+    def agent_spans_stats(self, req: SpanStatsParams) -> SpanStatsResponse:
         """Query chart-ready aggregations over agent spans.
 
         Args:
@@ -819,7 +798,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         )
 
     def agent_custom_attrs_schema(
-        self, req: SpanCustomAttrsSchemaParams | agent_types.AgentCustomAttrsSchemaReq
+        self, req: SpanCustomAttrsSchemaParams
     ) -> SpanCustomAttrsSchemaResponse:
         """Discover typed custom attribute keys on matching agent spans.
 
@@ -833,9 +812,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
             extra_headers=self._compose_headers(), **as_params(req)
         )
 
-    def agent_search(
-        self, req: AgentSearchParams | agent_types.AgentSearchReq
-    ) -> AgentSearchResponse:
+    def agent_search(self, req: AgentSearchParams) -> AgentSearchResponse:
         """Search conversations.
 
         Args:
@@ -849,7 +826,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         )
 
     # Call API
-    def call_start(self, req: CallStartParams | tsi.CallStartReq) -> CallStartResponse:
+    def call_start(self, req: CallStartParams) -> CallStartResponse:
         """Start a call.
 
         Args:
@@ -873,9 +850,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
             extra_headers=self._compose_headers(), **params
         )
 
-    def call_start_batch(
-        self, req: CallUpsertBatchParams | tsi.CallCreateBatchReq
-    ) -> CallUpsertBatchResponse:
+    def call_start_batch(self, req: CallUpsertBatchParams) -> CallUpsertBatchResponse:
         """Start a batch of calls.
 
         Args:
@@ -887,7 +862,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         self._update_client_headers()
         return self._upsert_calls_batch(as_params(req)["batch"])
 
-    def call_end(self, req: CallEndParams | tsi.CallEndReq) -> object:
+    def call_end(self, req: CallEndParams) -> object:
         """End a call.
 
         Args:
@@ -905,7 +880,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
             extra_headers=self._compose_headers(), **as_params(req)
         )
 
-    def call_read(self, req: CallReadParams | tsi.CallReadReq) -> CallReadResponse:
+    def call_read(self, req: CallReadParams) -> CallReadResponse:
         """Read a call.
 
         Args:
@@ -918,9 +893,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
             extra_headers=self._compose_headers(), **as_params(req)
         )
 
-    def calls_query(
-        self, req: CallStreamQueryParams | tsi.CallsQueryReq
-    ) -> CallsQueryRes:
+    def calls_query(self, req: CallStreamQueryParams) -> CallsQueryRes:
         """Query calls.
 
         Args:
@@ -931,9 +904,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         """
         return CallsQueryRes(calls=list(self.calls_query_stream(req)))
 
-    def calls_query_stream(
-        self, req: CallStreamQueryParams | tsi.CallsQueryReq
-    ) -> Iterator[Call]:
+    def calls_query_stream(self, req: CallStreamQueryParams) -> Iterator[Call]:
         """Stream query calls.
 
         Args:
@@ -949,9 +920,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
             # The route's lines are generated as bare objects; each one is a call.
             yield Call.construct(**cast(dict[str, Any], item))
 
-    def calls_query_stats(
-        self, req: CallQueryStatsParams | tsi.CallsQueryStatsReq
-    ) -> CallQueryStatsResponse:
+    def calls_query_stats(self, req: CallQueryStatsParams) -> CallQueryStatsResponse:
         """Query call statistics.
 
         Args:
@@ -964,7 +933,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
             extra_headers=self._compose_headers(), **as_params(req)
         )
 
-    def call_stats(self, req: CallStatsParams | tsi.CallStatsReq) -> CallStatsResponse:
+    def call_stats(self, req: CallStatsParams) -> CallStatsResponse:
         """Query call statistics bucketed over time.
 
         Args:
@@ -977,9 +946,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
             extra_headers=self._compose_headers(), **as_params(req)
         )
 
-    def trace_usage(
-        self, req: TraceUsageParams | tsi.TraceUsageReq
-    ) -> TraceUsageResponse:
+    def trace_usage(self, req: TraceUsageParams) -> TraceUsageResponse:
         """Compute per-call usage with descendant rollup.
 
         Args:
@@ -990,16 +957,14 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
 
         Examples:
             >>> server = StainlessRemoteHTTPTraceServer("http://example.com")
-            >>> req = tsi.TraceUsageReq(project_id="entity/project")
+            >>> req = {"project_id": "entity/project"}
             >>> _ = server.trace_usage(req)  # doctest: +SKIP
         """
         return self._stainless_client.trace.usage(
             extra_headers=self._compose_headers(), **as_params(req)
         )
 
-    def calls_usage(
-        self, req: CallUsageParams | tsi.CallsUsageReq
-    ) -> CallUsageResponse:
+    def calls_usage(self, req: CallUsageParams) -> CallUsageResponse:
         """Compute aggregated usage for multiple root calls.
 
         Args:
@@ -1012,9 +977,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
             extra_headers=self._compose_headers(), **as_params(req)
         )
 
-    def calls_delete(
-        self, req: CallDeleteParams | tsi.CallsDeleteReq
-    ) -> CallDeleteResponse:
+    def calls_delete(self, req: CallDeleteParams) -> CallDeleteResponse:
         """Delete calls.
 
         Args:
@@ -1027,7 +990,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
             extra_headers=self._compose_headers(), **as_params(req)
         )
 
-    def call_update(self, req: CallUpdateParams | tsi.CallUpdateReq) -> object:
+    def call_update(self, req: CallUpdateParams) -> object:
         """Update a call.
 
         Args:
@@ -1041,9 +1004,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         )
 
     # Obj API
-    def obj_create(
-        self, req: ObjectCreateParams | tsi.ObjCreateReq
-    ) -> ObjectCreateResponse:
+    def obj_create(self, req: ObjectCreateParams) -> ObjectCreateResponse:
         """Create an object.
 
         Args:
@@ -1056,7 +1017,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
             extra_headers=self._compose_headers(), **as_params(req)
         )
 
-    def obj_read(self, req: ObjectReadParams | tsi.ObjReadReq) -> ObjectReadResponse:
+    def obj_read(self, req: ObjectReadParams) -> ObjectReadResponse:
         """Read an object.
 
         Args:
@@ -1069,9 +1030,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
             extra_headers=self._compose_headers(), **as_params(req)
         )
 
-    def objs_query(
-        self, req: ObjectQueryParams | tsi.ObjQueryReq
-    ) -> ObjectQueryResponse:
+    def objs_query(self, req: ObjectQueryParams) -> ObjectQueryResponse:
         """Query objects.
 
         Args:
@@ -1085,9 +1044,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
             extra_headers=self._compose_headers(), **as_params(req, exclude={"query"})
         )
 
-    def obj_delete(
-        self, req: ObjectDeleteParams | tsi.ObjDeleteReq
-    ) -> ObjectDeleteResponse:
+    def obj_delete(self, req: ObjectDeleteParams) -> ObjectDeleteResponse:
         """Delete an object.
 
         Args:
@@ -1102,54 +1059,44 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
 
     # Tag and Alias API
     # The routes take the acting user from the auth header, not the body.
-    def obj_add_tags(self, req: ObjAddTagsParams | tsi.ObjAddTagsReq) -> object:
+    def obj_add_tags(self, req: ObjAddTagsParams) -> object:
         return self._stainless_client.objects.tags.add(
             extra_headers=self._compose_headers(),
             **as_params(req, exclude={"wb_user_id"}),
         )
 
-    def obj_remove_tags(
-        self, req: ObjRemoveTagsParams | tsi.ObjRemoveTagsReq
-    ) -> object:
+    def obj_remove_tags(self, req: ObjRemoveTagsParams) -> object:
         return self._stainless_client.objects.tags.remove(
             extra_headers=self._compose_headers(),
             **as_params(req, exclude={"wb_user_id"}),
         )
 
-    def obj_set_aliases(
-        self, req: ObjSetAliasesParams | tsi.ObjSetAliasesReq
-    ) -> object:
+    def obj_set_aliases(self, req: ObjSetAliasesParams) -> object:
         return self._stainless_client.objects.aliases.set(
             extra_headers=self._compose_headers(),
             **as_params(req, exclude={"wb_user_id"}),
         )
 
-    def obj_remove_aliases(
-        self, req: ObjRemoveAliasesParams | tsi.ObjRemoveAliasesReq
-    ) -> object:
+    def obj_remove_aliases(self, req: ObjRemoveAliasesParams) -> object:
         return self._stainless_client.objects.aliases.remove(
             extra_headers=self._compose_headers(),
             **as_params(req, exclude={"wb_user_id"}),
         )
 
-    def tags_list(self, req: TagListParams | tsi.TagsListReq) -> TagListResponse:
+    def tags_list(self, req: TagListParams) -> TagListResponse:
         return self._stainless_client.objects.tags.list(
             extra_headers=self._compose_headers(),
             **as_params(req, exclude={"wb_user_id"}),
         )
 
-    def aliases_list(
-        self, req: AliasListParams | tsi.AliasesListReq
-    ) -> AliasListResponse:
+    def aliases_list(self, req: AliasListParams) -> AliasListResponse:
         return self._stainless_client.objects.aliases.list(
             extra_headers=self._compose_headers(),
             **as_params(req, exclude={"wb_user_id"}),
         )
 
     # Table API
-    def table_create(
-        self, req: TableCreateParams | tsi.TableCreateReq
-    ) -> TableCreateResponse:
+    def table_create(self, req: TableCreateParams) -> TableCreateResponse:
         """Create a table.
 
         Args:
@@ -1162,9 +1109,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
             extra_headers=self._compose_headers(), **as_params(req)
         )
 
-    def table_update(
-        self, req: TableUpdateParams | tsi.TableUpdateReq
-    ) -> TableUpdateResponse:
+    def table_update(self, req: TableUpdateParams) -> TableUpdateResponse:
         """Update a table.
 
         Args:
@@ -1203,9 +1148,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
                 extra_headers=self._compose_headers(), **params
             )
 
-    def table_query(
-        self, req: TableQueryParams | tsi.TableQueryReq
-    ) -> TableQueryResponse:
+    def table_query(self, req: TableQueryParams) -> TableQueryResponse:
         """Query a table.
 
         Args:
@@ -1218,9 +1161,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
             extra_headers=self._compose_headers(), **as_params(req)
         )
 
-    def table_query_stream(
-        self, req: TableQueryParams | tsi.TableQueryReq
-    ) -> Iterator[Row]:
+    def table_query_stream(self, req: TableQueryParams) -> Iterator[Row]:
         """Stream query a table.
 
         Args:
@@ -1233,9 +1174,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         res = self.table_query(req)
         yield from res.rows
 
-    def table_query_stats(
-        self, req: TableQueryStatsParams | tsi.TableQueryStatsReq
-    ) -> TableQueryStatsResponse:
+    def table_query_stats(self, req: TableQueryStatsParams) -> TableQueryStatsResponse:
         """Query table statistics.
 
         Args:
@@ -1249,7 +1188,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         )
 
     def table_create_from_digests(
-        self, req: TableCreateFromDigestsParams | tsi.TableCreateFromDigestsReq
+        self, req: TableCreateFromDigestsParams
     ) -> TableCreateFromDigestsResponse:
         """Create a table from digests.
 
@@ -1264,7 +1203,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         )
 
     def table_query_stats_batch(
-        self, req: TableQueryStatsBatchParams | tsi.TableQueryStatsBatchReq
+        self, req: TableQueryStatsBatchParams
     ) -> TableQueryStatsBatchResponse:
         """Query table statistics in batch.
 
@@ -1278,9 +1217,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
             extra_headers=self._compose_headers(), **as_params(req)
         )
 
-    def refs_read_batch(
-        self, req: RefReadBatchParams | tsi.RefsReadBatchReq
-    ) -> RefReadBatchResponse:
+    def refs_read_batch(self, req: RefReadBatchParams) -> RefReadBatchResponse:
         """Read refs in batch.
 
         Args:
@@ -1293,9 +1230,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
             extra_headers=self._compose_headers(), **as_params(req)
         )
 
-    def file_create(
-        self, req: FileCreateParams | tsi.FileCreateReq
-    ) -> FileCreateResponse:
+    def file_create(self, req: FileCreateParams) -> FileCreateResponse:
         """Create a file.
 
         Args:
@@ -1304,18 +1239,10 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         Returns:
             File create response.
         """
-        if isinstance(req, BaseModel):
-            req = {
-                "project_id": req.project_id,
-                "file": (req.name, req.content),
-                "expected_digest": req.expected_digest,
-            }
         self._update_client_headers()
         return self._stainless_client.files.create(**req)
 
-    def file_content_read(
-        self, req: FileContentParams | tsi.FileContentReadReq
-    ) -> FileContentReadRes:
+    def file_content_read(self, req: FileContentParams) -> FileContentReadRes:
         """Read file content.
 
         Args:
@@ -1332,9 +1259,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         )
         return FileContentReadRes(content=response.read())
 
-    def files_stats(
-        self, req: FileStatsParams | tsi.FilesStatsReq
-    ) -> FileStatsResponse:
+    def files_stats(self, req: FileStatsParams) -> FileStatsResponse:
         """Get file statistics.
 
         Args:
@@ -1347,9 +1272,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
             extra_headers=self._compose_headers(), **as_params(req)
         )
 
-    def feedback_create(
-        self, req: FeedbackCreateParams | tsi.FeedbackCreateReq
-    ) -> FeedbackCreateResponse:
+    def feedback_create(self, req: FeedbackCreateParams) -> FeedbackCreateResponse:
         """Create feedback.
 
         Args:
@@ -1378,7 +1301,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
             return self._stainless_client.feedback.create(**_feedback_body(req))
 
     def feedback_create_batch(
-        self, req: FeedbackBatchCreateParams | tsi.FeedbackCreateBatchReq
+        self, req: FeedbackBatchCreateParams
     ) -> FeedbackBatchCreateResponse:
         """Create feedback in batch.
 
@@ -1393,9 +1316,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
             batch=[_feedback_body(item) for item in as_params(req)["batch"]]
         )
 
-    def feedback_query(
-        self, req: FeedbackQueryParams | tsi.FeedbackQueryReq
-    ) -> FeedbackQueryResponse:
+    def feedback_query(self, req: FeedbackQueryParams) -> FeedbackQueryResponse:
         """Query feedback.
 
         Args:
@@ -1408,7 +1329,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
             extra_headers=self._compose_headers(), **as_params(req)
         )
 
-    def feedback_purge(self, req: FeedbackPurgeParams | tsi.FeedbackPurgeReq) -> object:
+    def feedback_purge(self, req: FeedbackPurgeParams) -> object:
         """Purge feedback.
 
         Args:
@@ -1421,9 +1342,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
             extra_headers=self._compose_headers(), **as_params(req)
         )
 
-    def feedback_replace(
-        self, req: FeedbackReplaceParams | tsi.FeedbackReplaceReq
-    ) -> FeedbackReplaceResponse:
+    def feedback_replace(self, req: FeedbackReplaceParams) -> FeedbackReplaceResponse:
         """Replace feedback.
 
         Args:
@@ -1436,9 +1355,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
             extra_headers=self._compose_headers(), **as_params(req)
         )
 
-    def feedback_stats(
-        self, req: FeedbackStatsParams | tsi.FeedbackStatsReq
-    ) -> FeedbackStatsResponse:
+    def feedback_stats(self, req: FeedbackStatsParams) -> FeedbackStatsResponse:
         """Query feedback statistics bucketed over time.
 
         Args:
@@ -1452,7 +1369,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         )
 
     def feedback_aggregate(
-        self, req: FeedbackAggregateParams | tsi.FeedbackAggregateReq
+        self, req: FeedbackAggregateParams
     ) -> FeedbackAggregateResponse:
         """Aggregate feedback payload values.
 
@@ -1467,7 +1384,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         )
 
     def feedback_payload_schema(
-        self, req: FeedbackPayloadSchemaParams | tsi.FeedbackPayloadSchemaReq
+        self, req: FeedbackPayloadSchemaParams
     ) -> FeedbackPayloadSchemaResponse:
         """Discover the payload paths feedback rows use.
 
@@ -1482,7 +1399,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         )
 
     # Cost API
-    def cost_query(self, req: CostQueryParams | tsi.CostQueryReq) -> CostQueryResponse:
+    def cost_query(self, req: CostQueryParams) -> CostQueryResponse:
         """Query costs.
 
         Args:
@@ -1495,9 +1412,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
             extra_headers=self._compose_headers(), **as_params(req)
         )
 
-    def cost_create(
-        self, req: CostCreateParams | tsi.CostCreateReq
-    ) -> CostCreateResponse:
+    def cost_create(self, req: CostCreateParams) -> CostCreateResponse:
         """Create cost.
 
         Args:
@@ -1510,7 +1425,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
             extra_headers=self._compose_headers(), **as_params(req)
         )
 
-    def cost_purge(self, req: CostPurgeParams | tsi.CostPurgeReq) -> object:
+    def cost_purge(self, req: CostPurgeParams) -> object:
         """Purge costs.
 
         Args:
@@ -1524,7 +1439,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         )
 
     def completions_create(
-        self, req: CompletionCreateParams | tsi.CompletionsCreateReq
+        self, req: CompletionCreateParams
     ) -> CompletionCreateResponse:
         """Create completion.
 
@@ -1539,7 +1454,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         )
 
     def completions_create_stream(
-        self, req: CompletionCreateStreamParams | tsi.CompletionsCreateReq
+        self, req: CompletionCreateStreamParams
     ) -> Iterator[dict[str, Any]]:
         """Create completion stream.
 
@@ -1554,9 +1469,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         for item in response:
             yield item.model_dump(by_alias=True, exclude_unset=True)
 
-    def image_create(
-        self, req: ImageCreateParams | tsi.ImageGenerationCreateReq
-    ) -> ImageCreateResponse:
+    def image_create(self, req: ImageCreateParams) -> ImageCreateResponse:
         """Create image generation.
 
         Args:
@@ -1569,9 +1482,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
             extra_headers=self._compose_headers(), **as_params(req)
         )
 
-    def project_stats(
-        self, req: ProjectStatsParams | tsi.ProjectStatsReq
-    ) -> ProjectStatsResponse:
+    def project_stats(self, req: ProjectStatsParams) -> ProjectStatsResponse:
         """Get project statistics.
 
         Args:
@@ -1585,7 +1496,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         )
 
     def project_ttl_settings_read(
-        self, req: TtlSettingReadParams | tsi.ProjectTTLSettingsReadReq
+        self, req: TtlSettingReadParams
     ) -> TtlSettingReadResponse:
         """Read project TTL settings.
 
@@ -1600,7 +1511,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         )
 
     def project_ttl_settings_update(
-        self, req: TtlSettingUpdateParams | tsi.ProjectTTLSettingsUpdateReq
+        self, req: TtlSettingUpdateParams
     ) -> TtlSettingUpdateResponse:
         """Update project TTL settings.
 
@@ -1615,7 +1526,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         )
 
     def dataset_sources_link(
-        self, req: DatasetSourceLinkParams | tsi.DatasetSourcesLinkReq
+        self, req: DatasetSourceLinkParams
     ) -> DatasetSourceLinkResponse:
         """Link dataset rows to their provenance sources.
 
@@ -1630,7 +1541,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         )
 
     def dataset_sources_query(
-        self, req: DatasetSourceQueryParams | tsi.DatasetSourcesQueryReq
+        self, req: DatasetSourceQueryParams
     ) -> DatasetSourceQueryResponse:
         """Query sources linked to a dataset.
 
@@ -1645,7 +1556,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         )
 
     def source_datasets_query(
-        self, req: DatasetSourceSourceDatasetsQueryParams | tsi.SourceDatasetsQueryReq
+        self, req: DatasetSourceSourceDatasetsQueryParams
     ) -> DatasetSourceSourceDatasetsQueryResponse:
         """Query datasets that contain the given sources.
 
@@ -1660,7 +1571,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         )
 
     def threads_query_stream(
-        self, req: ThreadStreamQueryParams | tsi.ThreadsQueryReq
+        self, req: ThreadStreamQueryParams
     ) -> Iterator[ThreadStreamQueryResponse]:
         """Stream query threads.
 
@@ -1675,7 +1586,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
 
     # Annotation Queue API
     def annotation_queue_create(
-        self, req: AnnotationQueueCreateParams | tsi.AnnotationQueueCreateReq
+        self, req: AnnotationQueueCreateParams
     ) -> AnnotationQueueCreateResponse:
         """Create an annotation queue.
 
@@ -1690,7 +1601,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         )
 
     def annotation_queues_query_stream(
-        self, req: AnnotationQueueQueryParams | tsi.AnnotationQueuesQueryReq
+        self, req: AnnotationQueueQueryParams
     ) -> Iterator[AnnotationQueueSchema]:
         """Stream query annotation queues.
 
@@ -1704,7 +1615,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         yield from self._stainless_client.annotation_queues.query(**as_params(req))
 
     def annotation_queue_read(
-        self, req: QueueReadParams | tsi.AnnotationQueueReadReq
+        self, req: QueueReadParams
     ) -> AnnotationQueueReadResponse:
         """Read an annotation queue.
 
@@ -1719,7 +1630,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         )
 
     def annotation_queue_delete(
-        self, req: QueueDeleteParams | tsi.AnnotationQueueDeleteReq
+        self, req: QueueDeleteParams
     ) -> AnnotationQueueDeleteResponse:
         """Soft-delete an annotation queue.
 
@@ -1735,7 +1646,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         )
 
     def annotation_queue_update(
-        self, req: QueueUpdateParams | tsi.AnnotationQueueUpdateReq
+        self, req: QueueUpdateParams
     ) -> AnnotationQueueUpdateResponse:
         """Update an annotation queue's metadata.
 
@@ -1750,9 +1661,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
             **as_params(req, exclude={"wb_user_id"}),
         )
 
-    def annotation_queue_add_calls(
-        self, req: QueueAddCallsParams | tsi.AnnotationQueueAddCallsReq
-    ) -> ItemAddResponse:
+    def annotation_queue_add_calls(self, req: QueueAddCallsParams) -> ItemAddResponse:
         """Add calls to an annotation queue.
 
         Args:
@@ -1767,7 +1676,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         )
 
     def annotation_queue_items_query(
-        self, req: QueueItemsQueryParams | tsi.AnnotationQueueItemsQueryReq
+        self, req: QueueItemsQueryParams
     ) -> ItemQueryResponse:
         """Query the items of an annotation queue.
 
@@ -1782,7 +1691,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         )
 
     def annotation_queues_stats(
-        self, req: AnnotationQueueStatsParams | tsi.AnnotationQueuesStatsReq
+        self, req: AnnotationQueueStatsParams
     ) -> AnnotationQueueStatsResponse:
         """Get stats for multiple annotation queues.
 
@@ -1798,7 +1707,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
 
     def annotator_queue_items_progress_update(
         self,
-        req: QueueItemProgressUpdateParams | tsi.AnnotatorQueueItemsProgressUpdateReq,
+        req: QueueItemProgressUpdateParams,
     ) -> ItemUpdateProgressResponse:
         """Update the annotation state of a queue item.
 
@@ -1814,7 +1723,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         )
 
     def evaluate_model(
-        self, req: EvaluationEvaluateModelParams | tsi.EvaluateModelReq
+        self, req: EvaluationEvaluateModelParams
     ) -> EvaluationEvaluateModelResponse:
         """Evaluate model.
 
@@ -1829,7 +1738,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         )
 
     def evaluation_status(
-        self, req: EvaluationStatusParams | tsi.EvaluationStatusReq
+        self, req: EvaluationStatusParams
     ) -> EvaluationStatusResponse:
         """Get evaluation status.
 
@@ -1843,9 +1752,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
             extra_headers=self._compose_headers(), **as_params(req)
         )
 
-    def rescore(
-        self, req: EvaluationRescoreParams | tsi.RescoreReq
-    ) -> EvaluationRescoreResponse:
+    def rescore(self, req: EvaluationRescoreParams) -> EvaluationRescoreResponse:
         """Rescore an existing evaluation run with different scorers.
 
         Args:
@@ -1858,7 +1765,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
             extra_headers=self._compose_headers(), **as_params(req)
         )
 
-    def calls_score(self, req: CallScoreParams | tsi.CallsScoreReq) -> object:
+    def calls_score(self, req: CallScoreParams) -> object:
         """Score calls.
 
         Args:
@@ -1873,7 +1780,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
 
     # === Object APIs ===
 
-    def op_create(self, req: Mapping[str, Any] | tsi.OpCreateReq) -> V2OpCreateResponse:
+    def op_create(self, req: Mapping[str, Any]) -> V2OpCreateResponse:
         """Create op.
 
         Args:
@@ -1885,7 +1792,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         params = self._v2_params(req)
         return self._stainless_client.v2_ops.create(**params)
 
-    def op_read(self, req: Mapping[str, Any] | tsi.OpReadReq) -> V2OpReadResponse:
+    def op_read(self, req: Mapping[str, Any]) -> V2OpReadResponse:
         """Read op.
 
         Args:
@@ -1897,9 +1804,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         params = self._v2_params(req)
         return self._stainless_client.v2_ops.read(**params)
 
-    def op_list(
-        self, req: Mapping[str, Any] | tsi.OpListReq
-    ) -> Iterator[V2OpListResponse]:
+    def op_list(self, req: Mapping[str, Any]) -> Iterator[V2OpListResponse]:
         """List ops.
 
         Args:
@@ -1911,7 +1816,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         params = self._v2_params(req)
         yield from self._stainless_client.v2_ops.list(**params)
 
-    def op_delete(self, req: Mapping[str, Any] | tsi.OpDeleteReq) -> V2OpDeleteResponse:
+    def op_delete(self, req: Mapping[str, Any]) -> V2OpDeleteResponse:
         """Delete op.
 
         Args:
@@ -1923,9 +1828,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         params = self._v2_params(req)
         return self._stainless_client.v2_ops.delete(**params)
 
-    def dataset_create(
-        self, req: Mapping[str, Any] | tsi.DatasetCreateReq
-    ) -> V2DatasetCreateResponse:
+    def dataset_create(self, req: Mapping[str, Any]) -> V2DatasetCreateResponse:
         """Create dataset.
 
         Args:
@@ -1937,9 +1840,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         params = self._v2_params(req)
         return self._stainless_client.v2_datasets.create(**params)
 
-    def dataset_read(
-        self, req: Mapping[str, Any] | tsi.DatasetReadReq
-    ) -> V2DatasetReadResponse:
+    def dataset_read(self, req: Mapping[str, Any]) -> V2DatasetReadResponse:
         """Read dataset.
 
         Args:
@@ -1951,9 +1852,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         params = self._v2_params(req)
         return self._stainless_client.v2_datasets.read(**params)
 
-    def dataset_list(
-        self, req: Mapping[str, Any] | tsi.DatasetListReq
-    ) -> Iterator[V2DatasetListResponse]:
+    def dataset_list(self, req: Mapping[str, Any]) -> Iterator[V2DatasetListResponse]:
         """List datasets.
 
         Args:
@@ -1965,9 +1864,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         params = self._v2_params(req)
         yield from self._stainless_client.v2_datasets.list(**params)
 
-    def dataset_delete(
-        self, req: Mapping[str, Any] | tsi.DatasetDeleteReq
-    ) -> V2DatasetDeleteResponse:
+    def dataset_delete(self, req: Mapping[str, Any]) -> V2DatasetDeleteResponse:
         """Delete dataset.
 
         Args:
@@ -1979,9 +1876,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         params = self._v2_params(req)
         return self._stainless_client.v2_datasets.delete(**params)
 
-    def custom_runtime_apply(
-        self, req: Mapping[str, Any] | tsi.CustomRuntimeApplyReq
-    ) -> V2RuntimeApplyResponse:
+    def custom_runtime_apply(self, req: Mapping[str, Any]) -> V2RuntimeApplyResponse:
         """Apply custom runtime.
 
         Args:
@@ -1994,9 +1889,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
             extra_headers=self._compose_headers(), **self._v2_params(req)
         )
 
-    def scorer_create(
-        self, req: Mapping[str, Any] | tsi.ScorerCreateReq
-    ) -> V2ScorerCreateResponse:
+    def scorer_create(self, req: Mapping[str, Any]) -> V2ScorerCreateResponse:
         """Create scorer.
 
         Args:
@@ -2008,9 +1901,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         params = self._v2_params(req)
         return self._stainless_client.v2_scorers.create(**params)
 
-    def scorer_read(
-        self, req: Mapping[str, Any] | tsi.ScorerReadReq
-    ) -> V2ScorerReadResponse:
+    def scorer_read(self, req: Mapping[str, Any]) -> V2ScorerReadResponse:
         """Read scorer.
 
         Args:
@@ -2022,9 +1913,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         params = self._v2_params(req)
         return self._stainless_client.v2_scorers.read(**params)
 
-    def scorer_list(
-        self, req: Mapping[str, Any] | tsi.ScorerListReq
-    ) -> Iterator[V2ScorerListResponse]:
+    def scorer_list(self, req: Mapping[str, Any]) -> Iterator[V2ScorerListResponse]:
         """List scorers.
 
         Args:
@@ -2036,9 +1925,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         params = self._v2_params(req)
         yield from self._stainless_client.v2_scorers.list(**params)
 
-    def scorer_delete(
-        self, req: Mapping[str, Any] | tsi.ScorerDeleteReq
-    ) -> V2ScorerDeleteResponse:
+    def scorer_delete(self, req: Mapping[str, Any]) -> V2ScorerDeleteResponse:
         """Delete scorer.
 
         Args:
@@ -2050,9 +1937,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         params = self._v2_params(req)
         return self._stainless_client.v2_scorers.delete(**params)
 
-    def evaluation_create(
-        self, req: Mapping[str, Any] | tsi.EvaluationCreateReq
-    ) -> V2EvaluationCreateResponse:
+    def evaluation_create(self, req: Mapping[str, Any]) -> V2EvaluationCreateResponse:
         """Create evaluation.
 
         Args:
@@ -2064,9 +1949,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         params = self._v2_params(req)
         return self._stainless_client.v2_evaluations.create(**params)
 
-    def evaluation_read(
-        self, req: Mapping[str, Any] | tsi.EvaluationReadReq
-    ) -> V2EvaluationReadResponse:
+    def evaluation_read(self, req: Mapping[str, Any]) -> V2EvaluationReadResponse:
         """Read evaluation.
 
         Args:
@@ -2079,7 +1962,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         return self._stainless_client.v2_evaluations.read(**params)
 
     def evaluation_list(
-        self, req: Mapping[str, Any] | tsi.EvaluationListReq
+        self, req: Mapping[str, Any]
     ) -> Iterator[V2EvaluationListResponse]:
         """List evaluations.
 
@@ -2092,9 +1975,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         params = self._v2_params(req)
         yield from self._stainless_client.v2_evaluations.list(**params)
 
-    def evaluation_delete(
-        self, req: Mapping[str, Any] | tsi.EvaluationDeleteReq
-    ) -> V2EvaluationDeleteResponse:
+    def evaluation_delete(self, req: Mapping[str, Any]) -> V2EvaluationDeleteResponse:
         """Delete evaluation.
 
         Args:
@@ -2106,9 +1987,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         params = self._v2_params(req)
         return self._stainless_client.v2_evaluations.delete(**params)
 
-    def model_create(
-        self, req: Mapping[str, Any] | tsi.ModelCreateReq
-    ) -> V2ModelCreateResponse:
+    def model_create(self, req: Mapping[str, Any]) -> V2ModelCreateResponse:
         """Create model.
 
         Args:
@@ -2120,9 +1999,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         params = self._v2_params(req)
         return self._stainless_client.v2_models.create(**params)
 
-    def model_read(
-        self, req: Mapping[str, Any] | tsi.ModelReadReq
-    ) -> V2ModelReadResponse:
+    def model_read(self, req: Mapping[str, Any]) -> V2ModelReadResponse:
         """Read model.
 
         Args:
@@ -2134,9 +2011,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         params = self._v2_params(req)
         return self._stainless_client.v2_models.read(**params)
 
-    def model_list(
-        self, req: Mapping[str, Any] | tsi.ModelListReq
-    ) -> Iterator[V2ModelListResponse]:
+    def model_list(self, req: Mapping[str, Any]) -> Iterator[V2ModelListResponse]:
         """List models.
 
         Args:
@@ -2148,9 +2023,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         params = self._v2_params(req)
         yield from self._stainless_client.v2_models.list(**params)
 
-    def model_delete(
-        self, req: Mapping[str, Any] | tsi.ModelDeleteReq
-    ) -> V2ModelDeleteResponse:
+    def model_delete(self, req: Mapping[str, Any]) -> V2ModelDeleteResponse:
         """Delete model.
 
         Args:
@@ -2163,7 +2036,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         return self._stainless_client.v2_models.delete(**params)
 
     def evaluation_run_create(
-        self, req: Mapping[str, Any] | tsi.EvaluationRunCreateReq
+        self, req: Mapping[str, Any]
     ) -> V2EvaluationRunCreateResponse:
         """Create evaluation run.
 
@@ -2177,7 +2050,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         return self._stainless_client.v2_evaluation_runs.create(**params)
 
     def evaluation_run_read(
-        self, req: Mapping[str, Any] | tsi.EvaluationRunReadReq
+        self, req: Mapping[str, Any]
     ) -> V2EvaluationRunReadResponse:
         """Read evaluation run.
 
@@ -2191,7 +2064,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         return self._stainless_client.v2_evaluation_runs.read(**params)
 
     def evaluation_run_list(
-        self, req: Mapping[str, Any] | tsi.EvaluationRunListReq
+        self, req: Mapping[str, Any]
     ) -> Iterator[V2EvaluationRunListResponse]:
         """List evaluation runs.
 
@@ -2207,7 +2080,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         yield from self._stainless_client.v2_evaluation_runs.list(**params)
 
     def evaluation_run_delete(
-        self, req: Mapping[str, Any] | tsi.EvaluationRunDeleteReq
+        self, req: Mapping[str, Any]
     ) -> V2EvaluationRunDeleteResponse:
         """Delete evaluation run.
 
@@ -2221,7 +2094,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         return self._stainless_client.v2_evaluation_runs.delete(**params)
 
     def evaluation_run_finish(
-        self, req: Mapping[str, Any] | tsi.EvaluationRunFinishReq
+        self, req: Mapping[str, Any]
     ) -> V2EvaluationRunFinishResponse:
         """Finish evaluation run.
 
@@ -2234,9 +2107,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         params = self._v2_params(req)
         return self._stainless_client.v2_evaluation_runs.finish(**params)
 
-    def prediction_create(
-        self, req: Mapping[str, Any] | tsi.PredictionCreateReq
-    ) -> V2PredictionCreateResponse:
+    def prediction_create(self, req: Mapping[str, Any]) -> V2PredictionCreateResponse:
         """Create prediction.
 
         Args:
@@ -2248,9 +2119,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         params = self._v2_params(req)
         return self._stainless_client.v2_predictions.create(**params)
 
-    def prediction_read(
-        self, req: Mapping[str, Any] | tsi.PredictionReadReq
-    ) -> V2PredictionReadResponse:
+    def prediction_read(self, req: Mapping[str, Any]) -> V2PredictionReadResponse:
         """Read prediction.
 
         Args:
@@ -2263,7 +2132,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         return self._stainless_client.v2_predictions.read(**params)
 
     def prediction_list(
-        self, req: Mapping[str, Any] | tsi.PredictionListReq
+        self, req: Mapping[str, Any]
     ) -> Iterator[V2PredictionListResponse]:
         """List predictions.
 
@@ -2276,9 +2145,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         params = self._v2_params(req)
         yield from self._stainless_client.v2_predictions.list(**params)
 
-    def prediction_delete(
-        self, req: Mapping[str, Any] | tsi.PredictionDeleteReq
-    ) -> V2PredictionDeleteResponse:
+    def prediction_delete(self, req: Mapping[str, Any]) -> V2PredictionDeleteResponse:
         """Delete prediction.
 
         Args:
@@ -2290,9 +2157,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         params = self._v2_params(req)
         return self._stainless_client.v2_predictions.delete(**params)
 
-    def prediction_finish(
-        self, req: Mapping[str, Any] | tsi.PredictionFinishReq
-    ) -> V2PredictionFinishResponse:
+    def prediction_finish(self, req: Mapping[str, Any]) -> V2PredictionFinishResponse:
         """Finish prediction.
 
         Args:
@@ -2304,9 +2169,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         params = self._v2_params(req)
         return self._stainless_client.v2_predictions.finish(**params)
 
-    def score_create(
-        self, req: Mapping[str, Any] | tsi.ScoreCreateReq
-    ) -> V2ScoreCreateResponse:
+    def score_create(self, req: Mapping[str, Any]) -> V2ScoreCreateResponse:
         """Create score.
 
         Args:
@@ -2318,9 +2181,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         params = self._v2_params(req)
         return self._stainless_client.v2_scores.create(**params)
 
-    def score_read(
-        self, req: Mapping[str, Any] | tsi.ScoreReadReq
-    ) -> V2ScoreReadResponse:
+    def score_read(self, req: Mapping[str, Any]) -> V2ScoreReadResponse:
         """Read score.
 
         Args:
@@ -2332,9 +2193,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         params = self._v2_params(req)
         return self._stainless_client.v2_scores.read(**params)
 
-    def score_list(
-        self, req: Mapping[str, Any] | tsi.ScoreListReq
-    ) -> Iterator[V2ScoreListResponse]:
+    def score_list(self, req: Mapping[str, Any]) -> Iterator[V2ScoreListResponse]:
         """List scores.
 
         Args:
@@ -2346,9 +2205,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         params = self._v2_params(req)
         yield from self._stainless_client.v2_scores.list(**params)
 
-    def score_delete(
-        self, req: Mapping[str, Any] | tsi.ScoreDeleteReq
-    ) -> V2ScoreDeleteResponse:
+    def score_delete(self, req: Mapping[str, Any]) -> V2ScoreDeleteResponse:
         """Delete score.
 
         Args:
@@ -2360,9 +2217,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         params = self._v2_params(req)
         return self._stainless_client.v2_scores.delete(**params)
 
-    def eval_results_query(
-        self, req: Mapping[str, Any] | tsi.EvalResultsQueryReq
-    ) -> V2EvalResultQueryResponse:
+    def eval_results_query(self, req: Mapping[str, Any]) -> V2EvalResultQueryResponse:
         """Query eval results.
 
         Args:

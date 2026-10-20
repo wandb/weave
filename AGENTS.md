@@ -10,7 +10,7 @@
 
 ## The trace server moved to wandb/core (2026-10-13)
 
-Since 2026-10-13 the trace server runs from wandb/core, in `services/weave-trace/src/trace_server_backend/` (wandb/core#58291). Send changes to the server, its migrations and its tests there, not to `weave/trace_server/`, `tests/trace_server/` or `tests/trace_server_migrator/` in this repo: that copy no longer runs, and wandb/weave#8018 deleted it. The server also has its own copy of `weave/shared/`, in `services/weave-trace/src/trace_server_backend/contract/` (wandb/core#58624), and the UI's builtin object schema is generated from that copy (wandb/core#58719). The client no longer loads `weave/shared/`: it sends plain dicts in the generated client's params shape and reads the generated client's types, and everything in `weave/shared/` is deprecated until the package is deleted. A request or response field is therefore added in core only and reaches the client with the regenerated client (see *Generated Files* below); a weave PR is needed only for client code that sets or reads it. The exception is the client's own copies of server models, which ignore or reject fields they do not know: the query, filter and sort models that a `SavedView` or `Monitor` stores, in `weave/trace/builtin_object_classes/query.py`, and the `Feedback` rows `get_feedback` returns, in `weave/trace/feedback.py`. A field the server adds to those needs a PR here too. PRs that touch the old server paths or `weave/shared/` need a review from their code owners. The generated model provider and cost files are regenerated in core too, with `make update_model_providers` and `make update_costs` in `services/weave-trace`.
+Since 2026-10-13 the trace server runs from wandb/core, in `services/weave-trace/src/trace_server_backend/` (wandb/core#58291). Send changes to the server, its migrations and its tests there, not to `weave/trace_server/`, `tests/trace_server/` or `tests/trace_server_migrator/` in this repo: wandb/weave#8018 deleted that copy. The server's API types live in core too, in `services/weave-trace/src/trace_server_backend/contract/` (wandb/core#58624), and the UI's builtin object schema is generated from that copy (wandb/core#58719). This repo has no `weave/shared/` any more: the client sends plain dicts in the generated client's params shape and reads the generated client's types. A request or response field is therefore added in core only and reaches the client with the regenerated client (see *Generated Files* below); a weave PR is needed only for client code that sets or reads it. The exception is the client's own copies of server models, which ignore or reject fields they do not know: the query, filter and sort models that a `SavedView` or `Monitor` stores, in `weave/trace/builtin_object_classes/query.py`, and the `Feedback` rows `get_feedback` returns, in `weave/trace/feedback.py`. A field the server adds to those needs a PR here too. PRs that add files under the old server paths or `weave/shared/` need a review from their code owners. The generated model provider and cost files are regenerated in core too, with `make update_model_providers` and `make update_costs` in `services/weave-trace`.
 
 ## Python Import Rules
 
@@ -84,9 +84,6 @@ _Important:_ For OpenAI Codex agents (most likely you!), your environment does n
 
 - `weave/` - Core implementation
   - `weave/` - Python package implementation
-  - `weave/trace_server` - Deprecated import aliases for `weave.shared` and for
-    the modules that moved from it into the client; the trace server itself
-    lives in wandb/core
 
 ### W&B authentication
 
@@ -311,27 +308,6 @@ Writing a test against the server:
 - An object digest covers the refs inside it in their internal form, so it
   depends on the server's project id. Compare with the ref `weave.publish`
   returned, not with a pinned digest.
-
-#### Remote HTTP Trace Server Implementation Selection
-
-The `--remote-http-trace-server` flag controls which **remote HTTP trace server implementation** is used for testing trace server bindings:
-
-**RemoteHTTPTraceServer (Default):**
-
-```bash
-nox --no-install -e "tests-3.12(shard='trace_server_bindings')" -- tests/trace_server_bindings/test_trace_server_bindings.py --remote-http-trace-server=remote
-```
-
-**StainlessRemoteHTTPTraceServer:**
-
-```bash
-nox --no-install -e "tests-3.12(shard='trace_server_bindings')" -- tests/trace_server_bindings/test_trace_server_bindings.py --remote-http-trace-server=stainless
-```
-
-**Important Notes:**
-
-- The `--remote-http-trace-server` flag is for **trace server binding implementation** (RemoteHTTPTraceServer vs StainlessRemoteHTTPTraceServer)
-- Both implementations share the same test file; the flag determines which server class is used
 
 #### Environment Issues
 

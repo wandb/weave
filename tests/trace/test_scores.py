@@ -2,7 +2,6 @@ from concurrent.futures import Future
 
 import weave
 from weave.trace.ref_util import get_ref
-from weave.trace_server import trace_server_interface as tsi
 
 
 def test_send_score_call(client):
@@ -29,10 +28,10 @@ def test_send_score_call(client):
     assert isinstance(res, str)
 
     query_res = client.server.calls_query(
-        tsi.CallsQueryReq(
-            project_id=client.project_id,
-            include_feedback=True,
-        )
+        {
+            "project_id": client.project_id,
+            "include_feedback": True,
+        }
     )
     calls = query_res.calls
 

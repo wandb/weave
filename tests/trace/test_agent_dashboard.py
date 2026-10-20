@@ -1,7 +1,7 @@
 import pytest
 from pydantic import ValidationError
 
-from weave.trace_server.interface.builtin_object_classes.agent_dashboard import (
+from weave.trace.builtin_object_classes.agent_dashboard import (
     AgentDashboard,
 )
 
