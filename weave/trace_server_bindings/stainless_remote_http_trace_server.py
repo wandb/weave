@@ -24,6 +24,8 @@ from weave.trace_server_bindings.async_batch_processor import AsyncBatchProcesso
 from weave.trace_server_bindings.call_batch_processor import CallBatchProcessor
 from weave.trace_server_bindings.client_interface import TraceServerClientInterface
 from weave.trace_server_bindings.http_utils import (
+    CLIENT_CAPABILITIES,
+    CLIENT_CAPABILITIES_HEADER,
     REMOTE_REQUEST_BYTES_LIMIT,
     TRACE_ID_HEADER,
     CallsCompleteModeRequired,
@@ -137,6 +139,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
 
     def _compose_headers(self, trace_id: str | None = None) -> dict[str, str]:
         headers = self._extra_headers.copy()
+        headers[CLIENT_CAPABILITIES_HEADER] = CLIENT_CAPABILITIES
         if self._credentials is not None:
             headers["Authorization"] = self._credentials.authorization_header()
         if retry_id := get_current_retry_id():
