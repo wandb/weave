@@ -365,6 +365,8 @@ def _build_agent_spans_query(
     agent_expr = {"$eq": [{"$getField": "agent_name"}, {"$literal": agent_name}]}
     if wire_query is None:
         return {"$expr": agent_expr}
+    if "$expr" not in wire_query:
+        Query.model_validate(wire_query)
     return {"$expr": {"$and": [agent_expr, wire_query["$expr"]]}}
 
 
