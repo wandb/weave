@@ -400,6 +400,26 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
             batch=[item.model_dump(mode="json") for item in req.batch],  # type: ignore[misc]
         )
 
+    @validate_call
+    def calls_complete(
+        self, req: tsi.CallsUpsertCompleteReq
+    ) -> tsi.CallsUpsertCompleteRes:
+        """Upsert a batch of completed calls.
+
+        Args:
+            req: Calls upsert complete request.
+
+        Returns:
+            Calls upsert complete response.
+        """
+        if not req.batch:
+            return tsi.CallsUpsertCompleteRes()
+        entity, project = from_project_id(req.batch[0].project_id)
+        self._send_calls_complete_to_server(
+            entity, project, req.model_dump_json().encode("utf-8")
+        )
+        return tsi.CallsUpsertCompleteRes()
+
     def _flush_calls_complete(
         self,
         batch: list[CompleteBatchItem],
