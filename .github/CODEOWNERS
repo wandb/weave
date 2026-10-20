@@ -12,3 +12,5 @@
 # The trace server has its own copy of weave/shared in wandb/core. These owners
 # make sure that a change here that the server needs is made in core too.
 /weave/shared/ @ro31337 @andrewtruong @rgao-coreweave
+# The builtin object classes moved here from weave/shared; core keeps its own copy.
+/weave/trace/builtin_object_classes/ @ro31337 @andrewtruong @rgao-coreweave

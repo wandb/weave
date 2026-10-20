@@ -10,12 +10,12 @@ from pydantic import (
 )
 from typing_extensions import Self
 
-from weave.shared import serialization_metadata
 from weave.trace import api
 from weave.trace.objectify import Objectifyable
 from weave.trace.op_protocol import Op
 from weave.trace.ref_util import get_ref
 from weave.trace.refs import ObjectRef
+from weave.trace.serialization import serialization_metadata
 from weave.trace.vals import WeaveObject, pydantic_getattribute
 
 

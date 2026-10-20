@@ -11,9 +11,9 @@ from typing import Any, cast
 # TODO: type_handlers is imported here to trigger registration of the image serializer.
 # There is probably a better place for this, but including here for now to get the fix in.
 from weave import type_handlers  # noqa: F401
-from weave.shared.interface.builtin_object_classes import leaderboard
 from weave.trace import urls, weave_client, weave_init
 from weave.trace.autopatch import AutopatchSettings
+from weave.trace.builtin_object_classes import leaderboard
 from weave.trace.constants import TRACE_OBJECT_EMOJI
 from weave.trace.context import call_context, weave_client_context
 from weave.trace.context.call_context import get_current_call, require_current_call
