@@ -10,6 +10,8 @@ from cohere.types.assistant_message_response_content_item import (
     TextAssistantMessageResponseContentItem,
 )
 from cohere.types.non_streamed_chat_response import NonStreamedChatResponse
+from cohere.types.tool_call_v2 import ToolCallV2
+from cohere.types.tool_call_v2function import ToolCallV2Function
 from cohere.types.usage import Usage
 from cohere.v2.types.v2chat_response import V2ChatResponse
 
@@ -109,6 +111,43 @@ def cohere_accumulator_v2(acc: V2ChatResponse | None, value: Any) -> V2ChatRespo
             current_item = acc.message.content[value.index]  # type: ignore
             if hasattr(current_item, "text"):
                 current_item.text += value.delta.message.content.text
+
+    elif value.type == "tool-plan-delta":
+        plan_delta = getattr(getattr(value.delta, "message", None), "tool_plan", None)
+        if plan_delta:
+            acc.message.tool_plan = (acc.message.tool_plan or "") + plan_delta
+
+    elif value.type == "tool-call-start":
+        started = getattr(getattr(value.delta, "message", None), "tool_calls", None)
+        if started is not None:
+            if acc.message.tool_calls is None:
+                acc.message.tool_calls = []
+            function = getattr(started, "function", None)
+            acc.message.tool_calls.append(
+                ToolCallV2(
+                    id=started.id,
+                    type="function",
+                    function=ToolCallV2Function(
+                        name=getattr(function, "name", None),
+                        arguments=getattr(function, "arguments", None) or "",
+                    ),
+                )
+            )
+
+    elif value.type == "tool-call-delta":
+        # the delta names its call by index; the calls were appended in index order
+        tool_calls = acc.message.tool_calls
+        delta_call = getattr(getattr(value.delta, "message", None), "tool_calls", None)
+        arguments = getattr(getattr(delta_call, "function", None), "arguments", None)
+        if (
+            tool_calls
+            and arguments
+            and value.index is not None
+            and value.index < len(tool_calls)
+        ):
+            function = tool_calls[value.index].function
+            if function is not None:
+                function.arguments = (function.arguments or "") + arguments
 
     elif value.type == "message-end":
         if hasattr(value, "delta") and hasattr(value.delta, "finish_reason"):
