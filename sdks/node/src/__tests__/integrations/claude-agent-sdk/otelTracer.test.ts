@@ -27,7 +27,7 @@ import {
   ATTR_GEN_AI_TOOL_CALL_ID,
   ATTR_GEN_AI_TOOL_CALL_RESULT,
   ATTR_GEN_AI_TOOL_NAME,
-  ATTR_GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS,
+  ATTR_GEN_AI_USAGE_CACHE_WRITE_INPUT_TOKENS,
   ATTR_GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS,
   ATTR_GEN_AI_USAGE_INPUT_TOKENS,
   ATTR_GEN_AI_USAGE_OUTPUT_TOKENS,
@@ -1891,9 +1891,9 @@ describe('Claude Agent SDK — OTel tracer', () => {
     expect(haiku.attributes[ATTR_GEN_AI_USAGE_INPUT_TOKENS]).toBe(28);
     expect(haiku.attributes[ATTR_GEN_AI_USAGE_OUTPUT_TOKENS]).toBe(8);
     expect(haiku.attributes[ATTR_GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS]).toBe(5);
-    expect(
-      haiku.attributes[ATTR_GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS]
-    ).toBe(3);
+    expect(haiku.attributes[ATTR_GEN_AI_USAGE_CACHE_WRITE_INPUT_TOKENS]).toBe(
+      3
+    );
     // total_tokens = inclusive input (28) + output (8).
     expect(haiku.attributes[ATTR_GEN_AI_USAGE_TOTAL_TOKENS]).toBe(36);
     expect(haiku.parentSpanId).toBe(invoke.spanContext().spanId);

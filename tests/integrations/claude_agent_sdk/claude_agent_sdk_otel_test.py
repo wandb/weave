@@ -776,7 +776,7 @@ async def test_cached_usage_is_normalized_in_otel_span(
     assert usage_attrs == {
         "gen_ai.usage.input_tokens": 20481,
         "gen_ai.usage.output_tokens": 75,
-        "gen_ai.usage.cache_creation.input_tokens": 1024,
+        "gen_ai.usage.cache_write.input_tokens": 1024,
         "gen_ai.usage.cache_read.input_tokens": 19447,
     }
 

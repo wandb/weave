@@ -204,7 +204,10 @@ describe('PiCodingAgentOtelAdapter', () => {
         type: 'text',
         content: 'Hello!',
       });
-      expect(outputMessages[0].finish_reason).toBe('stop');
+      expect(outputMessages[0]).not.toHaveProperty('finish_reason');
+      expect(invoke.attributes['gen_ai.response.finish_reasons']).toEqual([
+        'stop',
+      ]);
     });
 
     it('omits message attributes when captureContent is false', () => {
@@ -305,9 +308,7 @@ describe('PiCodingAgentOtelAdapter', () => {
       expect(chat.attributes['gen_ai.usage.output_tokens']).toBe(50);
       expect(chat.attributes['gen_ai.usage.total_tokens']).toBe(150);
       expect(chat.attributes['gen_ai.usage.cache_read.input_tokens']).toBe(10);
-      expect(chat.attributes['gen_ai.usage.cache_creation.input_tokens']).toBe(
-        5
-      );
+      expect(chat.attributes['gen_ai.usage.cache_write.input_tokens']).toBe(5);
     });
 
     it('sets gen_ai.system_instructions and gen_ai.input.messages from context', () => {
@@ -369,7 +370,7 @@ describe('PiCodingAgentOtelAdapter', () => {
         type: 'text',
         content: 'Hello!',
       });
-      expect(outputMessages[0].finish_reason).toBe('stop');
+      expect(outputMessages[0]).not.toHaveProperty('finish_reason');
     });
 
     it('omits message attributes when captureContent is false', () => {

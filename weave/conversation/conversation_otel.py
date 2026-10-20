@@ -117,14 +117,12 @@ def _serialize_output_messages(
     messages: list[Message] | None,
     *,
     reasoning: Reasoning | None = None,
-    finish_reasons: list[str] | None = None,
 ) -> str | None:
     """Serialize output messages.
 
     Reasoning, when present, is prepended as a ReasoningPart to the most
     recent assistant message; a synthetic assistant message is created if
-    no output messages exist. ``finish_reasons[0]`` is attached to the
-    last output message per semconv (one finish_reason per message).
+    no output messages exist.
     """
     has_reasoning = reasoning is not None and bool(reasoning.content)
     if not messages and not has_reasoning:
@@ -148,8 +146,6 @@ def _serialize_output_messages(
                 target["parts"].insert(0, rpart)
             else:
                 out.append({"role": "assistant", "parts": [rpart]})
-    if out and finish_reasons:
-        out[-1]["finish_reason"] = finish_reasons[0]
     return json.dumps(out)
 
 
@@ -291,9 +287,9 @@ def llm_attributes(
         if usage.total_tokens is not None:
             attrs["gen_ai.usage.total_tokens"] = usage.total_tokens
         if usage.reasoning_tokens:
-            attrs["gen_ai.usage.reasoning_tokens"] = usage.reasoning_tokens
+            attrs["gen_ai.usage.reasoning.output_tokens"] = usage.reasoning_tokens
         if usage.cache_creation_input_tokens:
-            attrs["gen_ai.usage.cache_creation.input_tokens"] = (
+            attrs["gen_ai.usage.cache_write.input_tokens"] = (
                 usage.cache_creation_input_tokens
             )
         if usage.cache_read_input_tokens:
@@ -305,9 +301,7 @@ def llm_attributes(
     if serialized_in is not None:
         attrs["gen_ai.input.messages"] = serialized_in
 
-    serialized_out = _serialize_output_messages(
-        output_messages, reasoning=reasoning, finish_reasons=finish_reasons
-    )
+    serialized_out = _serialize_output_messages(output_messages, reasoning=reasoning)
     if serialized_out is not None:
         attrs["gen_ai.output.messages"] = serialized_out
 

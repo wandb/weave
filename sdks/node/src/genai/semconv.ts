@@ -53,8 +53,8 @@ export const ATTR_GEN_AI_TOOL_CALL_ID = 'gen_ai.tool.call.id';
 export const ATTR_GEN_AI_TOOL_CALL_RESULT = 'gen_ai.tool.call.result';
 export const ATTR_GEN_AI_TOOL_DEFINITIONS = 'gen_ai.tool.definitions';
 export const ATTR_GEN_AI_TOOL_NAME = 'gen_ai.tool.name';
-export const ATTR_GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS =
-  'gen_ai.usage.cache_creation.input_tokens';
+export const ATTR_GEN_AI_USAGE_CACHE_WRITE_INPUT_TOKENS =
+  'gen_ai.usage.cache_write.input_tokens';
 export const ATTR_GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS =
   'gen_ai.usage.cache_read.input_tokens';
 export const ATTR_GEN_AI_USAGE_INPUT_TOKENS = 'gen_ai.usage.input_tokens';
