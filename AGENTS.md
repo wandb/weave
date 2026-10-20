@@ -823,6 +823,10 @@ export WEAVE_IMPLICITLY_PATCH_INTEGRATIONS=false
 
 When disabled, you must explicitly call patch functions like `weave.patch_openai()` to enable tracing for integrations.
 
+## Bayes@N scorer inputs
+
+`weave.BayesAtNScorer` lives under `weave.flow` so it needs no optional scorer dependencies. Its complete-cohort validation uses explicit question/trial IDs in each score payload. Use expanded dataset rows with `Evaluation(trials=1)`; the generic `trials` option repeats payloads without adding trial identity. The explicit `scorer_inputs` dictionary preserves the wrapped scorer's normal argument mapping, including reserved names. Preserve both ID types and this nested payload when changing this path.
+
 # Requests to Humans
 
 This section contains a list of questions, clarifications, or tasks that LLM agents wish to have humans complete.
