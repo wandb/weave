@@ -472,7 +472,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
                 )
                 # Convert to stainless format
                 stainless_batch = [
-                    item.model_dump(exclude={"id", "created_at"}, exclude_none=True)
+                    item.model_dump(exclude={"created_at"}, exclude_none=True)
                     for item in batch_req.batch
                 ]
                 self._stainless_client.feedback.batch_create(batch=stainless_batch)
@@ -1298,7 +1298,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         else:
             self._update_client_headers()
             req_dict = req.model_dump(
-                exclude={"id", "created_at"}, exclude_none=True, by_alias=True
+                exclude={"created_at"}, exclude_none=True, by_alias=True
             )
             response = self._stainless_client.feedback.create(**req_dict)
             return tsi.FeedbackCreateRes.model_validate(response.model_dump())
@@ -1318,9 +1318,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         self._update_client_headers()
         # Convert to stainless format
         stainless_batch = [
-            item.model_dump(
-                exclude={"id", "created_at"}, exclude_none=True, by_alias=True
-            )
+            item.model_dump(exclude={"created_at"}, exclude_none=True, by_alias=True)
             for item in req.batch
         ]
         response = self._stainless_client.feedback.batch_create(batch=stainless_batch)
