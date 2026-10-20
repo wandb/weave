@@ -15,7 +15,6 @@ from typing import TYPE_CHECKING, Any
 
 from httpx import HTTPStatusError as HTTPError
 
-from weave.shared.trace_server_interface import ProjectsInfoReq
 from weave.trace.errors import DigestMismatchError
 from weave.trace.settings import should_enable_client_side_digests
 
@@ -87,9 +86,7 @@ class ProjectIdResolver:
         if cached is not None:
             return cached
         try:
-            results = self._server.projects_info(
-                ProjectsInfoReq(project_ids=[ext_project_id])
-            )
+            results = self._server.projects_info({"project_ids": [ext_project_id]})
         except AttributeError:
             # Endpoint doesn't exist on this server — disable entirely.
             logger.debug(

@@ -46,16 +46,16 @@ def test_register_custom_runtime_normalizes_string_and_explicit_runtime_ids() ->
     )
 
     server.custom_runtime_apply.assert_called_once_with(
-        tsi.CustomRuntimeApplyReq(
-            project_id="entity/project",
-            runtime_name="support-agent",
-            base_url="https://agent.example/v1",
-            api_key_secret="AGENT_API_KEY",
-            headers={"X-Tenant-ID": "customer-1"},
-            runtime_ids=[
-                tsi.CustomRuntimeID(id="support-v12", max_tokens=4096),
-                tsi.CustomRuntimeID(id="support-canary", max_tokens=8192),
+        {
+            "project_id": "entity/project",
+            "runtime_name": "support-agent",
+            "base_url": "https://agent.example/v1",
+            "api_key_secret": "AGENT_API_KEY",
+            "headers": {"X-Tenant-ID": "customer-1"},
+            "runtime_ids": [
+                {"id": "support-v12", "max_tokens": 4096},
+                {"id": "support-canary", "max_tokens": 8192},
             ],
-        )
+        }
     )
     assert result == expected_result

@@ -1,18 +1,25 @@
 from __future__ import annotations
 
-from collections.abc import Iterator
+from collections.abc import Iterator, Mapping
 from typing import Any, Protocol
 
 from weave.shared import trace_server_interface as tsi
 from weave.shared.agents import types as agent_types
-from weave.shared.service_interface import (
-    EnsureProjectExistsRes,
-    ProjectsInfoReq,
-    ProjectsInfoRes,
-    ServerInfoRes,
-)
-from weave.trace_server_bindings.models import CallsQueryRes
+from weave.shared.service_interface import ProjectsInfoReq
+from weave.trace_server_bindings.models import CallsQueryRes, EnsureProjectExistsRes
 from weave.vendor.weave_server_sdk.types import (
+    AnnotationQueueCreateParams,
+    AnnotationQueueCreateResponse,
+    AnnotationQueueDeleteParams,
+    AnnotationQueueDeleteResponse,
+    AnnotationQueueQueryParams,
+    AnnotationQueueReadParams,
+    AnnotationQueueReadResponse,
+    AnnotationQueueSchema,
+    AnnotationQueueStatsParams,
+    AnnotationQueueStatsResponse,
+    AnnotationQueueUpdateParams,
+    AnnotationQueueUpdateResponse,
     CallDeleteParams,
     CallDeleteResponse,
     CallEndParams,
@@ -20,6 +27,7 @@ from weave.vendor.weave_server_sdk.types import (
     CallQueryStatsResponse,
     CallReadParams,
     CallReadResponse,
+    CallScoreParams,
     CallStartParams,
     CallStartResponse,
     CallStatsParams,
@@ -30,12 +38,95 @@ from weave.vendor.weave_server_sdk.types import (
     CallUpsertBatchResponse,
     CallUsageParams,
     CallUsageResponse,
+    CompletionCreateParams,
+    CompletionCreateResponse,
+    CompletionCreateStreamParams,
+    CostCreateParams,
+    CostCreateResponse,
+    CostPurgeParams,
+    CostQueryParams,
+    CostQueryResponse,
+    DatasetSourceLinkParams,
+    DatasetSourceLinkResponse,
+    DatasetSourceQueryParams,
+    DatasetSourceQueryResponse,
+    DatasetSourceSourceDatasetsQueryParams,
+    DatasetSourceSourceDatasetsQueryResponse,
+    EvaluationEvaluateModelParams,
+    EvaluationEvaluateModelResponse,
+    EvaluationRescoreParams,
+    EvaluationRescoreResponse,
+    EvaluationStatusParams,
+    EvaluationStatusResponse,
+    FeedbackAggregateParams,
+    FeedbackAggregateResponse,
+    FeedbackBatchCreateParams,
+    FeedbackBatchCreateResponse,
+    FeedbackCreateParams,
+    FeedbackCreateResponse,
+    FeedbackPayloadSchemaParams,
+    FeedbackPayloadSchemaResponse,
+    FeedbackPurgeParams,
+    FeedbackQueryParams,
+    FeedbackQueryResponse,
+    FeedbackReplaceParams,
+    FeedbackReplaceResponse,
+    FeedbackStatsParams,
+    FeedbackStatsResponse,
+    ImageCreateParams,
+    ImageCreateResponse,
+    ProjectStatsParams,
+    ProjectStatsResponse,
+    ServerInfoRes,
+    ServiceProjectsInfoParams,
+    ServiceProjectsInfoResponse,
     ThreadStreamQueryParams,
     ThreadStreamQueryResponse,
     TraceUsageParams,
     TraceUsageResponse,
+    V2RuntimeApplyResponse,
+)
+from weave.vendor.weave_server_sdk.types.annotation_queues import (
+    ItemAddParams,
+    ItemAddResponse,
+    ItemQueryParams,
+    ItemQueryResponse,
+    ItemUpdateProgressParams,
+    ItemUpdateProgressResponse,
 )
 from weave.vendor.weave_server_sdk.types.call_read_response import Call
+from weave.vendor.weave_server_sdk.types.projects import (
+    TtlSettingReadParams,
+    TtlSettingReadResponse,
+    TtlSettingUpdateParams,
+    TtlSettingUpdateResponse,
+)
+
+
+# The generated annotation queue methods take the queue or item id as a
+# positional path argument, so their params types leave it out.
+class QueueReadParams(AnnotationQueueReadParams):
+    queue_id: str
+
+
+class QueueDeleteParams(AnnotationQueueDeleteParams):
+    queue_id: str
+
+
+class QueueUpdateParams(AnnotationQueueUpdateParams):
+    queue_id: str
+
+
+class QueueAddCallsParams(ItemAddParams):
+    queue_id: str
+
+
+class QueueItemsQueryParams(ItemQueryParams):
+    queue_id: str
+
+
+class QueueItemProgressUpdateParams(ItemUpdateProgressParams):
+    item_id: str
 
 
 class TraceServerClientInterface(Protocol):
@@ -117,9 +208,13 @@ class TraceServerClientInterface(Protocol):
     ) -> CallUpsertBatchResponse: ...
 
     # Cost API
-    def cost_create(self, req: tsi.CostCreateReq) -> tsi.CostCreateRes: ...
-    def cost_query(self, req: tsi.CostQueryReq) -> tsi.CostQueryRes: ...
-    def cost_purge(self, req: tsi.CostPurgeReq) -> tsi.CostPurgeRes: ...
+    def cost_create(
+        self, req: CostCreateParams | tsi.CostCreateReq
+    ) -> CostCreateResponse: ...
+    def cost_query(
+        self, req: CostQueryParams | tsi.CostQueryReq
+    ) -> CostQueryResponse: ...
+    def cost_purge(self, req: CostPurgeParams | tsi.CostPurgeReq) -> object: ...
 
     # Obj API
     def obj_create(self, req: tsi.ObjCreateReq) -> tsi.ObjCreateRes: ...
@@ -170,53 +265,63 @@ class TraceServerClientInterface(Protocol):
     def export_status(self, req: tsi.ExportStatusReq) -> tsi.ExportStatusRes: ...
 
     # Feedback API
-    def feedback_create(self, req: tsi.FeedbackCreateReq) -> tsi.FeedbackCreateRes: ...
+    def feedback_create(
+        self, req: FeedbackCreateParams | tsi.FeedbackCreateReq
+    ) -> FeedbackCreateResponse: ...
     def feedback_create_batch(
-        self, req: tsi.FeedbackCreateBatchReq
-    ) -> tsi.FeedbackCreateBatchRes: ...
+        self, req: FeedbackBatchCreateParams | tsi.FeedbackCreateBatchReq
+    ) -> FeedbackBatchCreateResponse: ...
 
-    def feedback_query(self, req: tsi.FeedbackQueryReq) -> tsi.FeedbackQueryRes: ...
-    def feedback_purge(self, req: tsi.FeedbackPurgeReq) -> tsi.FeedbackPurgeRes: ...
+    def feedback_query(
+        self, req: FeedbackQueryParams | tsi.FeedbackQueryReq
+    ) -> FeedbackQueryResponse: ...
+    def feedback_purge(
+        self, req: FeedbackPurgeParams | tsi.FeedbackPurgeReq
+    ) -> object: ...
     def feedback_replace(
-        self, req: tsi.FeedbackReplaceReq
-    ) -> tsi.FeedbackReplaceRes: ...
-    def feedback_stats(self, req: tsi.FeedbackStatsReq) -> tsi.FeedbackStatsRes: ...
+        self, req: FeedbackReplaceParams | tsi.FeedbackReplaceReq
+    ) -> FeedbackReplaceResponse: ...
+    def feedback_stats(
+        self, req: FeedbackStatsParams | tsi.FeedbackStatsReq
+    ) -> FeedbackStatsResponse: ...
     def feedback_aggregate(
-        self, req: tsi.FeedbackAggregateReq
-    ) -> tsi.FeedbackAggregateRes: ...
+        self, req: FeedbackAggregateParams | tsi.FeedbackAggregateReq
+    ) -> FeedbackAggregateResponse: ...
     def feedback_payload_schema(
-        self, req: tsi.FeedbackPayloadSchemaReq
-    ) -> tsi.FeedbackPayloadSchemaRes: ...
+        self, req: FeedbackPayloadSchemaParams | tsi.FeedbackPayloadSchemaReq
+    ) -> FeedbackPayloadSchemaResponse: ...
 
     # Execute LLM API
     def completions_create(
-        self, req: tsi.CompletionsCreateReq
-    ) -> tsi.CompletionsCreateRes: ...
+        self, req: CompletionCreateParams | tsi.CompletionsCreateReq
+    ) -> CompletionCreateResponse: ...
 
     # Execute LLM API (Streaming)
     # Returns an iterator of JSON-serializable chunks that together form the streamed
     # response from the model provider. Each element must be a dictionary that can
     # be serialized with ``json.dumps``.
     def completions_create_stream(
-        self, req: tsi.CompletionsCreateReq
+        self, req: CompletionCreateStreamParams | tsi.CompletionsCreateReq
     ) -> Iterator[dict[str, Any]]: ...
 
     # Execute Image Generation API
     def image_create(
-        self, req: tsi.ImageGenerationCreateReq
-    ) -> tsi.ImageGenerationCreateRes: ...
+        self, req: ImageCreateParams | tsi.ImageGenerationCreateReq
+    ) -> ImageCreateResponse: ...
 
     # Project statistics API
-    def project_stats(self, req: tsi.ProjectStatsReq) -> tsi.ProjectStatsRes: ...
+    def project_stats(
+        self, req: ProjectStatsParams | tsi.ProjectStatsReq
+    ) -> ProjectStatsResponse: ...
 
     # TTL settings API
     def project_ttl_settings_read(
-        self, req: tsi.ProjectTTLSettingsReadReq
-    ) -> tsi.ProjectTTLSettingsReadRes: ...
+        self, req: TtlSettingReadParams | tsi.ProjectTTLSettingsReadReq
+    ) -> TtlSettingReadResponse: ...
 
     def project_ttl_settings_update(
-        self, req: tsi.ProjectTTLSettingsUpdateReq
-    ) -> tsi.ProjectTTLSettingsUpdateRes: ...
+        self, req: TtlSettingUpdateParams | tsi.ProjectTTLSettingsUpdateReq
+    ) -> TtlSettingUpdateResponse: ...
 
     # Thread API
     def threads_query_stream(
@@ -225,67 +330,72 @@ class TraceServerClientInterface(Protocol):
 
     # Annotation Queue API
     def annotation_queue_create(
-        self, req: tsi.AnnotationQueueCreateReq
-    ) -> tsi.AnnotationQueueCreateRes: ...
+        self, req: AnnotationQueueCreateParams | tsi.AnnotationQueueCreateReq
+    ) -> AnnotationQueueCreateResponse: ...
 
     def annotation_queues_query_stream(
-        self, req: tsi.AnnotationQueuesQueryReq
-    ) -> Iterator[tsi.AnnotationQueueSchema]: ...
+        self, req: AnnotationQueueQueryParams | tsi.AnnotationQueuesQueryReq
+    ) -> Iterator[AnnotationQueueSchema]: ...
 
     def annotation_queue_read(
-        self, req: tsi.AnnotationQueueReadReq
-    ) -> tsi.AnnotationQueueReadRes: ...
+        self, req: QueueReadParams | tsi.AnnotationQueueReadReq
+    ) -> AnnotationQueueReadResponse: ...
 
     def annotation_queue_delete(
-        self, req: tsi.AnnotationQueueDeleteReq
-    ) -> tsi.AnnotationQueueDeleteRes: ...
+        self, req: QueueDeleteParams | tsi.AnnotationQueueDeleteReq
+    ) -> AnnotationQueueDeleteResponse: ...
 
     def annotation_queue_update(
-        self, req: tsi.AnnotationQueueUpdateReq
-    ) -> tsi.AnnotationQueueUpdateRes: ...
+        self, req: QueueUpdateParams | tsi.AnnotationQueueUpdateReq
+    ) -> AnnotationQueueUpdateResponse: ...
 
     def annotation_queue_add_calls(
-        self, req: tsi.AnnotationQueueAddCallsReq
-    ) -> tsi.AnnotationQueueAddCallsRes: ...
+        self, req: QueueAddCallsParams | tsi.AnnotationQueueAddCallsReq
+    ) -> ItemAddResponse: ...
 
     def annotation_queues_stats(
-        self, req: tsi.AnnotationQueuesStatsReq
-    ) -> tsi.AnnotationQueuesStatsRes: ...
+        self, req: AnnotationQueueStatsParams | tsi.AnnotationQueuesStatsReq
+    ) -> AnnotationQueueStatsResponse: ...
 
     def annotation_queue_items_query(
-        self, req: tsi.AnnotationQueueItemsQueryReq
-    ) -> tsi.AnnotationQueueItemsQueryRes: ...
+        self, req: QueueItemsQueryParams | tsi.AnnotationQueueItemsQueryReq
+    ) -> ItemQueryResponse: ...
 
     def annotator_queue_items_progress_update(
-        self, req: tsi.AnnotatorQueueItemsProgressUpdateReq
-    ) -> tsi.AnnotatorQueueItemsProgressUpdateRes: ...
+        self,
+        req: QueueItemProgressUpdateParams | tsi.AnnotatorQueueItemsProgressUpdateReq,
+    ) -> ItemUpdateProgressResponse: ...
 
     # Dataset Sources API
     def dataset_sources_link(
-        self, req: tsi.DatasetSourcesLinkReq
-    ) -> tsi.DatasetSourcesLinkRes: ...
+        self, req: DatasetSourceLinkParams | tsi.DatasetSourcesLinkReq
+    ) -> DatasetSourceLinkResponse: ...
 
     def dataset_sources_link_delete(
         self, req: tsi.DatasetSourcesLinkDeleteReq
     ) -> tsi.DatasetSourcesLinkDeleteRes: ...
 
     def dataset_sources_query(
-        self, req: tsi.DatasetSourcesQueryReq
-    ) -> tsi.DatasetSourcesQueryRes: ...
+        self, req: DatasetSourceQueryParams | tsi.DatasetSourcesQueryReq
+    ) -> DatasetSourceQueryResponse: ...
 
     def source_datasets_query(
-        self, req: tsi.SourceDatasetsQueryReq
-    ) -> tsi.SourceDatasetsQueryRes: ...
+        self, req: DatasetSourceSourceDatasetsQueryParams | tsi.SourceDatasetsQueryReq
+    ) -> DatasetSourceSourceDatasetsQueryResponse: ...
 
     # Evaluation API
-    def evaluate_model(self, req: tsi.EvaluateModelReq) -> tsi.EvaluateModelRes: ...
+    def evaluate_model(
+        self, req: EvaluationEvaluateModelParams | tsi.EvaluateModelReq
+    ) -> EvaluationEvaluateModelResponse: ...
     def evaluation_status(
-        self, req: tsi.EvaluationStatusReq
-    ) -> tsi.EvaluationStatusRes: ...
-    def rescore(self, req: tsi.RescoreReq) -> tsi.RescoreRes: ...
+        self, req: EvaluationStatusParams | tsi.EvaluationStatusReq
+    ) -> EvaluationStatusResponse: ...
+    def rescore(
+        self, req: EvaluationRescoreParams | tsi.RescoreReq
+    ) -> EvaluationRescoreResponse: ...
 
     # Scoring API
-    def calls_score(self, req: tsi.CallsScoreReq) -> tsi.CallsScoreRes: ...
+    def calls_score(self, req: CallScoreParams | tsi.CallsScoreReq) -> object: ...
 
     # Calls V2 API
     def calls_complete(
@@ -307,9 +417,11 @@ class TraceServerClientInterface(Protocol):
     def dataset_delete(self, req: tsi.DatasetDeleteReq) -> tsi.DatasetDeleteRes: ...
 
     # Custom Runtimes
+    # The request names its project as project_id, which fills the route's
+    # entity and project path parameters that the generated params require.
     def custom_runtime_apply(
-        self, req: tsi.CustomRuntimeApplyReq
-    ) -> tsi.CustomRuntimeApplyRes: ...
+        self, req: Mapping[str, Any] | tsi.CustomRuntimeApplyReq
+    ) -> V2RuntimeApplyResponse: ...
 
     # Scorers
     def scorer_create(self, req: tsi.ScorerCreateReq) -> tsi.ScorerCreateRes: ...
@@ -381,4 +493,6 @@ class TraceServerClientInterface(Protocol):
     def ensure_project_exists(
         self, entity: str, project: str
     ) -> EnsureProjectExistsRes: ...
-    def projects_info(self, req: ProjectsInfoReq) -> list[ProjectsInfoRes]: ...
+    def projects_info(
+        self, req: ServiceProjectsInfoParams | ProjectsInfoReq
+    ) -> ServiceProjectsInfoResponse: ...

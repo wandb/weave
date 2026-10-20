@@ -1,11 +1,15 @@
 import datetime
 import uuid
+from unittest.mock import MagicMock
 
 import pytest
 
+from weave.trace.weave_client import WeaveClient
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.errors import InvalidRequest
 from weave.trace_server.interface.query import Query
+from weave.trace_server_bindings.client_interface import TraceServerClientInterface
+from weave.vendor.weave_server_sdk.types import CostQueryResponse
 
 
 def test_cost_apis(client):
@@ -387,3 +391,31 @@ def test_calls_query_bool_filter_with_costs_does_not_collide(client):
     )
     assert len(calls) == 1
     assert calls[0].id == call_id
+
+
+def test_query_costs_sends_a_query_given_as_a_dict() -> None:
+    """A wire-form query dict reaches the cost query request."""
+    server = MagicMock(spec=TraceServerClientInterface)
+    server.cost_query.return_value = CostQueryResponse(results=[])
+    client = WeaveClient("entity", "project", server, ensure_project_exists=False)
+    expr = {"$eq": [{"$getField": "provider_id"}, {"$literal": "openai"}]}
+
+    assert client.query_costs(query={"$expr": expr}, llm_ids=["m"]) == []
+
+    server.cost_query.assert_called_once_with(
+        {
+            "project_id": "entity/project",
+            "fields": None,
+            "query": {
+                "$expr": {
+                    "$and": [
+                        expr,
+                        {"$in": [{"$getField": "llm_id"}, [{"$literal": "m"}]]},
+                    ]
+                }
+            },
+            "sort_by": None,
+            "limit": 100,
+            "offset": 0,
+        }
+    )

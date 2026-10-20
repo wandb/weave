@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import collections.abc
 import datetime
+import inspect
 import json
 import types
 import typing
@@ -31,10 +32,21 @@ from weave.trace_server_bindings.stainless_remote_http_trace_server import (
 )
 from weave.vendor.weave_server_sdk import Client as StainlessClient
 from weave.vendor.weave_server_sdk.types import (
+    AnnotationQueueCreateParams,
+    AnnotationQueueCreateResponse,
+    AnnotationQueueDeleteParams,
+    AnnotationQueueQueryParams,
+    AnnotationQueueReadParams,
+    AnnotationQueueReadResponse,
+    AnnotationQueueSchema,
+    AnnotationQueueStatsParams,
+    AnnotationQueueStatsResponse,
+    AnnotationQueueUpdateParams,
     CallDeleteParams,
     CallEndParams,
     CallQueryStatsParams,
     CallReadParams,
+    CallScoreParams,
     CallStartParams,
     CallStatsParams,
     CallStatsResponse,
@@ -43,12 +55,60 @@ from weave.vendor.weave_server_sdk.types import (
     CallUpsertBatchParams,
     CallUpsertBatchResponse,
     CallUsageParams,
+    CompletionCreateParams,
+    CompletionCreateResponse,
+    CompletionCreateStreamParams,
+    CostCreateParams,
+    CostPurgeParams,
+    CostQueryParams,
+    DatasetSourceLinkParams,
+    DatasetSourceLinkResponse,
+    DatasetSourceQueryParams,
+    DatasetSourceQueryResponse,
+    DatasetSourceSourceDatasetsQueryParams,
+    DatasetSourceSourceDatasetsQueryResponse,
+    EvaluationEvaluateModelParams,
+    EvaluationEvaluateModelResponse,
+    EvaluationRescoreParams,
+    EvaluationRescoreResponse,
+    EvaluationStatusParams,
+    EvaluationStatusResponse,
+    FeedbackAggregateParams,
+    FeedbackAggregateResponse,
+    FeedbackBatchCreateParams,
+    FeedbackCreateParams,
+    FeedbackPayloadSchemaParams,
+    FeedbackPayloadSchemaResponse,
+    FeedbackPurgeParams,
+    FeedbackQueryParams,
+    FeedbackReplaceParams,
+    FeedbackStatsParams,
+    FeedbackStatsResponse,
+    ImageCreateParams,
+    ImageCreateResponse,
+    ProjectStatsParams,
+    ProjectStatsResponse,
+    ServiceProjectsInfoParams,
     ThreadStreamQueryParams,
     ThreadStreamQueryResponse,
     TraceUsageParams,
+    V2RuntimeApplyParams,
+    V2RuntimeApplyResponse,
+)
+from weave.vendor.weave_server_sdk.types.annotation_queues import (
+    ItemAddParams,
+    ItemQueryParams,
+    ItemQueryResponse,
+    ItemUpdateProgressParams,
 )
 from weave.vendor.weave_server_sdk.types.call_upsert_batch_response import (
     ReCallStartRes,
+)
+from weave.vendor.weave_server_sdk.types.projects import (
+    TtlSettingReadParams,
+    TtlSettingReadResponse,
+    TtlSettingUpdateParams,
+    TtlSettingUpdateResponse,
 )
 
 BASE_URL = "http://example.com"
@@ -542,7 +602,7 @@ def test_v2_method_reaches_its_flat_route(
             tsi.FeedbackStatsReq(project_id=PROJECT, start=START, end=END),
             "POST",
             "/feedback/stats",
-            tsi.FeedbackStatsRes,
+            FeedbackStatsResponse,
             id="feedback_stats",
         ),
         pytest.param(
@@ -550,7 +610,7 @@ def test_v2_method_reaches_its_flat_route(
             tsi.FeedbackAggregateReq(project_id=PROJECT, after_ms=0, before_ms=1),
             "POST",
             "/feedback/aggregate",
-            tsi.FeedbackAggregateRes,
+            FeedbackAggregateResponse,
             id="feedback_aggregate",
         ),
         pytest.param(
@@ -558,7 +618,7 @@ def test_v2_method_reaches_its_flat_route(
             tsi.FeedbackPayloadSchemaReq(project_id=PROJECT, start=START, end=END),
             "POST",
             "/feedback/payload_schema",
-            tsi.FeedbackPayloadSchemaRes,
+            FeedbackPayloadSchemaResponse,
             id="feedback_payload_schema",
         ),
         pytest.param(
@@ -566,7 +626,7 @@ def test_v2_method_reaches_its_flat_route(
             tsi.CompletionsCreateReq(project_id=PROJECT, inputs={"model": "gpt-4o"}),
             "POST",
             "/completions/create",
-            tsi.CompletionsCreateRes,
+            CompletionCreateResponse,
             id="completions_create",
         ),
         pytest.param(
@@ -576,7 +636,7 @@ def test_v2_method_reaches_its_flat_route(
             ),
             "POST",
             "/image/create",
-            tsi.ImageGenerationCreateRes,
+            ImageCreateResponse,
             id="image_create",
         ),
         pytest.param(
@@ -584,7 +644,7 @@ def test_v2_method_reaches_its_flat_route(
             tsi.ProjectStatsReq(project_id=PROJECT),
             "POST",
             "/project/stats",
-            tsi.ProjectStatsRes,
+            ProjectStatsResponse,
             id="project_stats",
         ),
         pytest.param(
@@ -592,7 +652,7 @@ def test_v2_method_reaches_its_flat_route(
             tsi.ProjectTTLSettingsReadReq(project_id=PROJECT),
             "POST",
             "/project/ttl_settings/read",
-            tsi.ProjectTTLSettingsReadRes,
+            TtlSettingReadResponse,
             id="project_ttl_settings_read",
         ),
         pytest.param(
@@ -600,7 +660,7 @@ def test_v2_method_reaches_its_flat_route(
             tsi.ProjectTTLSettingsUpdateReq(project_id=PROJECT, retention_days=30),
             "POST",
             "/project/ttl_settings/update",
-            tsi.ProjectTTLSettingsUpdateRes,
+            TtlSettingUpdateResponse,
             id="project_ttl_settings_update",
         ),
         pytest.param(
@@ -624,7 +684,7 @@ def test_v2_method_reaches_its_flat_route(
             ),
             "POST",
             "/dataset_sources/link",
-            tsi.DatasetSourcesLinkRes,
+            DatasetSourceLinkResponse,
             id="dataset_sources_link",
         ),
         pytest.param(
@@ -632,7 +692,7 @@ def test_v2_method_reaches_its_flat_route(
             tsi.DatasetSourcesQueryReq(project_id=PROJECT, dataset_object_id="ds"),
             "POST",
             "/dataset_sources/query",
-            tsi.DatasetSourcesQueryRes,
+            DatasetSourceQueryResponse,
             id="dataset_sources_query",
         ),
         pytest.param(
@@ -649,7 +709,7 @@ def test_v2_method_reaches_its_flat_route(
             ),
             "POST",
             "/dataset_sources/source_datasets_query",
-            tsi.SourceDatasetsQueryRes,
+            DatasetSourceSourceDatasetsQueryResponse,
             id="source_datasets_query",
         ),
         pytest.param(
@@ -661,7 +721,7 @@ def test_v2_method_reaches_its_flat_route(
             ),
             "POST",
             "/evaluations/evaluate_model",
-            tsi.EvaluateModelRes,
+            EvaluationEvaluateModelResponse,
             id="evaluate_model",
         ),
         pytest.param(
@@ -669,7 +729,7 @@ def test_v2_method_reaches_its_flat_route(
             tsi.EvaluationStatusReq(project_id=PROJECT, call_id="c1"),
             "POST",
             "/evaluations/status",
-            tsi.EvaluationStatusRes,
+            EvaluationStatusResponse,
             id="evaluation_status",
         ),
         pytest.param(
@@ -681,7 +741,7 @@ def test_v2_method_reaches_its_flat_route(
             ),
             "POST",
             "/evaluations/rescore",
-            tsi.RescoreRes,
+            EvaluationRescoreResponse,
             id="rescore",
         ),
         pytest.param(
@@ -693,7 +753,7 @@ def test_v2_method_reaches_its_flat_route(
             ),
             "POST",
             "/calls/score",
-            tsi.CallsScoreRes,
+            dict,
             id="calls_score",
         ),
         pytest.param(
@@ -703,7 +763,7 @@ def test_v2_method_reaches_its_flat_route(
             ),
             "POST",
             "/annotation_queues",
-            tsi.AnnotationQueueCreateRes,
+            AnnotationQueueCreateResponse,
             id="annotation_queue_create",
         ),
         pytest.param(
@@ -711,7 +771,7 @@ def test_v2_method_reaches_its_flat_route(
             tsi.AnnotationQueueReadReq(project_id=PROJECT, queue_id="q1"),
             "GET",
             "/annotation_queues/q1",
-            tsi.AnnotationQueueReadRes,
+            AnnotationQueueReadResponse,
             id="annotation_queue_read",
         ),
         pytest.param(
@@ -719,7 +779,7 @@ def test_v2_method_reaches_its_flat_route(
             tsi.AnnotationQueueItemsQueryReq(project_id=PROJECT, queue_id="q1"),
             "POST",
             "/annotation_queues/q1/items/query",
-            tsi.AnnotationQueueItemsQueryRes,
+            ItemQueryResponse,
             id="annotation_queue_items_query",
         ),
         pytest.param(
@@ -727,7 +787,7 @@ def test_v2_method_reaches_its_flat_route(
             tsi.AnnotationQueuesStatsReq(project_id=PROJECT, queue_ids=["q1"]),
             "POST",
             "/annotation_queues/stats",
-            tsi.AnnotationQueuesStatsRes,
+            AnnotationQueueStatsResponse,
             id="annotation_queues_stats",
         ),
         pytest.param(
@@ -740,7 +800,7 @@ def test_v2_method_reaches_its_flat_route(
             ),
             "PUT",
             f"{V2}/runtimes/my-runtime",
-            tsi.CustomRuntimeApplyRes,
+            V2RuntimeApplyResponse,
             id="custom_runtime_apply",
         ),
         pytest.param(
@@ -758,7 +818,7 @@ def test_route_reaches_its_path(
     req: BaseModel,
     expected_method: str,
     expected_path: str,
-    res_type: type[BaseModel],
+    res_type: type,
 ):
     """Test that a bound method reaches its route and parses the response back."""
     mock_server = _mock_server(httpx.Response(200, json=V1_RESPONSE))
@@ -932,17 +992,19 @@ def test_tag_and_alias_list_omits_wb_user_id(
         ),
     ],
 )
+@pytest.mark.parametrize("as_dict", [False, True], ids=["model", "dict"])
 def test_annotation_queue_method_omits_wb_user_id(
     method_name: str,
     req: BaseModel,
     expected_method: str,
     expected_path: str,
     expected_body: dict,
+    as_dict: bool,
 ):
     """Test that the server-populated wb_user_id stays out of the request."""
     mock_server = _mock_server(httpx.Response(200, json=V1_RESPONSE))
 
-    getattr(mock_server.server, method_name)(req)
+    getattr(mock_server.server, method_name)(req.model_dump() if as_dict else req)
 
     assert len(mock_server.requests) == 1
     assert (mock_server.requests[0].method, mock_server.requests[0].url.path) == (
@@ -1749,6 +1811,90 @@ def _leaves(value: Any, here: str = "") -> Iterator[tuple[str, Any]]:
             "POST",
             "/threads/stream_query",
         ),
+        pytest.param("feedback_query", FeedbackQueryParams, "POST", "/feedback/query"),
+        pytest.param("feedback_purge", FeedbackPurgeParams, "POST", "/feedback/purge"),
+        pytest.param(
+            "feedback_replace", FeedbackReplaceParams, "POST", "/feedback/replace"
+        ),
+        pytest.param("feedback_stats", FeedbackStatsParams, "POST", "/feedback/stats"),
+        pytest.param(
+            "feedback_aggregate", FeedbackAggregateParams, "POST", "/feedback/aggregate"
+        ),
+        pytest.param(
+            "feedback_payload_schema",
+            FeedbackPayloadSchemaParams,
+            "POST",
+            "/feedback/payload_schema",
+        ),
+        pytest.param("cost_query", CostQueryParams, "POST", "/cost/query"),
+        pytest.param("cost_create", CostCreateParams, "POST", "/cost/create"),
+        pytest.param("cost_purge", CostPurgeParams, "POST", "/cost/purge"),
+        pytest.param(
+            "completions_create", CompletionCreateParams, "POST", "/completions/create"
+        ),
+        pytest.param("image_create", ImageCreateParams, "POST", "/image/create"),
+        pytest.param("project_stats", ProjectStatsParams, "POST", "/project/stats"),
+        pytest.param(
+            "project_ttl_settings_read",
+            TtlSettingReadParams,
+            "POST",
+            "/project/ttl_settings/read",
+        ),
+        pytest.param(
+            "project_ttl_settings_update",
+            TtlSettingUpdateParams,
+            "POST",
+            "/project/ttl_settings/update",
+        ),
+        pytest.param(
+            "dataset_sources_link",
+            DatasetSourceLinkParams,
+            "POST",
+            "/dataset_sources/link",
+        ),
+        pytest.param(
+            "dataset_sources_query",
+            DatasetSourceQueryParams,
+            "POST",
+            "/dataset_sources/query",
+        ),
+        pytest.param(
+            "source_datasets_query",
+            DatasetSourceSourceDatasetsQueryParams,
+            "POST",
+            "/dataset_sources/source_datasets_query",
+        ),
+        pytest.param(
+            "annotation_queue_create",
+            AnnotationQueueCreateParams,
+            "POST",
+            "/annotation_queues",
+        ),
+        pytest.param(
+            "annotation_queues_stats",
+            AnnotationQueueStatsParams,
+            "POST",
+            "/annotation_queues/stats",
+        ),
+        pytest.param(
+            "evaluate_model",
+            EvaluationEvaluateModelParams,
+            "POST",
+            "/evaluations/evaluate_model",
+        ),
+        pytest.param(
+            "evaluation_status", EvaluationStatusParams, "POST", "/evaluations/status"
+        ),
+        pytest.param(
+            "rescore", EvaluationRescoreParams, "POST", "/evaluations/rescore"
+        ),
+        pytest.param("calls_score", CallScoreParams, "POST", "/calls/score"),
+        pytest.param(
+            "projects_info",
+            ServiceProjectsInfoParams,
+            "POST",
+            "/service/projects_info",
+        ),
     ],
 )
 def test_every_params_key_reaches_the_request(
@@ -1784,6 +1930,147 @@ def test_every_params_key_reaches_the_request(
         value for _, value in _leaves(params)
     )
     # Each value sits under the key path it names.
+    assert all(value == f"<{path}>" for path, value in body.items())
+
+
+@pytest.mark.parametrize(
+    ("method_name", "params", "expected_method", "expected_path"),
+    [
+        pytest.param(
+            "annotation_queue_read",
+            {**_sentinel_params(AnnotationQueueReadParams), "queue_id": "<queue_id>"},
+            "GET",
+            "/annotation_queues/<queue_id>",
+            id="annotation_queue_read",
+        ),
+        pytest.param(
+            "annotation_queue_delete",
+            {**_sentinel_params(AnnotationQueueDeleteParams), "queue_id": "<queue_id>"},
+            "DELETE",
+            "/annotation_queues/<queue_id>",
+            id="annotation_queue_delete",
+        ),
+        pytest.param(
+            "annotation_queue_update",
+            {**_sentinel_params(AnnotationQueueUpdateParams), "queue_id": "<queue_id>"},
+            "PUT",
+            "/annotation_queues/<queue_id>",
+            id="annotation_queue_update",
+        ),
+        pytest.param(
+            "annotation_queue_add_calls",
+            {**_sentinel_params(ItemAddParams), "queue_id": "<queue_id>"},
+            "POST",
+            "/annotation_queues/<queue_id>/items",
+            id="annotation_queue_add_calls",
+        ),
+        pytest.param(
+            "annotation_queue_items_query",
+            {**_sentinel_params(ItemQueryParams), "queue_id": "<queue_id>"},
+            "POST",
+            "/annotation_queues/<queue_id>/items/query",
+            id="annotation_queue_items_query",
+        ),
+        pytest.param(
+            "annotator_queue_items_progress_update",
+            {**_sentinel_params(ItemUpdateProgressParams), "item_id": "<item_id>"},
+            "POST",
+            "/annotation_queues/<queue_id>/items/<item_id>/progress",
+            id="annotator_queue_items_progress_update",
+        ),
+        pytest.param(
+            "annotation_queues_query_stream",
+            _sentinel_params(AnnotationQueueQueryParams),
+            "POST",
+            "/annotation_queues/query",
+            id="annotation_queues_query_stream",
+        ),
+        pytest.param(
+            "completions_create_stream",
+            _sentinel_params(CompletionCreateStreamParams),
+            "POST",
+            "/completions/create_stream",
+            id="completions_create_stream",
+        ),
+    ],
+)
+def test_every_key_of_a_path_or_stream_request_reaches_it(
+    method_name: str, params: dict[str, Any], expected_method: str, expected_path: str
+):
+    """Path parameters, which the params TypedDict leaves out, and streams lose no key."""
+    mock_server = _mock_server(httpx.Response(200, json=V1_RESPONSE))
+
+    res = getattr(mock_server.server, method_name)(params)
+    if inspect.isgenerator(res):
+        list(res)
+
+    assert len(mock_server.requests) == 1
+    request = mock_server.requests[0]
+    assert (request.method, request.url.path) == (expected_method, expected_path)
+    body = dict(_leaves(json.loads(request.content))) if request.content else {}
+    sent = sorted(
+        [*body.values(), *request.url.params.values(), *request.url.path.split("/")]
+    )
+    assert [s for s in sent if s.startswith("<")] == sorted(
+        value for _, value in _leaves(params)
+    )
+    assert all(value == f"<{path}>" for path, value in body.items())
+
+
+def test_custom_runtime_apply_sends_every_key():
+    """The project id and runtime name make the path; every other key is the body."""
+    mock_server = _mock_server(httpx.Response(200, json=V1_RESPONSE))
+    body = _sentinel_params(V2RuntimeApplyParams)
+    entity, project = body.pop("entity"), body.pop("project")
+
+    mock_server.server.custom_runtime_apply(
+        {"project_id": f"{entity}/{project}", "runtime_name": "<runtime_name>", **body}
+    )
+
+    assert len(mock_server.requests) == 1
+    request = mock_server.requests[0]
+    assert (request.method, request.url.path) == (
+        "PUT",
+        "/v2/<entity>/<project>/runtimes/<runtime_name>",
+    )
+    assert json.loads(request.content) == body
+
+
+@pytest.mark.parametrize(
+    ("method_name", "params_type", "expected_path", "dropped"),
+    [
+        pytest.param(
+            "feedback_create",
+            FeedbackCreateParams,
+            "/feedback/create",
+            ["<id>"],
+            id="feedback_create",
+        ),
+        pytest.param(
+            "feedback_create_batch",
+            FeedbackBatchCreateParams,
+            "/feedback/batch/create",
+            ["<batch[0].id>"],
+            id="feedback_create_batch",
+        ),
+    ],
+)
+def test_feedback_create_sends_every_key_but_the_id(
+    method_name: str, params_type: type, expected_path: str, dropped: list[str]
+):
+    """Feedback creation sends every key it is given except the feedback id."""
+    mock_server = _mock_server(httpx.Response(200, json=V1_RESPONSE))
+    params = _sentinel_params(params_type)
+
+    getattr(mock_server.server, method_name)(params)
+
+    assert len(mock_server.requests) == 1
+    request = mock_server.requests[0]
+    assert (request.method, request.url.path) == ("POST", expected_path)
+    body = dict(_leaves(json.loads(request.content)))
+    assert sorted(body.values()) == sorted(
+        value for _, value in _leaves(params) if value not in dropped
+    )
     assert all(value == f"<{path}>" for path, value in body.items())
 
 
@@ -2166,8 +2453,8 @@ def test_call_records_written_from_models_replay(should_batch: bool, monkeypatch
             "/annotation_queues/query",
             [QUEUE, {**QUEUE, "id": "q2"}],
             [
-                tsi.AnnotationQueueSchema.model_validate(QUEUE),
-                tsi.AnnotationQueueSchema.model_validate({**QUEUE, "id": "q2"}),
+                AnnotationQueueSchema.construct(**QUEUE),
+                AnnotationQueueSchema.construct(**{**QUEUE, "id": "q2"}),
             ],
             id="annotation_queues_query_stream",
         ),

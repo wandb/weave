@@ -39,6 +39,13 @@ class CallsQueryRes:
     calls: list[Call]
 
 
+@dataclass
+class EnsureProjectExistsRes:
+    """What `ensure_project_exists` returns: it calls W&B, not a trace server route."""
+
+    project_name: str
+
+
 class EntityProjectInfo(BaseModel):
     """Extracted entity and project information from a project_id."""
 

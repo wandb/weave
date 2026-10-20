@@ -1,9 +1,11 @@
 import datetime
+from unittest.mock import MagicMock
 
 import pytest
 
 import weave
 from weave import AnnotationSpec
+from weave.trace.context import weave_client_context
 from weave.trace.weave_client import WeaveClient, get_ref
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.common_interface import SortBy
@@ -20,6 +22,8 @@ from weave.trace_server.trace_server_interface import (
     FeedbackQueryReq,
     FeedbackReplaceReq,
 )
+from weave.trace_server_bindings.client_interface import TraceServerClientInterface
+from weave.vendor.weave_server_sdk.types import FeedbackQueryResponse
 
 
 def test_client_feedback(client) -> None:
@@ -2383,4 +2387,39 @@ def test_feedback_query_by_collection_size(client: WeaveClient) -> None:
     ) == sorted(
         [{"id": rated_id}, {"id": tagged_id}],
         key=lambda row: row["id"],
+    )
+
+
+def test_get_feedback_sends_a_query_given_as_a_dict(monkeypatch) -> None:
+    """A wire-form query dict reaches the feedback query request."""
+    server = MagicMock(spec=TraceServerClientInterface)
+    server.feedback_query.return_value = FeedbackQueryResponse(result=[], total_count=0)
+    client = WeaveClient("entity", "project", server, ensure_project_exists=False)
+    monkeypatch.setattr(weave_client_context, "_global_weave_client", client)
+    expr = {"$eq": [{"$getField": "feedback_type"}, {"$literal": "custom"}]}
+
+    assert list(client.get_feedback(query={"$expr": expr}, reaction="👍")) == []
+
+    server.feedback_query.assert_called_once_with(
+        {
+            "project_id": "entity/project",
+            "fields": None,
+            "query": {
+                "$expr": {
+                    "$and": [
+                        expr,
+                        {
+                            "$eq": [
+                                {"$getField": "feedback_type"},
+                                {"$literal": "wandb.reaction.1"},
+                            ]
+                        },
+                        {"$eq": [{"$getField": "payload.emoji"}, {"$literal": "👍"}]},
+                    ]
+                }
+            },
+            "sort_by": [{"field": "created_at", "direction": "asc"}],
+            "limit": 100,
+            "offset": 0,
+        }
     )

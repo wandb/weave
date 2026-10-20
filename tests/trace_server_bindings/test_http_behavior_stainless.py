@@ -489,6 +489,25 @@ def test_other_400s_do_not_upgrade(monkeypatch):
         assert [r.url.path for r in requests] == ["/call/upsert_batch"]
 
 
+def test_batched_feedback_that_fails_on_the_client_is_not_sent():
+    """A feedback item whose response cannot be built raises and is not queued."""
+    feedback = {
+        "project_id": PROJECT,
+        "weave_ref": f"weave:///{PROJECT}/call/call-id",
+        "feedback_type": "note",
+    }
+    with _batching_server(_ok) as (server, requests):
+        with pytest.raises(ValidationError):
+            server.feedback_create({**feedback, "payload": "not a dict"})
+        server.feedback_create({**feedback, "payload": {"note": "ok"}})
+        assert server.feedback_processor is not None
+        server.feedback_processor.stop_accepting_new_work_and_flush_queue()
+
+    (request,) = requests
+    batch = json.loads(request.read())["batch"]
+    assert [item["payload"] for item in batch] == [{"note": "ok"}]
+
+
 def test_calls_complete_needs_batching(monkeypatch):
     """Without batching there is no processor to pair calls in."""
     monkeypatch.setenv("WEAVE_USE_CALLS_COMPLETE", "true")
