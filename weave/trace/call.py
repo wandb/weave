@@ -10,10 +10,13 @@ from typing import TYPE_CHECKING, Any, TypedDict, cast
 import pydantic
 
 from weave.evaluation.eval_meta import EVAL_META_KEY
-from weave.shared.trace_server_interface import TraceStatus
 from weave.trace import urls
 from weave.trace.casting import cast_to_calls_filter
-from weave.trace.constants import EVALUATION_RUN_OP_NAME, MAX_DISPLAY_NAME_LENGTH
+from weave.trace.constants import (
+    EVALUATION_RUN_OP_NAME,
+    MAX_DISPLAY_NAME_LENGTH,
+    TraceStatus,
+)
 from weave.trace.context import weave_client_context
 from weave.trace.feedback import RefFeedbackQuery
 from weave.trace.isinstance import weave_isinstance

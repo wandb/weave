@@ -9,7 +9,10 @@ from typing import Any
 import httpx
 from gql.transport.exceptions import TransportQueryError, TransportServerError
 
-from weave.shared.validation_util import CHValidationError
+# Sibling modules warn too; one warning, this module's, is enough.
+with warnings.catch_warnings():
+    warnings.simplefilter("ignore", FutureWarning)
+    from weave.shared.validation_util import CHValidationError
 
 # Re-exported, so `from weave.shared.errors import NotFoundError` keeps working.
 from weave.trace.errors import (

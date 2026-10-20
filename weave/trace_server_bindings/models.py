@@ -1,15 +1,19 @@
+from __future__ import annotations
+
 from dataclasses import dataclass
-from typing import Literal
+from typing import TYPE_CHECKING, Literal
 
 from pydantic import BaseModel
 
-from weave.shared import trace_server_interface as tsi
 from weave.vendor.weave_server_sdk.types import (
     CallEndParams,
     CallStartParams,
     v2_call_complete_params,
 )
 from weave.vendor.weave_server_sdk.types.call_read_response import Call
+
+if TYPE_CHECKING:
+    from weave.shared import trace_server_interface as tsi
 
 
 @dataclass(kw_only=True)

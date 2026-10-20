@@ -80,6 +80,7 @@ _SERVER_TYPE_MODULES = {
     "weave.trace_server.agents.constants",
     "weave.trace_server.sensitive_data.policy",
     "weave.trace_server.validation",
+    "weave.trace_server.validation_util",
 }
 
 

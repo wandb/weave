@@ -6,14 +6,13 @@ import logging
 import os
 import tempfile
 from collections.abc import Callable, Mapping
-from typing import Any, TypedDict, TypeVar, cast
+from typing import TYPE_CHECKING, Any, TypedDict, TypeVar, cast
 
 from pydantic import BaseModel
 from pydantic_core import to_json
 from typing_extensions import Self
 
 from weave import version
-from weave.shared import trace_server_interface as tsi
 from weave.trace.refs import ObjectRef, Ref
 from weave.trace.settings import (
     server_cache_dir,
@@ -53,7 +52,12 @@ from weave.vendor.weave_server_sdk.types import (
     TableQueryStatsBatchResponse,
     TableQueryStatsParams,
     TableQueryStatsResponse,
+    V2DatasetReadResponse,
+    V2OpReadResponse,
 )
+
+if TYPE_CHECKING:
+    from weave.shared import trace_server_interface as tsi
 
 logger = logging.getLogger(__name__)
 
@@ -562,18 +566,20 @@ class CachingMiddlewareTraceServer(
         )
 
     # Object APIs
-    def op_read(self, req: tsi.OpReadReq) -> tsi.OpReadRes:
-        if not digest_is_cacheable(req.digest):
+    def op_read(self, req: Mapping[str, Any] | tsi.OpReadReq) -> V2OpReadResponse:
+        if not digest_is_cacheable(as_params(req)["digest"]):
             return self._next_trace_server.op_read(req)
         return self._with_cache_pydantic(
-            self._next_trace_server.op_read, req, tsi.OpReadRes
+            self._next_trace_server.op_read, req, V2OpReadResponse
         )
 
-    def dataset_read(self, req: tsi.DatasetReadReq) -> tsi.DatasetReadRes:
-        if not digest_is_cacheable(req.digest):
+    def dataset_read(
+        self, req: Mapping[str, Any] | tsi.DatasetReadReq
+    ) -> V2DatasetReadResponse:
+        if not digest_is_cacheable(as_params(req)["digest"]):
             return self._next_trace_server.dataset_read(req)
         return self._with_cache_pydantic(
-            self._next_trace_server.dataset_read, req, tsi.DatasetReadRes
+            self._next_trace_server.dataset_read, req, V2DatasetReadResponse
         )
 
 
@@ -626,7 +632,7 @@ def _obj_create_cache_key(req: ObjectCreateParams | tsi.ObjCreateReq) -> str:
 
 def _file_create_cache_key(req: FileCreateParams | tsi.FileCreateReq) -> str:
     """The key uploads have always been cached by, so a cached digest still applies."""
-    if isinstance(req, tsi.FileCreateReq):
+    if isinstance(req, BaseModel):
         return pydantic_bytes_safe_dump(req)
     name, content = cast("tuple[str, bytes]", req["file"])
     return pydantic_bytes_safe_dump(

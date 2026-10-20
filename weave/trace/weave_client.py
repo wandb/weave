@@ -19,18 +19,6 @@ from pydantic_core import to_jsonable_python
 from weave.chat.chat import Chat
 from weave.chat.inference_models import InferenceModels
 from weave.durability.wal_manager import WALManager
-from weave.shared.interface.feedback_types import (
-    RUNNABLE_FEEDBACK_TYPE_PREFIX,
-    runnable_feedback_output_selector,
-    runnable_feedback_runnable_ref_selector,
-)
-from weave.shared.trace_server_interface import (
-    CustomRuntimeID,
-    ObjectVersionFilter,
-    Query,
-    TraceStatus,
-    agent_types,
-)
 from weave.telemetry import trace_sentry
 from weave.trace import settings
 from weave.trace.call import (
@@ -52,12 +40,19 @@ from weave.trace.casting import (
 )
 from weave.trace.concurrent.futures import FutureExecutor
 from weave.trace.constants import (
+    DEFAULT_AGENT_CUSTOM_ATTR_SCHEMA_LIMIT,
+    DEFAULT_AGENT_QUERY_LIMIT,
+    DEFAULT_AGENT_STATS_GROUP_LIMIT,
     DEFAULT_CUSTOM_RUNTIME_MAX_TOKENS,
+    DEFAULT_SEARCH_LIMIT,
     INVOKING_SPAN_ATTR_KEY,
+    MAX_CONVERSATION_CHAT_TURNS,
     MAX_OBJECT_NAME_LENGTH,
     TRACE_CALL_EMOJI,
+    TraceStatus,
 )
 from weave.trace.context import call_context
+from weave.trace.custom_runtime import CustomRuntimeID
 from weave.trace.errors import (
     DigestMismatchError,
     InvalidExternalRef,
@@ -67,6 +62,11 @@ from weave.trace.feedback import (
     FeedbackQuery,
     RefFeedbackQuery,
     feedback_create_params,
+)
+from weave.trace.feedback_types import (
+    RUNNABLE_FEEDBACK_TYPE_PREFIX,
+    runnable_feedback_output_selector,
+    runnable_feedback_runnable_ref_selector,
 )
 from weave.trace.interface_query_builder import (
     exists_expr,
@@ -232,6 +232,9 @@ except ImportError:
 
 if TYPE_CHECKING:
     from weave.evaluation.eval import Evaluation
+    from weave.shared.agents import types as agent_types
+    from weave.shared.interface.query import Query
+    from weave.shared.trace_server_interface import ObjectVersionFilter
 
 # Controls if objects can have refs to projects not the WeaveClient project.
 # If False, object refs with with mismatching projects will be recreated.
@@ -852,7 +855,7 @@ class WeaveClient:
         Example:
             ```python
             calls = client.get_calls(
-                filter=CallsFilter(op_names=["my_op"]),
+                filter={"op_names": ["my_op"]},
                 columns=["inputs", "output", "summary"],
                 limit=100,
             )
@@ -946,7 +949,7 @@ class WeaveClient:
         sort_by: list[agent_types.AgentSortBy] | None = None,
         limit: int | None = None,
         offset: int | None = None,
-        page_size: int = agent_types.DEFAULT_AGENT_QUERY_LIMIT,
+        page_size: int = DEFAULT_AGENT_QUERY_LIMIT,
     ) -> AgentsIter:
         """List agents in this project with aggregated stats.
 
@@ -1008,7 +1011,7 @@ class WeaveClient:
         sort_by: list[agent_types.AgentSortBy] | None = None,
         limit: int | None = None,
         offset: int | None = None,
-        page_size: int = agent_types.DEFAULT_AGENT_QUERY_LIMIT,
+        page_size: int = DEFAULT_AGENT_QUERY_LIMIT,
     ) -> AgentVersionsIter:
         """List versions for a single agent, with aggregated stats.
 
@@ -1068,7 +1071,7 @@ class WeaveClient:
         sort_by: list[agent_types.AgentSortBy] | None = None,
         limit: int | None = None,
         offset: int | None = None,
-        page_size: int = agent_types.DEFAULT_AGENT_QUERY_LIMIT,
+        page_size: int = DEFAULT_AGENT_QUERY_LIMIT,
     ) -> AgentSpansIter:
         """Query agent spans for this project, optionally filtered.
 
@@ -1179,7 +1182,7 @@ class WeaveClient:
         self,
         *,
         conversation_id: str,
-        limit: int = agent_types.MAX_CONVERSATION_CHAT_TURNS,
+        limit: int = MAX_CONVERSATION_CHAT_TURNS,
         offset: int = 0,
         include_feedback: bool = False,
     ) -> ConversationChatResponse:
@@ -1271,7 +1274,7 @@ class WeaveClient:
                 "timezone": timezone,
                 "group_by": _request_values(group_by or []),
                 "metrics": _request_values(metrics),
-                "group_limit": agent_types.DEFAULT_AGENT_STATS_GROUP_LIMIT,
+                "group_limit": DEFAULT_AGENT_STATS_GROUP_LIMIT,
                 "bucket_by": None,
                 "group_filters": [],
                 "signal_filters": None,
@@ -1286,7 +1289,7 @@ class WeaveClient:
         query: Query | None = None,
         started_after: datetime.datetime | None = None,
         started_before: datetime.datetime | None = None,
-        limit: int = agent_types.DEFAULT_AGENT_CUSTOM_ATTR_SCHEMA_LIMIT,
+        limit: int = DEFAULT_AGENT_CUSTOM_ATTR_SCHEMA_LIMIT,
         offset: int = 0,
     ) -> SpanCustomAttrsSchemaResponse:
         """Discover typed custom-attribute keys on matching agent spans.
@@ -1335,7 +1338,7 @@ class WeaveClient:
         agent_name: str | None = None,
         conversation_id: str | None = None,
         trace_id: str | None = None,
-        limit: int = agent_types.DEFAULT_SEARCH_LIMIT,
+        limit: int = DEFAULT_SEARCH_LIMIT,
         offset: int = 0,
     ) -> AgentSearchResponse:
         """Search agent messages by content, grouped by conversation.

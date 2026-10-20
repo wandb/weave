@@ -6,12 +6,25 @@ included in the URL path, whereas the full request models in trace_server_interf
 include all parameters for internal use.
 """
 
+import warnings
+
 from pydantic import Field
 
-from weave.shared.common_interface import (
-    AnnotationQueueItemsFilter,
-    BaseModelStrict,
-    SortBy,
+# Sibling modules warn too; one warning, this module's, is enough.
+with warnings.catch_warnings():
+    warnings.simplefilter("ignore", FutureWarning)
+    from weave.shared.common_interface import (
+        AnnotationQueueItemsFilter,
+        BaseModelStrict,
+        SortBy,
+    )
+
+# TODO: delete this module together with weave.shared.
+warnings.warn(
+    "weave.shared.http_service_interface is deprecated and will be removed in a "
+    "future release.",
+    FutureWarning,
+    stacklevel=2,
 )
 
 

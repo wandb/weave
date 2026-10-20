@@ -4,15 +4,13 @@ import datetime
 import json
 import logging
 from collections.abc import Iterator, Mapping
-from typing import Any, cast
+from typing import TYPE_CHECKING, Any, cast
 from zoneinfo import ZoneInfo
 
-from pydantic import BaseModel, validate_call
+from pydantic import BaseModel
 from pydantic_core import to_json, to_jsonable_python
 from typing_extensions import Self
 
-from weave.shared import trace_server_interface as tsi
-from weave.shared.trace_server_interface import agent_types
 from weave.trace.env import ssl_verify, weave_trace_server_url
 from weave.trace.settings import (
     http_timeout,
@@ -167,6 +165,7 @@ from weave.vendor.weave_server_sdk.types import (
     V2DatasetCreateResponse,
     V2DatasetDeleteResponse,
     V2DatasetListResponse,
+    V2DatasetReadResponse,
     V2EvalResultQueryResponse,
     V2EvaluationCreateResponse,
     V2EvaluationDeleteResponse,
@@ -184,6 +183,7 @@ from weave.vendor.weave_server_sdk.types import (
     V2OpCreateResponse,
     V2OpDeleteResponse,
     V2OpListResponse,
+    V2OpReadResponse,
     V2PredictionCreateResponse,
     V2PredictionDeleteResponse,
     V2PredictionFinishResponse,
@@ -239,6 +239,10 @@ from weave.wandb_interface.auth import (
     ApiKeyCredentials,
     WandbCredentials,
 )
+
+if TYPE_CHECKING:
+    from weave.shared import trace_server_interface as tsi
+    from weave.shared.agents import types as agent_types
 
 logger = logging.getLogger(__name__)
 
@@ -680,7 +684,6 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         self._update_client_headers()
         return self._stainless_client.services.projects_info(**as_params(req))
 
-    @validate_call
     def otel_export(self, req: tsi.OTelExportReq) -> tsi.OTelExportRes:
         """Export OTEL traces.
 
@@ -1301,7 +1304,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         Returns:
             File create response.
         """
-        if isinstance(req, tsi.FileCreateReq):
+        if isinstance(req, BaseModel):
             req = {
                 "project_id": req.project_id,
                 "file": (req.name, req.content),
@@ -1882,8 +1885,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         params = self._v2_params(req)
         return self._stainless_client.v2_ops.create(**params)
 
-    @validate_call
-    def op_read(self, req: tsi.OpReadReq) -> tsi.OpReadRes:
+    def op_read(self, req: Mapping[str, Any] | tsi.OpReadReq) -> V2OpReadResponse:
         """Read op.
 
         Args:
@@ -1892,14 +1894,8 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         Returns:
             Op read response.
         """
-        entity, project = self._prepare_v2_request(req)
-        response = self._stainless_client.v2_ops.read(
-            entity=entity,
-            project=project,
-            object_id=req.object_id,
-            digest=req.digest,
-        )
-        return tsi.OpReadRes.model_validate(response.model_dump())
+        params = self._v2_params(req)
+        return self._stainless_client.v2_ops.read(**params)
 
     def op_list(
         self, req: Mapping[str, Any] | tsi.OpListReq
@@ -1941,8 +1937,9 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         params = self._v2_params(req)
         return self._stainless_client.v2_datasets.create(**params)
 
-    @validate_call
-    def dataset_read(self, req: tsi.DatasetReadReq) -> tsi.DatasetReadRes:
+    def dataset_read(
+        self, req: Mapping[str, Any] | tsi.DatasetReadReq
+    ) -> V2DatasetReadResponse:
         """Read dataset.
 
         Args:
@@ -1951,14 +1948,8 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         Returns:
             Dataset read response.
         """
-        entity, project = self._prepare_v2_request(req)
-        response = self._stainless_client.v2_datasets.read(
-            entity=entity,
-            project=project,
-            object_id=req.object_id,
-            digest=req.digest,
-        )
-        return tsi.DatasetReadRes.model_validate(response.model_dump())
+        params = self._v2_params(req)
+        return self._stainless_client.v2_datasets.read(**params)
 
     def dataset_list(
         self, req: Mapping[str, Any] | tsi.DatasetListReq

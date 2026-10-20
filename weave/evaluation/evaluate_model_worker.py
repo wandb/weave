@@ -1,16 +1,24 @@
 import asyncio
+from typing import Protocol
 
 import weave
 from weave.evaluation.eval import Evaluation
 from weave.flow.llm_structured_model import LLMStructuredCompletionModel
 from weave.scorers.llm_as_a_judge_scorer import LLMAsAJudgeScorer
-from weave.shared.trace_server_interface import EvaluateModelArgs
 from weave.trace.context.weave_client_context import require_secure_weave_client
 from weave.trace.refs import Ref
 from weave.trace.server_tracing import traced
 from weave.trace.weave_client import WeaveClient
 
 EVALUATE_MODEL_WORKER_MARKER = {"_weave_eval_meta": {"evaluate_model_worker": True}}
+
+
+class EvaluateModelArgs(Protocol):
+    """The fields of the trace server's evaluate-model job that this worker reads."""
+
+    evaluation_ref: str
+    model_ref: str
+    evaluation_call_id: str
 
 
 def evaluate_model(args: EvaluateModelArgs) -> None:

@@ -1,11 +1,8 @@
 from __future__ import annotations
 
 from collections.abc import Iterator, Mapping
-from typing import Any, Protocol
+from typing import TYPE_CHECKING, Any, Protocol
 
-from weave.shared import trace_server_interface as tsi
-from weave.shared.agents import types as agent_types
-from weave.shared.service_interface import ProjectsInfoReq
 from weave.trace_server_bindings.models import (
     CallsQueryRes,
     EnsureProjectExistsRes,
@@ -123,6 +120,7 @@ from weave.vendor.weave_server_sdk.types import (
     V2DatasetCreateResponse,
     V2DatasetDeleteResponse,
     V2DatasetListResponse,
+    V2DatasetReadResponse,
     V2EvalResultQueryResponse,
     V2EvaluationCreateResponse,
     V2EvaluationDeleteResponse,
@@ -140,6 +138,7 @@ from weave.vendor.weave_server_sdk.types import (
     V2OpCreateResponse,
     V2OpDeleteResponse,
     V2OpListResponse,
+    V2OpReadResponse,
     V2PredictionCreateResponse,
     V2PredictionDeleteResponse,
     V2PredictionFinishResponse,
@@ -196,6 +195,11 @@ from weave.vendor.weave_server_sdk.types.projects import (
     TtlSettingUpdateResponse,
 )
 from weave.vendor.weave_server_sdk.types.table_query_response import Row
+
+if TYPE_CHECKING:
+    from weave.shared import trace_server_interface as tsi
+    from weave.shared.agents import types as agent_types
+    from weave.shared.service_interface import ProjectsInfoReq
 
 
 # The generated tag and alias methods take their last path parameter as a
@@ -547,7 +551,7 @@ class TraceServerClientInterface(Protocol):
     def op_create(
         self, req: Mapping[str, Any] | tsi.OpCreateReq
     ) -> V2OpCreateResponse: ...
-    def op_read(self, req: tsi.OpReadReq) -> tsi.OpReadRes: ...
+    def op_read(self, req: Mapping[str, Any] | tsi.OpReadReq) -> V2OpReadResponse: ...
     def op_list(
         self, req: Mapping[str, Any] | tsi.OpListReq
     ) -> Iterator[V2OpListResponse]: ...
@@ -559,7 +563,9 @@ class TraceServerClientInterface(Protocol):
     def dataset_create(
         self, req: Mapping[str, Any] | tsi.DatasetCreateReq
     ) -> V2DatasetCreateResponse: ...
-    def dataset_read(self, req: tsi.DatasetReadReq) -> tsi.DatasetReadRes: ...
+    def dataset_read(
+        self, req: Mapping[str, Any] | tsi.DatasetReadReq
+    ) -> V2DatasetReadResponse: ...
     def dataset_list(
         self, req: Mapping[str, Any] | tsi.DatasetListReq
     ) -> Iterator[V2DatasetListResponse]: ...

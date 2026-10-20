@@ -3,8 +3,11 @@
 import sys
 import warnings
 
-from weave.shared.agents import constants as _canonical
-from weave.shared.agents.constants import *  # noqa: F403
+# weave.shared.agents.constants warns too; one warning, this module's, is enough.
+with warnings.catch_warnings():
+    warnings.simplefilter("ignore", FutureWarning)
+    from weave.shared.agents import constants as _canonical
+    from weave.shared.agents.constants import *  # noqa: F403
 
 # TODO: delete this alias together with weave.shared.
 warnings.warn(

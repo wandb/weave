@@ -30,7 +30,6 @@ from weave.trace_server_bindings.caching_middleware_trace_server import (
     CachingMiddlewareTraceServer,
 )
 from weave.trace_server_bindings.client_interface import TraceServerClientInterface
-from weave.trace_server_bindings.remote_http_trace_server import RemoteHTTPTraceServer
 from weave.trace_server_version import MIN_TRACE_SERVER_VERSION
 from weave.version import VERSION
 from weave.wandb_interface.auth import (
@@ -473,6 +472,11 @@ def init_weave_get_server(
 
         res = StainlessRemoteHTTPTraceServer.from_env(should_batch)
     else:
+        # Imported here: it loads weave.shared, which `import weave` must not load.
+        from weave.trace_server_bindings.remote_http_trace_server import (
+            RemoteHTTPTraceServer,
+        )
+
         res = RemoteHTTPTraceServer.from_env(should_batch)
     if credentials is not None:
         res.set_auth(credentials)

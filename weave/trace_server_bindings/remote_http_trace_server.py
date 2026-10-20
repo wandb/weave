@@ -3,6 +3,7 @@ import functools
 import inspect
 import io
 import logging
+import warnings
 from collections.abc import Callable, Iterator, Mapping
 from typing import Any, TypeVar, cast, get_type_hints
 from urllib.parse import quote
@@ -13,10 +14,13 @@ from pydantic import BaseModel, Field, validate_call
 from pydantic.json_schema import SkipJsonSchema
 from typing_extensions import Self
 
-from weave.shared import http_service_interface as his
-from weave.shared import trace_server_interface as tsi
-from weave.shared.service_interface import ServerInfoRes
-from weave.shared.trace_server_interface import agent_types
+# The frozen client still speaks the deprecated types; selecting it does not warn.
+with warnings.catch_warnings():
+    warnings.simplefilter("ignore", FutureWarning)
+    from weave.shared import http_service_interface as his
+    from weave.shared import trace_server_interface as tsi
+    from weave.shared.service_interface import ServerInfoRes
+    from weave.shared.trace_server_interface import agent_types
 from weave.trace.env import weave_trace_server_url
 from weave.trace.settings import (
     max_calls_queue_size,
