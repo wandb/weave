@@ -10,8 +10,8 @@ from weave.trace.weave_client_send_file_cache import (
     ThreadSafeLRUCache,
     WeaveClientSendFileCache,
 )
-from weave.trace_server.trace_server_interface import FileCreateReq, FileCreateRes
 from weave.trace_server_bindings.remote_http_trace_server import RemoteHTTPTraceServer
+from weave.vendor.weave_server_sdk.types import FileCreateResponse
 
 
 class TestThreadSafeLRUCache:
@@ -238,10 +238,10 @@ class TestWeaveClientSendFileCache:
         """Test that the _key method generates unique keys for different requests."""
         cache = WeaveClientSendFileCache()
 
-        req1 = FileCreateReq(project_id="test", name="file1", content=b"content1")
-        req2 = FileCreateReq(project_id="test", name="file2", content=b"content1")
-        req3 = FileCreateReq(project_id="other", name="file1", content=b"content1")
-        req4 = FileCreateReq(project_id="test", name="file1", content=b"different")
+        req1 = {"project_id": "test", "file": ("file1", b"content1")}
+        req2 = {"project_id": "test", "file": ("file2", b"content1")}
+        req3 = {"project_id": "other", "file": ("file1", b"content1")}
+        req4 = {"project_id": "test", "file": ("file1", b"different")}
 
         key1 = cache._key(req1)
         key2 = cache._key(req2)
@@ -255,14 +255,14 @@ class TestWeaveClientSendFileCache:
 
         # Same request should have the same key
         assert key1 == cache._key(
-            FileCreateReq(project_id="test", name="file1", content=b"content1")
+            {"project_id": "test", "file": ("file1", b"content1")}
         )
 
     def test_put_get_basic(self):
         """Test basic put and get operations."""
         cache = WeaveClientSendFileCache()
-        req = FileCreateReq(project_id="test", name="test", content=b"test")
-        res = FileCreateRes(digest="test_digest")
+        req = {"project_id": "test", "file": ("test", b"test")}
+        res = FileCreateResponse(digest="test_digest")
 
         cache.put(req, res)
         assert cache.get(req) == res
@@ -270,15 +270,15 @@ class TestWeaveClientSendFileCache:
     def test_get_nonexistent(self):
         """Test get on a non-existent key."""
         cache = WeaveClientSendFileCache()
-        req = FileCreateReq(project_id="test", name="nonexistent", content=b"test")
+        req = {"project_id": "test", "file": ("nonexistent", b"test")}
         assert cache.get(req) is None
 
     def test_put_update(self):
         """Test updating an existing key."""
         cache = WeaveClientSendFileCache()
-        req = FileCreateReq(project_id="test", name="test", content=b"test")
-        res1 = FileCreateRes(digest="digest1")
-        res2 = FileCreateRes(digest="digest2")
+        req = {"project_id": "test", "file": ("test", b"test")}
+        res1 = FileCreateResponse(digest="digest1")
+        res2 = FileCreateResponse(digest="digest2")
 
         cache.put(req, res1)
         cache.put(req, res2)
@@ -287,10 +287,10 @@ class TestWeaveClientSendFileCache:
     def test_clear(self):
         """Test clearing the cache."""
         cache = WeaveClientSendFileCache()
-        req1 = FileCreateReq(project_id="test", name="file1", content=b"content1")
-        req2 = FileCreateReq(project_id="test", name="file2", content=b"content2")
-        res1 = FileCreateRes(digest="digest1")
-        res2 = FileCreateRes(digest="digest2")
+        req1 = {"project_id": "test", "file": ("file1", b"content1")}
+        req2 = {"project_id": "test", "file": ("file2", b"content2")}
+        res1 = FileCreateResponse(digest="digest1")
+        res2 = FileCreateResponse(digest="digest2")
 
         cache.put(req1, res1)
         cache.put(req2, res2)
@@ -304,8 +304,8 @@ class TestWeaveClientSendFileCache:
     def test_delete(self):
         """Test deleting a cached entry by request."""
         cache = WeaveClientSendFileCache()
-        req = FileCreateReq(project_id="test", name="file", content=b"content")
-        cache.put(req, FileCreateRes(digest="d"))
+        req = {"project_id": "test", "file": ("file", b"content")}
+        cache.put(req, FileCreateResponse(digest="d"))
         assert cache.get(req) is not None
         cache.delete(req)
         assert cache.get(req) is None
@@ -313,7 +313,7 @@ class TestWeaveClientSendFileCache:
     def test_delete_nonexistent(self):
         """Deleting a missing entry should not raise."""
         cache = WeaveClientSendFileCache()
-        req = FileCreateReq(project_id="test", name="missing", content=b"x")
+        req = {"project_id": "test", "file": ("missing", b"x")}
         cache.delete(req)  # no-op
 
     def test_size(self):
@@ -321,10 +321,10 @@ class TestWeaveClientSendFileCache:
         cache = WeaveClientSendFileCache()
         assert cache.size() == 0
 
-        req1 = FileCreateReq(project_id="test", name="file1", content=b"content1")
-        req2 = FileCreateReq(project_id="test", name="file2", content=b"content2")
-        res1 = FileCreateRes(digest="digest1")
-        res2 = FileCreateRes(digest="digest2")
+        req1 = {"project_id": "test", "file": ("file1", b"content1")}
+        req2 = {"project_id": "test", "file": ("file2", b"content2")}
+        res1 = FileCreateResponse(digest="digest1")
+        res2 = FileCreateResponse(digest="digest2")
 
         cache.put(req1, res1)
         assert cache.size() == 1
@@ -348,13 +348,13 @@ class TestWeaveClientSendFileCache:
         """Test that LRU eviction works correctly."""
         cache = WeaveClientSendFileCache(max_size=2)
 
-        req1 = FileCreateReq(project_id="test", name="file1", content=b"content1")
-        req2 = FileCreateReq(project_id="test", name="file2", content=b"content2")
-        req3 = FileCreateReq(project_id="test", name="file3", content=b"content3")
+        req1 = {"project_id": "test", "file": ("file1", b"content1")}
+        req2 = {"project_id": "test", "file": ("file2", b"content2")}
+        req3 = {"project_id": "test", "file": ("file3", b"content3")}
 
-        res1 = FileCreateRes(digest="digest1")
-        res2 = FileCreateRes(digest="digest2")
-        res3 = FileCreateRes(digest="digest3")
+        res1 = FileCreateResponse(digest="digest1")
+        res2 = FileCreateResponse(digest="digest2")
+        res3 = FileCreateResponse(digest="digest3")
 
         # Add two items, filling the cache
         cache.put(req1, res1)
@@ -382,8 +382,8 @@ class TestWeaveClientSendFileCache:
 def test_wave_client_file_cache_backwards_compatible():
     """Test that the cache is backwards compatible with the original test."""
     cache = WeaveClientSendFileCache()
-    req = FileCreateReq(project_id="test", name="test", content=b"test")
-    res = FileCreateRes(digest="test")
+    req = {"project_id": "test", "file": ("test", b"test")}
+    res = FileCreateResponse(digest="test")
     cache.put(req, res)
     assert cache.get(req) == res
 
@@ -416,7 +416,7 @@ def offline_client(monkeypatch):
 def test_failed_file_create_evicts_cache_and_retries_on_next_call(offline_client):
     """A failed file_create future must be evicted so the next call retries."""
     client, server = offline_client
-    req = FileCreateReq(project_id="ent/proj", name="f", content=b"hello")
+    req = {"project_id": "ent/proj", "file": ("f", b"hello")}
 
     with patch.object(server, "file_create", side_effect=_make_502()):
         fut1 = client._send_file_create(req)
@@ -427,7 +427,7 @@ def test_failed_file_create_evicts_cache_and_retries_on_next_call(offline_client
     assert fut1.exception() is not None
     assert client.send_file_cache.get(req) is None
 
-    success_res = FileCreateRes(digest="abc")
+    success_res = FileCreateResponse(digest="abc")
     with patch.object(server, "file_create", return_value=success_res):
         fut2 = client._send_file_create(req)
         client.future_executor.flush()
@@ -442,8 +442,8 @@ def test_failed_file_create_evicts_cache_and_retries_on_next_call(offline_client
 def test_successful_file_create_stays_cached(offline_client):
     """A successful file_create must stay cached so duplicates are deduped."""
     client, server = offline_client
-    req = FileCreateReq(project_id="ent/proj", name="f", content=b"hello")
-    success_res = FileCreateRes(digest="abc")
+    req = {"project_id": "ent/proj", "file": ("f", b"hello")}
+    success_res = FileCreateResponse(digest="abc")
 
     with patch.object(server, "file_create", return_value=success_res):
         fut1 = client._send_file_create(req)
@@ -467,10 +467,10 @@ def test_stale_failure_callback_does_not_evict_replacement_entry(offline_client)
     client, server = offline_client
     client.send_file_cache.max_size = 1  # force LRU eviction after each put
 
-    req_a = FileCreateReq(project_id="ent/proj", name="a", content=b"a")
-    req_b = FileCreateReq(project_id="ent/proj", name="b", content=b"b")
+    req_a = {"project_id": "ent/proj", "file": ("a", b"a")}
+    req_b = {"project_id": "ent/proj", "file": ("b", b"b")}
 
-    controllable_future: Future[FileCreateRes] = Future()
+    controllable_future: Future[FileCreateResponse] = Future()
     target_executor = client.future_executor_fastlane or client.future_executor
     original_defer = target_executor.defer
     call_count = [0]
@@ -489,7 +489,7 @@ def test_stale_failure_callback_does_not_evict_replacement_entry(offline_client)
 
         # 2. Put req_b -> LRU evicts req_a from the cache.
         with patch.object(
-            server, "file_create", return_value=FileCreateRes(digest="b")
+            server, "file_create", return_value=FileCreateResponse(digest="b")
         ):
             client._send_file_create(req_b)
             client.future_executor.flush()
@@ -499,7 +499,7 @@ def test_stale_failure_callback_does_not_evict_replacement_entry(offline_client)
 
         # 3. Cache miss for req_a -> fresh successful upload takes the slot.
         with patch.object(
-            server, "file_create", return_value=FileCreateRes(digest="a")
+            server, "file_create", return_value=FileCreateResponse(digest="a")
         ):
             fut_a_v2 = client._send_file_create(req_a)
             client.future_executor.flush()

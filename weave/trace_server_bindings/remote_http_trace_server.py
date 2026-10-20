@@ -47,6 +47,7 @@ from weave.utils import http_requests
 from weave.utils.ids import generate_id
 from weave.utils.project_id import from_project_id
 from weave.utils.retry import get_current_retry_id, with_retry
+from weave.vendor.weave_server_sdk.types import FileCreateParams
 from weave.wandb_interface import project_creator
 from weave.wandb_interface.auth import WandbCredentials
 
@@ -1033,7 +1034,17 @@ class RemoteHTTPTraceServer:
         )
 
     @with_retry
-    def file_create(self, req: tsi.FileCreateReq) -> tsi.FileCreateRes:
+    def file_create(
+        self, req: FileCreateParams | tsi.FileCreateReq
+    ) -> tsi.FileCreateRes:
+        if not isinstance(req, tsi.FileCreateReq):
+            name, content = cast("tuple[str, bytes]", req["file"])
+            req = tsi.FileCreateReq(
+                project_id=req["project_id"],
+                name=name,
+                content=content,
+                expected_digest=req.get("expected_digest"),
+            )
         data: dict[str, str] = {"project_id": req.project_id}
         if req.expected_digest is not None:
             data["expected_digest"] = req.expected_digest

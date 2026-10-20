@@ -1130,6 +1130,26 @@ def test_edited_object_reaches_call_start_and_end():
         assert value["_type"]["name"] == "thing"
 
 
+def test_edited_object_publishes_again():
+    """A fetched object edited and saved again is sent as a new object version.
+
+    Its serialized `_type` holds the object's ref, which has to go out as JSON.
+    """
+    sent: list[tuple[str, dict]] = []
+    client = _client_storing_objects(sent)
+    ref = client._save_object(_EditedThing(a="hello"), "thing")
+    thing = client.get(ref)
+    thing.a = "newer"
+
+    client._save_object(thing, "thing")
+    client._flush()
+
+    creates = [body["obj"] for path, body in sent if path == "/obj/create"]
+    assert len(creates) == 2
+    assert creates[1]["val"]["a"] == "newer"
+    assert creates[1]["val"]["_type"]["name"] == "thing"
+
+
 def test_dataset_calls(client):
     rows = [{"doc": "xx", "label": "c"}, {"doc": "yy", "label": "d"}]
     op_name = ""

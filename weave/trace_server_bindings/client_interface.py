@@ -6,7 +6,11 @@ from typing import Any, Protocol
 from weave.shared import trace_server_interface as tsi
 from weave.shared.agents import types as agent_types
 from weave.shared.service_interface import ProjectsInfoReq
-from weave.trace_server_bindings.models import CallsQueryRes, EnsureProjectExistsRes
+from weave.trace_server_bindings.models import (
+    CallsQueryRes,
+    EnsureProjectExistsRes,
+    FileContentReadRes,
+)
 from weave.vendor.weave_server_sdk.types import (
     AgentQueryParams,
     AgentQueryResponse,
@@ -78,13 +82,40 @@ from weave.vendor.weave_server_sdk.types import (
     FeedbackReplaceResponse,
     FeedbackStatsParams,
     FeedbackStatsResponse,
+    FileContentParams,
+    FileCreateParams,
+    FileCreateResponse,
+    FileStatsParams,
+    FileStatsResponse,
     ImageCreateParams,
     ImageCreateResponse,
+    ObjectCreateParams,
+    ObjectCreateResponse,
+    ObjectDeleteParams,
+    ObjectDeleteResponse,
+    ObjectQueryParams,
+    ObjectQueryResponse,
+    ObjectReadParams,
+    ObjectReadResponse,
     ProjectStatsParams,
     ProjectStatsResponse,
+    RefReadBatchParams,
+    RefReadBatchResponse,
     ServerInfoRes,
     ServiceProjectsInfoParams,
     ServiceProjectsInfoResponse,
+    TableCreateFromDigestsParams,
+    TableCreateFromDigestsResponse,
+    TableCreateParams,
+    TableCreateResponse,
+    TableQueryParams,
+    TableQueryResponse,
+    TableQueryStatsBatchParams,
+    TableQueryStatsBatchResponse,
+    TableQueryStatsParams,
+    TableQueryStatsResponse,
+    TableUpdateParams,
+    TableUpdateResponse,
     ThreadStreamQueryParams,
     ThreadStreamQueryResponse,
     TraceUsageParams,
@@ -148,12 +179,41 @@ from weave.vendor.weave_server_sdk.types.annotation_queues import (
     ItemUpdateProgressResponse,
 )
 from weave.vendor.weave_server_sdk.types.call_read_response import Call
+from weave.vendor.weave_server_sdk.types.objects import (
+    AliasListParams,
+    AliasListResponse,
+    AliasRemoveParams,
+    AliasSetParams,
+    TagAddParams,
+    TagListParams,
+    TagListResponse,
+    TagRemoveParams,
+)
 from weave.vendor.weave_server_sdk.types.projects import (
     TtlSettingReadParams,
     TtlSettingReadResponse,
     TtlSettingUpdateParams,
     TtlSettingUpdateResponse,
 )
+from weave.vendor.weave_server_sdk.types.table_query_response import Row
+
+
+# The generated tag and alias methods take their last path parameter as a
+# positional argument, so their params types leave it out.
+class ObjAddTagsParams(TagAddParams):
+    digest: str
+
+
+class ObjRemoveTagsParams(TagRemoveParams):
+    digest: str
+
+
+class ObjSetAliasesParams(AliasSetParams):
+    object_id: str
+
+
+class ObjRemoveAliasesParams(AliasRemoveParams):
+    object_id: str
 
 
 # The generated annotation queue methods take the queue or item id as a
@@ -270,48 +330,74 @@ class TraceServerClientInterface(Protocol):
     def cost_purge(self, req: CostPurgeParams | tsi.CostPurgeReq) -> object: ...
 
     # Obj API
-    def obj_create(self, req: tsi.ObjCreateReq) -> tsi.ObjCreateRes: ...
-    def obj_read(self, req: tsi.ObjReadReq) -> tsi.ObjReadRes: ...
-    def objs_query(self, req: tsi.ObjQueryReq) -> tsi.ObjQueryRes: ...
-    def obj_delete(self, req: tsi.ObjDeleteReq) -> tsi.ObjDeleteRes: ...
+    def obj_create(
+        self, req: ObjectCreateParams | tsi.ObjCreateReq
+    ) -> ObjectCreateResponse: ...
+    def obj_read(
+        self, req: ObjectReadParams | tsi.ObjReadReq
+    ) -> ObjectReadResponse: ...
+    def objs_query(
+        self, req: ObjectQueryParams | tsi.ObjQueryReq
+    ) -> ObjectQueryResponse: ...
+    def obj_delete(
+        self, req: ObjectDeleteParams | tsi.ObjDeleteReq
+    ) -> ObjectDeleteResponse: ...
 
     # Tag and Alias API
-    def obj_add_tags(self, req: tsi.ObjAddTagsReq) -> tsi.ObjAddTagsRes: ...
-    def obj_remove_tags(self, req: tsi.ObjRemoveTagsReq) -> tsi.ObjRemoveTagsRes: ...
-    def obj_set_aliases(self, req: tsi.ObjSetAliasesReq) -> tsi.ObjSetAliasesRes: ...
+    def obj_add_tags(self, req: ObjAddTagsParams | tsi.ObjAddTagsReq) -> object: ...
+    def obj_remove_tags(
+        self, req: ObjRemoveTagsParams | tsi.ObjRemoveTagsReq
+    ) -> object: ...
+    def obj_set_aliases(
+        self, req: ObjSetAliasesParams | tsi.ObjSetAliasesReq
+    ) -> object: ...
     def obj_remove_aliases(
-        self, req: tsi.ObjRemoveAliasesReq
-    ) -> tsi.ObjRemoveAliasesRes: ...
-    def tags_list(self, req: tsi.TagsListReq) -> tsi.TagsListRes: ...
-    def aliases_list(self, req: tsi.AliasesListReq) -> tsi.AliasesListRes: ...
+        self, req: ObjRemoveAliasesParams | tsi.ObjRemoveAliasesReq
+    ) -> object: ...
+    def tags_list(self, req: TagListParams | tsi.TagsListReq) -> TagListResponse: ...
+    def aliases_list(
+        self, req: AliasListParams | tsi.AliasesListReq
+    ) -> AliasListResponse: ...
 
     # Table API
-    def table_create(self, req: tsi.TableCreateReq) -> tsi.TableCreateRes: ...
+    def table_create(
+        self, req: TableCreateParams | tsi.TableCreateReq
+    ) -> TableCreateResponse: ...
     def table_create_from_digests(
-        self, req: tsi.TableCreateFromDigestsReq
-    ) -> tsi.TableCreateFromDigestsRes: ...
+        self, req: TableCreateFromDigestsParams | tsi.TableCreateFromDigestsReq
+    ) -> TableCreateFromDigestsResponse: ...
 
-    def table_update(self, req: tsi.TableUpdateReq) -> tsi.TableUpdateRes: ...
-    def table_query(self, req: tsi.TableQueryReq) -> tsi.TableQueryRes: ...
+    def table_update(
+        self, req: TableUpdateParams | tsi.TableUpdateReq
+    ) -> TableUpdateResponse: ...
+    def table_query(
+        self, req: TableQueryParams | tsi.TableQueryReq
+    ) -> TableQueryResponse: ...
     def table_query_stream(
-        self, req: tsi.TableQueryReq
-    ) -> Iterator[tsi.TableRowSchema]: ...
+        self, req: TableQueryParams | tsi.TableQueryReq
+    ) -> Iterator[Row]: ...
     def table_query_stats(
-        self, req: tsi.TableQueryStatsReq
-    ) -> tsi.TableQueryStatsRes: ...
+        self, req: TableQueryStatsParams | tsi.TableQueryStatsReq
+    ) -> TableQueryStatsResponse: ...
     def table_query_stats_batch(
-        self, req: tsi.TableQueryStatsBatchReq
-    ) -> tsi.TableQueryStatsBatchRes: ...
+        self, req: TableQueryStatsBatchParams | tsi.TableQueryStatsBatchReq
+    ) -> TableQueryStatsBatchResponse: ...
 
     # Ref API
-    def refs_read_batch(self, req: tsi.RefsReadBatchReq) -> tsi.RefsReadBatchRes: ...
+    def refs_read_batch(
+        self, req: RefReadBatchParams | tsi.RefsReadBatchReq
+    ) -> RefReadBatchResponse: ...
 
     # File API
-    def file_create(self, req: tsi.FileCreateReq) -> tsi.FileCreateRes: ...
+    def file_create(
+        self, req: FileCreateParams | tsi.FileCreateReq
+    ) -> FileCreateResponse: ...
     def file_content_read(
-        self, req: tsi.FileContentReadReq
-    ) -> tsi.FileContentReadRes: ...
-    def files_stats(self, req: tsi.FilesStatsReq) -> tsi.FilesStatsRes: ...
+        self, req: FileContentParams | tsi.FileContentReadReq
+    ) -> FileContentReadRes: ...
+    def files_stats(
+        self, req: FileStatsParams | tsi.FilesStatsReq
+    ) -> FileStatsResponse: ...
 
     # Export API
     def export_start(self, req: tsi.ExportStartReq) -> tsi.ExportStartRes: ...

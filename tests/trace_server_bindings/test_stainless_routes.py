@@ -28,6 +28,12 @@ from tests.trace_server_bindings.conftest import generate_call_start_end_pair
 from weave.durability.wal_sender import build_trace_server_handlers
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.agents import types as agent_types
+from weave.trace_server_bindings.client_interface import (
+    ObjAddTagsParams,
+    ObjRemoveAliasesParams,
+    ObjRemoveTagsParams,
+    ObjSetAliasesParams,
+)
 from weave.trace_server_bindings.stainless_remote_http_trace_server import (
     StainlessRemoteHTTPTraceServer,
 )
@@ -90,11 +96,25 @@ from weave.vendor.weave_server_sdk.types import (
     FeedbackReplaceParams,
     FeedbackStatsParams,
     FeedbackStatsResponse,
+    FileContentParams,
+    FileCreateResponse,
+    FileStatsParams,
     ImageCreateParams,
     ImageCreateResponse,
+    ObjectCreateParams,
+    ObjectDeleteParams,
+    ObjectQueryParams,
+    ObjectReadParams,
     ProjectStatsParams,
     ProjectStatsResponse,
+    RefReadBatchParams,
     ServiceProjectsInfoParams,
+    TableCreateFromDigestsParams,
+    TableCreateParams,
+    TableQueryParams,
+    TableQueryStatsBatchParams,
+    TableQueryStatsParams,
+    TableUpdateParams,
     ThreadStreamQueryParams,
     ThreadStreamQueryResponse,
     TraceUsageParams,
@@ -178,6 +198,10 @@ from weave.vendor.weave_server_sdk.types.annotation_queues import (
 )
 from weave.vendor.weave_server_sdk.types.call_upsert_batch_response import (
     ReCallStartRes,
+)
+from weave.vendor.weave_server_sdk.types.objects import (
+    AliasListParams,
+    TagListParams,
 )
 from weave.vendor.weave_server_sdk.types.projects import (
     TtlSettingReadParams,
@@ -966,17 +990,19 @@ def test_route_reaches_its_path(
         ),
     ],
 )
+@pytest.mark.parametrize("as_dict", [False, True], ids=["model", "dict"])
 def test_tag_and_alias_method_omits_wb_user_id(
     method_name: str,
     req: BaseModel,
     expected_method: str,
     expected_path: str,
     expected_body: dict,
+    as_dict: bool,
 ):
     """Test that the server-populated wb_user_id stays out of the request."""
     mock_server = _mock_server(httpx.Response(200, json={}))
 
-    getattr(mock_server.server, method_name)(req)
+    getattr(mock_server.server, method_name)(req.model_dump() if as_dict else req)
 
     assert len(mock_server.requests) == 1
     assert (mock_server.requests[0].method, mock_server.requests[0].url.path) == (
@@ -984,6 +1010,18 @@ def test_tag_and_alias_method_omits_wb_user_id(
         expected_path,
     )
     assert json.loads(mock_server.requests[0].content) == expected_body
+
+
+def test_objs_query_drops_a_query_key():
+    """A dict with a `query` key, which the route lacks, sends the model's body."""
+    mock_server = _mock_server(httpx.Response(200, json={"objs": []}))
+    req = tsi.ObjQueryReq(project_id=PROJECT)
+
+    mock_server.server.objs_query(req)
+    mock_server.server.objs_query({**req.model_dump(), "query": {"$expr": {}}})
+
+    first, second = (json.loads(r.content) for r in mock_server.requests)
+    assert first == second
 
 
 @pytest.mark.parametrize(
@@ -2010,6 +2048,54 @@ def _leaves(value: Any, here: str = "") -> Iterator[tuple[str, Any]]:
             "/agents/spans/custom-attrs/schema",
         ),
         pytest.param("agent_search", AgentSearchParams, "POST", "/agents/search"),
+        pytest.param("obj_create", ObjectCreateParams, "POST", "/obj/create"),
+        pytest.param("obj_read", ObjectReadParams, "POST", "/obj/read"),
+        pytest.param("objs_query", ObjectQueryParams, "POST", "/objs/query"),
+        pytest.param("obj_delete", ObjectDeleteParams, "POST", "/obj/delete"),
+        pytest.param(
+            "obj_add_tags",
+            ObjAddTagsParams,
+            "PUT",
+            "/objs/<object_id>/versions/<digest>/tags",
+        ),
+        pytest.param(
+            "obj_remove_tags",
+            ObjRemoveTagsParams,
+            "POST",
+            "/objs/<object_id>/versions/<digest>/tags/remove",
+        ),
+        pytest.param(
+            "obj_set_aliases", ObjSetAliasesParams, "PUT", "/objs/<object_id>/aliases"
+        ),
+        pytest.param(
+            "obj_remove_aliases",
+            ObjRemoveAliasesParams,
+            "POST",
+            "/objs/<object_id>/aliases/remove",
+        ),
+        pytest.param("tags_list", TagListParams, "GET", "/tags"),
+        pytest.param("aliases_list", AliasListParams, "GET", "/aliases"),
+        pytest.param("table_create", TableCreateParams, "POST", "/table/create"),
+        pytest.param("table_update", TableUpdateParams, "POST", "/table/update"),
+        pytest.param("table_query", TableQueryParams, "POST", "/table/query"),
+        pytest.param(
+            "table_query_stats", TableQueryStatsParams, "POST", "/table/query_stats"
+        ),
+        pytest.param(
+            "table_query_stats_batch",
+            TableQueryStatsBatchParams,
+            "POST",
+            "/table/query_stats_batch",
+        ),
+        pytest.param(
+            "table_create_from_digests",
+            TableCreateFromDigestsParams,
+            "POST",
+            "/table/create_from_digests",
+        ),
+        pytest.param("refs_read_batch", RefReadBatchParams, "POST", "/refs/read_batch"),
+        pytest.param("file_content_read", FileContentParams, "POST", "/file/content"),
+        pytest.param("files_stats", FileStatsParams, "POST", "/files/query_stats"),
     ],
 )
 def test_every_params_key_reaches_the_request(
@@ -2030,7 +2116,7 @@ def test_every_params_key_reaches_the_request(
     assert len(mock_server.requests) == 1
     request = mock_server.requests[0]
     assert (request.method, request.url.path) == (expected_method, expected_path)
-    body = dict(_leaves(json.loads(request.content)))
+    body = dict(_leaves(json.loads(request.content) if request.content else {}))
     # A header parameter (the stream's `accept`) joins the generated default.
     headers = [v for h in request.headers.values() for v in h.split(", ")]
     sent = sorted(
@@ -2373,6 +2459,46 @@ def test_call_records_written_from_models_replay(should_batch: bool, monkeypatch
                 tsi.CallsUpsertCompleteReq(batch=[paired]).model_dump(mode="json"),
             )
         ]
+
+
+def _sent(request: httpx.Request) -> tuple[str, str, bytes]:
+    """A request's method, path and body, with any multipart boundary made fixed."""
+    body = request.read()
+    content_type = request.headers.get("content-type", "")
+    if "boundary=" in content_type:
+        body = body.replace(content_type.split("boundary=")[1].encode(), b"BOUNDARY")
+    return request.method, request.url.path, body
+
+
+def test_object_records_written_from_models_replay():
+    """WAL records hold a request model's JSON dump; replaying sends what the model did."""
+    models: dict[str, BaseModel] = {
+        "obj_create": tsi.ObjCreateReq(
+            obj=tsi.ObjSchemaForInsert(
+                project_id=PROJECT, object_id="o", val={"a": [1, "b", None]}
+            )
+        ),
+        "table_create": tsi.TableCreateReq(
+            table=tsi.TableSchemaForInsert(project_id=PROJECT, rows=[{"x": 1.5}])
+        ),
+        "file_create": tsi.FileCreateReq(
+            project_id=PROJECT,
+            name="f.txt",
+            content="café".encode(),
+            expected_digest="d",
+        ),
+    }
+    direct = _mock_server(httpx.Response(200, json={"digest": "d"}))
+    for method_name, req in models.items():
+        getattr(direct.server, method_name)(req)
+
+    replayed = _mock_server(httpx.Response(200, json={"digest": "d"}))
+    handlers = build_trace_server_handlers(replayed.server)
+    for record_type, req in models.items():
+        handlers[record_type]({"type": record_type, "req": req.model_dump(mode="json")})
+
+    assert len(direct.requests) == 3
+    assert [_sent(r) for r in replayed.requests] == [_sent(r) for r in direct.requests]
 
 
 @pytest.mark.parametrize(
@@ -2821,18 +2947,33 @@ def test_completions_create_stream_reads_ndjson_chunks():
     assert json.loads(request.content)["wb_user_id"] == "user-id"
 
 
-def test_file_create_sends_the_filename():
+@pytest.mark.parametrize(
+    "req",
+    [
+        pytest.param(
+            tsi.FileCreateReq(
+                project_id=PROJECT,
+                name="pic.png",
+                content=b"\x89PNG",
+                expected_digest="deadbeef",
+            ),
+            id="model",
+        ),
+        pytest.param(
+            {
+                "project_id": PROJECT,
+                "file": ("pic.png", b"\x89PNG"),
+                "expected_digest": "deadbeef",
+            },
+            id="dict",
+        ),
+    ],
+)
+def test_file_create_sends_the_filename(req):
     """Test that the upload keeps the filename on the multipart part."""
     mock_server = _mock_server(httpx.Response(200, json={"digest": "abc123"}))
 
-    res = mock_server.server.file_create(
-        tsi.FileCreateReq(
-            project_id=PROJECT,
-            name="pic.png",
-            content=b"\x89PNG",
-            expected_digest="deadbeef",
-        )
-    )
+    res = mock_server.server.file_create(req)
 
     assert len(mock_server.requests) == 1
     assert (mock_server.requests[0].method, mock_server.requests[0].url.path) == (
@@ -2844,7 +2985,7 @@ def test_file_create_sends_the_filename():
     assert b'filename="pic.png"' in body
     assert b"\x89PNG" in body
     assert b"deadbeef" in body
-    assert res == tsi.FileCreateRes(digest="abc123")
+    assert res == FileCreateResponse(digest="abc123")
 
 
 @pytest.mark.parametrize(

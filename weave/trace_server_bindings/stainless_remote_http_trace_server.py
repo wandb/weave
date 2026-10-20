@@ -3,8 +3,8 @@ from __future__ import annotations
 import datetime
 import json
 import logging
-from collections.abc import Callable, Iterator, Mapping
-from typing import Any, TypeVar, cast
+from collections.abc import Iterator, Mapping
+from typing import Any, cast
 from zoneinfo import ZoneInfo
 
 from pydantic import BaseModel, validate_call
@@ -23,6 +23,10 @@ from weave.trace.settings import (
 from weave.trace_server_bindings.async_batch_processor import AsyncBatchProcessor
 from weave.trace_server_bindings.call_batch_processor import CallBatchProcessor
 from weave.trace_server_bindings.client_interface import (
+    ObjAddTagsParams,
+    ObjRemoveAliasesParams,
+    ObjRemoveTagsParams,
+    ObjSetAliasesParams,
     QueueAddCallsParams,
     QueueDeleteParams,
     QueueItemProgressUpdateParams,
@@ -46,6 +50,7 @@ from weave.trace_server_bindings.models import (
     CompleteBatchItem,
     EndBatchItem,
     EnsureProjectExistsRes,
+    FileContentReadRes,
     StartBatchItem,
 )
 from weave.utils.ids import generate_id
@@ -121,13 +126,40 @@ from weave.vendor.weave_server_sdk.types import (
     FeedbackReplaceResponse,
     FeedbackStatsParams,
     FeedbackStatsResponse,
+    FileContentParams,
+    FileCreateParams,
+    FileCreateResponse,
+    FileStatsParams,
+    FileStatsResponse,
     ImageCreateParams,
     ImageCreateResponse,
+    ObjectCreateParams,
+    ObjectCreateResponse,
+    ObjectDeleteParams,
+    ObjectDeleteResponse,
+    ObjectQueryParams,
+    ObjectQueryResponse,
+    ObjectReadParams,
+    ObjectReadResponse,
     ProjectStatsParams,
     ProjectStatsResponse,
+    RefReadBatchParams,
+    RefReadBatchResponse,
     ServerInfoRes,
     ServiceProjectsInfoParams,
     ServiceProjectsInfoResponse,
+    TableCreateFromDigestsParams,
+    TableCreateFromDigestsResponse,
+    TableCreateParams,
+    TableCreateResponse,
+    TableQueryParams,
+    TableQueryResponse,
+    TableQueryStatsBatchParams,
+    TableQueryStatsBatchResponse,
+    TableQueryStatsParams,
+    TableQueryStatsResponse,
+    TableUpdateParams,
+    TableUpdateResponse,
     ThreadStreamQueryParams,
     ThreadStreamQueryResponse,
     TraceUsageParams,
@@ -189,20 +221,24 @@ from weave.vendor.weave_server_sdk.types.annotation_queues import (
     ItemUpdateProgressResponse,
 )
 from weave.vendor.weave_server_sdk.types.call_read_response import Call
+from weave.vendor.weave_server_sdk.types.objects import (
+    AliasListParams,
+    AliasListResponse,
+    TagListParams,
+    TagListResponse,
+)
 from weave.vendor.weave_server_sdk.types.projects import (
     TtlSettingReadParams,
     TtlSettingReadResponse,
     TtlSettingUpdateParams,
     TtlSettingUpdateResponse,
 )
+from weave.vendor.weave_server_sdk.types.table_query_response import Row
 from weave.wandb_interface import project_creator
 from weave.wandb_interface.auth import (
     ApiKeyCredentials,
     WandbCredentials,
 )
-
-TReq = TypeVar("TReq", bound=BaseModel)
-TRes = TypeVar("TRes", bound=BaseModel)
 
 logger = logging.getLogger(__name__)
 
@@ -316,45 +352,6 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
             self._stainless_client = self._stainless_client.copy(
                 default_headers=headers
             )
-
-    def _stainless_request(
-        self,
-        req: BaseModel,
-        res_type: type[TRes],
-        stainless_api: Callable[..., Any],
-        *,
-        exclude: set[str] | None = None,
-        **extra_kwargs: Any,
-    ) -> TRes:
-        """Helper method to make a stainless API request with proper type conversion.
-
-        Args:
-            req: Request object (already validated by @validate_call).
-            res_type: Type of the response model.
-            stainless_api: Stainless API callable to invoke.
-            exclude: Set of field names to exclude from request dump.
-            **extra_kwargs: Additional keyword arguments to pass to the API.
-
-        Returns:
-            Validated response model instance.
-        """
-        dump_kwargs: dict[str, Any] = {"by_alias": True}
-        exclude_set = set(extra_kwargs.keys())
-        if exclude:
-            exclude_set.update(exclude)
-        if exclude_set:
-            dump_kwargs["exclude"] = exclude_set
-
-        req_dict = req.model_dump(**dump_kwargs)
-        response = stainless_api(
-            extra_headers=self._compose_headers(),
-            **req_dict,
-            **extra_kwargs,
-        )
-        # An empty response schema is generated as a bare `object`: a plain dict.
-        if hasattr(response, "model_dump"):
-            response = response.model_dump()
-        return res_type.model_validate(response)
 
     def _prepare_v2_request(
         self, req: Mapping[str, Any] | BaseModel
@@ -1041,8 +1038,9 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         )
 
     # Obj API
-    @validate_call
-    def obj_create(self, req: tsi.ObjCreateReq) -> tsi.ObjCreateRes:
+    def obj_create(
+        self, req: ObjectCreateParams | tsi.ObjCreateReq
+    ) -> ObjectCreateResponse:
         """Create an object.
 
         Args:
@@ -1051,14 +1049,11 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         Returns:
             Object create response.
         """
-        return self._stainless_request(
-            req,
-            tsi.ObjCreateRes,
-            self._stainless_client.objects.create,
+        return self._stainless_client.objects.create(
+            extra_headers=self._compose_headers(), **as_params(req)
         )
 
-    @validate_call
-    def obj_read(self, req: tsi.ObjReadReq) -> tsi.ObjReadRes:
+    def obj_read(self, req: ObjectReadParams | tsi.ObjReadReq) -> ObjectReadResponse:
         """Read an object.
 
         Args:
@@ -1067,12 +1062,13 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         Returns:
             Object read response.
         """
-        return self._stainless_request(
-            req, tsi.ObjReadRes, self._stainless_client.objects.read
+        return self._stainless_client.objects.read(
+            extra_headers=self._compose_headers(), **as_params(req)
         )
 
-    @validate_call
-    def objs_query(self, req: tsi.ObjQueryReq) -> tsi.ObjQueryRes:
+    def objs_query(
+        self, req: ObjectQueryParams | tsi.ObjQueryReq
+    ) -> ObjectQueryResponse:
         """Query objects.
 
         Args:
@@ -1081,14 +1077,14 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         Returns:
             Object query response.
         """
-        return self._stainless_request(
-            req,
-            tsi.ObjQueryRes,
-            self._stainless_client.objects.query,
+        # The route takes no `query`, and the server ignores one.
+        return self._stainless_client.objects.query(
+            extra_headers=self._compose_headers(), **as_params(req, exclude={"query"})
         )
 
-    @validate_call
-    def obj_delete(self, req: tsi.ObjDeleteReq) -> tsi.ObjDeleteRes:
+    def obj_delete(
+        self, req: ObjectDeleteParams | tsi.ObjDeleteReq
+    ) -> ObjectDeleteResponse:
         """Delete an object.
 
         Args:
@@ -1097,67 +1093,60 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         Returns:
             Object delete response.
         """
-        return self._stainless_request(
-            req,
-            tsi.ObjDeleteRes,
-            self._stainless_client.objects.delete,
+        return self._stainless_client.objects.delete(
+            extra_headers=self._compose_headers(), **as_params(req)
         )
 
     # Tag and Alias API
     # The routes take the acting user from the auth header, not the body.
-    def obj_add_tags(self, req: tsi.ObjAddTagsReq) -> tsi.ObjAddTagsRes:
-        return self._stainless_request(
-            req,
-            tsi.ObjAddTagsRes,
-            self._stainless_client.objects.tags.add,
-            exclude={"wb_user_id"},
+    def obj_add_tags(self, req: ObjAddTagsParams | tsi.ObjAddTagsReq) -> object:
+        return self._stainless_client.objects.tags.add(
+            extra_headers=self._compose_headers(),
+            **as_params(req, exclude={"wb_user_id"}),
         )
 
-    def obj_remove_tags(self, req: tsi.ObjRemoveTagsReq) -> tsi.ObjRemoveTagsRes:
-        return self._stainless_request(
-            req,
-            tsi.ObjRemoveTagsRes,
-            self._stainless_client.objects.tags.remove,
-            exclude={"wb_user_id"},
+    def obj_remove_tags(
+        self, req: ObjRemoveTagsParams | tsi.ObjRemoveTagsReq
+    ) -> object:
+        return self._stainless_client.objects.tags.remove(
+            extra_headers=self._compose_headers(),
+            **as_params(req, exclude={"wb_user_id"}),
         )
 
-    def obj_set_aliases(self, req: tsi.ObjSetAliasesReq) -> tsi.ObjSetAliasesRes:
-        return self._stainless_request(
-            req,
-            tsi.ObjSetAliasesRes,
-            self._stainless_client.objects.aliases.set,
-            exclude={"wb_user_id"},
+    def obj_set_aliases(
+        self, req: ObjSetAliasesParams | tsi.ObjSetAliasesReq
+    ) -> object:
+        return self._stainless_client.objects.aliases.set(
+            extra_headers=self._compose_headers(),
+            **as_params(req, exclude={"wb_user_id"}),
         )
 
     def obj_remove_aliases(
-        self, req: tsi.ObjRemoveAliasesReq
-    ) -> tsi.ObjRemoveAliasesRes:
-        return self._stainless_request(
-            req,
-            tsi.ObjRemoveAliasesRes,
-            self._stainless_client.objects.aliases.remove,
-            exclude={"wb_user_id"},
+        self, req: ObjRemoveAliasesParams | tsi.ObjRemoveAliasesReq
+    ) -> object:
+        return self._stainless_client.objects.aliases.remove(
+            extra_headers=self._compose_headers(),
+            **as_params(req, exclude={"wb_user_id"}),
         )
 
-    def tags_list(self, req: tsi.TagsListReq) -> tsi.TagsListRes:
-        return self._stainless_request(
-            req,
-            tsi.TagsListRes,
-            self._stainless_client.objects.tags.list,
-            exclude={"wb_user_id"},
+    def tags_list(self, req: TagListParams | tsi.TagsListReq) -> TagListResponse:
+        return self._stainless_client.objects.tags.list(
+            extra_headers=self._compose_headers(),
+            **as_params(req, exclude={"wb_user_id"}),
         )
 
-    def aliases_list(self, req: tsi.AliasesListReq) -> tsi.AliasesListRes:
-        return self._stainless_request(
-            req,
-            tsi.AliasesListRes,
-            self._stainless_client.objects.aliases.list,
-            exclude={"wb_user_id"},
+    def aliases_list(
+        self, req: AliasListParams | tsi.AliasesListReq
+    ) -> AliasListResponse:
+        return self._stainless_client.objects.aliases.list(
+            extra_headers=self._compose_headers(),
+            **as_params(req, exclude={"wb_user_id"}),
         )
 
     # Table API
-    @validate_call
-    def table_create(self, req: tsi.TableCreateReq) -> tsi.TableCreateRes:
+    def table_create(
+        self, req: TableCreateParams | tsi.TableCreateReq
+    ) -> TableCreateResponse:
         """Create a table.
 
         Args:
@@ -1166,14 +1155,13 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         Returns:
             Table create response.
         """
-        return self._stainless_request(
-            req,
-            tsi.TableCreateRes,
-            self._stainless_client.tables.create,
+        return self._stainless_client.tables.create(
+            extra_headers=self._compose_headers(), **as_params(req)
         )
 
-    @validate_call
-    def table_update(self, req: tsi.TableUpdateReq) -> tsi.TableUpdateRes:
+    def table_update(
+        self, req: TableUpdateParams | tsi.TableUpdateReq
+    ) -> TableUpdateResponse:
         """Update a table.
 
         Args:
@@ -1182,37 +1170,39 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         Returns:
             Table update response.
         """
+        params = as_params(req)
+        updates = list(params["updates"])
         # Handle large requests by splitting
-        estimated_bytes = len(req.model_dump_json(by_alias=True).encode("utf-8"))
-        if estimated_bytes > self.remote_request_bytes_limit and len(req.updates) > 1:
-            split_ndx = len(req.updates) // 2
-            first_half_req = tsi.TableUpdateReq(
-                project_id=req.project_id,
-                base_digest=req.base_digest,
-                updates=req.updates[:split_ndx],
+        estimated_bytes = len(to_json(params, inf_nan_mode="null"))
+        if estimated_bytes > self.remote_request_bytes_limit and len(updates) > 1:
+            split_ndx = len(updates) // 2
+            first_half_res = self.table_update(
+                cast(TableUpdateParams, {**params, "updates": updates[:split_ndx]})
             )
-            first_half_res = self.table_update(first_half_req)
-            second_half_req = tsi.TableUpdateReq(
-                project_id=req.project_id,
-                base_digest=first_half_res.digest,
-                updates=req.updates[split_ndx:],
+            second_half_res = self.table_update(
+                cast(
+                    TableUpdateParams,
+                    {
+                        **params,
+                        "base_digest": first_half_res.digest,
+                        "updates": updates[split_ndx:],
+                    },
+                )
             )
-            second_half_res = self.table_update(second_half_req)
-            all_digests = (
-                first_half_res.updated_row_digests + second_half_res.updated_row_digests
+            all_digests = (first_half_res.updated_row_digests or []) + (
+                second_half_res.updated_row_digests or []
             )
-            return tsi.TableUpdateRes(
+            return TableUpdateResponse(
                 digest=second_half_res.digest, updated_row_digests=all_digests
             )
         else:
-            return self._stainless_request(
-                req,
-                tsi.TableUpdateRes,
-                self._stainless_client.tables.update,
+            return self._stainless_client.tables.update(
+                extra_headers=self._compose_headers(), **params
             )
 
-    @validate_call
-    def table_query(self, req: tsi.TableQueryReq) -> tsi.TableQueryRes:
+    def table_query(
+        self, req: TableQueryParams | tsi.TableQueryReq
+    ) -> TableQueryResponse:
         """Query a table.
 
         Args:
@@ -1221,30 +1211,28 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         Returns:
             Table query response.
         """
-        return self._stainless_request(
-            req,
-            tsi.TableQueryRes,
-            self._stainless_client.tables.query,
+        return self._stainless_client.tables.query(
+            extra_headers=self._compose_headers(), **as_params(req)
         )
 
-    @validate_call
     def table_query_stream(
-        self, req: tsi.TableQueryReq
-    ) -> Iterator[tsi.TableRowSchema]:
+        self, req: TableQueryParams | tsi.TableQueryReq
+    ) -> Iterator[Row]:
         """Stream query a table.
 
         Args:
             req: Table query request.
 
         Yields:
-            TableRowSchema instances.
+            Table rows.
         """
         # Need to manually iterate over this until the stream endpoint is built and shipped.
         res = self.table_query(req)
         yield from res.rows
 
-    @validate_call
-    def table_query_stats(self, req: tsi.TableQueryStatsReq) -> tsi.TableQueryStatsRes:
+    def table_query_stats(
+        self, req: TableQueryStatsParams | tsi.TableQueryStatsReq
+    ) -> TableQueryStatsResponse:
         """Query table statistics.
 
         Args:
@@ -1253,16 +1241,13 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         Returns:
             Table query stats response.
         """
-        return self._stainless_request(
-            req,
-            tsi.TableQueryStatsRes,
-            self._stainless_client.tables.query_stats,
+        return self._stainless_client.tables.query_stats(
+            extra_headers=self._compose_headers(), **as_params(req)
         )
 
-    @validate_call
     def table_create_from_digests(
-        self, req: tsi.TableCreateFromDigestsReq
-    ) -> tsi.TableCreateFromDigestsRes:
+        self, req: TableCreateFromDigestsParams | tsi.TableCreateFromDigestsReq
+    ) -> TableCreateFromDigestsResponse:
         """Create a table from digests.
 
         Args:
@@ -1271,16 +1256,13 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         Returns:
             Table create from digests response.
         """
-        return self._stainless_request(
-            req,
-            tsi.TableCreateFromDigestsRes,
-            self._stainless_client.tables.create_from_digests,
+        return self._stainless_client.tables.create_from_digests(
+            extra_headers=self._compose_headers(), **as_params(req)
         )
 
-    @validate_call
     def table_query_stats_batch(
-        self, req: tsi.TableQueryStatsBatchReq
-    ) -> tsi.TableQueryStatsBatchRes:
+        self, req: TableQueryStatsBatchParams | tsi.TableQueryStatsBatchReq
+    ) -> TableQueryStatsBatchResponse:
         """Query table statistics in batch.
 
         Args:
@@ -1289,14 +1271,13 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         Returns:
             Table query stats batch response.
         """
-        return self._stainless_request(
-            req,
-            tsi.TableQueryStatsBatchRes,
-            self._stainless_client.tables.query_stats_batch,
+        return self._stainless_client.tables.query_stats_batch(
+            extra_headers=self._compose_headers(), **as_params(req)
         )
 
-    @validate_call
-    def refs_read_batch(self, req: tsi.RefsReadBatchReq) -> tsi.RefsReadBatchRes:
+    def refs_read_batch(
+        self, req: RefReadBatchParams | tsi.RefsReadBatchReq
+    ) -> RefReadBatchResponse:
         """Read refs in batch.
 
         Args:
@@ -1305,14 +1286,13 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         Returns:
             Refs read batch response.
         """
-        return self._stainless_request(
-            req,
-            tsi.RefsReadBatchRes,
-            self._stainless_client.refs.read_batch,
+        return self._stainless_client.refs.read_batch(
+            extra_headers=self._compose_headers(), **as_params(req)
         )
 
-    @validate_call
-    def file_create(self, req: tsi.FileCreateReq) -> tsi.FileCreateRes:
+    def file_create(
+        self, req: FileCreateParams | tsi.FileCreateReq
+    ) -> FileCreateResponse:
         """Create a file.
 
         Args:
@@ -1321,16 +1301,18 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         Returns:
             File create response.
         """
+        if isinstance(req, tsi.FileCreateReq):
+            req = {
+                "project_id": req.project_id,
+                "file": (req.name, req.content),
+                "expected_digest": req.expected_digest,
+            }
         self._update_client_headers()
-        response = self._stainless_client.files.create(
-            project_id=req.project_id,
-            file=(req.name, req.content),
-            expected_digest=req.expected_digest,
-        )
-        return tsi.FileCreateRes.model_validate(response.model_dump())
+        return self._stainless_client.files.create(**req)
 
-    @validate_call
-    def file_content_read(self, req: tsi.FileContentReadReq) -> tsi.FileContentReadRes:
+    def file_content_read(
+        self, req: FileContentParams | tsi.FileContentReadReq
+    ) -> FileContentReadRes:
         """Read file content.
 
         Args:
@@ -1343,12 +1325,13 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         # TODO: Should stream to disk rather than to memory
         # The plain call decodes the body as text, corrupting binary files.
         response = self._stainless_client.files.with_raw_response.content(
-            digest=req.digest, project_id=req.project_id
+            **as_params(req)
         )
-        return tsi.FileContentReadRes(content=response.read())
+        return FileContentReadRes(content=response.read())
 
-    @validate_call
-    def files_stats(self, req: tsi.FilesStatsReq) -> tsi.FilesStatsRes:
+    def files_stats(
+        self, req: FileStatsParams | tsi.FilesStatsReq
+    ) -> FileStatsResponse:
         """Get file statistics.
 
         Args:
@@ -1357,10 +1340,8 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         Returns:
             Files stats response.
         """
-        return self._stainless_request(
-            req,
-            tsi.FilesStatsRes,
-            self._stainless_client.files.stats,
+        return self._stainless_client.files.stats(
+            extra_headers=self._compose_headers(), **as_params(req)
         )
 
     def feedback_create(

@@ -9,7 +9,7 @@ from weave.trace.weave_client_send_file_cache import (
     ThreadSafeLRUCache,
     WeaveClientSendFileCache,
 )
-from weave.trace_server.trace_server_interface import FileCreateReq, FileCreateRes
+from weave.vendor.weave_server_sdk.types import FileCreateResponse
 
 
 # Add a Counter class since threading.Counter doesn't exist in standard library
@@ -59,10 +59,11 @@ def test_cache_memory_usage_with_file_contents():
     for i in range(50):
         size = random.choice(file_sizes)
         content = bytes([random.randint(0, 255) for _ in range(size)])
-        req = FileCreateReq(
-            project_id=f"test_project_{i % 5}", name=f"file_{i}.txt", content=content
-        )
-        res = FileCreateRes(digest=f"digest_{i}")
+        req = {
+            "project_id": f"test_project_{i % 5}",
+            "file": (f"file_{i}.txt", content),
+        }
+        res = FileCreateResponse(digest=f"digest_{i}")
         cache.put(req, res)
 
     # Verify that only max_size entries remain

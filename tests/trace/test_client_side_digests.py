@@ -7,6 +7,8 @@ the expected_digest field.
 
 from __future__ import annotations
 
+from typing import Any
+
 import pytest
 from PIL import Image
 
@@ -413,7 +415,7 @@ class TestConvertRefsToInternal:
         original = type(adapter).obj_create
 
         def spy(self, req):
-            captured.append(req.obj.expected_digest)
+            captured.append(req["obj"]["expected_digest"])
             return original(self, req)
 
         monkeypatch.setattr(type(adapter), "obj_create", spy)
@@ -453,10 +455,10 @@ class TestDigestMismatchAutoDisable:
         seen_digests: list[str | None] = []
         injected = False
 
-        def mismatch_once(req: tsi.ObjCreateReq) -> tsi.ObjCreateRes:
+        def mismatch_once(req: dict[str, Any]) -> tsi.ObjCreateRes:
             nonlocal injected
-            seen_digests.append(req.obj.expected_digest)
-            if not injected and req.obj.expected_digest is not None:
+            seen_digests.append(req["obj"]["expected_digest"])
+            if not injected and req["obj"]["expected_digest"] is not None:
                 injected = True
                 raise DigestMismatchError("forced mismatch")
             return original(req)
@@ -487,9 +489,9 @@ class TestDigestMismatchAutoDisable:
         original = adapter.table_create
         injected = False
 
-        def mismatch_once(req: tsi.TableCreateReq) -> tsi.TableCreateRes:
+        def mismatch_once(req: dict[str, Any]) -> tsi.TableCreateRes:
             nonlocal injected
-            if not injected and req.table.expected_digest is not None:
+            if not injected and req["table"]["expected_digest"] is not None:
                 injected = True
                 raise DigestMismatchError("forced table mismatch")
             return original(req)
@@ -516,9 +518,9 @@ class TestDigestMismatchAutoDisable:
         original = adapter.file_create
         injected = False
 
-        def mismatch_once(req: tsi.FileCreateReq) -> tsi.FileCreateRes:
+        def mismatch_once(req: dict[str, Any]) -> tsi.FileCreateRes:
             nonlocal injected
-            if not injected and req.expected_digest is not None:
+            if not injected and req["expected_digest"] is not None:
                 injected = True
                 raise DigestMismatchError("forced file mismatch")
             return original(req)

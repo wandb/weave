@@ -25,32 +25,9 @@ from weave.shared.interface.feedback_types import (
     runnable_feedback_runnable_ref_selector,
 )
 from weave.shared.trace_server_interface import (
-    AliasesListReq,
     CustomRuntimeID,
-    FileCreateReq,
-    FileCreateRes,
-    ObjAddTagsReq,
-    ObjCreateReq,
-    ObjCreateRes,
-    ObjDeleteReq,
     ObjectVersionFilter,
-    ObjQueryReq,
-    ObjReadReq,
-    ObjRemoveAliasesReq,
-    ObjRemoveTagsReq,
-    ObjSchema,
-    ObjSchemaForInsert,
-    ObjSetAliasesReq,
     Query,
-    RefsReadBatchReq,
-    TableAppendSpec,
-    TableAppendSpecPayload,
-    TableCreateFromDigestsReq,
-    TableCreateReq,
-    TableCreateRes,
-    TableSchemaForInsert,
-    TableUpdateReq,
-    TagsListReq,
     TraceStatus,
     agent_types,
 )
@@ -200,6 +177,14 @@ from weave.vendor.weave_server_sdk.types import (
     CallStartParams,
     CallUpdateParams,
     CostCreateResponse,
+    FileCreateParams,
+    FileCreateResponse,
+    ObjectCreateParams,
+    ObjectCreateResponse,
+    TableCreateFromDigestsParams,
+    TableCreateParams,
+    TableCreateResponse,
+    TableUpdateParams,
     V2RuntimeApplyResponse,
     agent_query_params,
     agent_query_response,
@@ -209,6 +194,8 @@ from weave.vendor.weave_server_sdk.types import (
     cost_purge_params,
     cost_query_params,
     cost_query_response,
+    object_query_params,
+    object_query_response,
 )
 from weave.vendor.weave_server_sdk.types.agents import (
     ConversationChatParams,
@@ -690,11 +677,13 @@ class WeaveClient:
         # missing ref is not user-visible.
         try:
             read_res = retry_on_not_found(self.server.obj_read)(
-                ObjReadReq(
-                    project_id=project_id,
-                    object_id=ref.name,
-                    digest=ref.digest,
-                )
+                {
+                    "project_id": project_id,
+                    "object_id": ref.name,
+                    "digest": ref.digest,
+                    "metadata_only": False,
+                    "include_tags_and_aliases": False,
+                }
             )
         except HTTPError as e:
             if e.response is not None:
@@ -720,9 +709,7 @@ class WeaveClient:
         # let the server resolve it.
         if ref.extra:
             try:
-                ref_read_res = self.server.refs_read_batch(
-                    RefsReadBatchReq(refs=[ref.uri])
-                )
+                ref_read_res = self.server.refs_read_batch({"refs": [ref.uri]})
             except HTTPError as e:
                 if e.response is not None and e.response.status_code == 404:
                     raise ValueError(
@@ -794,9 +781,7 @@ class WeaveClient:
                 print(f"Evaluation: {eval.name}")
             ```
         """
-        eval_objs = self._objects(
-            filter=ObjectVersionFilter(base_object_classes=["Evaluation"]),
-        )
+        eval_objs = self._objects(filter={"base_object_classes": ["Evaluation"]})
 
         lst = []
         for obj in eval_objs:
@@ -806,7 +791,7 @@ class WeaveClient:
             ref = ObjectRef(
                 entity=entity,
                 project=project,
-                name=obj.val["name"],
+                name=cast("dict[str, Any]", obj.val)["name"],
                 _digest=obj.digest,
             )
             try:
@@ -2055,11 +2040,11 @@ class WeaveClient:
     @trace_sentry.global_trace_sentry.watch()
     def delete_object_version(self, object: ObjectRef) -> None:
         self.server.obj_delete(
-            ObjDeleteReq(
-                project_id=self.project_id,
-                object_id=object.name,
-                digests=[object.digest],
-            )
+            {
+                "project_id": self.project_id,
+                "object_id": object.name,
+                "digests": [object.digest],
+            }
         )
 
     @trace_sentry.global_trace_sentry.watch()
@@ -2073,11 +2058,7 @@ class WeaveClient:
             The number of versions deleted.
         """
         result = self.server.obj_delete(
-            ObjDeleteReq(
-                project_id=self.project_id,
-                object_id=object_name,
-                digests=None,
-            )
+            {"project_id": self.project_id, "object_id": object_name, "digests": None}
         )
         return result.num_deleted
 
@@ -2093,11 +2074,11 @@ class WeaveClient:
             The number of versions deleted.
         """
         result = self.server.obj_delete(
-            ObjDeleteReq(
-                project_id=self.project_id,
-                object_id=object_name,
-                digests=digests,
-            )
+            {
+                "project_id": self.project_id,
+                "object_id": object_name,
+                "digests": digests,
+            }
         )
         return result.num_deleted
 
@@ -2155,12 +2136,12 @@ class WeaveClient:
         """
         obj_ref = self._resolve_obj_ref(obj_ref)
         self.server.obj_add_tags(
-            ObjAddTagsReq(
-                project_id=self.project_id,
-                object_id=obj_ref.name,
-                digest=obj_ref.digest,
-                tags=tags,
-            )
+            {
+                "project_id": self.project_id,
+                "object_id": obj_ref.name,
+                "digest": obj_ref.digest,
+                "tags": tags,
+            }
         )
 
     @trace_sentry.global_trace_sentry.watch()
@@ -2174,12 +2155,12 @@ class WeaveClient:
         """
         obj_ref = self._resolve_obj_ref(obj_ref)
         self.server.obj_remove_tags(
-            ObjRemoveTagsReq(
-                project_id=self.project_id,
-                object_id=obj_ref.name,
-                digest=obj_ref.digest,
-                tags=tags,
-            )
+            {
+                "project_id": self.project_id,
+                "object_id": obj_ref.name,
+                "digest": obj_ref.digest,
+                "tags": tags,
+            }
         )
 
     @trace_sentry.global_trace_sentry.watch()
@@ -2196,12 +2177,13 @@ class WeaveClient:
         """
         obj_ref = self._resolve_obj_ref(obj_ref)
         res = retry_on_not_found(self.server.obj_read)(
-            ObjReadReq(
-                project_id=self.project_id,
-                object_id=obj_ref.name,
-                digest=obj_ref.digest,
-                include_tags_and_aliases=True,
-            )
+            {
+                "project_id": self.project_id,
+                "object_id": obj_ref.name,
+                "digest": obj_ref.digest,
+                "metadata_only": False,
+                "include_tags_and_aliases": True,
+            }
         )
         return res.obj.tags or []
 
@@ -2221,12 +2203,13 @@ class WeaveClient:
         """
         obj_ref = self._resolve_obj_ref(obj_ref)
         res = retry_on_not_found(self.server.obj_read)(
-            ObjReadReq(
-                project_id=self.project_id,
-                object_id=obj_ref.name,
-                digest=obj_ref.digest,
-                include_tags_and_aliases=True,
-            )
+            {
+                "project_id": self.project_id,
+                "object_id": obj_ref.name,
+                "digest": obj_ref.digest,
+                "metadata_only": False,
+                "include_tags_and_aliases": True,
+            }
         )
         return (res.obj.tags or [], res.obj.aliases or [])
 
@@ -2244,12 +2227,12 @@ class WeaveClient:
         if not aliases:
             return
         self.server.obj_set_aliases(
-            ObjSetAliasesReq(
-                project_id=self.project_id,
-                object_id=obj_ref.name,
-                digest=obj_ref.digest,
-                aliases=aliases,
-            )
+            {
+                "project_id": self.project_id,
+                "object_id": obj_ref.name,
+                "digest": obj_ref.digest,
+                "aliases": aliases,
+            }
         )
 
     @trace_sentry.global_trace_sentry.watch()
@@ -2266,11 +2249,11 @@ class WeaveClient:
         if not aliases:
             return
         self.server.obj_remove_aliases(
-            ObjRemoveAliasesReq(
-                project_id=self.project_id,
-                object_id=obj_ref.name,
-                aliases=aliases,
-            )
+            {
+                "project_id": self.project_id,
+                "object_id": obj_ref.name,
+                "aliases": aliases,
+            }
         )
 
     @trace_sentry.global_trace_sentry.watch()
@@ -2287,12 +2270,13 @@ class WeaveClient:
         """
         obj_ref = self._resolve_obj_ref(obj_ref)
         res = retry_on_not_found(self.server.obj_read)(
-            ObjReadReq(
-                project_id=self.project_id,
-                object_id=obj_ref.name,
-                digest=obj_ref.digest,
-                include_tags_and_aliases=True,
-            )
+            {
+                "project_id": self.project_id,
+                "object_id": obj_ref.name,
+                "digest": obj_ref.digest,
+                "metadata_only": False,
+                "include_tags_and_aliases": True,
+            }
         )
         return res.obj.aliases or []
 
@@ -2303,7 +2287,7 @@ class WeaveClient:
         Returns:
             List of all tag strings in the project.
         """
-        res = self.server.tags_list(TagsListReq(project_id=self.project_id))
+        res = self.server.tags_list({"project_id": self.project_id})
         return res.tags
 
     @trace_sentry.global_trace_sentry.watch()
@@ -2313,17 +2297,17 @@ class WeaveClient:
         Returns:
             List of all alias strings in the project.
         """
-        res = self.server.aliases_list(AliasesListReq(project_id=self.project_id))
+        res = self.server.aliases_list({"project_id": self.project_id})
         return res.aliases
 
     @trace_sentry.global_trace_sentry.watch()
     def delete_op_version(self, op: OpRef) -> None:
         self.server.obj_delete(
-            ObjDeleteReq(
-                project_id=self.project_id,
-                object_id=op.name,
-                digests=[op.digest],
-            )
+            {
+                "project_id": self.project_id,
+                "object_id": op.name,
+                "digests": [op.digest],
+            }
         )
 
     @trace_sentry.global_trace_sentry.watch()
@@ -2337,11 +2321,7 @@ class WeaveClient:
             The number of versions deleted.
         """
         result = self.server.obj_delete(
-            ObjDeleteReq(
-                project_id=self.project_id,
-                object_id=op_name,
-                digests=None,
-            )
+            {"project_id": self.project_id, "object_id": op_name, "digests": None}
         )
         return result.num_deleted
 
@@ -2963,7 +2943,7 @@ class WeaveClient:
 
         compute_digests = self._should_compute_client_digests()
 
-        def send_obj_create() -> ObjCreateRes:
+        def send_obj_create() -> ObjectCreateResponse:
             # `to_json` is mostly fast, except for CustomWeaveTypes
             # which incur network costs to serialize the payload
             json_val = to_json(val, self.project_id, self)
@@ -2999,26 +2979,31 @@ class WeaveClient:
                         InvalidExternalRef,
                     ):
                         local_digest = compute_object_digest(json_val)
-                req = ObjCreateReq(
-                    obj=ObjSchemaForInsert(
-                        project_id=self.entity + "/" + self.project,
-                        object_id=name,
-                        val=json_val,
-                    )
-                )
+                req: ObjectCreateParams = {
+                    "obj": {
+                        "project_id": self.entity + "/" + self.project,
+                        "object_id": name,
+                        "val": to_jsonable_python(json_val),
+                        "builtin_object_class": None,
+                        "expected_digest": None,
+                        "wb_user_id": None,
+                    }
+                }
                 self._wal.write("obj_create", req)
-                return ObjCreateRes(digest=local_digest)
+                return ObjectCreateResponse(digest=local_digest)
 
             # Standard path: send directly to the trace server and get
             # back a server-computed digest.
-            req = ObjCreateReq(
-                obj=ObjSchemaForInsert(
-                    project_id=self.entity + "/" + self.project,
-                    object_id=name,
-                    val=json_val,
-                    expected_digest=expected_digest,
-                )
-            )
+            req = {
+                "obj": {
+                    "project_id": self.entity + "/" + self.project,
+                    "object_id": name,
+                    "val": to_jsonable_python(json_val),
+                    "builtin_object_class": None,
+                    "expected_digest": expected_digest,
+                    "wb_user_id": None,
+                }
+            }
             try:
                 return self.server.obj_create(req)
             except (DigestMismatchError, HTTPError) as e:
@@ -3027,10 +3012,12 @@ class WeaveClient:
                 self._handle_digest_mismatch(
                     e, f"weave:///{self.entity}/{self.project}/object/{name}"
                 )
-                req.obj.expected_digest = None
+                req["obj"]["expected_digest"] = None
                 return self.server.obj_create(req)
 
-        res_future: Future[ObjCreateRes] = self.future_executor.defer(send_obj_create)
+        res_future: Future[ObjectCreateResponse] = self.future_executor.defer(
+            send_obj_create
+        )
         digest_future: Future[str] = self.future_executor.then(
             [res_future], lambda res: res[0].digest
         )
@@ -3061,7 +3048,7 @@ class WeaveClient:
 
         return self._save_object_basic(op, name)
 
-    def _send_table_create(self, rows: list[Any]) -> TableCreateRes:
+    def _send_table_create(self, rows: list[Any]) -> TableCreateResponse:
         compute_digests = self._should_compute_client_digests()
         json_rows = to_json(rows, self.project_id, self)
 
@@ -3082,30 +3069,31 @@ class WeaveClient:
         if self._wal is not None:
             row_digests = [compute_row_digest(row) for row in json_rows]
             local_digest = expected_digest or compute_table_digest(row_digests)
-            req = TableCreateReq(
-                table=TableSchemaForInsert(
-                    project_id=self.project_id,
-                    rows=json_rows,
-                )
-            )
+            req: TableCreateParams = {
+                "table": {
+                    "project_id": self.project_id,
+                    "rows": json_rows,
+                    "expected_digest": None,
+                }
+            }
             self._wal.write("table_create", req)
-            return TableCreateRes(digest=local_digest, row_digests=row_digests)
+            return TableCreateResponse(digest=local_digest, row_digests=row_digests)
 
         # Standard path: send directly to the trace server.
-        req = TableCreateReq(
-            table=TableSchemaForInsert(
-                project_id=self.project_id,
-                rows=json_rows,
-                expected_digest=expected_digest,
-            )
-        )
+        req = {
+            "table": {
+                "project_id": self.project_id,
+                "rows": json_rows,
+                "expected_digest": expected_digest,
+            }
+        }
         try:
             return self.server.table_create(req)
         except (DigestMismatchError, HTTPError) as e:
             if expected_digest is None:
                 raise
             self._handle_digest_mismatch(e, f"table in {self.project_id}")
-            req.table.expected_digest = None
+            req["table"]["expected_digest"] = None
             return self.server.table_create(req)
 
     @trace_sentry.global_trace_sentry.watch()
@@ -3123,7 +3111,7 @@ class WeaveClient:
         chunking_config = self._should_use_chunking(table)
         if not chunking_config.use_chunking:
             # Simple case: defer the entire serialization and upload
-            res_future: Future[TableCreateRes] = self.future_executor.defer(
+            res_future: Future[TableCreateResponse] = self.future_executor.defer(
                 lambda: self._send_table_create(list(table.rows))
             )
         elif chunking_config.use_parallel_chunks:
@@ -3137,7 +3125,7 @@ class WeaveClient:
             [res_future], lambda res: res[0].digest
         )
         row_digests_future: Future[list[str]] = self.future_executor.then(
-            [res_future], lambda res: res[0].row_digests
+            [res_future], lambda res: res[0].row_digests or []
         )
 
         table_ref = TableRef(
@@ -3182,9 +3170,11 @@ class WeaveClient:
         # Determine parallel vs incremental chunking
         use_parallel_chunks = False
         if use_chunking and should_use_parallel_table_upload():
-            test_req = TableCreateFromDigestsReq(
-                project_id=self.project_id, row_digests=[]
-            )
+            test_req: TableCreateFromDigestsParams = {
+                "project_id": self.project_id,
+                "row_digests": [],
+                "expected_digest": None,
+            }
 
             use_parallel_chunks = check_endpoint_exists(
                 self.server.table_create_from_digests,
@@ -3198,7 +3188,7 @@ class WeaveClient:
 
     def _create_table_with_parallel_chunks(
         self, table: Table | WeaveTable
-    ) -> Future[TableCreateRes]:
+    ) -> Future[TableCreateResponse]:
         """Execute the actual parallel chunk upload."""
         # Create chunks from raw table data (not serialized yet)
         chunk_manager = TableChunkManager()
@@ -3208,8 +3198,8 @@ class WeaveClient:
         chunk_futures = []
         for raw_chunk in raw_chunks:
 
-            def make_chunk_task(chunk: list[Any]) -> Callable[[], TableCreateRes]:
-                def chunk_task() -> TableCreateRes:
+            def make_chunk_task(chunk: list[Any]) -> Callable[[], TableCreateResponse]:
+                def chunk_task() -> TableCreateResponse:
                     return self._send_table_create(chunk)
 
                 return chunk_task
@@ -3219,31 +3209,31 @@ class WeaveClient:
 
         # Chain the operations using future_executor.then
         def combine_chunks_and_create_table(
-            chunk_results: list[TableCreateRes],
-        ) -> TableCreateRes:
+            chunk_results: list[TableCreateResponse],
+        ) -> TableCreateResponse:
             all_row_digests = []
             for chunk_result in chunk_results:
-                all_row_digests.extend(chunk_result.row_digests)
+                all_row_digests.extend(chunk_result.row_digests or [])
 
             # Create final table from digests
             expected_digest = None
             if self._should_compute_client_digests():
                 expected_digest = compute_table_digest(all_row_digests)
-            create_req = TableCreateFromDigestsReq(
-                project_id=self.project_id,
-                row_digests=all_row_digests,
-                expected_digest=expected_digest,
-            )
+            create_req: TableCreateFromDigestsParams = {
+                "project_id": self.project_id,
+                "row_digests": all_row_digests,
+                "expected_digest": expected_digest,
+            }
             try:
                 create_res = self.server.table_create_from_digests(create_req)
             except (DigestMismatchError, HTTPError) as e:
                 if expected_digest is None:
                     raise
                 self._handle_digest_mismatch(e, "table_create_from_digests")
-                create_req.expected_digest = None
+                create_req["expected_digest"] = None
                 create_res = self.server.table_create_from_digests(create_req)
 
-            return TableCreateRes(
+            return TableCreateResponse(
                 digest=create_res.digest,
                 row_digests=all_row_digests,
             )
@@ -3253,7 +3243,7 @@ class WeaveClient:
 
     def _create_table_with_incremental_updates(
         self, table: Table | WeaveTable
-    ) -> Future[TableCreateRes]:
+    ) -> Future[TableCreateResponse]:
         """Create table using incremental table_update pattern (fallback)."""
         # Create chunks from raw table data (not serialized yet)
         chunk_manager = TableChunkManager()
@@ -3264,7 +3254,7 @@ class WeaveClient:
         # Create first chunk as the base table - defer serialization
         first_raw_chunk = raw_chunks[0]
 
-        def create_first_chunk() -> TableCreateRes:
+        def create_first_chunk() -> TableCreateResponse:
             serialized_rows = to_json(first_raw_chunk, self.project_id, self)
             return self._send_table_create(serialized_rows)
 
@@ -3272,27 +3262,26 @@ class WeaveClient:
 
         # Chain the incremental updates sequentially
         def process_remaining_chunks(
-            base_results: list[TableCreateRes],
-        ) -> TableCreateRes:
+            base_results: list[TableCreateResponse],
+        ) -> TableCreateResponse:
             base_result = base_results[0]
             current_digest = base_result.digest
-            all_row_digests = list(base_result.row_digests)
+            all_row_digests = list(base_result.row_digests or [])
 
             # Process remaining chunks sequentially (each depends on previous)
             for raw_chunk in raw_chunks[1:]:
                 # Serialize each chunk separately to avoid recursion
                 serialized_chunk = to_json(raw_chunk, self.project_id, self)
-                payloads = [TableAppendSpecPayload(row=row) for row in serialized_chunk]
-                update_req = TableUpdateReq(
-                    project_id=self.project_id,
-                    base_digest=current_digest,
-                    updates=[TableAppendSpec(append=payload) for payload in payloads],
-                )
+                update_req: TableUpdateParams = {
+                    "project_id": self.project_id,
+                    "base_digest": current_digest,
+                    "updates": [{"append": {"row": row}} for row in serialized_chunk],
+                }
                 update_result = self.server.table_update(update_req)
                 current_digest = update_result.digest
-                all_row_digests.extend(update_result.updated_row_digests)
+                all_row_digests.extend(update_result.updated_row_digests or [])
 
-            return TableCreateRes(
+            return TableCreateResponse(
                 digest=current_digest,
                 row_digests=all_row_digests,
             )
@@ -3301,12 +3290,11 @@ class WeaveClient:
         return self.future_executor.then([base_future], process_remaining_chunks)
 
     def _append_to_table(self, table_digest: str, rows: list[dict]) -> WeaveTable:
-        payloads = [TableAppendSpecPayload(row=row) for row in rows]
-        table_update_req = TableUpdateReq(
-            project_id=self.project_id,
-            base_digest=table_digest,
-            updates=[TableAppendSpec(append=payload) for payload in payloads],
-        )
+        table_update_req: TableUpdateParams = {
+            "project_id": self.project_id,
+            "base_digest": table_digest,
+            "updates": [{"append": {"row": row}} for row in rows],
+        }
         res = self.server.table_update(table_update_req)
         return WeaveTable(
             table_ref=TableRef(
@@ -3334,19 +3322,35 @@ class WeaveClient:
         return self.get_calls(filter={"op_names": [op_ref.uri]})
 
     @trace_sentry.global_trace_sentry.watch()
-    def _objects(self, filter: ObjectVersionFilter | None = None) -> list[ObjSchema]:
-        if not filter:
-            filter = ObjectVersionFilter()
-        else:
-            filter = filter.model_copy()
-        filter = cast(ObjectVersionFilter, filter)
-        filter.is_op = False
+    def _objects(
+        self, filter: object_query_params.Filter | ObjectVersionFilter | None = None
+    ) -> list[object_query_response.Obj]:
+        # Every filter key, null when unset.
+        query_filter: object_query_params.Filter = {
+            "base_object_classes": None,
+            "exclude_base_object_classes": None,
+            "leaf_object_classes": None,
+            "object_ids": None,
+            "is_op": None,
+            "latest_only": None,
+            "tags": None,
+            "aliases": None,
+        }
+        if filter:
+            query_filter.update(cast(object_query_params.Filter, as_params(filter)))
+        query_filter["is_op"] = False
 
         response = self.server.objs_query(
-            ObjQueryReq(
-                project_id=self.project_id,
-                filter=filter,
-            )
+            {
+                "project_id": self.project_id,
+                "filter": query_filter,
+                "limit": None,
+                "offset": None,
+                "sort_by": None,
+                "metadata_only": False,
+                "include_storage_size": False,
+                "include_tags_and_aliases": False,
+            }
         )
         return response.objs
 
@@ -3381,29 +3385,37 @@ class WeaveClient:
     def _ref_uri(self, name: str, version: str, path: str) -> str:
         return ObjectRef(self.entity, self.project, name, version).uri
 
-    def _send_file_create(self, req: FileCreateReq) -> Future[FileCreateRes]:
+    def _send_file_create(self, req: FileCreateParams) -> Future[FileCreateResponse]:
         cached_res = self.send_file_cache.get(req)
         if cached_res:
             return cached_res
 
+        name, content = cast("tuple[str, bytes]", req["file"])
         # WAL path: persist to disk; return a resolved future immediately.
         if self._wal is not None:
-            digest = req.expected_digest or compute_file_digest(req.content)
-            self._wal.write("file_create", req)
-            f: Future[FileCreateRes] = Future()
-            f.set_result(FileCreateRes(digest=digest))
+            digest = req.get("expected_digest") or compute_file_digest(content)
+            # The record keeps the name and content keys every SDK version replays.
+            record = {
+                "project_id": req["project_id"],
+                "name": name,
+                "content": content,
+                "expected_digest": req.get("expected_digest"),
+            }
+            self._wal.write("file_create", record)
+            f: Future[FileCreateResponse] = Future()
+            f.set_result(FileCreateResponse(digest=digest))
             self.send_file_cache.put(req, f)
             return f
 
         # Standard path: send directly to the trace server.
-        def file_create_with_fallback() -> FileCreateRes:
+        def file_create_with_fallback() -> FileCreateResponse:
             try:
                 return self.server.file_create(req)
             except (DigestMismatchError, HTTPError) as e:
-                if req.expected_digest is None:
+                if req.get("expected_digest") is None:
                     raise
-                self._handle_digest_mismatch(e, f"file://{req.name}")
-                req.expected_digest = None
+                self._handle_digest_mismatch(e, f"file://{name}")
+                req["expected_digest"] = None
                 return self.server.file_create(req)
 
         if self.future_executor_fastlane:
@@ -3413,7 +3425,7 @@ class WeaveClient:
 
         self.send_file_cache.put(req, res)
 
-        def _evict_on_failure(fut: Future[FileCreateRes]) -> None:
+        def _evict_on_failure(fut: Future[FileCreateResponse]) -> None:
             if fut.exception() is not None:
                 self.send_file_cache.delete_if(req, fut)
 

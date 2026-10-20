@@ -4,7 +4,6 @@ import logging
 from collections.abc import Mapping
 from typing import Any, Literal, TypedDict
 
-from weave.shared.trace_server_interface import FileContentReadReq
 from weave.trace.context.weave_client_context import (
     get_weave_client,
     require_weave_client,
@@ -183,7 +182,7 @@ def _load_custom_obj_files(
     loaded_files: dict[str, bytes] = {}
     for name, digest in file_digests.items():
         file_response = server.file_content_read(
-            FileContentReadReq(project_id=project_id, digest=digest)
+            {"project_id": project_id, "digest": digest}
         )
         loaded_files[name] = file_response.content
     return loaded_files

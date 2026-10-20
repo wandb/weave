@@ -161,17 +161,10 @@ def test_timeout_retry_mechanism(success_response, monkeypatch):
 
 
 @pytest.fixture
-def fast_retrying_server(monkeypatch):
-    """Create a StainlessRemoteHTTPTraceServer with fast retry settings for testing."""
+def batched_server(monkeypatch):
+    """Create a batching StainlessRemoteHTTPTraceServer; the test sets the retried send."""
     monkeypatch.setenv("WEAVE_USE_CALLS_COMPLETE", "false")
     server = StainlessRemoteHTTPTraceServer("http://example.com", should_batch=True)
-    fast_retry = tenacity.retry(
-        wait=tenacity.wait_fixed(0.1),
-        stop=tenacity.stop_after_attempt(2),
-        reraise=True,
-    )
-    original_stainless_request = server._stainless_request
-    server._stainless_request = fast_retry(original_stainless_request)
     yield server
     if server.call_processor:
         server.call_processor.stop_accepting_new_work_and_flush_queue()
@@ -180,7 +173,7 @@ def fast_retrying_server(monkeypatch):
 
 
 @pytest.mark.disable_logging_error_check
-def test_post_timeout(success_response, fast_retrying_server, log_collector):
+def test_post_timeout(success_response, batched_server, log_collector):
     """Test batch recovery after timeout exhaustion.
 
     This test verifies that we can still send new batches even if one batch
@@ -195,11 +188,11 @@ def test_post_timeout(success_response, fast_retrying_server, log_collector):
         raise requests.exceptions.Timeout("Connection timed out")
 
     # Wrap the mock with the retry decorator to preserve retry behavior
-    fast_retrying_server._send_batch_to_server = with_retry(mock_send_batch_timeout)
+    batched_server._send_batch_to_server = with_retry(mock_send_batch_timeout)
 
     # Phase 1: Try but fail to process the first batch
-    fast_retrying_server.call_start(tsi.CallStartReq(start=generate_start()))
-    fast_retrying_server.call_processor.stop_accepting_new_work_and_flush_queue()
+    batched_server.call_start(tsi.CallStartReq(start=generate_start()))
+    batched_server.call_processor.stop_accepting_new_work_and_flush_queue()
     logs = log_collector.get_warning_logs()
     assert len(logs) >= 1
     assert any(

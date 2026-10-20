@@ -46,6 +46,13 @@ class EnsureProjectExistsRes:
     project_name: str
 
 
+@dataclass
+class FileContentReadRes:
+    """A file's content; the generated client has no model for a binary body."""
+
+    content: bytes
+
+
 class EntityProjectInfo(BaseModel):
     """Extracted entity and project information from a project_id."""
 
