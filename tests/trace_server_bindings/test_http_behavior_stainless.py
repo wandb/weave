@@ -9,6 +9,7 @@ from __future__ import annotations
 import datetime
 import json
 import logging
+import re
 from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 from unittest.mock import MagicMock
@@ -21,6 +22,8 @@ from pydantic import ValidationError
 
 from tests.trace_server_bindings.conftest import generate_id, generate_start
 from weave.trace.display.term import configure_logger
+from weave.trace.refs import ObjectRef
+from weave.trace.weave_client import WeaveClient
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server_bindings.async_batch_processor import AsyncBatchProcessor
 from weave.trace_server_bindings.call_batch_processor import CallBatchProcessor
@@ -512,6 +515,77 @@ def test_calls_complete_needs_batching(monkeypatch):
 
     assert server.use_calls_complete is False
     assert server.call_processor is None
+
+
+# =============================================================================
+# Server errors seen by WeaveClient
+#
+# The vendored client raises its own APIStatusError, not httpx.HTTPStatusError.
+# These tests build WeaveClient straight on the binding, without the test-only
+# layer that turns HTTP errors back into server exceptions.
+# =============================================================================
+
+
+def _weave_client(server: StainlessRemoteHTTPTraceServer) -> WeaveClient:
+    entity, project = PROJECT.split("/")
+    return WeaveClient(entity, project, server, ensure_project_exists=False)
+
+
+def test_digest_mismatch_falls_back_to_server_digest(monkeypatch):
+    """A 409 on expected_digest resends without it and turns the fast path off."""
+    monkeypatch.setenv("WEAVE_ENABLE_CLIENT_SIDE_DIGESTS", "true")
+
+    def handle(request: httpx.Request) -> httpx.Response:
+        if request.url.path == "/service/projects_info":
+            info = {"external_project_id": PROJECT, "internal_project_id": "pid"}
+            return httpx.Response(200, json=[info], request=request)
+        if json.loads(request.read())["obj"].get("expected_digest"):
+            # retry-after-ms keeps the vendor's own 409 retries fast.
+            return httpx.Response(
+                409,
+                json={"reason": "digest mismatch"},
+                headers={"retry-after-ms": "1"},
+                request=request,
+            )
+        return httpx.Response(200, json={"digest": "server-digest"}, request=request)
+
+    with _batching_server(handle) as (server, requests):
+        client = _weave_client(server)
+        ref = client._save_object({"a": 1}, "obj")
+
+        assert ref.digest == "server-digest"
+    sent = [
+        json.loads(r.read())["obj"].get("expected_digest")
+        for r in requests
+        if r.url.path == "/obj/create"
+    ]
+    assert len(sent) >= 2
+    assert all(sent[:-1])
+    assert sent[-1] is None
+    assert client.project_id_resolver.is_disabled
+
+
+def test_failed_read_names_the_ref(monkeypatch):
+    """A 404 on read raises the ValueError naming the ref, not the vendor's error."""
+    monkeypatch.setenv("WEAVE_RETRY_MAX_ATTEMPTS", "1")
+
+    def handle(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(
+            404, json={"reason": "Obj missing not found"}, request=request
+        )
+
+    ref = ObjectRef(*PROJECT.split("/"), "missing", "abc")
+    expected = (
+        f"Unable to read object for ref uri: {ref.uri} (status 404): "
+        "Obj missing not found"
+    )
+    with _batching_server(handle) as (server, _):
+        client = _weave_client(server)
+
+        with pytest.raises(ValueError, match=re.escape(expected)) as exc_info:
+            client.get(ref)
+
+    assert str(exc_info.value) == expected
 
 
 def test_generated_client_gets_our_ssl_and_timeout_settings(monkeypatch):
