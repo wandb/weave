@@ -129,8 +129,89 @@ def test_start_end_pairing_orders(start_first: bool) -> None:
     batch = complete_fn.call_args[0][0]
     assert len(batch) == 1
     assert isinstance(batch[0], CompleteBatchItem)
-    assert batch[0].req.id == "call-1"
+    assert batch[0].req["id"] == "call-1"
     eager_fn.assert_not_called()
+
+
+@pytest.mark.parametrize(
+    ("start_as_dict", "end_as_dict"),
+    [(False, False), (True, True), (True, False), (False, True)],
+)
+def test_paired_call_has_every_field_in_model_order(
+    start_as_dict: bool, end_as_dict: bool
+) -> None:
+    """Pairing a start and an end, given as models or dicts, builds the model's dump."""
+    started_at = datetime.datetime(2026, 1, 2, tzinfo=datetime.timezone.utc)
+    ended_at = started_at + datetime.timedelta(seconds=1)
+    start_req = tsi.CallStartReq(
+        start=tsi.StartedCallSchemaForInsert(
+            project_id="proj",
+            id="call-1",
+            trace_id="trace-1",
+            op_name="op",
+            display_name="name",
+            parent_id="parent",
+            thread_id="thread",
+            turn_id="turn",
+            started_at=started_at,
+            attributes={"a": 1},
+            inputs={"b": 2},
+            otel_dump={"c": 3},
+            wb_user_id="user",
+            wb_run_id="run",
+            wb_run_step=1,
+        )
+    )
+    end_req = tsi.CallEndReq(
+        end=tsi.EndedCallSchemaForInsert(
+            project_id="proj",
+            id="call-1",
+            trace_id="trace-1",
+            ended_at=ended_at,
+            exception="boom",
+            output={"d": 4},
+            summary={"usage": {}},
+            wb_run_step_end=2,
+        )
+    )
+    complete_fn = MagicMock()
+    processor = CallBatchProcessor(complete_fn, MagicMock(), min_batch_interval=0.01)
+
+    processor.enqueue(
+        [
+            StartBatchItem(req=start_req.model_dump() if start_as_dict else start_req),
+            EndBatchItem(req=end_req.model_dump() if end_as_dict else end_req),
+        ]
+    )
+    processor.stop_accepting_new_work_and_flush_queue()
+
+    expected = tsi.CompletedCallSchemaForInsert(
+        project_id="proj",
+        id="call-1",
+        trace_id="trace-1",
+        op_name="op",
+        started_at=started_at,
+        ended_at=ended_at,
+        display_name="name",
+        parent_id="parent",
+        thread_id="thread",
+        turn_id="turn",
+        attributes={"a": 1},
+        inputs={"b": 2},
+        output={"d": 4},
+        summary={"usage": {}},
+        otel_dump={"c": 3},
+        exception="boom",
+        wb_user_id="user",
+        wb_run_id="run",
+        wb_run_step=1,
+        wb_run_step_end=2,
+    ).model_dump()
+    complete_fn.assert_called_once()
+    (item,) = complete_fn.call_args[0][0]
+    assert item.req == expected
+    # The same key order is what keeps the encoded batch byte-identical.
+    assert list(item.req) == list(expected)
 
 
 def test_eager_start_and_end_use_eager_processor() -> None:

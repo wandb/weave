@@ -1,8 +1,10 @@
 import datetime
+import functools
+import inspect
 import io
 import logging
-from collections.abc import Iterator
-from typing import Any, cast
+from collections.abc import Callable, Iterator, Mapping
+from typing import Any, TypeVar, cast, get_type_hints
 from urllib.parse import quote
 from zoneinfo import ZoneInfo
 
@@ -29,13 +31,13 @@ from weave.trace_server_bindings.http_utils import (
     REMOTE_REQUEST_BYTES_LIMIT,
     TRACE_ID_HEADER,
     CallsCompleteModeRequired,
+    as_params,
     handle_response_error,
     log_dropped_call_batch,
     log_dropped_feedback_batch,
     process_batch_with_retry,
 )
 from weave.trace_server_bindings.models import (
-    Batch,
     CompleteBatchItem,
     EndBatchItem,
     EntityProjectInfo,
@@ -50,12 +52,43 @@ from weave.wandb_interface.auth import WandbCredentials
 
 logger = logging.getLogger(__name__)
 
+_ServerT = TypeVar("_ServerT", bound=type)
+_R = TypeVar("_R")
+
 # Default timeout values (in seconds)
 # DEFAULT_CONNECT_TIMEOUT = 10
 # DEFAULT_READ_TIMEOUT = 30
 # DEFAULT_TIMEOUT = (DEFAULT_CONNECT_TIMEOUT, DEFAULT_READ_TIMEOUT)
 
 
+def _accept_mapping_requests(cls: _ServerT) -> _ServerT:
+    """Let every request method take a Mapping as well as its request model.
+
+    The Mapping becomes the model the method's `req` parameter is annotated
+    with, as `@validate_call` already does for the methods that have it.
+    """
+    for name, method in list(vars(cls).items()):
+        if name.startswith("_") or not inspect.isfunction(method):
+            continue
+        req_model = get_type_hints(method).get("req")
+        if isinstance(req_model, type) and issubclass(req_model, BaseModel):
+            setattr(cls, name, _validate_mapping_req(method, req_model))
+    return cls
+
+
+def _validate_mapping_req(
+    method: Callable[..., _R], req_model: type[BaseModel]
+) -> Callable[..., _R]:
+    @functools.wraps(method)
+    def wrapper(self: Any, req: Any, *args: Any, **kwargs: Any) -> _R:
+        if isinstance(req, Mapping):
+            req = req_model.model_validate(req)
+        return method(self, req, *args, **kwargs)
+
+    return wrapper
+
+
+@_accept_mapping_requests
 class RemoteHTTPTraceServer:
     trace_server_url: str
 
@@ -209,14 +242,21 @@ class RemoteHTTPTraceServer:
 
         def get_item_id(item: StartBatchItem | EndBatchItem) -> str:
             if isinstance(item, StartBatchItem):
-                return f"{item.req.start.id}-start"
+                return f"{as_params(item.req)['start'].get('id')}-start"
             elif isinstance(item, EndBatchItem):
-                return f"{item.req.end.id}-end"
+                return f"{as_params(item.req)['end'].get('id')}-end"
             return "unknown"
 
         def encode_batch(batch: list[StartBatchItem | EndBatchItem]) -> bytes:
-            data = Batch(batch=batch).model_dump_json()
-            return data.encode("utf-8")
+            req = tsi.CallCreateBatchReq(
+                batch=[
+                    tsi.CallBatchStartMode(req=item.req)
+                    if isinstance(item, StartBatchItem)
+                    else tsi.CallBatchEndMode(req=item.req)
+                    for item in batch
+                ]
+            )
+            return req.model_dump_json().encode("utf-8")
 
         try:
             process_batch_with_retry(
@@ -303,9 +343,9 @@ class RemoteHTTPTraceServer:
         for item in batch:
             try:
                 if isinstance(item, StartBatchItem):
-                    self._send_call_start_v2(item.req.start)
+                    self._send_call_start_v2(as_params(item.req)["start"])
                 elif isinstance(item, EndBatchItem):
-                    self._send_call_end_v2(item.req.end)
+                    self._send_call_end_v2(as_params(item.req)["end"])
             except CallsCompleteModeRequired:
                 # Re-raise so caller can handle the upgrade to calls_complete mode
                 raise
@@ -313,30 +353,30 @@ class RemoteHTTPTraceServer:
                 log_dropped_call_batch([item], e)
 
     @with_retry
-    def _send_call_start_v2(self, start: tsi.StartedCallSchemaForInsert) -> None:
+    def _send_call_start_v2(self, start: Mapping[str, Any]) -> None:
         """Send a single call start to the v2 endpoint."""
-        project_id = start.project_id
+        req = tsi.CallStartV2Req(start=start)
+        project_id = req.start.project_id
         entity, project = project_id.split("/", 1)
         url = f"/v2/{entity}/{project}/call/start"
-        req = tsi.CallStartV2Req(start=start)
         r = self.post(
             url,
             data=req.model_dump_json().encode("utf-8"),
-            trace_id=start.trace_id,
+            trace_id=req.start.trace_id,
         )
         handle_response_error(r, url)
 
     @with_retry
-    def _send_call_end_v2(self, end: tsi.EndedCallSchemaForInsertWithStartedAt) -> None:
+    def _send_call_end_v2(self, end: Mapping[str, Any]) -> None:
         """Send a single call end to the v2 endpoint."""
-        project_id = end.project_id
+        req = tsi.CallEndV2Req(end=end)
+        project_id = req.end.project_id
         entity, project = project_id.split("/", 1)
         url = f"/v2/{entity}/{project}/call/end"
-        req = tsi.CallEndV2Req(end=end)
         r = self.post(
             url,
             data=req.model_dump_json().encode("utf-8"),
-            trace_id=end.trace_id,
+            trace_id=req.end.trace_id,
         )
         handle_response_error(r, url)
 
@@ -348,7 +388,7 @@ class RemoteHTTPTraceServer:
             raise ValueError("Cannot extract entity/project from empty batch")
 
         first_item = batch[0]
-        project_id = first_item.req.project_id
+        project_id = as_params(first_item.req)["project_id"]
 
         if not project_id or "/" not in project_id:
             raise ValueError(
@@ -388,7 +428,7 @@ class RemoteHTTPTraceServer:
         ep_info = self._extract_entity_project(batch)
 
         def get_item_id(item: CompleteBatchItem) -> str:
-            return f"{item.req.id}-complete"
+            return f"{as_params(item.req)['id']}-complete"
 
         def encode_batch(batch: list[CompleteBatchItem]) -> bytes:
             api_batch = [item.req for item in batch]

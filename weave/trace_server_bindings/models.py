@@ -1,30 +1,34 @@
-from typing import Annotated, Literal
+from dataclasses import dataclass
+from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 
 from weave.shared import trace_server_interface as tsi
+from weave.vendor.weave_server_sdk.types import (
+    CallEndParams,
+    CallStartParams,
+    v2_call_complete_params,
+)
 
 
-class StartBatchItem(BaseModel):
+@dataclass(kw_only=True)
+class StartBatchItem:
     mode: Literal["start"] = "start"
-    req: tsi.CallStartReq
+    req: CallStartParams | tsi.CallStartReq
 
 
-class EndBatchItem(BaseModel):
+@dataclass(kw_only=True)
+class EndBatchItem:
     mode: Literal["end"] = "end"
-    req: tsi.CallEndReq
+    req: CallEndParams | tsi.CallEndReq
 
 
-class CompleteBatchItem(BaseModel):
+@dataclass(kw_only=True)
+class CompleteBatchItem:
     """A complete call ready to be sent to calls_complete endpoint."""
 
     mode: Literal["complete"] = "complete"
-    req: tsi.CompletedCallSchemaForInsert
-
-
-class Batch(BaseModel):
-    # Discriminated: untagged, each item is tried against the wrong member and warns.
-    batch: list[Annotated[StartBatchItem | EndBatchItem, Field(discriminator="mode")]]
+    req: v2_call_complete_params.Batch | tsi.CompletedCallSchemaForInsert
 
 
 class EntityProjectInfo(BaseModel):

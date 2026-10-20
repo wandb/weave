@@ -176,3 +176,31 @@ def test_retry_on_not_found_retries_stainless_404(monkeypatch):
 
     assert flaky_read() == "ok"
     assert attempts == 2
+
+
+@pytest.mark.parametrize(
+    "error",
+    [_make_httpx_error(503), _make_stainless_error(503)],
+    ids=["httpx", "stainless"],
+)
+def test_5xx_requeues_batch_without_splitting(error):
+    """A server error is retried later as the same batch, not split."""
+    processor = Mock()
+    processor.is_accepting_new_work.return_value = True
+    sent = []
+
+    def mock_send(data: bytes) -> None:
+        sent.append(data)
+        raise error
+
+    process_batch_with_retry(
+        [1, 2, 3, 4],
+        batch_name="test",
+        remote_request_bytes_limit=100_000,
+        send_batch_fn=mock_send,
+        processor_obj=processor,
+        encode_batch_fn=lambda b: str(b).encode(),
+    )
+
+    assert len(sent) == 1
+    processor.enqueue.assert_called_once_with([1, 2, 3, 4])

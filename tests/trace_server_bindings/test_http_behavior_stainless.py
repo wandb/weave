@@ -38,6 +38,7 @@ from weave.trace_server_bindings.stainless_remote_http_trace_server import (
 )
 from weave.utils.retry import with_retry
 from weave.vendor.weave_server_sdk import APIStatusError, DefaultHttpxClient
+from weave.vendor.weave_server_sdk.types import CallStartResponse
 from weave.wandb_interface.auth import ApiKeyCredentials, WandbCredentials
 
 
@@ -92,21 +93,14 @@ def test_call_start_ok(unbatched_server):
     """Test successful call_start request."""
     call_id = generate_id()
 
-    mock_response = MagicMock()
-    mock_response.model_dump.return_value = {
-        "id": call_id,
-        "trace_id": "test_trace_id",
-    }
-    unbatched_server._stainless_client.calls.start = MagicMock(
-        return_value=mock_response
-    )
+    response = CallStartResponse(id=call_id, trace_id="test_trace_id")
+    unbatched_server._stainless_client.calls.start = MagicMock(return_value=response)
 
     start = generate_start(call_id)
     result = unbatched_server.call_start(tsi.CallStartReq(start=start))
 
     unbatched_server._stainless_client.calls.start.assert_called_once()
-    assert result.id == call_id
-    assert result.trace_id == "test_trace_id"
+    assert result == CallStartResponse(id=call_id, trace_id="test_trace_id")
 
 
 def test_400_no_retry(unbatched_server):
@@ -221,14 +215,7 @@ def test_post_timeout(success_response, fast_retrying_server, log_collector):
         if call_count == 1:
             raise requests.exceptions.Timeout("Connection timed out")
         else:
-            mock_response = MagicMock()
-            mock_response.id = "test_id"
-            mock_response.trace_id = "test_trace_id"
-            mock_response.model_dump.return_value = {
-                "id": "test_id",
-                "trace_id": "test_trace_id",
-            }
-            return mock_response
+            return CallStartResponse(id="test_id", trace_id="test_trace_id")
 
     # Create a new server since the old one has shutdown its batch processor
     new_server = StainlessRemoteHTTPTraceServer(
@@ -239,9 +226,7 @@ def test_post_timeout(success_response, fast_retrying_server, log_collector):
         stop=tenacity.stop_after_attempt(2),
         reraise=True,
     )
-    original_stainless_request = new_server._stainless_request
-    new_server._stainless_request = fast_retry(original_stainless_request)
-    new_server._stainless_client.calls.start = mock_start_success
+    new_server._stainless_client.calls.start = fast_retry(mock_start_success)
 
     # Should succeed with retry
     start_req = tsi.CallStartReq(start=generate_start())

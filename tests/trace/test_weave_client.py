@@ -30,7 +30,7 @@ from weave.trace import refs, settings, table_upload_chunking, weave_client
 from weave.trace.builtin_object_classes.llm_structured_model import (
     LLMStructuredCompletionModelDefaultParams,
 )
-from weave.trace.context import call_context
+from weave.trace.context import call_context, weave_client_context
 from weave.trace.context.call_context import tracing_disabled
 from weave.trace.errors import NotFoundError
 from weave.trace.isinstance import weave_isinstance
@@ -830,7 +830,7 @@ def test_set_display_name_does_not_block_caller(client, no_autoflush):
     executor drains.
     """
     gate = threading.Event()
-    seen: list[tsi.CallUpdateReq] = []
+    seen: list[dict] = []
 
     class GatedServer:
         def __init__(self, inner):
@@ -869,11 +869,87 @@ def test_set_display_name_does_not_block_caller(client, no_autoflush):
         gate.set()
         client.flush()
         assert len(seen) == 1
-        assert seen[0].call_id == call.id
-        assert seen[0].display_name == "new_name"
+        assert seen[0]["call_id"] == call.id
+        assert seen[0]["display_name"] == "new_name"
     finally:
         gate.set()
         client.server = real_server
+
+
+def _client_storing_objects(
+    sent: list[tuple[str, dict]],
+) -> weave_client.WeaveClient:
+    """A client on the unbatched default binding whose server stores objects."""
+    objs: dict[str, dict] = {}
+
+    def handle(request: httpx.Request) -> httpx.Response:
+        if request.url.path == "/file/create":
+            return httpx.Response(200, json={"digest": "f0"}, request=request)
+        body = json.loads(request.content)
+        sent.append((request.url.path, body))
+        if request.url.path == "/obj/create":
+            digest = f"d{len(objs)}"
+            objs[digest] = body["obj"]
+            return httpx.Response(200, json={"digest": digest}, request=request)
+        if request.url.path == "/obj/read":
+            obj = objs[body["digest"]]
+            read = {
+                "project_id": obj["project_id"],
+                "object_id": obj["object_id"],
+                "created_at": "2026-01-01T00:00:00Z",
+                "digest": body["digest"],
+                "version_index": 0,
+                "is_latest": 1,
+                "kind": "object",
+                "base_object_class": None,
+                "leaf_object_class": None,
+                "val": obj["val"],
+            }
+            return httpx.Response(200, json={"obj": read}, request=request)
+        if request.url.path == "/call/start":
+            start = body["start"]
+            res = {"id": start["id"], "trace_id": start["trace_id"]}
+            return httpx.Response(200, json=res, request=request)
+        return httpx.Response(200, json={}, request=request)
+
+    server = StainlessRemoteHTTPTraceServer("http://example.com", should_batch=False)
+    server._stainless_client = server._stainless_client.copy(
+        http_client=httpx.Client(transport=httpx.MockTransport(handle))
+    )
+    return weave_client.WeaveClient(
+        "entity", "project", server, ensure_project_exists=False
+    )
+
+
+class _EditedThing(weave.Object):
+    a: str
+
+
+def test_edited_object_reaches_call_start_and_end():
+    """A fetched object edited and passed to a call is sent as call input and output.
+
+    Its serialized `_type` holds the object's ref, which has to go out as JSON.
+    """
+    sent: list[tuple[str, dict]] = []
+    client = _client_storing_objects(sent)
+    ref = client._save_object(_EditedThing(a="hello"), "thing")
+    thing = client.get(ref)
+    thing.a = "newer"
+
+    weave_client_context.set_weave_client_global(client)
+    try:
+        call = client.create_call("op", {"x": thing})
+        client.finish_call(call, output=thing)
+        client._flush()
+    finally:
+        weave_client_context.set_weave_client_global(None)
+
+    bodies = dict(sent)
+    sent_input = bodies["/call/start"]["start"]["inputs"]["x"]
+    sent_output = bodies["/call/end"]["end"]["output"]
+    for value in (sent_input, sent_output):
+        assert value["a"] == "newer"
+        assert value["_type"]["name"] == "thing"
 
 
 def test_dataset_calls(client):

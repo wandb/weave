@@ -7,15 +7,17 @@ status codes, and error handling specific to RemoteHTTPTraceServer.
 from __future__ import annotations
 
 import datetime
+import inspect
 import json
 import logging
 from types import MethodType
+from typing import get_type_hints
 from unittest.mock import MagicMock, patch
 
 import httpx
 import pytest
 import tenacity
-from pydantic import ValidationError
+from pydantic import BaseModel, ValidationError
 
 from tests.trace_server_bindings.conftest import (
     generate_end,
@@ -78,6 +80,59 @@ def test_call_start_ok(mock_post, unbatched_server):
     start = generate_start(call_id)
     unbatched_server.call_start(tsi.CallStartReq(start=start))
     mock_post.assert_called_once()
+
+
+def _request_methods() -> list[tuple[str, type[BaseModel]]]:
+    """Each public method of the client with the request model `req` is annotated with."""
+    methods = []
+    for name, method in vars(RemoteHTTPTraceServer).items():
+        if name.startswith("_") or not inspect.isfunction(method):
+            continue
+        req_model = get_type_hints(method).get("req")
+        if isinstance(req_model, type) and issubclass(req_model, BaseModel):
+            methods.append((name, req_model))
+    return methods
+
+
+@pytest.mark.parametrize(("method_name", "req_model"), _request_methods())
+def test_every_request_method_validates_a_mapping(
+    method_name: str, req_model: type[BaseModel], unbatched_server
+):
+    """A Mapping is turned into the method's request model before the method runs."""
+    with pytest.raises(ValidationError) as exc_info:
+        getattr(unbatched_server, method_name)({})
+
+    assert exc_info.value.title == req_model.__name__
+
+
+@patch("weave.utils.http_requests.post")
+def test_call_start_batch_takes_a_dict(mock_post, unbatched_server):
+    """A dict request is sent as the request model it validates to."""
+    start, end = generate_start("call-id"), generate_end("call-id")
+    req = {
+        "batch": [
+            {"mode": "start", "req": {"start": start.model_dump()}},
+            {"mode": "end", "req": {"end": end.model_dump()}},
+        ]
+    }
+    mock_post.return_value = httpx.Response(
+        200,
+        json={"res": [{"id": "call-id", "trace_id": "test_trace_id"}, {}]},
+        request=httpx.Request("POST", "http://example.com"),
+    )
+
+    res = unbatched_server.call_start_batch(req)
+
+    assert mock_post.call_args.args[0] == "http://example.com/call/upsert_batch"
+    assert mock_post.call_args.kwargs["data"] == tsi.CallCreateBatchReq(
+        batch=[
+            tsi.CallBatchStartMode(req=tsi.CallStartReq(start=start)),
+            tsi.CallBatchEndMode(req=tsi.CallEndReq(end=end)),
+        ]
+    ).model_dump_json(by_alias=True).encode("utf-8")
+    assert res == tsi.CallCreateBatchRes(
+        res=[tsi.CallStartRes(id="call-id", trace_id="test_trace_id"), tsi.CallEndRes()]
+    )
 
 
 @patch("weave.utils.http_requests.put")
@@ -293,8 +348,8 @@ def test_eager_retryable_error_logs_and_continues(caplog):
     call_attempts = []
 
     def _raise_retryable_once(start) -> None:
-        call_attempts.append(start.id)
-        if start.id == "call-id-1":
+        call_attempts.append(start["id"])
+        if start["id"] == "call-id-1":
             raise httpx.HTTPStatusError(
                 "500",
                 request=httpx.Request("POST", "http://example.com"),

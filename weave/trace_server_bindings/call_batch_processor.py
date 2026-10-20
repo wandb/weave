@@ -16,12 +16,12 @@ from queue import Full
 
 from cachetools import TTLCache
 
-from weave.shared import trace_server_interface as tsi
 from weave.trace_server_bindings.async_batch_processor import (
     AsyncBatchProcessor,
     SkipIndividualProcessingError,
     log_warning_with_sentry,
 )
+from weave.trace_server_bindings.http_utils import as_params
 from weave.trace_server_bindings.models import (
     CompleteBatchItem,
     EndBatchItem,
@@ -143,8 +143,11 @@ class CallBatchProcessor(AsyncBatchProcessor[BatchItem]):
 
             self._check_pending_limit()
 
-    def enqueue_start(
-        self, item: StartBatchItem, *, eager_call_start: bool = False
+    def enqueue_start(  # type: ignore[override]
+        self,
+        item: StartBatchItem,  # type: ignore[override]
+        *,
+        eager_call_start: bool = False,
     ) -> None:
         """Enqueue a start item with eager_call_start flag.
 
@@ -237,7 +240,7 @@ class CallBatchProcessor(AsyncBatchProcessor[BatchItem]):
             eager_call_start: If True, send start immediately rather than batching.
                 Defined at op definition time via @op(eager_call_start=True).
         """
-        call_id = item.req.start.id
+        call_id = as_params(item.req)["start"].get("id")
 
         if call_id is None:
             logger.warning("Received start without call_id, dropping")
@@ -263,7 +266,7 @@ class CallBatchProcessor(AsyncBatchProcessor[BatchItem]):
 
     def _handle_end(self, item: EndBatchItem) -> None:
         """Handle an end item - pair with start if available, else hold."""
-        call_id = item.req.end.id
+        call_id = as_params(item.req)["end"].get("id")
         if call_id is None:
             logger.warning("Received end without call_id, dropping")
             return
@@ -298,34 +301,37 @@ class CallBatchProcessor(AsyncBatchProcessor[BatchItem]):
         Raises:
             ValueError: If start item is missing required id or trace_id.
         """
-        if start.req.start.id is None:
+        started = as_params(start.req)["start"]
+        ended = as_params(end.req)["end"]
+        if started.get("id") is None:
             raise ValueError("Cannot create complete call: start item missing id")
-        if start.req.start.trace_id is None:
+        if started.get("trace_id") is None:
             raise ValueError("Cannot create complete call: start item missing trace_id")
 
-        complete_call = tsi.CompletedCallSchemaForInsert(
-            project_id=start.req.start.project_id,
-            id=start.req.start.id,
-            trace_id=start.req.start.trace_id,
-            op_name=start.req.start.op_name,
-            display_name=start.req.start.display_name,
-            parent_id=start.req.start.parent_id,
-            thread_id=start.req.start.thread_id,
-            turn_id=start.req.start.turn_id,
-            started_at=start.req.start.started_at,
-            attributes=start.req.start.attributes,
-            inputs=start.req.start.inputs,
-            otel_dump=start.req.start.otel_dump,
-            ended_at=end.req.end.ended_at,
-            exception=end.req.end.exception,
-            output=end.req.end.output,
-            summary=end.req.end.summary,
-            wb_user_id=start.req.start.wb_user_id,
-            wb_run_id=start.req.start.wb_run_id,
-            wb_run_step=start.req.start.wb_run_step,
-            wb_run_step_end=end.req.end.wb_run_step_end,
+        return CompleteBatchItem(
+            req={
+                "project_id": started["project_id"],
+                "id": started["id"],
+                "trace_id": started["trace_id"],
+                "op_name": started["op_name"],
+                "started_at": started["started_at"],
+                "ended_at": ended["ended_at"],
+                "display_name": started.get("display_name"),
+                "parent_id": started.get("parent_id"),
+                "thread_id": started.get("thread_id"),
+                "turn_id": started.get("turn_id"),
+                "attributes": started["attributes"],
+                "inputs": started["inputs"],
+                "output": ended.get("output"),
+                "summary": ended["summary"],
+                "otel_dump": started.get("otel_dump"),
+                "exception": ended.get("exception"),
+                "wb_user_id": started.get("wb_user_id"),
+                "wb_run_id": started.get("wb_run_id"),
+                "wb_run_step": started.get("wb_run_step"),
+                "wb_run_step_end": ended.get("wb_run_step_end"),
+            }
         )
-        return CompleteBatchItem(req=complete_call)
 
     def _queue_item(self, item: BatchItem) -> None:
         """Queue an item for sending."""
@@ -380,7 +386,7 @@ class CallBatchProcessor(AsyncBatchProcessor[BatchItem]):
                         ) from e
                 else:
                     # Non-retryable: log warning and drop complete items
-                    ids = [item.req.id for item in complete_items]
+                    ids = [as_params(item.req)["id"] for item in complete_items]
                     log_warning_with_sentry(
                         f"Dropping {len(complete_items)} complete calls due to non-retryable error: {e}. "
                         f"Call IDs: {ids}"
