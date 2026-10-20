@@ -1600,6 +1600,27 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         )
 
     @validate_call
+    def dataset_sources_link_delete(
+        self, req: tsi.DatasetSourcesLinkDeleteReq
+    ) -> tsi.DatasetSourcesLinkDeleteRes:
+        """Soft-delete dataset source links by id.
+
+        Args:
+            req: Dataset sources link delete request.
+
+        Returns:
+            Dataset sources link delete response.
+        """
+        # Hidden from the OpenAPI spec, so the generator emits no method for it.
+        response = self._stainless_client.post(
+            "/dataset_sources/link_delete",
+            body=req.model_dump(mode="json"),
+            cast_to=object,
+            options={"headers": self._compose_headers()},
+        )
+        return tsi.DatasetSourcesLinkDeleteRes.model_validate(response)
+
+    @validate_call
     def dataset_sources_query(
         self, req: tsi.DatasetSourcesQueryReq
     ) -> tsi.DatasetSourcesQueryRes:
