@@ -1600,6 +1600,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         )
 
     @validate_call
+    @with_retry
     def dataset_sources_link_delete(
         self, req: tsi.DatasetSourcesLinkDeleteReq
     ) -> tsi.DatasetSourcesLinkDeleteRes:
@@ -1616,7 +1617,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
             "/dataset_sources/link_delete",
             body=req.model_dump(mode="json"),
             cast_to=object,
-            options={"headers": self._compose_headers()},
+            options={"headers": self._compose_headers(), "max_retries": 0},
         )
         return tsi.DatasetSourcesLinkDeleteRes.model_validate(response)
 
