@@ -54,6 +54,11 @@ from weave.utils.retry import get_current_retry_id, with_retry
 from weave.vendor.weave_server_sdk import APIStatusError, DefaultHttpxClient
 from weave.vendor.weave_server_sdk import Client as StainlessClient
 from weave.vendor.weave_server_sdk.types import (
+    AgentQueryParams,
+    AgentQueryResponse,
+    AgentSearchParams,
+    AgentSearchResponse,
+    AgentTraceChatRes,
     AnnotationQueueCreateParams,
     AnnotationQueueCreateResponse,
     AnnotationQueueDeleteResponse,
@@ -127,8 +132,56 @@ from weave.vendor.weave_server_sdk.types import (
     ThreadStreamQueryResponse,
     TraceUsageParams,
     TraceUsageResponse,
+    V2DatasetCreateResponse,
+    V2DatasetDeleteResponse,
+    V2DatasetListResponse,
+    V2EvalResultQueryResponse,
+    V2EvaluationCreateResponse,
+    V2EvaluationDeleteResponse,
+    V2EvaluationListResponse,
+    V2EvaluationReadResponse,
+    V2EvaluationRunCreateResponse,
+    V2EvaluationRunDeleteResponse,
+    V2EvaluationRunFinishResponse,
+    V2EvaluationRunListResponse,
+    V2EvaluationRunReadResponse,
+    V2ModelCreateResponse,
+    V2ModelDeleteResponse,
+    V2ModelListResponse,
+    V2ModelReadResponse,
+    V2OpCreateResponse,
+    V2OpDeleteResponse,
+    V2OpListResponse,
+    V2PredictionCreateResponse,
+    V2PredictionDeleteResponse,
+    V2PredictionFinishResponse,
+    V2PredictionListResponse,
+    V2PredictionReadResponse,
     V2RuntimeApplyResponse,
+    V2ScoreCreateResponse,
+    V2ScoreDeleteResponse,
+    V2ScoreListResponse,
+    V2ScorerCreateResponse,
+    V2ScorerDeleteResponse,
+    V2ScoreReadResponse,
+    V2ScorerListResponse,
+    V2ScorerReadResponse,
     feedback_batch_create_params,
+)
+from weave.vendor.weave_server_sdk.types.agents import (
+    AgentVersionQueryParams,
+    AgentVersionQueryResponse,
+    ConversationChatParams,
+    ConversationChatResponse,
+    ConversationSpansParams,
+    ConversationSpansResponse,
+    SpanCustomAttrsSchemaParams,
+    SpanCustomAttrsSchemaResponse,
+    SpanQueryParams,
+    SpanQueryResponse,
+    SpanStatsParams,
+    SpanStatsResponse,
+    TraceChatParams,
 )
 from weave.vendor.weave_server_sdk.types.annotation_queues import (
     ItemAddResponse,
@@ -646,10 +699,9 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         raise NotImplementedError("Sending otel traces directly is not yet supported.")
 
     # Agent Observability API
-    @validate_call
     def agent_spans_query(
-        self, req: agent_types.AgentSpansQueryReq
-    ) -> agent_types.AgentSpansQueryRes:
+        self, req: SpanQueryParams | agent_types.AgentSpansQueryReq
+    ) -> SpanQueryResponse:
         """Query agent spans, either as raw rows or grouped aggregates.
 
         Args:
@@ -658,16 +710,13 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         Returns:
             Agent spans query response.
         """
-        return self._stainless_request(
-            req,
-            agent_types.AgentSpansQueryRes,
-            self._stainless_client.agents.spans.query,
+        return self._stainless_client.agents.spans.query(
+            extra_headers=self._compose_headers(), **as_params(req)
         )
 
-    @validate_call
     def agent_traces_chat(
-        self, req: agent_types.AgentTraceChatReq
-    ) -> agent_types.AgentTraceChatRes:
+        self, req: TraceChatParams | agent_types.AgentTraceChatReq
+    ) -> AgentTraceChatRes:
         """Read an agent trace as a chat transcript.
 
         Args:
@@ -676,19 +725,20 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         Returns:
             Agent trace chat response.
         """
-        return self._stainless_request(
-            req,
-            agent_types.AgentTraceChatRes,
-            self._stainless_client.agents.traces.chat,
-            # The vendored SDK is generated from core and may lag this server's API.
-            exclude={"include_model_tool_calls"},
-            extra_body={"include_model_tool_calls": req.include_model_tool_calls},
+        params = dict(as_params(req))
+        # The vendored SDK is generated from core and may lag this server's API.
+        extra_body = {
+            key: params.pop(key)
+            for key in ["include_model_tool_calls"]
+            if key in params
+        }
+        return self._stainless_client.agents.traces.chat(
+            extra_headers=self._compose_headers(), extra_body=extra_body, **params
         )
 
-    @validate_call
     def agent_conversation_chat(
-        self, req: agent_types.AgentConversationChatReq
-    ) -> agent_types.AgentConversationChatRes:
+        self, req: ConversationChatParams | agent_types.AgentConversationChatReq
+    ) -> ConversationChatResponse:
         """Read a conversation as a chat transcript.
 
         Args:
@@ -697,19 +747,20 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         Returns:
             Agent conversation chat response.
         """
-        return self._stainless_request(
-            req,
-            agent_types.AgentConversationChatRes,
-            self._stainless_client.agents.conversations.chat,
-            # The vendored SDK is generated from core and may lag this server's API.
-            exclude={"include_model_tool_calls"},
-            extra_body={"include_model_tool_calls": req.include_model_tool_calls},
+        params = dict(as_params(req))
+        # The vendored SDK is generated from core and may lag this server's API.
+        extra_body = {
+            key: params.pop(key)
+            for key in ["include_model_tool_calls"]
+            if key in params
+        }
+        return self._stainless_client.agents.conversations.chat(
+            extra_headers=self._compose_headers(), extra_body=extra_body, **params
         )
 
-    @validate_call
     def agent_conversation_spans(
-        self, req: agent_types.AgentConversationSpansReq
-    ) -> agent_types.AgentConversationSpansRes:
+        self, req: ConversationSpansParams | agent_types.AgentConversationSpansReq
+    ) -> ConversationSpansResponse:
         """Read the spans of one or more conversations.
 
         Args:
@@ -718,16 +769,13 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         Returns:
             Agent conversation spans response.
         """
-        return self._stainless_request(
-            req,
-            agent_types.AgentConversationSpansRes,
-            self._stainless_client.agents.conversations.spans,
+        return self._stainless_client.agents.conversations.spans(
+            extra_headers=self._compose_headers(), **as_params(req)
         )
 
-    @validate_call
     def agent_agents_query(
-        self, req: agent_types.AgentsQueryReq
-    ) -> agent_types.AgentsQueryRes:
+        self, req: AgentQueryParams | agent_types.AgentsQueryReq
+    ) -> AgentQueryResponse:
         """Query agents.
 
         Args:
@@ -736,16 +784,13 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         Returns:
             Agents query response.
         """
-        return self._stainless_request(
-            req,
-            agent_types.AgentsQueryRes,
-            self._stainless_client.agents.query,
+        return self._stainless_client.agents.query(
+            extra_headers=self._compose_headers(), **as_params(req)
         )
 
-    @validate_call
     def agent_versions_query(
-        self, req: agent_types.AgentVersionsQueryReq
-    ) -> agent_types.AgentVersionsQueryRes:
+        self, req: AgentVersionQueryParams | agent_types.AgentVersionsQueryReq
+    ) -> AgentVersionQueryResponse:
         """Query the versions of an agent.
 
         Args:
@@ -754,16 +799,13 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         Returns:
             Agent versions query response.
         """
-        return self._stainless_request(
-            req,
-            agent_types.AgentVersionsQueryRes,
-            self._stainless_client.agents.agent_versions.query,
+        return self._stainless_client.agents.agent_versions.query(
+            extra_headers=self._compose_headers(), **as_params(req)
         )
 
-    @validate_call
     def agent_spans_stats(
-        self, req: agent_types.AgentSpanStatsReq
-    ) -> agent_types.AgentSpanStatsRes:
+        self, req: SpanStatsParams | agent_types.AgentSpanStatsReq
+    ) -> SpanStatsResponse:
         """Query chart-ready aggregations over agent spans.
 
         Args:
@@ -772,16 +814,13 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         Returns:
             Agent span stats response.
         """
-        return self._stainless_request(
-            req,
-            agent_types.AgentSpanStatsRes,
-            self._stainless_client.agents.spans.stats,
+        return self._stainless_client.agents.spans.stats(
+            extra_headers=self._compose_headers(), **as_params(req)
         )
 
-    @validate_call
     def agent_custom_attrs_schema(
-        self, req: agent_types.AgentCustomAttrsSchemaReq
-    ) -> agent_types.AgentCustomAttrsSchemaRes:
+        self, req: SpanCustomAttrsSchemaParams | agent_types.AgentCustomAttrsSchemaReq
+    ) -> SpanCustomAttrsSchemaResponse:
         """Discover typed custom attribute keys on matching agent spans.
 
         Args:
@@ -790,16 +829,13 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         Returns:
             Agent custom attrs schema response.
         """
-        return self._stainless_request(
-            req,
-            agent_types.AgentCustomAttrsSchemaRes,
-            self._stainless_client.agents.spans.custom_attrs_schema,
+        return self._stainless_client.agents.spans.custom_attrs_schema(
+            extra_headers=self._compose_headers(), **as_params(req)
         )
 
-    @validate_call
     def agent_search(
-        self, req: agent_types.AgentSearchReq
-    ) -> agent_types.AgentSearchRes:
+        self, req: AgentSearchParams | agent_types.AgentSearchReq
+    ) -> AgentSearchResponse:
         """Search conversations.
 
         Args:
@@ -808,10 +844,8 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         Returns:
             Agent search response.
         """
-        return self._stainless_request(
-            req,
-            agent_types.AgentSearchRes,
-            self._stainless_client.agents.search,
+        return self._stainless_client.agents.search(
+            extra_headers=self._compose_headers(), **as_params(req)
         )
 
     # Call API
@@ -1855,8 +1889,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
 
     # === Object APIs ===
 
-    @validate_call
-    def op_create(self, req: tsi.OpCreateReq) -> tsi.OpCreateRes:
+    def op_create(self, req: Mapping[str, Any] | tsi.OpCreateReq) -> V2OpCreateResponse:
         """Create op.
 
         Args:
@@ -1865,14 +1898,8 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         Returns:
             Op create response.
         """
-        entity, project = self._prepare_v2_request(req)
-        response = self._stainless_client.v2_ops.create(
-            entity=entity,
-            project=project,
-            name=req.name,
-            source_code=req.source_code,
-        )
-        return tsi.OpCreateRes.model_validate(response.model_dump())
+        params = self._v2_params(req)
+        return self._stainless_client.v2_ops.create(**params)
 
     @validate_call
     def op_read(self, req: tsi.OpReadReq) -> tsi.OpReadRes:
@@ -1893,28 +1920,21 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         )
         return tsi.OpReadRes.model_validate(response.model_dump())
 
-    @validate_call
-    def op_list(self, req: tsi.OpListReq) -> Iterator[tsi.OpReadRes]:
+    def op_list(
+        self, req: Mapping[str, Any] | tsi.OpListReq
+    ) -> Iterator[V2OpListResponse]:
         """List ops.
 
         Args:
             req: Op list request.
 
         Yields:
-            OpReadRes instances.
+            V2OpListResponse instances.
         """
-        entity, project = self._prepare_v2_request(req)
-        response: Any = self._stainless_client.v2_ops.list(
-            entity=entity,
-            project=project,
-            limit=req.limit,
-            offset=req.offset,
-        )
-        for item in response:
-            yield tsi.OpReadRes.model_validate(item.model_dump())
+        params = self._v2_params(req)
+        yield from self._stainless_client.v2_ops.list(**params)
 
-    @validate_call
-    def op_delete(self, req: tsi.OpDeleteReq) -> tsi.OpDeleteRes:
+    def op_delete(self, req: Mapping[str, Any] | tsi.OpDeleteReq) -> V2OpDeleteResponse:
         """Delete op.
 
         Args:
@@ -1923,17 +1943,12 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         Returns:
             Op delete response.
         """
-        entity, project = self._prepare_v2_request(req)
-        response = self._stainless_client.v2_ops.delete(
-            entity=entity,
-            project=project,
-            object_id=req.object_id,
-            digests=req.digests,
-        )
-        return tsi.OpDeleteRes.model_validate(response.model_dump())
+        params = self._v2_params(req)
+        return self._stainless_client.v2_ops.delete(**params)
 
-    @validate_call
-    def dataset_create(self, req: tsi.DatasetCreateReq) -> tsi.DatasetCreateRes:
+    def dataset_create(
+        self, req: Mapping[str, Any] | tsi.DatasetCreateReq
+    ) -> V2DatasetCreateResponse:
         """Create dataset.
 
         Args:
@@ -1942,15 +1957,8 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         Returns:
             Dataset create response.
         """
-        entity, project = self._prepare_v2_request(req)
-        response = self._stainless_client.v2_datasets.create(
-            entity=entity,
-            project=project,
-            rows=req.rows,
-            description=req.description,
-            name=req.name,
-        )
-        return tsi.DatasetCreateRes.model_validate(response.model_dump())
+        params = self._v2_params(req)
+        return self._stainless_client.v2_datasets.create(**params)
 
     @validate_call
     def dataset_read(self, req: tsi.DatasetReadReq) -> tsi.DatasetReadRes:
@@ -1971,28 +1979,23 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         )
         return tsi.DatasetReadRes.model_validate(response.model_dump())
 
-    @validate_call
-    def dataset_list(self, req: tsi.DatasetListReq) -> Iterator[tsi.DatasetReadRes]:
+    def dataset_list(
+        self, req: Mapping[str, Any] | tsi.DatasetListReq
+    ) -> Iterator[V2DatasetListResponse]:
         """List datasets.
 
         Args:
             req: Dataset list request.
 
         Yields:
-            DatasetReadRes instances.
+            V2DatasetListResponse instances.
         """
-        entity, project = self._prepare_v2_request(req)
-        response: Any = self._stainless_client.v2_datasets.list(
-            entity=entity,
-            project=project,
-            limit=req.limit,
-            offset=req.offset,
-        )
-        for item in response:
-            yield tsi.DatasetReadRes.model_validate(item.model_dump())
+        params = self._v2_params(req)
+        yield from self._stainless_client.v2_datasets.list(**params)
 
-    @validate_call
-    def dataset_delete(self, req: tsi.DatasetDeleteReq) -> tsi.DatasetDeleteRes:
+    def dataset_delete(
+        self, req: Mapping[str, Any] | tsi.DatasetDeleteReq
+    ) -> V2DatasetDeleteResponse:
         """Delete dataset.
 
         Args:
@@ -2001,14 +2004,8 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         Returns:
             Dataset delete response.
         """
-        entity, project = self._prepare_v2_request(req)
-        response = self._stainless_client.v2_datasets.delete(
-            entity=entity,
-            project=project,
-            object_id=req.object_id,
-            digests=req.digests,
-        )
-        return tsi.DatasetDeleteRes.model_validate(response.model_dump())
+        params = self._v2_params(req)
+        return self._stainless_client.v2_datasets.delete(**params)
 
     def custom_runtime_apply(
         self, req: Mapping[str, Any] | tsi.CustomRuntimeApplyReq
@@ -2025,8 +2022,9 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
             extra_headers=self._compose_headers(), **self._v2_params(req)
         )
 
-    @validate_call
-    def scorer_create(self, req: tsi.ScorerCreateReq) -> tsi.ScorerCreateRes:
+    def scorer_create(
+        self, req: Mapping[str, Any] | tsi.ScorerCreateReq
+    ) -> V2ScorerCreateResponse:
         """Create scorer.
 
         Args:
@@ -2035,18 +2033,12 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         Returns:
             Scorer create response.
         """
-        entity, project = self._prepare_v2_request(req)
-        response = self._stainless_client.v2_scorers.create(
-            entity=entity,
-            project=project,
-            name=req.name,
-            op_source_code=req.op_source_code,
-            description=req.description,
-        )
-        return tsi.ScorerCreateRes.model_validate(response.model_dump())
+        params = self._v2_params(req)
+        return self._stainless_client.v2_scorers.create(**params)
 
-    @validate_call
-    def scorer_read(self, req: tsi.ScorerReadReq) -> tsi.ScorerReadRes:
+    def scorer_read(
+        self, req: Mapping[str, Any] | tsi.ScorerReadReq
+    ) -> V2ScorerReadResponse:
         """Read scorer.
 
         Args:
@@ -2055,37 +2047,26 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         Returns:
             Scorer read response.
         """
-        entity, project = self._prepare_v2_request(req)
-        response = self._stainless_client.v2_scorers.read(
-            entity=entity,
-            project=project,
-            object_id=req.object_id,
-            digest=req.digest,
-        )
-        return tsi.ScorerReadRes.model_validate(response.model_dump())
+        params = self._v2_params(req)
+        return self._stainless_client.v2_scorers.read(**params)
 
-    @validate_call
-    def scorer_list(self, req: tsi.ScorerListReq) -> Iterator[tsi.ScorerReadRes]:
+    def scorer_list(
+        self, req: Mapping[str, Any] | tsi.ScorerListReq
+    ) -> Iterator[V2ScorerListResponse]:
         """List scorers.
 
         Args:
             req: Scorer list request.
 
         Yields:
-            ScorerReadRes instances.
+            V2ScorerListResponse instances.
         """
-        entity, project = self._prepare_v2_request(req)
-        response: Any = self._stainless_client.v2_scorers.list(
-            entity=entity,
-            project=project,
-            limit=req.limit,
-            offset=req.offset,
-        )
-        for item in response:
-            yield tsi.ScorerReadRes.model_validate(item.model_dump())
+        params = self._v2_params(req)
+        yield from self._stainless_client.v2_scorers.list(**params)
 
-    @validate_call
-    def scorer_delete(self, req: tsi.ScorerDeleteReq) -> tsi.ScorerDeleteRes:
+    def scorer_delete(
+        self, req: Mapping[str, Any] | tsi.ScorerDeleteReq
+    ) -> V2ScorerDeleteResponse:
         """Delete scorer.
 
         Args:
@@ -2094,19 +2075,12 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         Returns:
             Scorer delete response.
         """
-        entity, project = self._prepare_v2_request(req)
-        response = self._stainless_client.v2_scorers.delete(
-            entity=entity,
-            project=project,
-            object_id=req.object_id,
-            digests=req.digests,
-        )
-        return tsi.ScorerDeleteRes.model_validate(response.model_dump())
+        params = self._v2_params(req)
+        return self._stainless_client.v2_scorers.delete(**params)
 
-    @validate_call
     def evaluation_create(
-        self, req: tsi.EvaluationCreateReq
-    ) -> tsi.EvaluationCreateRes:
+        self, req: Mapping[str, Any] | tsi.EvaluationCreateReq
+    ) -> V2EvaluationCreateResponse:
         """Create evaluation.
 
         Args:
@@ -2115,22 +2089,12 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         Returns:
             Evaluation create response.
         """
-        entity, project = self._prepare_v2_request(req)
-        response = self._stainless_client.v2_evaluations.create(
-            entity=entity,
-            project=project,
-            dataset=req.dataset,
-            name=req.name,
-            description=req.description,
-            scorers=req.scorers,
-            trials=req.trials,
-            evaluation_name=req.evaluation_name,
-            eval_attributes=req.eval_attributes,
-        )
-        return tsi.EvaluationCreateRes.model_validate(response.model_dump())
+        params = self._v2_params(req)
+        return self._stainless_client.v2_evaluations.create(**params)
 
-    @validate_call
-    def evaluation_read(self, req: tsi.EvaluationReadReq) -> tsi.EvaluationReadRes:
+    def evaluation_read(
+        self, req: Mapping[str, Any] | tsi.EvaluationReadReq
+    ) -> V2EvaluationReadResponse:
         """Read evaluation.
 
         Args:
@@ -2139,41 +2103,26 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         Returns:
             Evaluation read response.
         """
-        entity, project = self._prepare_v2_request(req)
-        response = self._stainless_client.v2_evaluations.read(
-            entity=entity,
-            project=project,
-            object_id=req.object_id,
-            digest=req.digest,
-        )
-        return tsi.EvaluationReadRes.model_validate(response.model_dump())
+        params = self._v2_params(req)
+        return self._stainless_client.v2_evaluations.read(**params)
 
-    @validate_call
     def evaluation_list(
-        self, req: tsi.EvaluationListReq
-    ) -> Iterator[tsi.EvaluationReadRes]:
+        self, req: Mapping[str, Any] | tsi.EvaluationListReq
+    ) -> Iterator[V2EvaluationListResponse]:
         """List evaluations.
 
         Args:
             req: Evaluation list request.
 
         Yields:
-            EvaluationReadRes instances.
+            V2EvaluationListResponse instances.
         """
-        entity, project = self._prepare_v2_request(req)
-        response: Any = self._stainless_client.v2_evaluations.list(
-            entity=entity,
-            project=project,
-            limit=req.limit,
-            offset=req.offset,
-        )
-        for item in response:
-            yield tsi.EvaluationReadRes.model_validate(item.model_dump())
+        params = self._v2_params(req)
+        yield from self._stainless_client.v2_evaluations.list(**params)
 
-    @validate_call
     def evaluation_delete(
-        self, req: tsi.EvaluationDeleteReq
-    ) -> tsi.EvaluationDeleteRes:
+        self, req: Mapping[str, Any] | tsi.EvaluationDeleteReq
+    ) -> V2EvaluationDeleteResponse:
         """Delete evaluation.
 
         Args:
@@ -2182,17 +2131,12 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         Returns:
             Evaluation delete response.
         """
-        entity, project = self._prepare_v2_request(req)
-        response = self._stainless_client.v2_evaluations.delete(
-            entity=entity,
-            project=project,
-            object_id=req.object_id,
-            digests=req.digests,
-        )
-        return tsi.EvaluationDeleteRes.model_validate(response.model_dump())
+        params = self._v2_params(req)
+        return self._stainless_client.v2_evaluations.delete(**params)
 
-    @validate_call
-    def model_create(self, req: tsi.ModelCreateReq) -> tsi.ModelCreateRes:
+    def model_create(
+        self, req: Mapping[str, Any] | tsi.ModelCreateReq
+    ) -> V2ModelCreateResponse:
         """Create model.
 
         Args:
@@ -2201,19 +2145,12 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         Returns:
             Model create response.
         """
-        entity, project = self._prepare_v2_request(req)
-        response = self._stainless_client.v2_models.create(
-            entity=entity,
-            project=project,
-            name=req.name,
-            source_code=req.source_code,
-            attributes=req.attributes,
-            description=req.description,
-        )
-        return tsi.ModelCreateRes.model_validate(response.model_dump())
+        params = self._v2_params(req)
+        return self._stainless_client.v2_models.create(**params)
 
-    @validate_call
-    def model_read(self, req: tsi.ModelReadReq) -> tsi.ModelReadRes:
+    def model_read(
+        self, req: Mapping[str, Any] | tsi.ModelReadReq
+    ) -> V2ModelReadResponse:
         """Read model.
 
         Args:
@@ -2222,37 +2159,26 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         Returns:
             Model read response.
         """
-        entity, project = self._prepare_v2_request(req)
-        response = self._stainless_client.v2_models.read(
-            entity=entity,
-            project=project,
-            object_id=req.object_id,
-            digest=req.digest,
-        )
-        return tsi.ModelReadRes.model_validate(response.model_dump())
+        params = self._v2_params(req)
+        return self._stainless_client.v2_models.read(**params)
 
-    @validate_call
-    def model_list(self, req: tsi.ModelListReq) -> Iterator[tsi.ModelReadRes]:
+    def model_list(
+        self, req: Mapping[str, Any] | tsi.ModelListReq
+    ) -> Iterator[V2ModelListResponse]:
         """List models.
 
         Args:
             req: Model list request.
 
         Yields:
-            ModelReadRes instances.
+            V2ModelListResponse instances.
         """
-        entity, project = self._prepare_v2_request(req)
-        response: Any = self._stainless_client.v2_models.list(
-            entity=entity,
-            project=project,
-            limit=req.limit,
-            offset=req.offset,
-        )
-        for item in response:
-            yield tsi.ModelReadRes.model_validate(item.model_dump())
+        params = self._v2_params(req)
+        yield from self._stainless_client.v2_models.list(**params)
 
-    @validate_call
-    def model_delete(self, req: tsi.ModelDeleteReq) -> tsi.ModelDeleteRes:
+    def model_delete(
+        self, req: Mapping[str, Any] | tsi.ModelDeleteReq
+    ) -> V2ModelDeleteResponse:
         """Delete model.
 
         Args:
@@ -2261,19 +2187,12 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         Returns:
             Model delete response.
         """
-        entity, project = self._prepare_v2_request(req)
-        response = self._stainless_client.v2_models.delete(
-            entity=entity,
-            project=project,
-            object_id=req.object_id,
-            digests=req.digests,
-        )
-        return tsi.ModelDeleteRes.model_validate(response.model_dump())
+        params = self._v2_params(req)
+        return self._stainless_client.v2_models.delete(**params)
 
-    @validate_call
     def evaluation_run_create(
-        self, req: tsi.EvaluationRunCreateReq
-    ) -> tsi.EvaluationRunCreateRes:
+        self, req: Mapping[str, Any] | tsi.EvaluationRunCreateReq
+    ) -> V2EvaluationRunCreateResponse:
         """Create evaluation run.
 
         Args:
@@ -2282,20 +2201,12 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         Returns:
             Evaluation run create response.
         """
-        entity, project = self._prepare_v2_request(req)
-        response = self._stainless_client.v2_evaluation_runs.create(
-            entity=entity,
-            project=project,
-            evaluation=req.evaluation,
-            model=req.model,
-            source_evaluation_run_id=req.source_evaluation_run_id,
-        )
-        return tsi.EvaluationRunCreateRes.model_validate(response.model_dump())
+        params = self._v2_params(req)
+        return self._stainless_client.v2_evaluation_runs.create(**params)
 
-    @validate_call
     def evaluation_run_read(
-        self, req: tsi.EvaluationRunReadReq
-    ) -> tsi.EvaluationRunReadRes:
+        self, req: Mapping[str, Any] | tsi.EvaluationRunReadReq
+    ) -> V2EvaluationRunReadResponse:
         """Read evaluation run.
 
         Args:
@@ -2304,44 +2215,28 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         Returns:
             Evaluation run read response.
         """
-        entity, project = self._prepare_v2_request(req)
-        response = self._stainless_client.v2_evaluation_runs.read(
-            entity=entity,
-            project=project,
-            evaluation_run_id=req.evaluation_run_id,
-        )
-        return tsi.EvaluationRunReadRes.model_validate(response.model_dump())
+        params = self._v2_params(req)
+        return self._stainless_client.v2_evaluation_runs.read(**params)
 
-    @validate_call
     def evaluation_run_list(
-        self, req: tsi.EvaluationRunListReq
-    ) -> Iterator[tsi.EvaluationRunReadRes]:
+        self, req: Mapping[str, Any] | tsi.EvaluationRunListReq
+    ) -> Iterator[V2EvaluationRunListResponse]:
         """List evaluation runs.
 
         Args:
             req: Evaluation run list request.
 
         Yields:
-            EvaluationRunReadRes instances.
+            V2EvaluationRunListResponse instances.
         """
-        entity, project = self._prepare_v2_request(req)
-        response = self._stainless_client.v2_evaluation_runs.list(
-            entity=entity,
-            project=project,
-            limit=req.limit,
-            offset=req.offset,
-            evaluations=req.filter.evaluations if req.filter else None,
-            models=req.filter.models if req.filter else None,
-            evaluation_run_ids=req.filter.evaluation_run_ids if req.filter else None,
-        )
+        params = self._v2_params(req)
+        # The route takes each filter field as a query parameter of its own.
+        params.update(params.pop("filter", None) or {})
+        yield from self._stainless_client.v2_evaluation_runs.list(**params)
 
-        for item in response:
-            yield tsi.EvaluationRunReadRes.model_validate(item.model_dump())
-
-    @validate_call
     def evaluation_run_delete(
-        self, req: tsi.EvaluationRunDeleteReq
-    ) -> tsi.EvaluationRunDeleteRes:
+        self, req: Mapping[str, Any] | tsi.EvaluationRunDeleteReq
+    ) -> V2EvaluationRunDeleteResponse:
         """Delete evaluation run.
 
         Args:
@@ -2350,18 +2245,12 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         Returns:
             Evaluation run delete response.
         """
-        entity, project = self._prepare_v2_request(req)
-        response = self._stainless_client.v2_evaluation_runs.delete(
-            entity=entity,
-            project=project,
-            evaluation_run_ids=req.evaluation_run_ids,
-        )
-        return tsi.EvaluationRunDeleteRes.model_validate(response.model_dump())
+        params = self._v2_params(req)
+        return self._stainless_client.v2_evaluation_runs.delete(**params)
 
-    @validate_call
     def evaluation_run_finish(
-        self, req: tsi.EvaluationRunFinishReq
-    ) -> tsi.EvaluationRunFinishRes:
+        self, req: Mapping[str, Any] | tsi.EvaluationRunFinishReq
+    ) -> V2EvaluationRunFinishResponse:
         """Finish evaluation run.
 
         Args:
@@ -2370,19 +2259,12 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         Returns:
             Evaluation run finish response.
         """
-        entity, project = self._prepare_v2_request(req)
-        response = self._stainless_client.v2_evaluation_runs.finish(
-            entity=entity,
-            project=project,
-            evaluation_run_id=req.evaluation_run_id,
-            summary=req.summary,
-        )
-        return tsi.EvaluationRunFinishRes.model_validate(response.model_dump())
+        params = self._v2_params(req)
+        return self._stainless_client.v2_evaluation_runs.finish(**params)
 
-    @validate_call
     def prediction_create(
-        self, req: tsi.PredictionCreateReq
-    ) -> tsi.PredictionCreateRes:
+        self, req: Mapping[str, Any] | tsi.PredictionCreateReq
+    ) -> V2PredictionCreateResponse:
         """Create prediction.
 
         Args:
@@ -2391,20 +2273,12 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         Returns:
             Prediction create response.
         """
-        entity, project = self._prepare_v2_request(req)
-        response = self._stainless_client.v2_predictions.create(
-            entity=entity,
-            project=project,
-            inputs=req.inputs,
-            model=req.model,
-            output=req.output,
-            evaluation_run_id=req.evaluation_run_id,
-            genai_span_ref=req.genai_span_ref,
-        )
-        return tsi.PredictionCreateRes.model_validate(response.model_dump())
+        params = self._v2_params(req)
+        return self._stainless_client.v2_predictions.create(**params)
 
-    @validate_call
-    def prediction_read(self, req: tsi.PredictionReadReq) -> tsi.PredictionReadRes:
+    def prediction_read(
+        self, req: Mapping[str, Any] | tsi.PredictionReadReq
+    ) -> V2PredictionReadResponse:
         """Read prediction.
 
         Args:
@@ -2413,41 +2287,26 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         Returns:
             Prediction read response.
         """
-        entity, project = self._prepare_v2_request(req)
-        response = self._stainless_client.v2_predictions.read(
-            entity=entity,
-            project=project,
-            prediction_id=req.prediction_id,
-        )
-        return tsi.PredictionReadRes.model_validate(response.model_dump())
+        params = self._v2_params(req)
+        return self._stainless_client.v2_predictions.read(**params)
 
-    @validate_call
     def prediction_list(
-        self, req: tsi.PredictionListReq
-    ) -> Iterator[tsi.PredictionReadRes]:
+        self, req: Mapping[str, Any] | tsi.PredictionListReq
+    ) -> Iterator[V2PredictionListResponse]:
         """List predictions.
 
         Args:
             req: Prediction list request.
 
         Yields:
-            PredictionReadRes instances.
+            V2PredictionListResponse instances.
         """
-        entity, project = self._prepare_v2_request(req)
-        response = self._stainless_client.v2_predictions.list(
-            entity=entity,
-            project=project,
-            evaluation_run_id=req.evaluation_run_id,
-            limit=req.limit,
-            offset=req.offset,
-        )
-        for item in response:
-            yield tsi.PredictionReadRes.model_validate(item.model_dump())
+        params = self._v2_params(req)
+        yield from self._stainless_client.v2_predictions.list(**params)
 
-    @validate_call
     def prediction_delete(
-        self, req: tsi.PredictionDeleteReq
-    ) -> tsi.PredictionDeleteRes:
+        self, req: Mapping[str, Any] | tsi.PredictionDeleteReq
+    ) -> V2PredictionDeleteResponse:
         """Delete prediction.
 
         Args:
@@ -2456,18 +2315,12 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         Returns:
             Prediction delete response.
         """
-        entity, project = self._prepare_v2_request(req)
-        response = self._stainless_client.v2_predictions.delete(
-            entity=entity,
-            project=project,
-            prediction_ids=req.prediction_ids,
-        )
-        return tsi.PredictionDeleteRes.model_validate(response.model_dump())
+        params = self._v2_params(req)
+        return self._stainless_client.v2_predictions.delete(**params)
 
-    @validate_call
     def prediction_finish(
-        self, req: tsi.PredictionFinishReq
-    ) -> tsi.PredictionFinishRes:
+        self, req: Mapping[str, Any] | tsi.PredictionFinishReq
+    ) -> V2PredictionFinishResponse:
         """Finish prediction.
 
         Args:
@@ -2476,16 +2329,12 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         Returns:
             Prediction finish response.
         """
-        entity, project = self._prepare_v2_request(req)
-        response = self._stainless_client.v2_predictions.finish(
-            entity=entity,
-            project=project,
-            prediction_id=req.prediction_id,
-        )
-        return tsi.PredictionFinishRes.model_validate(response.model_dump())
+        params = self._v2_params(req)
+        return self._stainless_client.v2_predictions.finish(**params)
 
-    @validate_call
-    def score_create(self, req: tsi.ScoreCreateReq) -> tsi.ScoreCreateRes:
+    def score_create(
+        self, req: Mapping[str, Any] | tsi.ScoreCreateReq
+    ) -> V2ScoreCreateResponse:
         """Create score.
 
         Args:
@@ -2494,19 +2343,12 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         Returns:
             Score create response.
         """
-        entity, project = self._prepare_v2_request(req)
-        response = self._stainless_client.v2_scores.create(
-            entity=entity,
-            project=project,
-            prediction_id=req.prediction_id,
-            scorer=req.scorer,
-            value=req.value,
-            evaluation_run_id=req.evaluation_run_id,
-        )
-        return tsi.ScoreCreateRes.model_validate(response.model_dump())
+        params = self._v2_params(req)
+        return self._stainless_client.v2_scores.create(**params)
 
-    @validate_call
-    def score_read(self, req: tsi.ScoreReadReq) -> tsi.ScoreReadRes:
+    def score_read(
+        self, req: Mapping[str, Any] | tsi.ScoreReadReq
+    ) -> V2ScoreReadResponse:
         """Read score.
 
         Args:
@@ -2515,37 +2357,26 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         Returns:
             Score read response.
         """
-        entity, project = self._prepare_v2_request(req)
-        response = self._stainless_client.v2_scores.read(
-            entity=entity,
-            project=project,
-            score_id=req.score_id,
-        )
-        return tsi.ScoreReadRes.model_validate(response.model_dump())
+        params = self._v2_params(req)
+        return self._stainless_client.v2_scores.read(**params)
 
-    @validate_call
-    def score_list(self, req: tsi.ScoreListReq) -> Iterator[tsi.ScoreReadRes]:
+    def score_list(
+        self, req: Mapping[str, Any] | tsi.ScoreListReq
+    ) -> Iterator[V2ScoreListResponse]:
         """List scores.
 
         Args:
             req: Score list request.
 
         Yields:
-            ScoreReadRes instances.
+            V2ScoreListResponse instances.
         """
-        entity, project = self._prepare_v2_request(req)
-        response = self._stainless_client.v2_scores.list(
-            entity=entity,
-            project=project,
-            evaluation_run_id=req.evaluation_run_id,
-            limit=req.limit,
-            offset=req.offset,
-        )
-        for item in response:
-            yield tsi.ScoreReadRes.model_validate(item.model_dump())
+        params = self._v2_params(req)
+        yield from self._stainless_client.v2_scores.list(**params)
 
-    @validate_call
-    def score_delete(self, req: tsi.ScoreDeleteReq) -> tsi.ScoreDeleteRes:
+    def score_delete(
+        self, req: Mapping[str, Any] | tsi.ScoreDeleteReq
+    ) -> V2ScoreDeleteResponse:
         """Delete score.
 
         Args:
@@ -2554,18 +2385,12 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         Returns:
             Score delete response.
         """
-        entity, project = self._prepare_v2_request(req)
-        response = self._stainless_client.v2_scores.delete(
-            entity=entity,
-            project=project,
-            score_ids=req.score_ids,
-        )
-        return tsi.ScoreDeleteRes.model_validate(response.model_dump())
+        params = self._v2_params(req)
+        return self._stainless_client.v2_scores.delete(**params)
 
-    @validate_call
     def eval_results_query(
-        self, req: tsi.EvalResultsQueryReq
-    ) -> tsi.EvalResultsQueryRes:
+        self, req: Mapping[str, Any] | tsi.EvalResultsQueryReq
+    ) -> V2EvalResultQueryResponse:
         """Query eval results.
 
         Args:
@@ -2574,12 +2399,5 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         Returns:
             Eval results query response.
         """
-        entity, project = self._prepare_v2_request(req)
-        return self._stainless_request(
-            req,
-            tsi.EvalResultsQueryRes,
-            self._stainless_client.v2_eval_results.query,
-            exclude={"project_id"},
-            entity=entity,
-            project=project,
-        )
+        params = self._v2_params(req)
+        return self._stainless_client.v2_eval_results.query(**params)

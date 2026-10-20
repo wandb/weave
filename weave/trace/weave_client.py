@@ -193,18 +193,35 @@ from weave.utils.paginated_iterator import PaginatedIterator
 from weave.utils.project_id import from_project_id, to_project_id
 from weave.utils.sanitize import REDACTED_VALUE, redact_dataclass_fields, should_redact
 from weave.vendor.weave_server_sdk.types import (
+    AgentSearchResponse,
+    AgentTraceChatRes,
     AnnotationQueueSchema,
     CallEndParams,
     CallStartParams,
     CallUpdateParams,
     CostCreateResponse,
     V2RuntimeApplyResponse,
+    agent_query_params,
+    agent_query_response,
     annotation_queue_query_params,
     annotation_queue_stats_response,
     cost_create_params,
     cost_purge_params,
     cost_query_params,
     cost_query_response,
+)
+from weave.vendor.weave_server_sdk.types.agents import (
+    ConversationChatParams,
+    ConversationChatResponse,
+    SpanCustomAttrsSchemaResponse,
+    SpanStatsResponse,
+    TraceChatParams,
+    agent_version_query_params,
+    agent_version_query_response,
+    span_custom_attrs_schema_params,
+    span_query_params,
+    span_query_response,
+    span_stats_params,
 )
 from weave.vendor.weave_server_sdk.types.annotation_queues import (
     ItemAddResponse,
@@ -329,20 +346,26 @@ def _add_scored_by_to_calls_query(
     return {"$expr": {"$and": exprs}}
 
 
+def _request_values(values: Sequence[Any]) -> list[Any]:
+    """Return request values with each model dumped the way the bindings dump one."""
+    return [as_params(value) for value in values]
+
+
 def _build_agent_spans_query(
-    agent_name: str | None, query: Query | None
-) -> Query | None:
+    agent_name: str | None, query: Query | Mapping[str, Any] | None
+) -> Any:
     """Build the ``get_agent_spans`` query from the ``agent_name`` shortcut.
 
     Mirrors the TS SDK: ``agent_name`` becomes an ``$eq`` on the ``agent_name``
     field, AND-combined with any user-supplied ``query`` when both are present.
     """
+    wire_query = None if query is None else cast_to_query(query)
     if agent_name is None:
-        return query
+        return wire_query
     agent_expr = {"$eq": [{"$getField": "agent_name"}, {"$literal": agent_name}]}
-    if query is None:
-        return Query.model_validate({"$expr": agent_expr})
-    return Query.model_validate({"$expr": {"$and": [agent_expr, query.expr_]}})
+    if wire_query is None:
+        return {"$expr": agent_expr}
+    return {"$expr": {"$and": [agent_expr, wire_query["$expr"]]}}
 
 
 _AgentListItemT = TypeVar("_AgentListItemT")
@@ -387,13 +410,11 @@ def _make_agent_iterator(
 
 
 # Iterator return types for the paginated agent list methods (mirrors ``CallsIter``).
-AgentsIter = PaginatedIterator[agent_types.AgentSchema, agent_types.AgentSchema]
+AgentsIter = PaginatedIterator[agent_query_response.Agent, agent_query_response.Agent]
 AgentVersionsIter = PaginatedIterator[
-    agent_types.AgentVersionSchema, agent_types.AgentVersionSchema
+    agent_version_query_response.Version, agent_version_query_response.Version
 ]
-AgentSpansIter = PaginatedIterator[
-    agent_types.AgentSpanSchema, agent_types.AgentSpanSchema
-]
+AgentSpansIter = PaginatedIterator[span_query_response.Span, span_query_response.Span]
 
 
 def get_obj_name(val: Any) -> str:
@@ -933,7 +954,6 @@ class WeaveClient:
         return make_client_call(self.entity, self.project, response_call, self.server)
 
     @trace_sentry.global_trace_sentry.watch()
-    @pydantic.validate_call
     def get_agents(
         self,
         *,
@@ -957,7 +977,7 @@ class WeaveClient:
             page_size: Number of agents fetched per request.
 
         Returns:
-            A `PaginatedIterator` over `AgentSchema`.
+            A `PaginatedIterator` over `Agent`.
 
         Example:
             ```python
@@ -966,23 +986,25 @@ class WeaveClient:
                 print(agent.agent_name, agent.total_input_tokens)
             ```
         """
-        filters = (
-            agent_types.AgentsQueryFilters(agent_name=agent_name)
-            if agent_name is not None
-            else None
+        sort_by_values = cast(
+            "list[agent_query_params.SortBy] | None",
+            None if sort_by is None else [cast_to_sort_by(s) for s in sort_by],
         )
 
         def fetch_page(
             offset: int, page_limit: int
-        ) -> tuple[list[agent_types.AgentSchema], int]:
+        ) -> tuple[list[agent_query_response.Agent], int]:
             res = self.server.agent_agents_query(
-                agent_types.AgentsQueryReq(
-                    project_id=self.project_id,
-                    filters=filters,
-                    sort_by=sort_by,
-                    limit=page_limit,
-                    offset=offset,
-                )
+                {
+                    "project_id": self.project_id,
+                    "filters": (
+                        {"agent_name": agent_name} if agent_name is not None else None
+                    ),
+                    "sort_by": sort_by_values,
+                    "limit": page_limit,
+                    "offset": offset,
+                    "include_costs": False,
+                }
             )
             return res.agents, res.total_count
 
@@ -994,7 +1016,6 @@ class WeaveClient:
         )
 
     @trace_sentry.global_trace_sentry.watch()
-    @pydantic.validate_call
     def get_agent_versions(
         self,
         *,
@@ -1017,7 +1038,7 @@ class WeaveClient:
             page_size: Number of versions fetched per request.
 
         Returns:
-            A `PaginatedIterator` over `AgentVersionSchema`.
+            A `PaginatedIterator` over `Version`.
 
         Example:
             ```python
@@ -1026,18 +1047,23 @@ class WeaveClient:
                 print(version.agent_version, version.total_input_tokens)
             ```
         """
+        sort_by_values = cast(
+            "list[agent_version_query_params.SortBy] | None",
+            None if sort_by is None else [cast_to_sort_by(s) for s in sort_by],
+        )
 
         def fetch_page(
             offset: int, page_limit: int
-        ) -> tuple[list[agent_types.AgentVersionSchema], int]:
+        ) -> tuple[list[agent_version_query_response.Version], int]:
             res = self.server.agent_versions_query(
-                agent_types.AgentVersionsQueryReq(
-                    project_id=self.project_id,
-                    agent_name=agent_name,
-                    sort_by=sort_by,
-                    limit=page_limit,
-                    offset=offset,
-                )
+                {
+                    "project_id": self.project_id,
+                    "agent_name": agent_name,
+                    "sort_by": sort_by_values,
+                    "limit": page_limit,
+                    "offset": offset,
+                    "include_costs": False,
+                }
             )
             return res.versions, res.total_count
 
@@ -1049,7 +1075,6 @@ class WeaveClient:
         )
 
     @trace_sentry.global_trace_sentry.watch()
-    @pydantic.validate_call
     def get_agent_spans(
         self,
         *,
@@ -1076,7 +1101,7 @@ class WeaveClient:
             page_size: Number of spans fetched per request.
 
         Returns:
-            A `PaginatedIterator` over `AgentSpanSchema`.
+            A `PaginatedIterator` over `Span`.
 
         Example:
             ```python
@@ -1085,18 +1110,34 @@ class WeaveClient:
                 print(span.span_id, span.span_name, span.input_tokens)
             ```
         """
+        spans_query = _build_agent_spans_query(agent_name, query)
+        sort_by_values = cast(
+            "list[span_query_params.SortBy] | None",
+            None if sort_by is None else [cast_to_sort_by(s) for s in sort_by],
+        )
 
         def fetch_page(
             offset: int, page_limit: int
-        ) -> tuple[list[agent_types.AgentSpanSchema], int]:
+        ) -> tuple[list[span_query_response.Span], int]:
             res = self.server.agent_spans_query(
-                agent_types.AgentSpansQueryReq(
-                    project_id=self.project_id,
-                    query=_build_agent_spans_query(agent_name, query),
-                    sort_by=sort_by,
-                    limit=page_limit,
-                    offset=offset,
-                )
+                {
+                    "project_id": self.project_id,
+                    "query": spans_query,
+                    "group_by": None,
+                    "measures": [],
+                    "group_filters": [],
+                    "group_distributions": [],
+                    "custom_attr_columns": [],
+                    "include_details": False,
+                    "include_costs": False,
+                    "sort_by": sort_by_values,
+                    "limit": page_limit,
+                    "offset": offset,
+                    "started_after": None,
+                    "started_before": None,
+                    "signal_filters": None,
+                    "insight_filters": [],
+                }
             )
             return res.spans, res.total_count
 
@@ -1114,7 +1155,7 @@ class WeaveClient:
         *,
         trace_id: str,
         include_feedback: bool = False,
-    ) -> agent_types.AgentTraceChatRes:
+    ) -> AgentTraceChatRes:
         """Get the structured chat view (messages) for a single turn.
 
         A turn corresponds to one trace.
@@ -1135,10 +1176,15 @@ class WeaveClient:
             ```
         """
         return self.server.agent_traces_chat(
-            agent_types.AgentTraceChatReq(
-                project_id=self.project_id,
-                trace_id=trace_id,
-                include_feedback=include_feedback,
+            # The vendored SDK is generated from core and may lag this server's API.
+            cast(
+                TraceChatParams,
+                {
+                    "project_id": self.project_id,
+                    "trace_id": trace_id,
+                    "include_feedback": include_feedback,
+                    "include_model_tool_calls": False,
+                },
             )
         )
 
@@ -1151,7 +1197,7 @@ class WeaveClient:
         limit: int = agent_types.MAX_CONVERSATION_CHAT_TURNS,
         offset: int = 0,
         include_feedback: bool = False,
-    ) -> agent_types.AgentConversationChatRes:
+    ) -> ConversationChatResponse:
         """Get the multi-turn chat view for a conversation.
 
         Each turn corresponds to one trace.
@@ -1163,7 +1209,7 @@ class WeaveClient:
             include_feedback: If true, include feedback on the messages.
 
         Returns:
-            An `AgentConversationChatRes` with the ordered `turns`.
+            A `ConversationChatResponse` with the ordered `turns`.
 
         Example:
             ```python
@@ -1175,17 +1221,21 @@ class WeaveClient:
             ```
         """
         return self.server.agent_conversation_chat(
-            agent_types.AgentConversationChatReq(
-                project_id=self.project_id,
-                conversation_id=conversation_id,
-                limit=limit,
-                offset=offset,
-                include_feedback=include_feedback,
+            # The vendored SDK is generated from core and may lag this server's API.
+            cast(
+                ConversationChatParams,
+                {
+                    "project_id": self.project_id,
+                    "conversation_id": conversation_id,
+                    "limit": limit,
+                    "offset": offset,
+                    "include_feedback": include_feedback,
+                    "include_model_tool_calls": False,
+                },
             )
         )
 
     @trace_sentry.global_trace_sentry.watch()
-    @pydantic.validate_call
     def get_agent_span_stats(
         self,
         *,
@@ -1196,7 +1246,7 @@ class WeaveClient:
         group_by: list[agent_types.AgentGroupByRef] | None = None,
         granularity: int | None = None,
         timezone: str = "UTC",
-    ) -> agent_types.AgentSpanStatsRes:
+    ) -> SpanStatsResponse:
         """Compute chart-ready aggregations over agent spans.
 
         Covers the common time-series / grouped-metric case. For numeric-bucket
@@ -1213,7 +1263,7 @@ class WeaveClient:
             timezone: IANA timezone used to align time buckets.
 
         Returns:
-            An ``AgentSpanStatsRes`` with `columns` and `rows`.
+            A ``SpanStatsResponse`` with `columns` and `rows`.
 
         Example:
             ```python
@@ -1224,20 +1274,27 @@ class WeaveClient:
             ```
         """
         return self.server.agent_spans_stats(
-            agent_types.AgentSpanStatsReq(
-                project_id=self.project_id,
-                start=start,
-                end=end,
-                metrics=metrics,
-                query=query,
-                group_by=group_by or [],
-                granularity=granularity,
-                timezone=timezone,
-            )
+            {
+                "project_id": self.project_id,
+                "query": cast(
+                    "span_stats_params.Query | None",
+                    None if query is None else cast_to_query(query),
+                ),
+                "start": start,
+                "end": end,
+                "granularity": granularity,
+                "timezone": timezone,
+                "group_by": _request_values(group_by or []),
+                "metrics": _request_values(metrics),
+                "group_limit": agent_types.DEFAULT_AGENT_STATS_GROUP_LIMIT,
+                "bucket_by": None,
+                "group_filters": [],
+                "signal_filters": None,
+                "insight_filters": [],
+            }
         )
 
     @trace_sentry.global_trace_sentry.watch()
-    @pydantic.validate_call
     def get_agent_custom_attributes(
         self,
         *,
@@ -1246,7 +1303,7 @@ class WeaveClient:
         started_before: datetime.datetime | None = None,
         limit: int = agent_types.DEFAULT_AGENT_CUSTOM_ATTR_SCHEMA_LIMIT,
         offset: int = 0,
-    ) -> agent_types.AgentCustomAttrsSchemaRes:
+    ) -> SpanCustomAttrsSchemaResponse:
         """Discover typed custom-attribute keys on matching agent spans.
 
         Useful for populating filter/column pickers: returns the custom
@@ -1260,7 +1317,7 @@ class WeaveClient:
             offset: Number of keys to skip (for pagination).
 
         Returns:
-            An ``AgentCustomAttrsSchemaRes`` with `attributes` and `has_more`.
+            A ``SpanCustomAttrsSchemaResponse`` with `attributes` and `has_more`.
 
         Example:
             ```python
@@ -1271,14 +1328,17 @@ class WeaveClient:
             ```
         """
         return self.server.agent_custom_attrs_schema(
-            agent_types.AgentCustomAttrsSchemaReq(
-                project_id=self.project_id,
-                query=query,
-                started_after=started_after,
-                started_before=started_before,
-                limit=limit,
-                offset=offset,
-            )
+            {
+                "project_id": self.project_id,
+                "query": cast(
+                    "span_custom_attrs_schema_params.Query | None",
+                    None if query is None else cast_to_query(query),
+                ),
+                "started_after": started_after,
+                "started_before": started_before,
+                "limit": limit,
+                "offset": offset,
+            }
         )
 
     @trace_sentry.global_trace_sentry.watch()
@@ -1292,7 +1352,7 @@ class WeaveClient:
         trace_id: str | None = None,
         limit: int = agent_types.DEFAULT_SEARCH_LIMIT,
         offset: int = 0,
-    ) -> agent_types.AgentSearchRes:
+    ) -> AgentSearchResponse:
         """Search agent messages by content, grouped by conversation.
 
         Searches message content (and/or the structured filters below) and
@@ -1308,7 +1368,7 @@ class WeaveClient:
             offset: Number of matches to skip (for pagination).
 
         Returns:
-            An ``AgentSearchRes`` with `results` (matched conversations).
+            An ``AgentSearchResponse`` with `results` (matched conversations).
 
         Example:
             ```python
@@ -1319,15 +1379,21 @@ class WeaveClient:
             ```
         """
         return self.server.agent_search(
-            agent_types.AgentSearchReq(
-                project_id=self.project_id,
-                query=query,
-                agent_name=agent_name,
-                conversation_id=conversation_id,
-                trace_id=trace_id,
-                limit=limit,
-                offset=offset,
-            )
+            {
+                "project_id": self.project_id,
+                "query": query,
+                "trace_id": trace_id,
+                "roles": None,
+                "conversation_id": conversation_id,
+                "agent_name": agent_name,
+                "provider_name": None,
+                "request_model": None,
+                "truncate_content": True,
+                "started_after": None,
+                "started_before": None,
+                "limit": limit,
+                "offset": offset,
+            }
         )
 
     @trace_sentry.global_trace_sentry.watch()
