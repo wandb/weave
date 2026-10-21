@@ -1,6 +1,6 @@
 from typing import Any
 
-from weave.shared import refs_internal
+from weave.trace import refs_internal
 
 TRACE_REF_SCHEME = "weave"
 ARTIFACT_REF_SCHEME = "wandb-artifact"

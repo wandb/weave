@@ -9,7 +9,6 @@ from typing import TYPE_CHECKING, Any, TypedDict
 
 from weave.evaluation.eval_meta import EVAL_META_KEY
 from weave.shared.common_interface import SortBy
-from weave.shared.constants import EVALUATION_RUN_OP_NAME, MAX_DISPLAY_NAME_LENGTH
 from weave.shared.interface.query import Query
 from weave.shared.trace_server_interface import (
     CallSchema,
@@ -19,6 +18,7 @@ from weave.shared.trace_server_interface import (
     TraceServerInterface,
 )
 from weave.trace import urls
+from weave.trace.constants import EVALUATION_RUN_OP_NAME, MAX_DISPLAY_NAME_LENGTH
 from weave.trace.context import weave_client_context
 from weave.trace.feedback import RefFeedbackQuery
 from weave.trace.isinstance import weave_isinstance

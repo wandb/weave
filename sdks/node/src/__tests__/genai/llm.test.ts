@@ -3,7 +3,7 @@ import {SpanKind} from '@opentelemetry/api';
 import {
   ATTR_GEN_AI_INPUT_MESSAGES,
   ATTR_GEN_AI_OUTPUT_MESSAGES,
-  ATTR_GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS,
+  ATTR_GEN_AI_USAGE_CACHE_WRITE_INPUT_TOKENS,
   ATTR_GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS,
   ATTR_GEN_AI_USAGE_INPUT_TOKENS,
   ATTR_GEN_AI_USAGE_OUTPUT_TOKENS,
@@ -89,9 +89,9 @@ describe('LLM (via Turn.startLLM)', () => {
     expect(llmSpan.attributes[ATTR_GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS]).toBe(
       1
     );
-    expect(
-      llmSpan.attributes[ATTR_GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS]
-    ).toBe(3);
+    expect(llmSpan.attributes[ATTR_GEN_AI_USAGE_CACHE_WRITE_INPUT_TOKENS]).toBe(
+      3
+    );
   });
 
   it("omits message + usage attributes when fields aren't populated", () => {

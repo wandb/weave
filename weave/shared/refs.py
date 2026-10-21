@@ -1,23 +1,17 @@
-from __future__ import annotations
+"""Canonical location is ``weave.trace.refs_base``. This module is that module."""
 
-from concurrent.futures import Future
-from dataclasses import dataclass
+import sys
+import warnings
 
-from weave.shared import refs_internal
+from weave.trace import refs_base as _canonical
+from weave.trace.refs_base import *  # noqa: F403
 
+# TODO: delete this alias together with weave.shared.
+warnings.warn(
+    "weave.shared.refs is deprecated and will be removed in a future release; "
+    "import weave.trace.refs_base instead.",
+    FutureWarning,
+    stacklevel=2,
+)
 
-@dataclass(frozen=True)
-class ObjectRef:
-    entity: str
-    project: str
-    name: str
-    _digest: str | Future[str]
-    _extra: tuple[str | Future[str], ...] = ()
-
-    def __post_init__(self) -> None:
-        if isinstance(self._digest, str):
-            refs_internal.validate_no_slashes(self._digest, "digest")
-            refs_internal.validate_no_colons(self._digest, "digest")
-
-        refs_internal.validate_no_slashes(self.name, "name")
-        refs_internal.validate_no_colons(self.name, "name")
+sys.modules[__name__] = _canonical

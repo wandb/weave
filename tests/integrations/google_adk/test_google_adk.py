@@ -130,6 +130,7 @@ class _AttrSpan:
         self.attributes[key] = value
 
 
+@pytest.mark.trace_server
 class TestExtractors:
     """Cover the attribute extractors in isolation, without ADK's runner."""
 
@@ -225,8 +226,13 @@ class TestExtractors:
 
         # Output envelope mirrors the request side's role mapping.
         output_messages = json.loads(a["gen_ai.output.messages"])
-        assert output_messages[0]["role"] == "assistant"
-        assert output_messages[0]["parts"][0]["content"] == "cool answer"
+        assert output_messages == [
+            {
+                "role": "assistant",
+                "parts": [{"type": "text", "content": "cool answer"}],
+            }
+        ]
+        assert a["gen_ai.response.finish_reasons"] == ["stop"]
 
     def test_set_llm_response_attributes_skips_empty_fields(self) -> None:
         """Empty optional fields don't leak as attributes on the span."""

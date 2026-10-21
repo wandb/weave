@@ -64,11 +64,11 @@ This allows the user to subclass these objects to add additional metadata or fun
 
 ## Validated Base Objects
 
-While many Weave Objects are free-form and user-defined, there is often a need for well-defined schemas for configuration objects that are tightly defined by Weave itself. The BaseObject system provides a way to define these schemas once and use them consistently across the entire stack.
+While many Weave Objects are free-form and user-defined, there is often a need for well-defined schemas for configuration objects that are tightly defined by Weave itself. The BaseObject system provides a way to define these schemas as Pydantic models and use them consistently across the entire stack.
 
 ### Key Features
 
-1. **Single Source of Truth**: Define your schema once using Pydantic models
+1. **One Copy per Repo**: Define your schema with Pydantic models, in `weave` for the Python SDK and in `core` for the trace server and the frontend
 2. **Full Stack Integration**: The schema is used for:
    - Python SDK validation
    - Server-side HTTP API validation
@@ -80,11 +80,11 @@ While many Weave Objects are free-form and user-defined, there is often a need f
 
 Here's how to define and use a validated base object:
 
-1. **Define your schema** (in `weave/shared/interface/builtin_object_classes/your_schema.py`):
+1. **Define your schema** (in `weave/trace/builtin_object_classes/your_schema.py` for the Python SDK, and in the trace server's copy in wandb/core, `services/weave-trace/src/trace_server_backend/contract/interface/builtin_object_classes/your_schema.py`):
 
 ```python
 from pydantic import BaseModel
-from weave.shared.interface.builtin_object_classes import base_object_def
+from weave.trace.builtin_object_classes import base_object_def
 
 class NestedConfig(BaseModel):
     setting_a: int
@@ -146,9 +146,9 @@ createFn({...}); // TypeScript enforced schema
 
 ### Keeping Frontend Types in Sync
 
-Run `make synchronize-base-object-schemas` to ensure the frontend TypeScript types are up to date with your Pydantic schemas.
+The frontend TypeScript types are generated in wandb/core from the trace server's copy of the classes: run `make export-builtin-object-schemas` in `services/weave-trace`, then `bun run generate:weave-schemas` in `frontends/app`.
 
-- Note: the frontend types are committed to the `core` repository, whereas types used by the trace server and SDKs are committed to `weave`.
+- Note: the trace server's classes and the frontend types are committed to the `core` repository, whereas the classes the Python SDK uses are committed to `weave`.
 
 ### Implementation Notes
 
@@ -160,34 +160,32 @@ Run `make synchronize-base-object-schemas` to ensure the frontend TypeScript typ
 
 ### Architecture Flow
 
-1. Define your schema in a python file in the `weave/shared/interface/builtin_object_classes/` directory. See `weave/shared/interface/builtin_object_classes/test_only_example.py` as an example.
-2. Make sure to register your schemas in `weave/shared/interface/builtin_object_classes/builtin_object_registry.py` by calling `register_base_object`.
-3. Run `make synchronize-base-object-schemas` to generate the frontend types.
-   - The first step (`make generate_base_object_schemas`) will run `scripts/generate_base_object_schemas.py` to generate a JSON schema in `weave/shared/interface/builtin_object_classes/generated/generated_builtin_object_class_schemas.json`.
-   - The second step (yarn `generate-schemas`) will read this file and use it to generate the frontend types located in `frontends/weave/src/components/PagePanelComponents/Home/Browse3/pages/wfReactInterface/generatedBuiltinObjectClasses.zod.ts`.
+1. Define your schema in a python file in the `weave/trace/builtin_object_classes/` directory for the Python SDK, and in `services/weave-trace/src/trace_server_backend/contract/interface/builtin_object_classes/` in wandb/core for the trace server and the frontend. See `test_only_example.py` in either directory as an example.
+2. Make sure to register your schemas in `builtin_object_registry.py` in both directories by calling `register_base_object`.
+3. Generate the frontend types in wandb/core.
+   - `make export-builtin-object-schemas` in `services/weave-trace` runs `src/export_builtin_object_schemas.py` to write the JSON schema to `services/weave-trace/src/trace_server_backend/contract/interface/builtin_object_classes/generated/generated_builtin_object_class_schemas.json`.
+   - `bun run generate:weave-schemas` in `frontends/app` reads this file and uses it to generate the frontend types located in `frontends/app/src/weave/components/PagePanelComponents/Home/Browse3/pages/wfReactInterface/generatedBuiltinObjectClasses.zod.ts`.
 4. Now, each use case uses different parts:
    1. `Python Writing`. Users can directly import these classes and use them as normal Pydantic models, which get published with `weave.publish`. The python client correct builds the requisite payload.
    2. `Python Reading`. Users can `weave.ref().get()` and the weave python SDK will return the instance with the correct type. Note: we do some special handling such that the returned object is not a WeaveObject, but literally the exact pydantic class. The SDK reads through `weave.trace.base_objects.BUILTIN_OBJECT_REGISTRY`, which can swap a pure data schema for its SDK class: `LLMStructuredCompletionModel` comes back as the executable model from `weave/flow/llm_structured_model.py`.
    3. `HTTP Writing`. In cases where the client/user does not want to add the special type information, users can publish builtin objects (set of weave.Objects provided by Weave) by setting the `builtin_object_class` setting on `POST obj/create` to the name of the class. The weave server will validate the object against the schema, update the metadata fields, and store the object.
    4. `HTTP Reading`. When querying for objects, the server will return the object with the correct type if the `base_object_class` metadata field is set.
-   5. `Frontend`. The frontend will read the zod schema from `frontends/weave/src/components/PagePanelComponents/Home/Browse3/pages/wfReactInterface/generatedBuiltinObjectClasses.zod.ts` and use that to provide compile time type safety when using `useBaseObjectInstances` and runtime type safety when using `useCreateBuiltinObjectInstance`.
+   5. `Frontend`. The frontend will read the zod schema from `frontends/app/src/weave/components/PagePanelComponents/Home/Browse3/pages/wfReactInterface/generatedBuiltinObjectClasses.zod.ts` and use that to provide compile time type safety when using `useBaseObjectInstances` and runtime type safety when using `useCreateBuiltinObjectInstance`.
 
 - Note: it is critical that all techniques produce the same digest for the same data - which is tested in the tests. This way versions are not thrashed by different clients/users.
 
 ```mermaid
 graph TD
     subgraph Schema Definition
-        F["weave/shared/interface/<br>builtin_object_classes/your_schema.py"] --> |defines| P[Pydantic BaseObject]
+        F["builtin_object_classes/<br>your_schema.py"] --> |defines| P[Pydantic BaseObject]
         P --> |register_base_object| R["builtin_object_registry.py"]
     end
 
-    subgraph Schema Generation
-        M["make synchronize-base-object-schemas"] --> G["make generate_base_object_schemas"]
-        G --> |runs| S["scripts/<br>generate_base_object_schemas.py"]
+    subgraph "Schema Generation in wandb/core"
+        M["make export-builtin-object-schemas"] --> |runs| S["src/<br>export_builtin_object_schemas.py"]
         R --> |import registered classes| S
         S --> |generates| J["generated_builtin_object_class_schemas.json"]
-        M --> |yarn generate-schemas| Z["generatedBuiltinObjectClasses.zod.ts"]
-        J --> Z
+        J --> |bun run generate:weave-schemas| Z["generatedBuiltinObjectClasses.zod.ts"]
     end
 
     subgraph "Trace Server"

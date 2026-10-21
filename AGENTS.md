@@ -10,7 +10,7 @@
 
 ## The trace server moved to wandb/core (2026-10-13)
 
-Since 2026-10-13 the trace server runs from wandb/core, in `services/weave-trace/src/trace_server_backend/` (wandb/core#58291). Send changes to the server, its migrations and its tests there, not to `weave/trace_server/`, `tests/trace_server/` or `tests/trace_server_migrator/` in this repo: that copy no longer runs, and wandb/weave#8018 deletes it. PRs that touch those paths need a review from their code owners. The request and response models shared with the SDK stay in `weave/shared/`; change them here, and core picks them up through its submodule sync. The generated model provider and cost files are regenerated in core too, with `make update_model_providers` and `make update_costs` in `services/weave-trace`.
+Since 2026-10-13 the trace server runs from wandb/core, in `services/weave-trace/src/trace_server_backend/` (wandb/core#58291). Send changes to the server, its migrations and its tests there, not to `weave/trace_server/`, `tests/trace_server/` or `tests/trace_server_migrator/` in this repo: that copy no longer runs, and wandb/weave#8018 deleted it. The server also has its own copy of `weave/shared/`, in `services/weave-trace/src/trace_server_backend/contract/` (wandb/core#58624), and the UI's builtin object schema is generated from that copy (wandb/core#58719). `weave/shared/` is now only the client's: a change the server must see goes to core, and a field that both the client and the server use needs a PR in each repo. PRs that touch the old server paths or `weave/shared/` need a review from their code owners. The generated model provider and cost files are regenerated in core too, with `make update_model_providers` and `make update_costs` in `services/weave-trace`.
 
 ## Python Import Rules
 
@@ -84,8 +84,9 @@ _Important:_ For OpenAI Codex agents (most likely you!), your environment does n
 
 - `weave/` - Core implementation
   - `weave/` - Python package implementation
-  - `weave/trace_server` - Deprecated import aliases for `weave.shared`; the
-    trace server itself lives in wandb/core
+  - `weave/trace_server` - Deprecated import aliases for `weave.shared` and for
+    the modules that moved from it into the client; the trace server itself
+    lives in wandb/core
 
 ### W&B authentication
 
@@ -111,8 +112,8 @@ Never edit it by hand — regenerate it in core, then re-run
 
 A new field on a trace-server request is not a reason to regenerate or edit
 either vendored client, or its `origin.json`, in that same PR. Core's OpenAPI
-spec does not contain the field until core moves its weave pointer and exports
-the spec. The Stainless bot opens the PR that updates these copies. Until that
+spec does not contain the field until the server's copy in core has it and core
+exports the spec. The Stainless bot opens the PR that updates these copies. Until that
 PR lands, a Python binding that passes every dumped field into the generated
 method raises `TypeError` on the new name. Pass `exclude={"<field>"}` plus
 `extra_body={"<field>": ...}` to `_stainless_request`, under the comment
@@ -126,9 +127,11 @@ bridge.
 Persisted `AgentDashboard` objects intentionally use a closed, discriminated
 schema. Supported panel variants and their configuration fields must be added
 to `builtin_object_classes/agent_dashboard.py`; do not replace panel settings
-with an untyped dictionary. After changing the model, run
-`make synchronize-base-object-schemas` from the repository root so the Python
-schema and the dependent Core frontend types stay aligned.
+with an untyped dictionary. The trace server and the Core frontend types use
+the copy in wandb/core,
+`services/weave-trace/src/trace_server_backend/contract/interface/builtin_object_classes/agent_dashboard.py`:
+change it too, then run `make export-builtin-object-schemas` in
+`services/weave-trace` and `bun run generate:weave-schemas` in `frontends/app`.
 
 ### Trace Server API / Node SDK Schema
 
@@ -145,7 +148,8 @@ just the outermost one: skipping when the parent call already carries it marks
 every other level, because the check reads the parent's recorded state and the
 parent may itself have skipped. A reader must treat a missing key and a pair
 that matches no span as normal — the write does not check that the span reaches
-our backend. Spans opened by `trace_server.tracing` are the one exclusion, and
+our backend. Spans opened by `weave.trace.server_tracing` (and by its copy in
+the trace server in wandb/core) are the one exclusion, and
 they are recognised through `WEAVE_SERVER_SPAN_KEY` on the context rather than
 off the span object, which under the OTel→DD bridge is not an SDK span.
 

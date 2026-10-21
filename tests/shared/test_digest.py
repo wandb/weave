@@ -3,15 +3,16 @@ import json
 
 import pytest
 
-from weave.shared import (
+from weave.trace.serialization.digest import (
+    bytes_digest,
     compute_file_digest,
     compute_object_digest,
     compute_object_digest_result,
     compute_row_digest,
     compute_table_digest,
+    str_digest,
 )
-from weave.shared.digest import bytes_digest, str_digest
-from weave.shared.object_class_util import process_incoming_object_val
+from weave.trace.serialization.object_class_util import process_incoming_object_val
 
 pytestmark = pytest.mark.trace_server
 

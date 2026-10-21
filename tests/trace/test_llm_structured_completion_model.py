@@ -9,7 +9,8 @@ from weave.flow.llm_structured_model import (
     cast_to_llm_structured_model_params,
 )
 from weave.prompt.prompt import MessagesPrompt
-from weave.shared.interface.builtin_object_classes.llm_structured_model import (
+from weave.trace import object_record, vals
+from weave.trace.builtin_object_classes.llm_structured_model import (
     LLMStructuredCompletionModelDefaultParams,
     Message,
     _prepare_llm_messages,
@@ -18,7 +19,6 @@ from weave.shared.interface.builtin_object_classes.llm_structured_model import (
     parse_params_to_litellm_params,
     parse_response,
 )
-from weave.trace import object_record, vals
 from weave.trace.weave_client import WeaveClient
 from weave.trace_server import trace_server_interface as tsi
 

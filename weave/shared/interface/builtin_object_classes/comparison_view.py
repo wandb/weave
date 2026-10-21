@@ -1,53 +1,18 @@
-"""ComparisonView builtin object class for saving comparison view configurations.
+"""Canonical location is ``weave.trace.builtin_object_classes.comparison_view``. This module is that module."""
 
-This allows users to save and restore comparison configurations including
-evaluation call IDs and selected metrics.
-"""
+import sys
+import warnings
 
-from pydantic import BaseModel
+from weave.trace.builtin_object_classes import comparison_view as _canonical
+from weave.trace.builtin_object_classes.comparison_view import *  # noqa: F403
 
-from weave.shared.interface.builtin_object_classes import base_object_def
+# TODO: delete this alias together with weave.shared.
+warnings.warn(
+    "weave.shared.interface.builtin_object_classes.comparison_view is "
+    "deprecated and will be removed in a future release; import "
+    "weave.trace.builtin_object_classes.comparison_view instead.",
+    FutureWarning,
+    stacklevel=2,
+)
 
-
-class ComparisonViewDefinition(BaseModel):
-    """Definition of a comparison view's configuration.
-
-    Args:
-        evaluation_call_ids (list[str]): List of evaluation call IDs being compared.
-        selected_metrics (list[str] | None): List of metrics that are visible in plots.
-        column_visibility (dict[str, bool] | None): Results-table column visibility
-            keyed by column field. Absent/empty means the default columns.
-
-    Examples:
-        >>> definition = ComparisonViewDefinition(
-        ...     evaluation_call_ids=["call_1", "call_2"],
-        ...     selected_metrics=["accuracy", "f1_score"]
-        ... )
-    """
-
-    evaluation_call_ids: list[str]
-    selected_metrics: list[str] | None = None
-    column_visibility: dict[str, bool] | None = None
-
-
-class ComparisonView(base_object_def.BaseObject):
-    """A saved comparison view configuration.
-
-    Args:
-        label (str): Human-readable name for the comparison view.
-        definition (ComparisonViewDefinition): The view's configuration.
-
-    Examples:
-        >>> view = ComparisonView(
-        ...     label="My Comparison",
-        ...     definition=ComparisonViewDefinition(
-        ...         evaluation_call_ids=["call_1", "call_2"]
-        ...     )
-        ... )
-    """
-
-    label: str
-    definition: ComparisonViewDefinition
-
-
-__all__ = ["ComparisonView", "ComparisonViewDefinition"]
+sys.modules[__name__] = _canonical
