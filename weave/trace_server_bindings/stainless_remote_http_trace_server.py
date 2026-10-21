@@ -25,6 +25,8 @@ from weave.trace_server_bindings.async_batch_processor import AsyncBatchProcesso
 from weave.trace_server_bindings.call_batch_processor import CallBatchProcessor
 from weave.trace_server_bindings.client_interface import TraceServerClientInterface
 from weave.trace_server_bindings.http_utils import (
+    CLIENT_CAPABILITIES,
+    CLIENT_CAPABILITIES_HEADER,
     REMOTE_REQUEST_BYTES_LIMIT,
     TRACE_ID_HEADER,
     CallsCompleteModeRequired,
@@ -178,6 +180,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
 
     def _compose_headers(self, trace_id: str | None = None) -> dict[str, str]:
         headers = self._extra_headers.copy()
+        headers[CLIENT_CAPABILITIES_HEADER] = CLIENT_CAPABILITIES
         if self._credentials is not None:
             headers["Authorization"] = self._credentials.authorization_header()
         if retry_id := get_current_retry_id():
@@ -424,6 +427,27 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
             project, entity=entity, batch=json.loads(encoded_data)["batch"]
         )
 
+    def calls_complete(
+        self, req: Mapping[str, Any] | tsi.CallsUpsertCompleteReq
+    ) -> object:
+        """Upsert a batch of completed calls.
+
+        Args:
+            req: Calls upsert complete request.
+
+        Returns:
+            Calls upsert complete response.
+        """
+        batch = [as_params(item) for item in as_params(req)["batch"]]
+        if not batch:
+            return {}
+        entity, project = from_project_id(batch[0]["project_id"])
+        # The same body the batch processor sends (_flush_calls_complete).
+        self._send_calls_complete_to_server(
+            entity, project, to_json({"batch": batch}, inf_nan_mode="null")
+        )
+        return {}
+
     def _flush_calls_complete(
         self,
         batch: list[CompleteBatchItem],
@@ -495,7 +519,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
                 )
                 # Convert to stainless format
                 stainless_batch = [
-                    item.model_dump(exclude={"id", "created_at"}, exclude_none=True)
+                    item.model_dump(exclude={"created_at"}, exclude_none=True)
                     for item in batch_req.batch
                 ]
                 self._stainless_client.feedback.batch_create(batch=stainless_batch)
@@ -1287,7 +1311,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         else:
             self._update_client_headers()
             req_dict = req.model_dump(
-                exclude={"id", "created_at"}, exclude_none=True, by_alias=True
+                exclude={"created_at"}, exclude_none=True, by_alias=True
             )
             response = self._stainless_client.feedback.create(**req_dict)
             return tsi.FeedbackCreateRes.model_validate(response.model_dump())
@@ -1307,9 +1331,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         self._update_client_headers()
         # Convert to stainless format
         stainless_batch = [
-            item.model_dump(
-                exclude={"id", "created_at"}, exclude_none=True, by_alias=True
-            )
+            item.model_dump(exclude={"created_at"}, exclude_none=True, by_alias=True)
             for item in req.batch
         ]
         response = self._stainless_client.feedback.batch_create(batch=stainless_batch)

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from collections.abc import Iterator
+from collections.abc import Iterator, Mapping
 from typing import Any, Protocol
 
 from weave.shared import trace_server_interface as tsi
@@ -289,8 +289,8 @@ class TraceServerClientInterface(Protocol):
 
     # Calls V2 API
     def calls_complete(
-        self, req: tsi.CallsUpsertCompleteReq
-    ) -> tsi.CallsUpsertCompleteRes: ...
+        self, req: Mapping[str, Any] | tsi.CallsUpsertCompleteReq
+    ) -> object: ...
     def call_start_v2(self, req: tsi.CallStartV2Req) -> tsi.CallStartV2Res: ...
     def call_end_v2(self, req: tsi.CallEndV2Req) -> tsi.CallEndV2Res: ...
 

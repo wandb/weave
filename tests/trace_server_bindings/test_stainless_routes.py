@@ -1632,6 +1632,36 @@ def test_call_end_reads_an_empty_response_body():
     assert res == {}
 
 
+@pytest.mark.parametrize("as_dict", [False, True], ids=["model", "dict"])
+def test_calls_complete_sends_the_batch_to_the_v2_route(as_dict):
+    """Test that calls_complete posts the whole batch to the project's v2 route."""
+    mock_server = _mock_server(httpx.Response(200, json={}))
+    req = tsi.CallsUpsertCompleteReq(
+        batch=[
+            tsi.CompletedCallSchemaForInsert(
+                project_id=PROJECT,
+                id="call-id",
+                trace_id="trace-id",
+                op_name="my-op",
+                started_at=START,
+                ended_at=END,
+                attributes={},
+                inputs={"x": 1},
+                output={"y": 2},
+                summary={},
+            )
+        ]
+    )
+
+    res = mock_server.server.calls_complete(req.model_dump() if as_dict else req)
+
+    assert [(r.method, r.url.path) for r in mock_server.requests] == [
+        ("POST", f"{V2}/calls/complete")
+    ]
+    assert json.loads(mock_server.requests[0].content) == req.model_dump(mode="json")
+    assert res == {}
+
+
 def test_call_start_batch_reads_the_response_list():
     """Test that the batch response is read from the field the route returns."""
     mock_server = _mock_server(
