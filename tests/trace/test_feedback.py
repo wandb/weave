@@ -15,15 +15,17 @@ from weave.trace_server.errors import (
 )
 from weave.trace_server.interface.query import Query
 from weave.trace_server.trace_server_interface import (
-    FeedbackAggregateBucket,
     FeedbackAggregateReq,
-    FeedbackAggregateRes,
     FeedbackCreateReq,
     FeedbackQueryReq,
     FeedbackReplaceReq,
 )
 from weave.trace_server_bindings.client_interface import TraceServerClientInterface
-from weave.vendor.weave_server_sdk.types import FeedbackQueryResponse
+from weave.vendor.weave_server_sdk.types import (
+    FeedbackAggregateResponse,
+    FeedbackQueryResponse,
+)
+from weave.vendor.weave_server_sdk.types.feedback_aggregate_response import Bucket
 
 
 def test_client_feedback(client) -> None:
@@ -771,7 +773,7 @@ def test_agent_monitor_feedback_filters(client: WeaveClient) -> None:
 
 
 def test_feedback_aggregate(client: WeaveClient) -> None:
-    """Aggregate scorer feedback, asserting the entire FeedbackAggregateRes shape.
+    """Aggregate scorer feedback, asserting the entire response shape.
 
     Uses sumMap / toStartOfInterval. Ratings are
     exact binary fractions (0.75, 0.5) so the summed Float64 (1.25) compares
@@ -826,7 +828,7 @@ def test_feedback_aggregate(client: WeaveClient) -> None:
 
     # Per-scorer rollups, reused as the expected buckets across the cases below.
     # Grouping by scorer_id returns the scorer's object id (the name), not a ref.
-    scorer_a_bucket = FeedbackAggregateBucket(
+    scorer_a_bucket = Bucket(
         time_bucket_start_ms=None,
         group={"scorer_id": "scorer_a"},
         total_count=3,  # a1, a2, a3
@@ -835,7 +837,7 @@ def test_feedback_aggregate(client: WeaveClient) -> None:
         rating_counts={"_rating_": 2},
         rating_sums={"_rating_": 1.25},  # 0.75 + 0.5
     )
-    scorer_b_bucket = FeedbackAggregateBucket(
+    scorer_b_bucket = Bucket(
         time_bucket_start_ms=None,
         group={"scorer_id": "scorer_b"},
         total_count=1,
@@ -862,7 +864,7 @@ def test_feedback_aggregate(client: WeaveClient) -> None:
     # ORDER BY bucket leaves rows in the same bucket unordered; sort by scorer for
     # a stable shape. (A rare run straddling the hour boundary fails loudly here.)
     bucketed.buckets.sort(key=lambda b: b.group["scorer_id"])
-    assert bucketed == FeedbackAggregateRes(
+    assert bucketed == FeedbackAggregateResponse(
         time_bucket_seconds=3600,
         after_ms=after_ms,
         before_ms=before_ms,
@@ -885,7 +887,7 @@ def test_feedback_aggregate(client: WeaveClient) -> None:
             feedback_types=["wandb.agent_monitor"],
             group_by=["scorer_id"],
         )
-    ) == FeedbackAggregateRes(
+    ) == FeedbackAggregateResponse(
         time_bucket_seconds=None,
         after_ms=after_ms,
         before_ms=before_ms,
@@ -905,12 +907,12 @@ def test_feedback_aggregate(client: WeaveClient) -> None:
         )
     )
     by_status.buckets.sort(key=lambda b: b.group["span_status_code"])
-    assert by_status == FeedbackAggregateRes(
+    assert by_status == FeedbackAggregateResponse(
         time_bucket_seconds=None,
         after_ms=after_ms,
         before_ms=before_ms,
         buckets=[
-            FeedbackAggregateBucket(
+            Bucket(
                 time_bucket_start_ms=None,
                 group={"span_status_code": "ERROR"},
                 total_count=1,
@@ -919,7 +921,7 @@ def test_feedback_aggregate(client: WeaveClient) -> None:
                 rating_counts={},
                 rating_sums={},
             ),
-            FeedbackAggregateBucket(
+            Bucket(
                 time_bucket_start_ms=None,
                 group={"span_status_code": "OK"},
                 total_count=2,
@@ -928,7 +930,7 @@ def test_feedback_aggregate(client: WeaveClient) -> None:
                 rating_counts={"_rating_": 2},
                 rating_sums={"_rating_": 1.25},
             ),
-            FeedbackAggregateBucket(
+            Bucket(
                 time_bucket_start_ms=None,
                 group={"span_status_code": "UNSET"},
                 total_count=1,
@@ -948,12 +950,12 @@ def test_feedback_aggregate(client: WeaveClient) -> None:
             before_ms=before_ms,
             feedback_types=["wandb.agent_monitor"],
         )
-    ) == FeedbackAggregateRes(
+    ) == FeedbackAggregateResponse(
         time_bucket_seconds=None,
         after_ms=after_ms,
         before_ms=before_ms,
         buckets=[
-            FeedbackAggregateBucket(
+            Bucket(
                 time_bucket_start_ms=None,
                 group={},
                 total_count=4,  # a1, a2, a3, b1
@@ -976,12 +978,12 @@ def test_feedback_aggregate(client: WeaveClient) -> None:
             time_bucket_seconds=3600,
             feedback_types=["wandb.agent_monitor"],
         )
-    ) == FeedbackAggregateRes(
+    ) == FeedbackAggregateResponse(
         time_bucket_seconds=3600,
         after_ms=after_ms,
         before_ms=before_ms,
         buckets=[
-            FeedbackAggregateBucket(
+            Bucket(
                 time_bucket_start_ms=expected_bucket_start,
                 group={},
                 total_count=4,
@@ -1003,12 +1005,12 @@ def test_feedback_aggregate(client: WeaveClient) -> None:
             after_ms=0,
             before_ms=before_ms,
         )
-    ) == FeedbackAggregateRes(
+    ) == FeedbackAggregateResponse(
         time_bucket_seconds=None,
         after_ms=0,
         before_ms=before_ms,
         buckets=[
-            FeedbackAggregateBucket(
+            Bucket(
                 time_bucket_start_ms=None,
                 group={},
                 total_count=5,  # 4 agent_monitor rows + the note
@@ -1033,7 +1035,7 @@ def test_feedback_aggregate(client: WeaveClient) -> None:
                 scorer_ids=[scorer_filter],
                 group_by=["scorer_id"],
             )
-        ) == FeedbackAggregateRes(
+        ) == FeedbackAggregateResponse(
             time_bucket_seconds=None,
             after_ms=after_ms,
             before_ms=before_ms,
@@ -1051,7 +1053,7 @@ def test_feedback_aggregate(client: WeaveClient) -> None:
             tags=["nsfw"],
             group_by=["scorer_id"],
         )
-    ) == FeedbackAggregateRes(
+    ) == FeedbackAggregateResponse(
         time_bucket_seconds=None,
         after_ms=after_ms,
         before_ms=before_ms,
@@ -1068,12 +1070,12 @@ def test_feedback_aggregate(client: WeaveClient) -> None:
             feedback_types=["wandb.agent_monitor"],
             rating_min=0.7,
         )
-    ) == FeedbackAggregateRes(
+    ) == FeedbackAggregateResponse(
         time_bucket_seconds=None,
         after_ms=after_ms,
         before_ms=before_ms,
         buckets=[
-            FeedbackAggregateBucket(
+            Bucket(
                 time_bucket_start_ms=None,
                 group={},
                 total_count=1,
