@@ -13,11 +13,10 @@ import threading
 from concurrent.futures import Future
 from typing import TYPE_CHECKING, Any
 
-from httpx import HTTPStatusError as HTTPError
-
 from weave.shared.errors import DigestMismatchError
 from weave.shared.trace_server_interface import ProjectsInfoReq
 from weave.trace.settings import should_enable_client_side_digests
+from weave.utils.retry import _http_response
 
 if TYPE_CHECKING:
     from weave.trace_server_bindings.client_interface import TraceServerClientInterface
@@ -134,11 +133,8 @@ class ProjectIdResolver:
         """Return True if exc indicates a server-side digest mismatch."""
         if isinstance(exc, DigestMismatchError):
             return True
-        return (
-            isinstance(exc, HTTPError)
-            and exc.response is not None
-            and exc.response.status_code == 409
-        )
+        response = _http_response(exc)
+        return response is not None and response.status_code == 409
 
     def disable_after_validation_error(self, exc: Exception, ref_uri: str) -> None:
         """Permanently disable client-side digests for this session.
