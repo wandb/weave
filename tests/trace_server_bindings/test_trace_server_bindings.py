@@ -445,7 +445,7 @@ def test_invalid_item_is_dropped_alone(server_class, path, monkeypatch, caplog):
 def test_batch_invalid_in_every_item_is_dropped_without_looping(
     server_class, path, thread_id, monkeypatch, caplog
 ):
-    """Splitting stops at single items: 2n-1 requests, then every item dropped."""
+    """Both halves rejected too: three requests, then the whole batch is dropped."""
     with _server_over_transport(server_class, path, lambda _: 422, monkeypatch) as (
         server,
         requests_seen,
@@ -460,9 +460,11 @@ def test_batch_invalid_in_every_item_is_dropped_without_looping(
     rejected_before_sending = thread_id is not None and (
         server_class is RemoteHTTPTraceServer
     )
-    assert len(requests_seen) == (0 if rejected_before_sending else 2 * len(batch) - 1)
+    assert len(requests_seen) == (0 if rejected_before_sending else 3)
     assert stored == []
-    assert _dropped_batch_sizes(caplog) == [1] * len(batch)
+    assert _dropped_batch_sizes(caplog) == (
+        [1] * len(batch) if rejected_before_sending else [len(batch)]
+    )
     server.call_processor.enqueue.assert_not_called()
 
 
