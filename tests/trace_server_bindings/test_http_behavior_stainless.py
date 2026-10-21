@@ -25,6 +25,8 @@ from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server_bindings.async_batch_processor import AsyncBatchProcessor
 from weave.trace_server_bindings.call_batch_processor import CallBatchProcessor
 from weave.trace_server_bindings.http_utils import (
+    CLIENT_CAPABILITIES,
+    CLIENT_CAPABILITIES_HEADER,
     ERROR_CODE_CALLS_COMPLETE_MODE_REQUIRED,
     TRACE_ID_HEADER,
 )
@@ -78,7 +80,10 @@ def test_federated_auth_refreshes_headers(unbatched_server):
     request_headers = unbatched_server._stainless_client.calls.start.call_args.kwargs[
         "extra_headers"
     ]
-    assert request_headers == {"Authorization": "Bearer token-2"}
+    assert request_headers == {
+        CLIENT_CAPABILITIES_HEADER: CLIENT_CAPABILITIES,
+        "Authorization": "Bearer token-2",
+    }
 
 
 def test_set_auth_normalizes_api_key_tuple(unbatched_server):
@@ -395,6 +400,54 @@ def test_eager_calls_use_v2_start_end_endpoints(monkeypatch):
         assert end_body == tsi.CallEndV2Req(end=end_item.req.end).model_dump(
             mode="json"
         )
+
+
+def test_call_writes_send_client_capabilities_header(monkeypatch):
+    """Batched and eager call writes advertise the client's capabilities.
+
+    The server's ingest sampler only samples clients that send this header, the
+    same one the legacy client sends (see test_http_behavior_remote.py).
+    """
+    monkeypatch.setenv("WEAVE_USE_CALLS_COMPLETE", "true")
+    now = datetime.datetime.now(tz=datetime.timezone.utc)
+    complete = tsi.CompletedCallSchemaForInsert(
+        project_id=PROJECT,
+        id="call-id",
+        trace_id="trace-id",
+        op_name="test_op",
+        started_at=now,
+        ended_at=now,
+        attributes={},
+        inputs={},
+        summary={"result": "ok"},
+    )
+    start_item, end_item = _start_end_pair()
+
+    with _batching_server(_ok) as (server, requests):
+        server._flush_calls_complete([CompleteBatchItem(req=complete)])
+        server._flush_calls_eager([start_item, end_item])
+
+    assert [r.url.path for r in requests] == [
+        f"{V2}/calls/complete",
+        f"{V2}/call/start",
+        f"{V2}/call/end",
+    ]
+    assert [r.headers.get(CLIENT_CAPABILITIES_HEADER) for r in requests] == [
+        CLIENT_CAPABILITIES
+    ] * 3
+
+
+def test_other_routes_send_client_capabilities_header():
+    """The header describes the client, not a trace, so every route carries it."""
+    with _batching_server(_ok) as (server, requests):
+        server.call_update(
+            tsi.CallUpdateReq(
+                project_id=PROJECT, call_id="call-id", display_name="renamed"
+            )
+        )
+
+    assert [r.url.path for r in requests] == ["/call/update"]
+    assert requests[0].headers.get(CLIENT_CAPABILITIES_HEADER) == CLIENT_CAPABILITIES
 
 
 @pytest.mark.disable_logging_error_check
