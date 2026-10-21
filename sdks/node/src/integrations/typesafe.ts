@@ -223,7 +223,9 @@ function stampProvenance(
   span: {setAttributes(attributes: Attributes): unknown},
   client: object
 ): void {
-  const version = (client as Record<symbol, unknown>)[SDK_VERSION];
+  const version = (client as Record<symbol, unknown> | undefined)?.[
+    SDK_VERSION
+  ];
   span.setAttributes({
     ...integrationAttributes(typeof version === 'string' ? version : undefined),
     'weave.integration.operation': OPERATION,

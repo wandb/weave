@@ -4,6 +4,7 @@ import {
   type Context,
   type ContextManager,
   ROOT_CONTEXT,
+  SpanStatusCode,
 } from '@opentelemetry/api';
 import {BasicTracerProvider} from '@opentelemetry/sdk-trace-base';
 import {
@@ -539,6 +540,49 @@ describe('TypeSafe systemOne spans', () => {
     await client.systemOne({state: 'hello', questions, model: 'jev-latest'});
     expect(spans().filter(span => span.name.startsWith('chat'))).toHaveLength(
       1
+    );
+  });
+
+  test('each patched SDK copy keeps its own version', async () => {
+    class Copy extends TypeSafeClient {}
+    patchTypeSafeModule(await import('@typesafe-ai/sdk'));
+    patchTypeSafeModule({TypeSafeClient: Copy, VERSION: '0.6.0'});
+    const fetch = async () => jsonResponse(okBody());
+    await clientWith(fetch).systemOne({
+      state: 'a',
+      questions,
+      model: 'jev-latest',
+    });
+    await new Copy({
+      apiKey: 'test-key',
+      fetch,
+      retry: {maxRetries: 0},
+    }).systemOne({
+      state: 'b',
+      questions,
+      model: 'jev-preview',
+    });
+
+    const version = (name: string) =>
+      findSpan(spans(), name).attributes[
+        'weave.integration.meta.package_version'
+      ];
+    expect(version('chat jev-latest')).toBe(VERSION);
+    expect(version('chat jev-preview')).toBe('0.6.0');
+  });
+
+  test('a detached call still records a failed span', async () => {
+    const {systemOne} = wrapTypeSafe(
+      clientWith(async () => jsonResponse(okBody()))
+    );
+    await expect(
+      Promise.resolve().then(() => systemOne({state: 'a', questions}))
+    ).rejects.toThrow();
+
+    const chat = findSpan(spans(), 'chat jev-latest');
+    expect(chat.status.code).toBe(SpanStatusCode.ERROR);
+    expect(chat.attributes['weave.integration.operation']).toBe(
+      'typesafe.system_one'
     );
   });
 
