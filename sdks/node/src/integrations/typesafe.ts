@@ -38,7 +38,7 @@ const QUESTIONS_ATTR = 'typesafe.questions';
 const REQUEST_ID_HEADER = 'x-typesafe-request-id';
 const MODULE_NAME = '@typesafe-ai/sdk';
 const CJS_SUBPATH = 'dist/index.cjs';
-const VERSION_RANGE = '>=0.6.0 <0.7.0';
+const VERSION_RANGE = '>= 0.6.0';
 const CAPTURE_ENV = 'OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT';
 const CAPTURE_OFF = new Set(['0', 'false', 'no', 'off']);
 const HTTP_STATUS = 'http.response.status_code';
@@ -53,9 +53,17 @@ const BARRIER_METHODS = [
   'map',
 ] as const;
 
-const INTEGRATION_ATTRS = asOtelAttributes(
-  libraryIntegration(PROVIDER_NAME, {packageName: 'typesafe-sdk'})
-);
+function integrationAttributes(packageVersion?: string) {
+  return asOtelAttributes(
+    libraryIntegration(PROVIDER_NAME, {
+      packageName: 'typesafe-sdk',
+      packageVersion,
+    })
+  );
+}
+
+// The module hook sets the version. wrapTypeSafe alone cannot see the module.
+let integrationAttrs = integrationAttributes();
 
 const captureSettings = new WeakMap<object, boolean>();
 
@@ -128,12 +136,14 @@ function sortValue(value: unknown): unknown {
 }
 
 function stateMessage(state: unknown): Message {
-  if (typeof state === 'string') {
-    return {role: 'user', content: state};
+  // An image or withAssets text becomes the string the SDK sends.
+  const value = sortValue(state);
+  if (typeof value === 'string') {
+    return {role: 'user', content: value};
   }
   return {
     role: 'user',
-    parts: [{type: 'text', content: JSON.stringify(sortValue(state))}],
+    parts: [{type: 'text', content: JSON.stringify(value)}],
   };
 }
 
@@ -214,7 +224,7 @@ function stampProvenance(span: {
   setAttributes(attributes: Attributes): unknown;
 }): void {
   span.setAttributes({
-    ...INTEGRATION_ATTRS,
+    ...integrationAttrs,
     'weave.integration.operation': OPERATION,
   });
 }
@@ -569,6 +579,10 @@ export function patchTypeSafeModule(exports: any): any {
     exports?.default;
   if (typeof client?.prototype?.systemOne === 'function') {
     patchSystemOne(client.prototype);
+    const version = exports?.VERSION ?? exports?.default?.VERSION;
+    if (typeof version === 'string') {
+      integrationAttrs = integrationAttributes(version);
+    }
   }
   return exports;
 }

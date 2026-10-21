@@ -6,7 +6,14 @@ import {
   ROOT_CONTEXT,
 } from '@opentelemetry/api';
 import {BasicTracerProvider} from '@opentelemetry/sdk-trace-base';
-import {noul, TypeSafeClient, TypeSafeError} from '@typesafe-ai/sdk';
+import {
+  image,
+  noul,
+  TypeSafeClient,
+  TypeSafeError,
+  VERSION,
+  withAssets,
+} from '@typesafe-ai/sdk';
 
 import {Conversation, getCurrentTurn, Turn} from '../../genai';
 import {
@@ -197,6 +204,40 @@ describe('TypeSafe systemOne spans', () => {
       {role: 'user', parts: [{type: 'text', content: '["a","b"]'}]},
     ]);
     expect(input[0].content).toBeUndefined();
+  });
+
+  test('records an image as its reference', async () => {
+    const client = wrapTypeSafe(clientWith(async () => jsonResponse(okBody())));
+    const photo = image(new Uint8Array([0x89, 0x50, 0x4e, 0x47]));
+    await client.systemOne({state: {photo}, questions});
+    await client.systemOne({
+      state: withAssets`Compare ${photo}.`,
+      questions: {billing: noul(withAssets`Is ${photo} a bill?`)},
+    });
+
+    const [first, second] = spans().filter(span =>
+      span.name.startsWith('chat ')
+    );
+    expect(
+      JSON.parse(String(first.attributes['gen_ai.input.messages']))
+    ).toEqual([
+      {
+        role: 'user',
+        parts: [{type: 'text', content: `{"photo":"${String(photo)}"}`}],
+      },
+    ]);
+    expect(
+      JSON.parse(String(second.attributes['gen_ai.input.messages']))
+    ).toEqual([{role: 'user', content: `Compare ${String(photo)}.`}]);
+    expect(JSON.parse(String(second.attributes['typesafe.questions']))).toEqual(
+      [
+        {
+          id: 'billing',
+          type: 'noul',
+          instructions: `Is ${String(photo)} a bill?`,
+        },
+      ]
+    );
   });
 
   test('env false drops content and a client option overrides it', async () => {
@@ -484,6 +525,11 @@ describe('TypeSafe systemOne spans', () => {
     expect(spans().filter(span => span.name.startsWith('chat'))).toHaveLength(
       1
     );
+    expect(
+      findSpan(spans(), 'chat jev-latest').attributes[
+        'weave.integration.meta.package_version'
+      ]
+    ).toBe(VERSION);
 
     getExporter().reset();
     const wrapped = wrapTypeSafe(client);
