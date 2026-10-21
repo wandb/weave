@@ -660,3 +660,94 @@ def test_generated_client_gets_our_ssl_and_timeout_settings(monkeypatch):
 
     assert captured == {"verify": False}
     assert server._stainless_client.timeout == 7.0
+
+
+# =============================================================================
+# Feedback ids
+#
+# Call.feedback.add returns the id feedback_create returns, and purge deletes by
+# that id, so the request must carry it, as the legacy client's does. Only the
+# fallback for a server without the batch route strips it.
+# =============================================================================
+
+
+def _feedback_req(**kwargs: str) -> tsi.FeedbackCreateReq:
+    return tsi.FeedbackCreateReq(
+        project_id=PROJECT,
+        weave_ref=f"weave:///{PROJECT}/call/call-id",
+        feedback_type="wandb.note.1",
+        payload={"note": "hello"},
+        **kwargs,
+    )
+
+
+def _store_feedback(request: httpx.Request) -> httpx.Response:
+    """Answer like the server: use the request's id, else generate one."""
+
+    def row(item: dict) -> dict:
+        return {
+            "id": item.get("id") or "server-generated-id",
+            "created_at": "2026-01-01T00:00:00Z",
+            "wb_user_id": "user",
+            "payload": item["payload"],
+        }
+
+    body = json.loads(request.read())
+    if request.url.path == "/feedback/batch/create":
+        return httpx.Response(
+            200, json={"res": [row(item) for item in body["batch"]]}, request=request
+        )
+    return httpx.Response(200, json=row(body), request=request)
+
+
+def test_batched_feedback_sends_the_id_it_returns():
+    """The id handed back before the batch is sent is the id the server stores."""
+    with _batching_server(_store_feedback) as (server, requests):
+        res = server.feedback_create(_feedback_req())
+    # Leaving the block flushes the feedback queue.
+
+    assert [r.url.path for r in requests] == ["/feedback/batch/create"]
+    sent = json.loads(requests[0].read())["batch"]
+    assert [item["id"] for item in sent] == [res.id]
+
+
+@pytest.mark.parametrize("should_batch", [True, False])
+def test_feedback_create_sends_an_explicit_id(should_batch):
+    """A caller-chosen id reaches the server on both the batched and direct paths."""
+    requests: list[httpx.Request] = []
+
+    def record(request: httpx.Request) -> httpx.Response:
+        requests.append(request)
+        return _store_feedback(request)
+
+    server = StainlessRemoteHTTPTraceServer(
+        "http://example.com", should_batch=should_batch
+    )
+    server._stainless_client = server._stainless_client.copy(
+        http_client=httpx.Client(transport=httpx.MockTransport(record))
+    )
+    try:
+        res = server.feedback_create(_feedback_req(id="explicit-id"))
+    finally:
+        if server.call_processor:
+            server.call_processor.stop_accepting_new_work_and_flush_queue()
+        if server.feedback_processor:
+            server.feedback_processor.stop_accepting_new_work_and_flush_queue()
+
+    assert res.id == "explicit-id"
+    assert len(requests) == 1
+    body = json.loads(requests[0].read())
+    sent = body["batch"] if should_batch else [body]
+    assert [item["id"] for item in sent] == ["explicit-id"]
+
+
+def test_feedback_create_batch_sends_explicit_ids():
+    """The public batch route keeps caller-chosen ids too."""
+    with _batching_server(_store_feedback) as (server, requests):
+        res = server.feedback_create_batch(
+            tsi.FeedbackCreateBatchReq(batch=[_feedback_req(id="explicit-id")])
+        )
+
+    assert [row.id for row in res.res] == ["explicit-id"]
+    sent = json.loads(requests[0].read())["batch"]
+    assert [item["id"] for item in sent] == ["explicit-id"]
