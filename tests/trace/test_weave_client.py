@@ -31,7 +31,7 @@ from weave.shared.trace_server_interface_util import (
     WILDCARD_ARTIFACT_VERSION_AND_PATH,
 )
 from weave.trace import refs, settings, table_upload_chunking, weave_client
-from weave.trace.context import call_context
+from weave.trace.context import call_context, weave_client_context
 from weave.trace.context.call_context import tracing_disabled
 from weave.trace.isinstance import weave_isinstance
 from weave.trace.op import is_op
@@ -1669,8 +1669,8 @@ def test_table_partitioning_on_the_generated_client(
 ):
     """test_table_partitioning, for the client users get by default.
 
-    The generated client splits a table the same way, and the server must
-    compute the same digests from what it sends.
+    The server must compute the same digests from what the generated client
+    sends, through the same requests.
     """
     remote_client, paths = stainless_recording_server
     settings.replace_settings(
@@ -1689,7 +1689,7 @@ def test_table_partitioning_on_the_generated_client(
     assert res.digest == exp_digest
     assert paths == ["/table/create"]
 
-    # Small enough to need several updates.
+    # Small enough to turn on chunking.
     remote_client.remote_request_bytes_limit = 4 * 1024
     paths.clear()
     remote_weave_client = TestOnlyFlushingWeaveClient(
@@ -1707,20 +1707,18 @@ def test_table_partitioning_on_the_generated_client(
     remote_weave_client.flush()
 
     assert saved_table.table_ref._digest == exp_digest
+    # Chunks are cut at TARGET_CHUNK_BYTES, so this table is one chunk either way.
     if use_parallel_table_upload:
-        # Two chunks, the probe and the merge of the chunks, then the object.
-        assert sorted(paths) == sorted(
-            [
-                "/table/create",
-                "/table/create",
-                "/table/create_from_digests",
-                "/table/create_from_digests",
-                "/obj/create",
-                "/obj/read",
-            ]
-        )
+        # The chunk, the endpoint probe, the merge of the chunks, then the object.
+        assert sorted(paths) == [
+            "/obj/create",
+            "/obj/read",
+            "/table/create",
+            "/table/create_from_digests",
+            "/table/create_from_digests",
+        ]
     else:
-        assert "/table/update" in paths
+        assert sorted(paths) == ["/obj/create", "/obj/read", "/table/create"]
 
 
 def test_parallel_chunk_probe_works_for_the_generated_client(client, monkeypatch):
@@ -4352,14 +4350,19 @@ def test_feedback_batching_on_the_generated_client(client, stainless_recording_s
     test_call = remote_weave_client.get_calls()[0]
     paths.clear()
 
-    feedback_ids = [
-        test_call.feedback.add(
-            feedback_type=f"test_feedback_{i}",
-            payload={"score": i, "note": f"Test feedback {i}"},
-        )
-        for i in range(10)
-    ]
-    remote_weave_client.flush()
+    # Feedback goes through the global client, so make the recording one global.
+    weave_client_context.set_weave_client_global(remote_weave_client)
+    try:
+        feedback_ids = [
+            test_call.feedback.add(
+                feedback_type=f"test_feedback_{i}",
+                payload={"score": i, "note": f"Test feedback {i}"},
+            )
+            for i in range(10)
+        ]
+        remote_weave_client.flush()
+    finally:
+        weave_client_context.set_weave_client_global(client)
 
     assert remote_client.get_feedback_processor() is not None
     assert "/feedback/create" not in paths
