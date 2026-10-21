@@ -126,11 +126,13 @@ def create_app() -> FastAPI:
     @app.post("/call/upsert_batch")
     def upsert_batch(body: dict[str, Any]) -> dict[str, Any]:
         req = _validated(_UPSERT_BATCH, body)
-        results: list[dict[str, Any]] = []
         for i, item in enumerate(req["batch"]):
+            kind = "start" if "start" in item["req"] else "end"
+            _check_timestamps(item["req"][kind], ("batch", i, "req", kind))
+        results: list[dict[str, Any]] = []
+        for item in req["batch"]:
             if "start" in item["req"]:
                 payload = item["req"]["start"]
-                _check_timestamps(payload, ("batch", i, "req", "start"))
                 store.add_start(payload)
                 results.append(
                     {
@@ -139,7 +141,6 @@ def create_app() -> FastAPI:
                     }
                 )
             else:
-                _check_timestamps(item["req"]["end"], ("batch", i, "req", "end"))
                 store.add_end(item["req"]["end"])
                 # An end has an empty response.
                 results.append({})
