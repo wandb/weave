@@ -260,7 +260,30 @@ def process_batch_with_retry(
     if len(batch) == 0:
         return
 
-    encoded_data = encode_batch_fn(batch)
+    try:
+        encoded_data = encode_batch_fn(batch)
+    except Exception as e:
+        # Encoding sends nothing, so a failure here repeats on every attempt: the
+        # item that fails is dropped rather than requeued.
+        if len(batch) > 1:
+            logger.warning(
+                "%s batch of %s items failed validation, splitting and retrying",
+                batch_name.capitalize(),
+                len(batch),
+            )
+            _split_and_process_halves(
+                batch,
+                batch_name=batch_name,
+                remote_request_bytes_limit=remote_request_bytes_limit,
+                send_batch_fn=send_batch_fn,
+                processor_obj=processor_obj,
+                get_item_id_fn=get_item_id_fn,
+                log_dropped_fn=log_dropped_fn,
+                encode_batch_fn=encode_batch_fn,
+            )
+        else:
+            _log_dropped_batch(batch, e, batch_name, log_dropped_fn)
+        return
     encoded_bytes = len(encoded_data)
 
     # Update target batch size dynamically based on actual data size

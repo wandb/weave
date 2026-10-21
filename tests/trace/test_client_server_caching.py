@@ -1,4 +1,6 @@
+import dataclasses
 import datetime
+import json
 import os
 import random
 import sys
@@ -15,6 +17,9 @@ import weave
 from tests.conftest import CachingMiddlewareTraceServer
 from tests.trace.server_utils import find_server_layer
 from weave.trace import weave_client
+from weave.trace_server_bindings.caching_middleware_trace_server import (
+    _obj_create_cache_key,
+)
 from weave.trace_server_bindings.client_interface import TraceServerClientInterface
 from weave.trace_server_bindings.models import EnsureProjectExistsRes
 from weave.vendor.weave_server_sdk.types import ObjectReadParams, ObjectReadResponse
@@ -806,3 +811,17 @@ def test_invalidation_prefix_is_prefix_of_cache_key(form):
         f"  prefix: {create_prefix}\n"
         f"  key:    {create_full_key}"
     )
+
+
+@dataclasses.dataclass
+class _CachePayload:
+    n: int
+
+
+def test_obj_create_cache_key_accepts_a_dataclass_value():
+    """A dict-form request whose value holds a dataclass still gets a cache key."""
+    key = _obj_create_cache_key(
+        {"obj": {"project_id": "e/p", "object_id": "o", "val": {"x": _CachePayload(1)}}}
+    )
+
+    assert json.loads(key)["obj"]["val"] == {"x": {"n": 1}}

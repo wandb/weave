@@ -6,6 +6,7 @@ from unittest.mock import Mock
 
 import httpx
 import pytest
+from pydantic_core import to_json
 
 from weave.trace.errors import NotFoundError, ObjectDeletedError
 from weave.trace_server_bindings import http_utils
@@ -205,6 +206,54 @@ def test_5xx_requeues_batch_without_splitting(error):
 
     assert len(sent) == 1
     processor.enqueue.assert_called_once_with([1, 2, 3, 4])
+
+
+def _encode_failing_on(bad: object, error: Exception):
+    """An encoder that raises `error` for any batch holding `bad`."""
+
+    def encode(batch: list) -> bytes:
+        if any(item is bad for item in batch):
+            raise error
+        return to_json(batch)
+
+    return encode
+
+
+@pytest.mark.parametrize(
+    "make_encoder",
+    [
+        pytest.param(lambda bad: to_json, id="pydantic-serialization-error"),
+        pytest.param(
+            lambda bad: _encode_failing_on(bad, TypeError("not serializable")),
+            id="type-error",
+        ),
+        pytest.param(
+            lambda bad: _encode_failing_on(bad, ValueError("out of range")),
+            id="value-error",
+        ),
+    ],
+)
+def test_unserializable_item_is_dropped_alone_without_requeue(make_encoder):
+    """An item whose value cannot be encoded is dropped; the rest is sent."""
+    processor = Mock()
+    processor.is_accepting_new_work.return_value = True
+    sent: list[bytes] = []
+    dropped: list[list] = []
+    bad = object()
+
+    process_batch_with_retry(
+        ["good-1", bad, "good-2"],
+        batch_name="test",
+        remote_request_bytes_limit=100_000,
+        send_batch_fn=sent.append,
+        processor_obj=processor,
+        log_dropped_fn=lambda batch, e: dropped.append(batch),
+        encode_batch_fn=make_encoder(bad),
+    )
+
+    assert sent == [b'["good-1"]', b'["good-2"]']
+    assert dropped == [[bad]]
+    processor.enqueue.assert_not_called()
 
 
 def _send_rejecting(bad: set[int], sent: list[list[int]]):
