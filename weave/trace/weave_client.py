@@ -366,7 +366,9 @@ def _build_agent_spans_query(
     if wire_query is None:
         return {"$expr": agent_expr}
     if "$expr" not in wire_query:
-        Query.model_validate(wire_query)
+        # A Query dumped without aliases carries `expr_`; validate it and
+        # dump it back with aliases (or reject it when no expression exists).
+        wire_query = Query.model_validate(wire_query).model_dump(by_alias=True)
     return {"$expr": {"$and": [agent_expr, wire_query["$expr"]]}}
 
 

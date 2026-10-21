@@ -387,6 +387,12 @@ def test_iterator_method_builds_request(method, kind, builder, kwargs, expected)
             {"$expr": {"$and": [AGENT_NAME_EXPR, GT_EXPR]}},
             id="agent_name_and_wire_form_query",
         ),
+        pytest.param(
+            "my-agent",
+            Query.model_validate({"$expr": GT_EXPR}).model_dump(),
+            {"$expr": {"$and": [AGENT_NAME_EXPR, GT_EXPR]}},
+            id="agent_name_and_model_dump_query_without_alias",
+        ),
     ],
 )
 def test_get_agent_spans_query_translation(agent_name, query, expected_query):
