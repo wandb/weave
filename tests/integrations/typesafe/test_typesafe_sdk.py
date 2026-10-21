@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import json
 from collections.abc import Awaitable, Callable, Generator, Sequence
+from importlib.metadata import version
 from typing import Any
 
 import httpx2
@@ -18,6 +19,7 @@ from opentelemetry.trace import NonRecordingSpan, SpanContext, TraceFlags
 from pydantic import BaseModel
 from typesafe_sdk import (
     AsyncTypeSafeClient,
+    Image,
     Noul,
     RetryPolicy,
     TypeSafeAPIError,
@@ -187,6 +189,7 @@ def test_system_one_records_one_chat_span_under_a_synthetic_turn(
     assert "gen_ai.usage.total_tokens" not in attrs
     assert attrs["integration.name"] == "typesafe"
     assert attrs["integration.meta.package_name"] == "typesafe-sdk"
+    assert attrs["integration.meta.package_version"] == version("typesafe-sdk")
     assert attrs["weave.integration.operation"] == "typesafe.system_one"
     assert "gen_ai.provider.name" not in _attrs(turns[0])
 
@@ -253,6 +256,26 @@ def test_sequence_state_is_recorded_on_the_chat_span(
     client.system_one(_Rows(("a", "b")), _questions())
     message = _messages(_chat(otel_spans), "gen_ai.input.messages")[0]
     assert message["parts"][0] == {"type": "text", "content": '["a", "b"]'}
+
+
+def test_image_is_recorded_as_its_reference(otel_spans: InMemorySpanExporter) -> None:
+    image = Image(b"\x89PNG\r\n\x1a\nimage-bytes")
+    client = _client(lambda request: _response())
+
+    client.system_one({"photo": image}, _questions())
+    client.system_one(image, {"billing": Noul(instructions=image)})
+
+    first, second = _by_op(otel_spans.get_finished_spans(), "chat")
+    assert _messages(first, "gen_ai.input.messages")[0]["parts"][0] == {
+        "type": "text",
+        "content": json.dumps({"photo": str(image)}),
+    }
+    assert _messages(second, "gen_ai.input.messages") == [
+        {"role": "user", "parts": [{"type": "text", "content": str(image)}]}
+    ]
+    assert json.loads(_attrs(second)["typesafe.questions"]) == [
+        {"id": "billing", "instructions": str(image), "type": "noul"}
+    ]
 
 
 def test_unencodable_state_does_not_open_a_turn(

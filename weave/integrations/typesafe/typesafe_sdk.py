@@ -19,6 +19,7 @@ from typing import Any
 
 from opentelemetry import trace as otel_trace
 from opentelemetry.trace import Status, StatusCode
+from pydantic_core import to_jsonable_python
 
 from weave.conversation import (
     LLM,
@@ -187,15 +188,17 @@ def _jsonable(value: Any) -> Any:
     # The SDK accepts any Sequence and encodes it as a JSON array.
     if isinstance(value, Sequence) and not isinstance(value, (str, bytes, bytearray)):
         return [_jsonable(item) for item in value]
-    return value
+    # An Image becomes its reference, the text the SDK puts in the JSON body.
+    return to_jsonable_python(value)
 
 
 def _state_message(state: Any) -> Message:
-    if isinstance(state, str):
-        return Message(role="user", content=state)
+    value = _jsonable(state)
+    if isinstance(value, str):
+        return Message(role="user", content=value)
     return Message(
         role="user",
-        parts=[TextPart(content=json.dumps(_jsonable(state), sort_keys=True))],
+        parts=[TextPart(content=json.dumps(value, sort_keys=True))],
     )
 
 
