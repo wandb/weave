@@ -20,7 +20,11 @@ import requests
 import tenacity
 from pydantic import BaseModel, ValidationError
 
-from tests.trace_server_bindings.conftest import generate_id, generate_start
+from tests.trace_server_bindings.conftest import (
+    generate_end,
+    generate_id,
+    generate_start,
+)
 from weave.trace.display.term import configure_logger
 from weave.trace.refs import ObjectRef
 from weave.trace.weave_client import WeaveClient
@@ -136,6 +140,37 @@ def test_invalid_no_retry(unbatched_server):
     """Test that validation errors are not retried."""
     with pytest.raises(ValidationError):
         unbatched_server.call_start(tsi.CallStartReq(start={"invalid": "broken"}))
+
+
+@pytest.mark.parametrize("should_batch", [False, True], ids=["unbatched", "batched"])
+def test_a_bad_dict_start_or_end_is_rejected_before_it_is_sent(should_batch):
+    """A start or end passed as a dict with a bad field fails like a request model did."""
+    requests: list[httpx.Request] = []
+
+    def handle(request: httpx.Request) -> httpx.Response:
+        requests.append(request)
+        return httpx.Response(200, json={}, request=request)
+
+    server = StainlessRemoteHTTPTraceServer(
+        "http://example.com", should_batch=should_batch
+    )
+    server._stainless_client = server._stainless_client.copy(
+        http_client=httpx.Client(transport=httpx.MockTransport(handle))
+    )
+    start = {**generate_start("call-id").model_dump(), "display_name": 5}
+    end = {**generate_end("call-id").model_dump(), "exception": 5}
+    try:
+        with pytest.raises(ValidationError):
+            server.call_start({"start": start})
+        with pytest.raises(ValidationError):
+            server.call_end({"end": end})
+    finally:
+        if server.call_processor:
+            server.call_processor.stop_accepting_new_work_and_flush_queue()
+        if server.feedback_processor:
+            server.feedback_processor.stop_accepting_new_work_and_flush_queue()
+
+    assert requests == []
 
 
 @pytest.mark.disable_logging_error_check
