@@ -5,8 +5,11 @@ from __future__ import annotations
 import asyncio
 import json
 from collections.abc import Awaitable, Callable, Generator, Sequence
+from datetime import datetime
+from decimal import Decimal
 from importlib.metadata import version
 from typing import Any
+from uuid import UUID
 
 import httpx2
 import pytest
@@ -292,6 +295,33 @@ def test_generator_state_reaches_the_sdk_unconsumed(
     _client(handler).system_one((row for row in ("a", "b")), _questions())
 
     assert seen["state"] == ["a", "b"]
+
+
+def test_datetime_uuid_and_decimal_state_is_recorded_as_sent(
+    otel_spans: InMemorySpanExporter,
+) -> None:
+    seen: dict[str, Any] = {}
+
+    def handler(request: httpx2.Request) -> httpx2.Response:
+        seen["state"] = json.loads(request.content)["state"]
+        return _response()
+
+    state = {
+        "amount": Decimal("1.50"),
+        "id": UUID(int=1),
+        "when": datetime(2026, 10, 21),
+    }
+    _client(handler).system_one(state, _questions())
+
+    sent = {
+        "amount": "1.50",
+        "id": "00000000-0000-0000-0000-000000000001",
+        "when": "2026-10-21T00:00:00",
+    }
+    assert seen["state"] == sent
+    assert _messages(_chat(otel_spans), "gen_ai.input.messages") == [
+        {"role": "user", "parts": [{"type": "text", "content": json.dumps(sent)}]}
+    ]
 
 
 def test_unencodable_state_does_not_open_a_turn(
