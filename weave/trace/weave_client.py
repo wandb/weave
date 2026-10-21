@@ -3425,10 +3425,9 @@ class WeaveClient:
             try:
                 return self.server.file_create(req)
             except Exception as e:
-                if (
-                    req.get("expected_digest") is None
-                    or not ProjectIdResolver.is_digest_validation_error(e)
-                ):
+                if req.get(
+                    "expected_digest"
+                ) is None or not ProjectIdResolver.is_digest_validation_error(e):
                     raise
                 self._handle_digest_mismatch(e, f"file://{name}")
                 req["expected_digest"] = None
