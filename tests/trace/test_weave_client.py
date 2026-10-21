@@ -74,6 +74,7 @@ from weave.trace_server_bindings.http_utils import (
 from weave.trace_server_bindings.stainless_remote_http_trace_server import (
     StainlessRemoteHTTPTraceServer,
 )
+from weave.vendor.weave_server_sdk import UnprocessableEntityError
 
 
 @pytest.mark.flaky(reruns=3, reruns_delay=0.2)
@@ -774,7 +775,8 @@ def test_delete_calls(client):
     assert len(calls) == 1
     assert calls[0].id == call_2_id
 
-    with pytest.raises(ValueError, match="validation error"):
+    # The server rejects a call id that is not a string.
+    with pytest.raises(UnprocessableEntityError):
         client.delete_calls([1111111111111111])
 
     client.delete_calls([call_2_id])
