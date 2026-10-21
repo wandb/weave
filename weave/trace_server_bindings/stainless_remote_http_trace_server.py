@@ -1402,6 +1402,10 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
                 wb_user_id=params.get("wb_user_id") or "",
                 payload=params["payload"],
             )
+            # Snapshot the payload so a caller's later edits do not reach the queue.
+            params["payload"] = to_jsonable_python(
+                params["payload"], inf_nan_mode="null"
+            )
             self.feedback_processor.enqueue([params])
             return res
         else:

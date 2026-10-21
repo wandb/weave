@@ -564,6 +564,29 @@ def test_batched_feedback_that_fails_on_the_client_is_not_sent():
     assert [item["payload"] for item in batch] == [{"note": "ok"}]
 
 
+def test_batched_feedback_keeps_the_payload_as_passed():
+    """Editing the payload after feedback_create and before the flush changes nothing sent."""
+    payload = {"note": "submitted", "scores": {"quality": 1}}
+    with _batching_server(_ok) as (server, requests):
+        res = server.feedback_create(
+            {
+                "project_id": PROJECT,
+                "weave_ref": f"weave:///{PROJECT}/call/call-id",
+                "feedback_type": "note",
+                "payload": payload,
+            }
+        )
+        payload["note"] = "reused"
+        payload["scores"]["quality"] = 0
+        assert server.feedback_processor is not None
+        server.feedback_processor.stop_accepting_new_work_and_flush_queue()
+
+    (request,) = requests
+    (sent,) = json.loads(request.read())["batch"]
+    assert sent["payload"] == {"note": "submitted", "scores": {"quality": 1}}
+    assert res.payload["note"] == "submitted"
+
+
 def test_feedback_payload_keeps_nested_model_defaults():
     """Unbatched, batched and replace sends carry a nested model's default fields."""
 
