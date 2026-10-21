@@ -188,8 +188,10 @@ def _jsonable(value: Any) -> Any:
     # The SDK accepts any Sequence and encodes it as a JSON array.
     if isinstance(value, Sequence) and not isinstance(value, (str, bytes, bytearray)):
         return [_jsonable(item) for item in value]
-    # An Image becomes its reference, the text the SDK puts in the JSON body.
-    return to_jsonable_python(value)
+    # An Image becomes its reference. A generic fallback would consume a generator.
+    if hasattr(value, "__pydantic_serializer__"):
+        return to_jsonable_python(value)
+    return value
 
 
 def _state_message(state: Any) -> Message:

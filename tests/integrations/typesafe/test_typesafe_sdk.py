@@ -266,16 +266,32 @@ def test_image_is_recorded_as_its_reference(otel_spans: InMemorySpanExporter) ->
     client.system_one(image, {"billing": Noul(instructions=image)})
 
     first, second = _by_op(otel_spans.get_finished_spans(), "chat")
-    assert _messages(first, "gen_ai.input.messages")[0]["parts"][0] == {
-        "type": "text",
-        "content": json.dumps({"photo": str(image)}),
-    }
+    assert _messages(first, "gen_ai.input.messages") == [
+        {
+            "role": "user",
+            "parts": [{"type": "text", "content": json.dumps({"photo": str(image)})}],
+        }
+    ]
     assert _messages(second, "gen_ai.input.messages") == [
         {"role": "user", "parts": [{"type": "text", "content": str(image)}]}
     ]
     assert json.loads(_attrs(second)["typesafe.questions"]) == [
         {"id": "billing", "instructions": str(image), "type": "noul"}
     ]
+
+
+def test_generator_state_reaches_the_sdk_unconsumed(
+    otel_spans: InMemorySpanExporter,
+) -> None:
+    seen: dict[str, Any] = {}
+
+    def handler(request: httpx2.Request) -> httpx2.Response:
+        seen["state"] = json.loads(request.content)["state"]
+        return _response()
+
+    _client(handler).system_one((row for row in ("a", "b")), _questions())
+
+    assert seen["state"] == ["a", "b"]
 
 
 def test_unencodable_state_does_not_open_a_turn(
