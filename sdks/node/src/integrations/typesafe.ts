@@ -43,6 +43,8 @@ const CAPTURE_ENV = 'OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT';
 const CAPTURE_OFF = new Set(['0', 'false', 'no', 'off']);
 const HTTP_STATUS = 'http.response.status_code';
 const PATCHED = Symbol.for('weave.typesafe.patched');
+// Set by the module hook. wrapTypeSafe alone cannot see the SDK version.
+const SDK_VERSION = Symbol.for('weave.typesafe.version');
 const barriers = new WeakSet<object>();
 const BARRIER_METHODS = [
   'then',
@@ -61,9 +63,6 @@ function integrationAttributes(packageVersion?: string) {
     })
   );
 }
-
-// The module hook sets the version. wrapTypeSafe alone cannot see the module.
-let integrationAttrs = integrationAttributes();
 
 const captureSettings = new WeakMap<object, boolean>();
 
@@ -136,7 +135,7 @@ function sortValue(value: unknown): unknown {
 }
 
 function stateMessage(state: unknown): Message {
-  // An image or withAssets text becomes the string the SDK sends.
+  // An image or withAssets text is recorded as its string form.
   const value = sortValue(state);
   if (typeof value === 'string') {
     return {role: 'user', content: value};
@@ -220,11 +219,13 @@ function responseModel(body: unknown): string | undefined {
   return typeof model === 'string' && model ? model : undefined;
 }
 
-function stampProvenance(span: {
-  setAttributes(attributes: Attributes): unknown;
-}): void {
+function stampProvenance(
+  span: {setAttributes(attributes: Attributes): unknown},
+  client: object
+): void {
+  const version = (client as Record<symbol, unknown>)[SDK_VERSION];
   span.setAttributes({
-    ...integrationAttrs,
+    ...integrationAttributes(typeof version === 'string' ? version : undefined),
     'weave.integration.operation': OPERATION,
   });
 }
@@ -339,9 +340,9 @@ function openTrace(
     if (state) {
       llm.inputMessages = [state];
     }
-    stampProvenance(llm);
+    stampProvenance(llm, client);
     if (ownsTurn) {
-      stampProvenance(turn);
+      stampProvenance(turn, client);
     }
     if (questions !== undefined) {
       llm.setAttributes({[QUESTIONS_ATTR]: questions});
@@ -581,7 +582,10 @@ export function patchTypeSafeModule(exports: any): any {
     patchSystemOne(client.prototype);
     const version = exports?.VERSION ?? exports?.default?.VERSION;
     if (typeof version === 'string') {
-      integrationAttrs = integrationAttributes(version);
+      Object.defineProperty(client.prototype, SDK_VERSION, {
+        value: version,
+        configurable: true,
+      });
     }
   }
   return exports;

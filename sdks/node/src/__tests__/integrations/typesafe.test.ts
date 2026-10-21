@@ -30,6 +30,7 @@ import {
 const CAPTURE_ENV = 'OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT';
 const SECRET = 'SECRET_BODY_xyz';
 const PATCHED = Symbol.for('weave.typesafe.patched');
+const SDK_VERSION = Symbol.for('weave.typesafe.version');
 
 const questions = {
   billing: noul('Is this about billing?'),
@@ -120,6 +121,7 @@ describe('TypeSafe systemOne spans', () => {
   afterEach(() => {
     TypeSafeClient.prototype.systemOne = originalSystemOne;
     delete (TypeSafeClient.prototype as any)[PATCHED];
+    delete (TypeSafeClient.prototype as any)[SDK_VERSION];
     if (previousCapture === undefined) {
       delete process.env[CAPTURE_ENV];
     } else {
