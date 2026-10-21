@@ -16,6 +16,7 @@ import datetime
 import json
 
 import pytest
+from pydantic import ValidationError
 
 from weave.trace.weave_client import WeaveClient
 from weave.trace_server.interface.query import Query
@@ -386,6 +387,12 @@ def test_iterator_method_builds_request(method, kind, builder, kwargs, expected)
             {"$expr": {"$and": [AGENT_NAME_EXPR, GT_EXPR]}},
             id="agent_name_and_wire_form_query",
         ),
+        pytest.param(
+            "my-agent",
+            Query.model_validate({"$expr": GT_EXPR}).model_dump(),
+            {"$expr": {"$and": [AGENT_NAME_EXPR, GT_EXPR]}},
+            id="agent_name_and_model_dump_query_without_alias",
+        ),
     ],
 )
 def test_get_agent_spans_query_translation(agent_name, query, expected_query):
@@ -398,3 +405,16 @@ def test_get_agent_spans_query_translation(agent_name, query, expected_query):
     assert req["project_id"] == "entity/project"
     # A query model dumps its operands as tuples; the request encodes them as lists.
     assert json.loads(json.dumps(req["query"])) == expected_query
+
+
+@pytest.mark.parametrize("query", [{}, {"nope": 1}])
+@pytest.mark.trace_server
+def test_get_agent_spans_rejects_query_missing_expr(query):
+    server = FakePagingAgentServer()
+    client = _make_client(server)
+
+    with pytest.raises(ValidationError) as exc_info:
+        client.get_agent_spans(agent_name="x", query=query)
+
+    assert any(err["loc"] == ("$expr",) for err in exc_info.value.errors())
+    assert server.requests == {}
