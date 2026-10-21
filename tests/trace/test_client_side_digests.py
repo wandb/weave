@@ -32,7 +32,9 @@ from weave.trace.weave_client import (
 )
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.errors import DigestMismatchError
-from weave.trace_server_bindings.remote_http_trace_server import RemoteHTTPTraceServer
+from weave.trace_server_bindings.stainless_remote_http_trace_server import (
+    StainlessRemoteHTTPTraceServer,
+)
 
 
 def _configure_digests(client: WeaveClient, *, enable: bool) -> None:
@@ -411,7 +413,7 @@ class TestConvertRefsToInternal:
         """
         # Spy on obj_create to capture expected_digest values
         captured: list[str | None] = []
-        adapter = find_server_layer(client.server, RemoteHTTPTraceServer)
+        adapter = find_server_layer(client.server, StainlessRemoteHTTPTraceServer)
         original = type(adapter).obj_create
 
         def spy(self, req):
@@ -450,7 +452,7 @@ class TestDigestMismatchAutoDisable:
         """First obj_create with expected_digest fails; client retries without
         it and disables fast path for subsequent saves.
         """
-        adapter = find_server_layer(client.server, RemoteHTTPTraceServer)
+        adapter = find_server_layer(client.server, StainlessRemoteHTTPTraceServer)
         original = adapter.obj_create
         seen_digests: list[str | None] = []
         injected = False
@@ -485,7 +487,7 @@ class TestDigestMismatchAutoDisable:
         self, client: WeaveClient, fast_path: None, monkeypatch
     ) -> None:
         """Table digest mismatch retries and disables fast path."""
-        adapter = find_server_layer(client.server, RemoteHTTPTraceServer)
+        adapter = find_server_layer(client.server, StainlessRemoteHTTPTraceServer)
         original = adapter.table_create
         injected = False
 
@@ -514,7 +516,7 @@ class TestDigestMismatchAutoDisable:
         self, client: WeaveClient, fast_path: None, monkeypatch
     ) -> None:
         """File digest mismatch retries and disables fast path."""
-        adapter = find_server_layer(client.server, RemoteHTTPTraceServer)
+        adapter = find_server_layer(client.server, StainlessRemoteHTTPTraceServer)
         original = adapter.file_create
         injected = False
 

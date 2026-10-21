@@ -2068,6 +2068,66 @@ def test_table_partitioning(network_proxy_client, use_parallel_table_upload):
         assert len(records) == 6, f"Expected 6 total records, got {len(records)}"
 
 
+@pytest.mark.timeout(60)
+@pytest.mark.flaky(reruns=3, reruns_delay=2)
+@pytest.mark.parametrize("use_parallel_table_upload", [False, True])
+def test_table_partitioning_on_the_generated_client(
+    client, stainless_recording_server, use_parallel_table_upload
+):
+    """test_table_partitioning, for the client users get by default.
+
+    The server must compute the same digests from what the generated client
+    sends, through the same requests.
+    """
+    remote_client, paths = stainless_recording_server
+    settings.replace_settings(
+        settings.UserSettings(use_parallel_table_upload=use_parallel_table_upload)
+    )
+
+    rows = list(row_gen(16, 1024))
+    exp_digest = "15696550bde28f9231173a085ce107c823e7eab6744a97adaa7da55bc9c93347"
+    # A buffer large enough for a single request.
+    remote_client.remote_request_bytes_limit = 100 * 1024
+    res = remote_client.table_create(
+        tsi.TableCreateReq(
+            table=tsi.TableSchemaForInsert(project_id=client.project_id, rows=rows)
+        )
+    )
+    assert res.digest == exp_digest
+    assert paths == ["/table/create"]
+
+    # Small enough to turn on chunking.
+    remote_client.remote_request_bytes_limit = 4 * 1024
+    paths.clear()
+    remote_weave_client = TestOnlyFlushingWeaveClient(
+        entity=client.entity,
+        project=client.project,
+        server=remote_client,
+        ensure_project_exists=False,
+    )
+    remote_weave_client.set_autoflush(False)
+    # The probe is made only once per process; clear it so the paths are the same
+    # whatever ran before.
+    _ENDPOINT_CACHE.discard("table_create_from_digests")
+
+    saved_table = remote_weave_client.save(weave_client.Table(rows), "table")
+    remote_weave_client.flush()
+
+    assert saved_table.table_ref._digest == exp_digest
+    # Chunks are cut at TARGET_CHUNK_BYTES, so this table is one chunk either way.
+    if use_parallel_table_upload:
+        # The chunk, the endpoint probe, the merge of the chunks, then the object.
+        assert sorted(paths) == [
+            "/obj/create",
+            "/obj/read",
+            "/table/create",
+            "/table/create_from_digests",
+            "/table/create_from_digests",
+        ]
+    else:
+        assert sorted(paths) == ["/obj/create", "/obj/read", "/table/create"]
+
+
 def test_parallel_chunk_probe_works_for_the_generated_client(client, monkeypatch):
     """The probe must work for any client, not just the hand-written one.
 
@@ -4675,6 +4735,57 @@ def test_feedback_batching(network_proxy_client):
         assert feedback.feedback_type == f"test_feedback_{i}"
         assert feedback.payload["score"] == i
         assert feedback.payload["note"] == f"Test feedback {i}"
+
+
+def test_feedback_batching_on_the_generated_client(client, stainless_recording_server):
+    """test_feedback_batching, for the client users get by default."""
+    remote_client, paths = stainless_recording_server
+    remote_weave_client = TestOnlyFlushingWeaveClient(
+        entity=client.entity,
+        project=client.project,
+        server=remote_client,
+        ensure_project_exists=False,
+    )
+    remote_weave_client.set_autoflush(False)
+
+    @weave.op
+    def test_op(x: int) -> int:
+        return x * 2
+
+    test_op(5)
+    client.flush()
+    test_call = remote_weave_client.get_calls()[0]
+    paths.clear()
+
+    # Feedback goes through the global client, so make the recording one global.
+    # The setter only replaces an unset client, hence the None first.
+    weave_client_context.set_weave_client_global(None)
+    weave_client_context.set_weave_client_global(remote_weave_client)
+    try:
+        feedback_ids = [
+            test_call.feedback.add(
+                feedback_type=f"test_feedback_{i}",
+                payload={"score": i, "note": f"Test feedback {i}"},
+            )
+            for i in range(10)
+        ]
+        remote_weave_client.flush()
+    finally:
+        weave_client_context.set_weave_client_global(None)
+        weave_client_context.set_weave_client_global(client)
+
+    assert remote_client.get_feedback_processor() is not None
+    assert "/feedback/create" not in paths
+    assert "/feedback/batch/create" in paths
+    created_feedback = sorted(
+        (f for f in test_call.feedback if f.feedback_type.startswith("test_feedback_")),
+        key=lambda f: f.feedback_type,
+    )
+    assert sorted(f.id for f in created_feedback) == sorted(feedback_ids)
+    assert [(f.feedback_type, f.payload) for f in created_feedback] == [
+        (f"test_feedback_{i}", {"score": i, "note": f"Test feedback {i}"})
+        for i in range(10)
+    ]
 
 
 @pytest.mark.disable_logging_error_check

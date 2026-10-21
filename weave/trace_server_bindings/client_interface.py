@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING, Any, Protocol
 
 from weave.trace_server_bindings.models import (
     CallsQueryRes,
+    DatasetSourcesLinkDeleteRes,
     EnsureProjectExistsRes,
     FileContentReadRes,
 )
@@ -515,8 +516,8 @@ class TraceServerClientInterface(Protocol):
     ) -> DatasetSourceLinkResponse: ...
 
     def dataset_sources_link_delete(
-        self, req: tsi.DatasetSourcesLinkDeleteReq
-    ) -> tsi.DatasetSourcesLinkDeleteRes: ...
+        self, req: Mapping[str, Any] | tsi.DatasetSourcesLinkDeleteReq
+    ) -> DatasetSourcesLinkDeleteRes: ...
 
     def dataset_sources_query(
         self, req: DatasetSourceQueryParams | tsi.DatasetSourcesQueryReq
