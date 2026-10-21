@@ -369,7 +369,9 @@ def _build_agent_spans_query(
         # A Query dumped without aliases carries `expr_`; validate it and
         # dump it back with aliases (or reject it when no expression exists).
         wire_query = Query.model_validate(wire_query).model_dump(by_alias=True)
-    return {"$expr": {"$and": [agent_expr, wire_query["$expr"]]}}
+    # Keep any other top-level keys so the server sees (and rejects) them,
+    # exactly as it does when no `agent_name` is given.
+    return {**wire_query, "$expr": {"$and": [agent_expr, wire_query["$expr"]]}}
 
 
 _AgentListItemT = TypeVar("_AgentListItemT")
