@@ -448,7 +448,7 @@ def main(argv: list[str] | None = None) -> None:
 
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
 
-    # RemoteHTTPTraceServer is missing a few abstract methods that the
+    # RemoteHTTPTraceServer is missing a few protocol methods that the
     # WAL sender doesn't use.  Suppress via Any intermediate.
     remote_cls: Any = RemoteHTTPTraceServer
     server: TraceServerClientInterface = remote_cls(

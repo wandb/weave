@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 import os
 from collections.abc import Mapping
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 import requests
 
@@ -465,7 +465,7 @@ def init_weave_get_server(
     credentials: WandbCredentials | None = None,
     should_batch: bool = True,
 ) -> TraceServerClientInterface:
-    res: TraceServerClientInterface
+    res: StainlessRemoteHTTPTraceServer | RemoteHTTPTraceServer
     if should_use_stainless_server():
         from weave.trace_server_bindings.stainless_remote_http_trace_server import (
             StainlessRemoteHTTPTraceServer,
@@ -476,7 +476,9 @@ def init_weave_get_server(
         res = RemoteHTTPTraceServer.from_env(should_batch)
     if credentials is not None:
         res.set_auth(credentials)
-    return res
+    # The legacy binding is frozen on the weave.shared types and lacks a few
+    # methods, so it is not checked against the protocol.
+    return cast(TraceServerClientInterface, res)
 
 
 def finish() -> None:
