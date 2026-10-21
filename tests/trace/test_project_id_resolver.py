@@ -6,10 +6,12 @@ import logging
 from concurrent.futures import Future
 from unittest.mock import MagicMock
 
+import httpx
 import pytest
 
 from weave.trace.errors import DigestMismatchError
 from weave.trace.project_id_resolver import ProjectIdResolver, ResolverDisabledError
+from weave.vendor.weave_server_sdk import APIStatusError
 
 
 @pytest.fixture(autouse=True)
@@ -135,6 +137,27 @@ class TestOnFireAndForgetDone:
         resolver = _make_resolver("int-abc")
         future: Future = Future()
         future.set_exception(DigestMismatchError("mismatch"))
+
+        resolver.on_fire_and_forget_done(future, ref_uri="weave:///a/b/obj")
+
+        assert resolver.is_disabled
+
+    @pytest.mark.parametrize("client", ["httpx", "stainless"])
+    def test_disables_on_http_409(self, client: str) -> None:
+        """Both remote clients' 409 errors count, though neither subclasses the other."""
+        response = httpx.Response(
+            409, request=httpx.Request("POST", "http://example.com/obj/create")
+        )
+        exc: Exception
+        if client == "httpx":
+            exc = httpx.HTTPStatusError(
+                "409", request=response.request, response=response
+            )
+        else:
+            exc = APIStatusError("409", response=response, body=None)
+        resolver = _make_resolver("int-abc")
+        future: Future = Future()
+        future.set_exception(exc)
 
         resolver.on_fire_and_forget_done(future, ref_uri="weave:///a/b/obj")
 

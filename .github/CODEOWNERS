@@ -5,12 +5,12 @@
 # The trace server implementation moved to wandb/core. These owners stay so
 # that a PR adding files under the old paths needs their review and does not
 # quietly recreate the deleted code.
-/weave/trace_server/ @ro31337 @andrewtruong @rgao-coreweave
-/weave/shared/ @ro31337 @andrewtruong @rgao-coreweave
-/tests/trace_server/ @ro31337 @andrewtruong @rgao-coreweave
-/tests/trace_server_migrator/ @ro31337 @andrewtruong @rgao-coreweave
+/weave/trace_server/ @wandb/weave-sdk
+/weave/shared/ @wandb/weave-sdk
+/tests/trace_server/ @wandb/weave-sdk
+/tests/trace_server_migrator/ @wandb/weave-sdk
 
 # The builtin object classes moved here from weave/shared, and the trace server
 # in wandb/core has its own copy. These owners make sure that a change here that
 # the server needs is made in core too.
-/weave/trace/builtin_object_classes/ @ro31337 @andrewtruong @rgao-coreweave
+/weave/trace/builtin_object_classes/ @wandb/weave-sdk

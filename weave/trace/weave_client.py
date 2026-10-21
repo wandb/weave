@@ -13,7 +13,6 @@ from functools import cached_property
 from typing import TYPE_CHECKING, Any, TypedDict, TypeVar, cast
 
 import pydantic
-from httpx import HTTPStatusError as HTTPError
 from pydantic_core import to_jsonable_python
 
 from weave.chat.chat import Chat
@@ -21,6 +20,7 @@ from weave.chat.inference_models import InferenceModels
 from weave.durability.wal_manager import WALManager
 from weave.telemetry import trace_sentry
 from weave.trace import settings
+from weave.trace.builtin_object_classes.query import Query
 from weave.trace.call import (
     DEFAULT_CALLS_PAGE_SIZE,
     Call,
@@ -168,6 +168,7 @@ from weave.utils.exception import exception_to_json_str
 from weave.utils.ids import generate_id
 from weave.utils.paginated_iterator import PaginatedIterator
 from weave.utils.project_id import from_project_id, to_project_id
+from weave.utils.retry import _http_response
 from weave.utils.sanitize import REDACTED_VALUE, redact_dataclass_fields, should_redact
 from weave.vendor.weave_server_sdk.types import (
     AgentSearchResponse,
@@ -232,7 +233,6 @@ except ImportError:
 
 if TYPE_CHECKING:
     from weave.evaluation.eval import Evaluation
-    from weave.trace.builtin_object_classes.query import Query
 
 # Controls if objects can have refs to projects not the WeaveClient project.
 # If False, object refs with with mismatching projects will be recreated.
@@ -353,6 +353,10 @@ def _build_agent_spans_query(
     agent_expr = {"$eq": [{"$getField": "agent_name"}, {"$literal": agent_name}]}
     if wire_query is None:
         return {"$expr": agent_expr}
+    if "$expr" not in wire_query:
+        # A Query dumped without aliases carries `expr_`; validate it and
+        # dump it back with aliases (or reject it when no expression exists).
+        wire_query = Query.model_validate(wire_query).model_dump(by_alias=True)
     return {"$expr": {"$and": [agent_expr, wire_query["$expr"]]}}
 
 
@@ -686,11 +690,13 @@ class WeaveClient:
                     "include_tags_and_aliases": False,
                 }
             )
-        except HTTPError as e:
-            if e.response is not None:
+        except Exception as e:
+            # The Stainless client's APIStatusError is not an httpx.HTTPStatusError.
+            response = _http_response(e)
+            if response is not None:
                 raise ValueError(
                     format_http_error(
-                        e.response,
+                        response,
                         f"Unable to read object for ref uri: {ref.uri}",
                     )
                 ) from None
@@ -711,8 +717,9 @@ class WeaveClient:
         if ref.extra:
             try:
                 ref_read_res = self.server.refs_read_batch({"refs": [ref.uri]})
-            except HTTPError as e:
-                if e.response is not None and e.response.status_code == 404:
+            except Exception as e:
+                response = _http_response(e)
+                if response is not None and response.status_code == 404:
                     raise ValueError(
                         f"Unable to find object for ref uri: {ref.uri}"
                     ) from None
@@ -2837,23 +2844,17 @@ class WeaveClient:
         """
         self.project_id_resolver.get_internal_project_id(self.project_id)
 
-    def _handle_digest_mismatch(
-        self, e: DigestMismatchError | HTTPError, label: str
-    ) -> None:
+    def _handle_digest_mismatch(self, e: Exception, label: str) -> None:
         """If *e* is a digest-mismatch error, disable client-side digests.
 
         Raises the original exception if it is NOT a digest mismatch
-        (e.g. an HTTPError with a non-409 status code).
+        (e.g. an HTTP error with a non-409 status code).
         """
         # DigestMismatchError: raised directly by in-process servers (ClickHouse).
         is_local_mismatch = isinstance(e, DigestMismatchError)
-        # HTTPError 409: the remote server returned HTTP 409 Conflict for a
-        # digest mismatch.
-        is_remote_mismatch = (
-            isinstance(e, HTTPError)
-            and e.response is not None
-            and e.response.status_code == 409
-        )
+        # HTTP 409 from the remote client: the server rejected expected_digest.
+        response = _http_response(e)
+        is_remote_mismatch = response is not None and response.status_code == 409
         is_mismatch = is_local_mismatch or is_remote_mismatch
         if is_mismatch:
             self.project_id_resolver.disable_after_validation_error(e, label)
@@ -3007,8 +3008,11 @@ class WeaveClient:
             }
             try:
                 return self.server.obj_create(req)
-            except (DigestMismatchError, HTTPError) as e:
-                if expected_digest is None:
+            except Exception as e:
+                if (
+                    expected_digest is None
+                    or not ProjectIdResolver.is_digest_validation_error(e)
+                ):
                     raise
                 self._handle_digest_mismatch(
                     e, f"weave:///{self.entity}/{self.project}/object/{name}"
@@ -3090,8 +3094,11 @@ class WeaveClient:
         }
         try:
             return self.server.table_create(req)
-        except (DigestMismatchError, HTTPError) as e:
-            if expected_digest is None:
+        except Exception as e:
+            if (
+                expected_digest is None
+                or not ProjectIdResolver.is_digest_validation_error(e)
+            ):
                 raise
             self._handle_digest_mismatch(e, f"table in {self.project_id}")
             req["table"]["expected_digest"] = None
@@ -3227,8 +3234,11 @@ class WeaveClient:
             }
             try:
                 create_res = self.server.table_create_from_digests(create_req)
-            except (DigestMismatchError, HTTPError) as e:
-                if expected_digest is None:
+            except Exception as e:
+                if (
+                    expected_digest is None
+                    or not ProjectIdResolver.is_digest_validation_error(e)
+                ):
                     raise
                 self._handle_digest_mismatch(e, "table_create_from_digests")
                 create_req["expected_digest"] = None
@@ -3412,8 +3422,10 @@ class WeaveClient:
         def file_create_with_fallback() -> FileCreateResponse:
             try:
                 return self.server.file_create(req)
-            except (DigestMismatchError, HTTPError) as e:
-                if req.get("expected_digest") is None:
+            except Exception as e:
+                if req.get(
+                    "expected_digest"
+                ) is None or not ProjectIdResolver.is_digest_validation_error(e):
                     raise
                 self._handle_digest_mismatch(e, f"file://{name}")
                 req["expected_digest"] = None

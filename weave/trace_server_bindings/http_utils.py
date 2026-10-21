@@ -138,6 +138,72 @@ def _split_and_process_halves(
         )
 
 
+class _InvalidBatchError(Exception):
+    """The server rejected a batch as invalid (422), and the caller decides what to drop."""
+
+    def __init__(self, error: Exception) -> None:
+        super().__init__(str(error))
+        self.error = error
+
+
+def _split_invalid_batch(
+    batch: list[T],
+    error: Exception,
+    *,
+    batch_name: str,
+    remote_request_bytes_limit: int,
+    send_batch_fn: Callable[[bytes], None],
+    processor_obj: BatchProcessor[T] | None,
+    get_item_id_fn: Callable[[T], str] | None,
+    log_dropped_fn: Callable[[list[T], Exception], None] | None,
+    encode_batch_fn: Callable[[list[T]], bytes],
+) -> None:
+    """Find the items that made the server reject a batch as invalid.
+
+    Each half is sent once. A half the server rejects too is split again, so one
+    bad item is dropped alone. When both halves are rejected, the rejection is
+    most likely about every item, for example a field an older server does not
+    accept, so the batch is dropped instead of being split item by item.
+    """
+    split_idx = len(batch) // 2
+    rejected: list[tuple[list[T], Exception]] = []
+    for half in (batch[:split_idx], batch[split_idx:]):
+        try:
+            process_batch_with_retry(
+                half,
+                batch_name=batch_name,
+                remote_request_bytes_limit=remote_request_bytes_limit,
+                send_batch_fn=send_batch_fn,
+                processor_obj=processor_obj,
+                should_update_batch_size=False,
+                get_item_id_fn=get_item_id_fn,
+                log_dropped_fn=log_dropped_fn,
+                encode_batch_fn=encode_batch_fn,
+                split_invalid=False,
+            )
+        except _InvalidBatchError as e:
+            rejected.append((half, e.error))
+
+    if len(rejected) == 2:
+        _log_dropped_batch(batch, rejected[-1][1], batch_name, log_dropped_fn)
+        return
+    for half, half_error in rejected:
+        if len(half) > 1:
+            _split_invalid_batch(
+                half,
+                half_error,
+                batch_name=batch_name,
+                remote_request_bytes_limit=remote_request_bytes_limit,
+                send_batch_fn=send_batch_fn,
+                processor_obj=processor_obj,
+                get_item_id_fn=get_item_id_fn,
+                log_dropped_fn=log_dropped_fn,
+                encode_batch_fn=encode_batch_fn,
+            )
+        else:
+            _log_dropped_batch(half, half_error, batch_name, log_dropped_fn)
+
+
 def _log_dropped_batch(
     batch: list[T],
     e: Exception,
@@ -166,6 +232,7 @@ def process_batch_with_retry(
     get_item_id_fn: Callable[[T], str] | None = None,
     log_dropped_fn: Callable[[list[T], Exception], None] | None = None,
     encode_batch_fn: Callable[[list[T]], bytes],
+    split_invalid: bool = True,
 ) -> None:
     """Process a batch with common retry and error handling logic.
 
@@ -186,6 +253,9 @@ def process_batch_with_retry(
         get_item_id_fn: Optional function to extract item IDs for debug logging
         log_dropped_fn: Optional function to log dropped batches
         encode_batch_fn: Function to encode the batch into bytes
+        split_invalid: Whether to split a batch the server rejects as invalid.
+            When False, the rejection raises `_InvalidBatchError` instead, so
+            `_split_invalid_batch` can compare the two halves.
     """
     if len(batch) == 0:
         return
@@ -233,6 +303,8 @@ def process_batch_with_retry(
         # too large (413) or invalid (422). Split and retry, so only that item
         # is dropped.
         status_code = _split_status_code(e)
+        if status_code == INVALID_BATCH_STATUS_CODE and not split_invalid:
+            raise _InvalidBatchError(e) from e
         if status_code is not None and len(batch) > 1:
             logger.warning(
                 "Server returned %s for %s batch of %s items, splitting and retrying",
@@ -240,16 +312,19 @@ def process_batch_with_retry(
                 batch_name,
                 len(batch),
             )
-            _split_and_process_halves(
-                batch,
-                batch_name=batch_name,
-                remote_request_bytes_limit=remote_request_bytes_limit,
-                send_batch_fn=send_batch_fn,
-                processor_obj=processor_obj,
-                get_item_id_fn=get_item_id_fn,
-                log_dropped_fn=log_dropped_fn,
-                encode_batch_fn=encode_batch_fn,
-            )
+            split_kwargs: dict[str, Any] = {
+                "batch_name": batch_name,
+                "remote_request_bytes_limit": remote_request_bytes_limit,
+                "send_batch_fn": send_batch_fn,
+                "processor_obj": processor_obj,
+                "get_item_id_fn": get_item_id_fn,
+                "log_dropped_fn": log_dropped_fn,
+                "encode_batch_fn": encode_batch_fn,
+            }
+            if status_code == INVALID_BATCH_STATUS_CODE:
+                _split_invalid_batch(batch, e, **split_kwargs)
+            else:
+                _split_and_process_halves(batch, **split_kwargs)
             return
 
         if not _is_retryable_exception(e):
@@ -386,6 +461,7 @@ def check_endpoint_exists(
 # Too Large and 422 Unprocessable Content. Other 4xx (auth, not found, the
 # calls_complete mode 400) apply to every item, so splitting would not help.
 SPLIT_BATCH_STATUS_CODES = frozenset({413, 422})
+INVALID_BATCH_STATUS_CODE = 422
 
 
 def _split_status_code(e: Exception) -> int | None:

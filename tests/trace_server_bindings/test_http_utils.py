@@ -1,6 +1,7 @@
 """Tests for http_utils error handling."""
 
 import datetime
+import json
 from unittest.mock import Mock
 
 import httpx
@@ -204,3 +205,52 @@ def test_5xx_requeues_batch_without_splitting(error):
 
     assert len(sent) == 1
     processor.enqueue.assert_called_once_with([1, 2, 3, 4])
+
+
+def _send_rejecting(bad: set[int], sent: list[list[int]]):
+    """A send function whose server rejects (422) any batch holding a bad item."""
+
+    def send(data: bytes) -> None:
+        batch = json.loads(data)
+        sent.append(batch)
+        if bad.intersection(batch):
+            raise _make_stainless_error(422)
+
+    return send
+
+
+@pytest.mark.parametrize(
+    ("bad", "expected_requests", "expected_dropped"),
+    [
+        # One bad item: one half is rejected at each level, 1 + 2 * log2(16).
+        ({5}, 9, [[5]]),
+        # Every item bad: both halves are rejected, so the batch is dropped.
+        (set(range(16)), 3, [list(range(16))]),
+        # Bad items in both halves look the same as every item bad.
+        ({2, 12}, 3, [list(range(16))]),
+        # Both bad items in one half: that half is split further.
+        ({1, 2}, 7, [[0, 1, 2, 3]]),
+    ],
+    ids=["one_bad", "all_bad", "bad_in_both_halves", "bad_in_one_half"],
+)
+def test_422_finds_bad_items_without_splitting_every_item(
+    bad, expected_requests, expected_dropped
+):
+    """A batch rejected as invalid is split only while one half is the problem."""
+    sent: list[list[int]] = []
+    dropped: list[list[int]] = []
+
+    process_batch_with_retry(
+        list(range(16)),
+        batch_name="test",
+        remote_request_bytes_limit=100_000,
+        send_batch_fn=_send_rejecting(bad, sent),
+        processor_obj=None,
+        log_dropped_fn=lambda batch, e: dropped.append(batch),
+        encode_batch_fn=lambda b: json.dumps(b).encode(),
+    )
+
+    assert len(sent) == expected_requests
+    assert dropped == expected_dropped
+    stored = {item for batch in sent if not bad.intersection(batch) for item in batch}
+    assert stored == set(range(16)) - {item for batch in dropped for item in batch}

@@ -419,7 +419,7 @@ def test_invalid_item_is_dropped_alone(path, monkeypatch, caplog):
 def test_batch_invalid_in_every_item_is_dropped_without_looping(
     path, monkeypatch, caplog
 ):
-    """Splitting stops at single items: 2n-1 requests, then every item dropped."""
+    """Both halves rejected too: three requests, then the whole batch is dropped."""
     with _server_over_transport(path, lambda _: 422, monkeypatch) as (
         server,
         requests_seen,
@@ -429,9 +429,9 @@ def test_batch_invalid_in_every_item_is_dropped_without_looping(
         server.call_processor.enqueue = MagicMock()
         _flush(server, batch)
 
-    assert len(requests_seen) == 2 * len(batch) - 1
+    assert len(requests_seen) == 3
     assert stored == []
-    assert _dropped_batch_sizes(caplog) == [1] * len(batch)
+    assert _dropped_batch_sizes(caplog) == [len(batch)]
     server.call_processor.enqueue.assert_not_called()
 
 
