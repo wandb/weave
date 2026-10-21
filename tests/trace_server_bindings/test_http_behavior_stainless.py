@@ -598,6 +598,11 @@ def test_feedback_payload_keeps_nested_model_defaults():
     unbatched_server.feedback_replace({**feedback, "feedback_id": "feedback-id"})
     replaced = json.loads(sent[-1].read())
 
+    # The batched path sends the id it hands back; the direct path lets the
+    # server pick one.
+    batched_id = batched.pop("id")
+    assert isinstance(batched_id, str)
+    assert batched_id != ""
     assert unbatched == batched
     assert unbatched["payload"] == {"rating": {"score": 1.0}}
     assert replaced["payload"] == {"rating": {"score": 1.0}}
