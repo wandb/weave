@@ -622,6 +622,14 @@ def test_v2_method_reaches_its_flat_route(
             id="dataset_sources_link",
         ),
         pytest.param(
+            "dataset_sources_link_delete",
+            tsi.DatasetSourcesLinkDeleteReq(project_id=PROJECT, link_ids=["l1"]),
+            "POST",
+            "/dataset_sources/link_delete",
+            tsi.DatasetSourcesLinkDeleteRes,
+            id="dataset_sources_link_delete",
+        ),
+        pytest.param(
             "dataset_sources_query",
             tsi.DatasetSourcesQueryReq(project_id=PROJECT, dataset_object_id="ds"),
             "POST",
@@ -1264,6 +1272,18 @@ def test_create_sends_every_supported_field(
                 "wb_user_id": "user-id",
             },
             id="dataset_sources_link",
+        ),
+        pytest.param(
+            "dataset_sources_link_delete",
+            tsi.DatasetSourcesLinkDeleteReq(
+                project_id=PROJECT, link_ids=["l1", "l2"], wb_user_id="user-id"
+            ),
+            {
+                "project_id": PROJECT,
+                "link_ids": ["l1", "l2"],
+                "wb_user_id": "user-id",
+            },
+            id="dataset_sources_link_delete",
         ),
         pytest.param(
             "dataset_sources_query",
