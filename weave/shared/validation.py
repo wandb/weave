@@ -1,9 +1,10 @@
 import re
 from typing import Any, Literal
 
-from weave.shared import refs_internal, validation_util
-from weave.shared.constants import MAX_DISPLAY_NAME_LENGTH, MAX_OP_NAME_LENGTH
-from weave.shared.errors import InvalidFieldError, InvalidRequest
+from weave.shared import validation_util
+from weave.trace import refs_internal
+from weave.trace.constants import MAX_DISPLAY_NAME_LENGTH, MAX_OP_NAME_LENGTH
+from weave.trace.errors import InvalidFieldError, InvalidRequest
 
 
 def project_id_validator(s: str) -> str:

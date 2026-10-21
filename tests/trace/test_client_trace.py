@@ -26,7 +26,6 @@ from tests.trace.util import (
     MaybeStringMatcher,
 )
 from weave import Thread, ThreadPoolExecutor
-from weave.shared.refs_internal import extra_value_quoter
 from weave.shared.trace_server_interface_util import (
     TRACE_REF_SCHEME,
     WILDCARD_ARTIFACT_VERSION_AND_PATH,
@@ -39,6 +38,7 @@ from weave.trace.context.weave_client_context import (
     set_weave_client_global,
 )
 from weave.trace.refs import TableRef
+from weave.trace.refs_internal import extra_value_quoter
 from weave.trace.util import LOG_ONCE_MESSAGE_SUFFIX, logged_messages
 from weave.trace.vals import MissingSelfInstanceError
 from weave.trace.weave_client import sanitize_object_name

@@ -13,8 +13,8 @@ import threading
 from concurrent.futures import Future
 from typing import TYPE_CHECKING, Any
 
-from weave.shared.errors import DigestMismatchError
 from weave.shared.trace_server_interface import ProjectsInfoReq
+from weave.trace.errors import DigestMismatchError
 from weave.trace.settings import should_enable_client_side_digests
 from weave.utils.retry import _http_response
 

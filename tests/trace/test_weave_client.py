@@ -23,7 +23,6 @@ from weave import Evaluation
 from weave.flow.llm_structured_model import LLMStructuredCompletionModel
 from weave.integrations.integration_utilities import op_name_from_call
 from weave.prompt.prompt import MessagesPrompt
-from weave.shared.errors import NotFoundError
 from weave.shared.trace_server_interface_util import (
     WILDCARD_ARTIFACT_VERSION_AND_PATH,
 )
@@ -33,6 +32,7 @@ from weave.trace.builtin_object_classes.llm_structured_model import (
 )
 from weave.trace.context import call_context
 from weave.trace.context.call_context import tracing_disabled
+from weave.trace.errors import NotFoundError
 from weave.trace.isinstance import weave_isinstance
 from weave.trace.op import is_op
 from weave.trace.refs import (
