@@ -47,6 +47,8 @@ from weave.trace_server_bindings.http_utils import (
 from weave.trace_server_bindings.models import (
     CallsQueryRes,
     CompleteBatchItem,
+    DatasetSourcesLinkDeleteEntry,
+    DatasetSourcesLinkDeleteRes,
     EndBatchItem,
     EnsureProjectExistsRes,
     StartBatchItem,
@@ -1704,6 +1706,34 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         """
         return self._stainless_client.dataset_sources.link(
             extra_headers=self._compose_headers(), **as_params(req)
+        )
+
+    @with_retry
+    def dataset_sources_link_delete(
+        self, req: Mapping[str, Any] | tsi.DatasetSourcesLinkDeleteReq
+    ) -> DatasetSourcesLinkDeleteRes:
+        """Soft-delete dataset source links by id.
+
+        Args:
+            req: Dataset sources link delete request.
+
+        Returns:
+            Dataset sources link delete response.
+        """
+        # Hidden from the OpenAPI spec, so the generator emits no method for it.
+        response = self._stainless_client.post(
+            "/dataset_sources/link_delete",
+            body=to_jsonable_python(as_params(req), inf_nan_mode="null"),
+            cast_to=object,
+            options={"headers": self._compose_headers(), "max_retries": 0},
+        )
+        return DatasetSourcesLinkDeleteRes(
+            entries=[
+                DatasetSourcesLinkDeleteEntry(
+                    link_id=entry["link_id"], deleted=entry["deleted"]
+                )
+                for entry in cast(dict[str, Any], response)["entries"]
+            ]
         )
 
     def dataset_sources_query(
