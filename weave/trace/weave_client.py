@@ -1643,7 +1643,7 @@ class WeaveClient:
                     "thread_id": thread_id,
                     "turn_id": turn_id,
                     "started_at": started_at,
-                    "attributes": attributes_dict.unwrap(),
+                    "attributes": to_jsonable_python(attributes_dict.unwrap()),
                     "inputs": to_jsonable_python(inputs_json),
                     "otel_dump": None,
                     "wb_user_id": None,
@@ -1831,7 +1831,7 @@ class WeaveClient:
                     "started_at": call.started_at,
                     "exception": exception_str,
                     "output": to_jsonable_python(output_json),
-                    "summary": cast(EndSummary, merged_summary),
+                    "summary": cast(EndSummary, to_jsonable_python(merged_summary)),
                     "wb_run_step_end": current_wb_run_step_end,
                 }
             }

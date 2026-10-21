@@ -15,6 +15,10 @@ from pydantic import ValidationError
 import weave
 import weave.trace.call
 import weave.trace_server.trace_server_interface as tsi
+
+# The generated client imports its resource modules lazily; two executor threads
+# doing that at once from a fresh process trip the import lock's deadlock check.
+import weave.vendor.weave_server_sdk.resources  # noqa: F401
 from tests.conftest import TestOnlyFlushingWeaveClient
 from tests.trace.server_utils import TEST_ENTITY
 from tests.trace.testutil import ObjectRefStrMatcher
@@ -950,6 +954,65 @@ def test_edited_object_reaches_call_start_and_end():
     for value in (sent_input, sent_output):
         assert value["a"] == "newer"
         assert value["_type"]["name"] == "thing"
+
+
+class _Config(pydantic.BaseModel):
+    retries: int = 3
+
+
+def test_attributes_and_summary_models_keep_defaults_at_call_start_and_end():
+    """Default fields of models nested in attributes and summary reach the server.
+
+    The generated client dumps nested models with exclude_unset, so they have
+    to be turned into plain JSON before they go into the request.
+    """
+    sent: list[tuple[str, dict]] = []
+    client = _client_storing_objects(sent)
+
+    weave_client_context.set_weave_client_global(client)
+    try:
+        call = client.create_call("op", {"x": 1}, attributes={"config": _Config()})
+        call.summary = {"config": _Config()}
+        client.finish_call(call, output=None)
+        client._flush()
+    finally:
+        weave_client_context.set_weave_client_global(None)
+
+    bodies = dict(sent)
+    assert bodies["/call/start"]["start"]["attributes"]["config"] == {"retries": 3}
+    assert bodies["/call/end"]["end"]["summary"]["config"] == {"retries": 3}
+
+
+def test_summary_written_after_finish_does_not_change_the_end_request():
+    """The end request carries a copy of the summary, not the call's live dict."""
+    sent: list[tuple[str, dict]] = []
+    client = _client_storing_objects(sent)
+    built = threading.Event()
+    gate = threading.Event()
+    real_send = client.server.call_end
+
+    def gated_call_end(req):
+        built.set()
+        gate.wait(timeout=5)
+        return real_send(req)
+
+    client.server.call_end = gated_call_end
+
+    weave_client_context.set_weave_client_global(client)
+    try:
+        call = client.create_call("op", {"x": 1})
+        call.summary = {"result": "before"}
+        client.finish_call(call, output=None)
+        assert built.wait(timeout=5)
+        call.summary["result"] = "after"
+        gate.set()
+        client._flush()
+    finally:
+        gate.set()
+        weave_client_context.set_weave_client_global(None)
+
+    end_summary = dict(sent)["/call/end"]["end"]["summary"]
+    assert end_summary["result"] == "before"
 
 
 def test_dataset_calls(client):
