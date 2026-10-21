@@ -64,6 +64,7 @@ from weave.trace.call import (
     is_eval_call,
     make_client_call,
 )
+from weave.trace.call_request_validation import validate_call_end, validate_call_start
 from weave.trace.casting import (
     CallsFilterLike,
     QueryLike,
@@ -936,6 +937,9 @@ class WeaveClient:
         Returns:
             A call object.
         """
+        # The request is JSON, so a set or other iterable of names goes as a list.
+        if columns is not None and not isinstance(columns, (list, str)):
+            columns = list(columns)
         calls = list(
             self.server.calls_query_stream(
                 {
@@ -1741,7 +1745,7 @@ class WeaveClient:
                     "thread_id": thread_id,
                     "turn_id": turn_id,
                     "started_at": started_at,
-                    "attributes": attributes_dict.unwrap(),
+                    "attributes": to_jsonable_python(attributes_dict.unwrap()),
                     "inputs": to_jsonable_python(inputs_json),
                     "otel_dump": None,
                     "wb_user_id": None,
@@ -1749,6 +1753,8 @@ class WeaveClient:
                     "wb_run_step": current_wb_run_step,
                 }
             }
+
+            validate_call_start(call_start_req)
 
             # WAL path: persist to disk; the sender replays to the server.
             if self._wal is not None:
@@ -1929,10 +1935,12 @@ class WeaveClient:
                     "started_at": call.started_at,
                     "exception": exception_str,
                     "output": to_jsonable_python(output_json),
-                    "summary": cast(EndSummary, merged_summary),
+                    "summary": cast(EndSummary, to_jsonable_python(merged_summary)),
                     "wb_run_step_end": current_wb_run_step_end,
                 }
             }
+            validate_call_end(call_end_req)
+
             # WAL path: persist to disk; the sender replays to the server.
             if self._wal is not None:
                 self._wal.write("call_end", call_end_req)
