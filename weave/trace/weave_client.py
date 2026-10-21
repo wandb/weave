@@ -549,9 +549,9 @@ class WeaveClient:
         # Whether this client may reconstruct code-bearing custom objects (ops, or any
         # type that decodes by running a stored `.py`) on `client.get`. Defaults True:
         # for normal users this only ever runs code from their own traces, so it is
-        # safe. Server-side workers flip it off via `require_secure_weave_client`, and
-        # anyone can disable it globally with `WEAVE_ALLOW_UNSAFE_CUSTOM_OBJ_DECODE=false`
-        # (data-only objects like images/audio still decode). Enforced in custom_objs.py.
+        # safe. Anyone can disable it globally with
+        # `WEAVE_ALLOW_UNSAFE_CUSTOM_OBJ_DECODE=false` (data-only objects like
+        # images/audio still decode). Enforced in custom_objs.py.
         self._allow_unsafe_custom_obj_decode = True
 
         if ensure_project_exists:
