@@ -2872,6 +2872,78 @@ def test_file_content_read_keeps_bytes():
     assert res.content == content
 
 
+@dataclass
+class _Payload:
+    n: int
+
+
+def _table_update_response() -> httpx.Response:
+    return httpx.Response(200, json={"digest": "d", "updated_row_digests": ["r"]})
+
+
+def test_table_update_sends_a_generator_of_updates():
+    """Updates read once for the size estimate still reach the request."""
+    mock_server = _mock_server(_table_update_response())
+
+    mock_server.server.table_update(
+        {
+            "project_id": PROJECT,
+            "base_digest": "b",
+            "updates": (u for u in [{"append": {"row": {"x": 1}}}]),
+        }
+    )
+
+    assert len(mock_server.requests) == 1
+    body = json.loads(mock_server.requests[0].content)
+    assert body["updates"] == [{"append": {"row": {"x": 1}}}]
+
+
+def test_table_update_splits_a_generator_of_updates():
+    """A large request built from a generator is split without losing updates."""
+    mock_server = _mock_server(_table_update_response())
+    mock_server.server.remote_request_bytes_limit = 10
+
+    res = mock_server.server.table_update(
+        {
+            "project_id": PROJECT,
+            "base_digest": "b",
+            "updates": (u for u in [{"append": {"row": {"x": i}}} for i in range(4)]),
+        }
+    )
+
+    sent = [json.loads(r.content)["updates"] for r in mock_server.requests]
+    assert sent == [[{"append": {"row": {"x": i}}}] for i in range(4)]
+    assert res.updated_row_digests == ["r"] * 4
+
+
+def test_table_update_sends_a_dataclass_row_as_a_dict():
+    """A row holding a dataclass encodes the way the request model encoded it."""
+    mock_server = _mock_server(_table_update_response())
+
+    mock_server.server.table_update(
+        {
+            "project_id": PROJECT,
+            "base_digest": "b",
+            "updates": [{"append": {"row": {"nested": _Payload(1)}}}],
+        }
+    )
+
+    body = json.loads(mock_server.requests[0].content)
+    assert body["updates"] == [{"append": {"row": {"nested": {"n": 1}}}}]
+
+
+def test_table_create_sends_a_dataclass_row_as_a_dict():
+    """A row holding a dataclass encodes the way the request model encoded it."""
+    mock_server = _mock_server(httpx.Response(200, json={"digest": "d"}))
+
+    mock_server.server.table_create(
+        {"table": {"project_id": PROJECT, "rows": [{"nested": _Payload(1)}]}}
+    )
+
+    body = json.loads(mock_server.requests[0].content)
+    assert body["table"]["rows"] == [{"nested": {"n": 1}}]
+
+
 def test_custom_runtime_name_keeps_its_colon():
     """Test that a runtime name reaches the path without percent-encoding."""
     mock_server = _mock_server(httpx.Response(200, json=V1_RESPONSE))

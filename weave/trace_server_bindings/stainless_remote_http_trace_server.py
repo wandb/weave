@@ -1155,8 +1155,13 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         Returns:
             Table create response.
         """
+        params = dict(as_params(req))
+        params["table"] = {
+            **params["table"],
+            "rows": to_jsonable_python(params["table"]["rows"], inf_nan_mode="null"),
+        }
         return self._stainless_client.tables.create(
-            extra_headers=self._compose_headers(), **as_params(req)
+            extra_headers=self._compose_headers(), **params
         )
 
     def table_update(
@@ -1170,8 +1175,11 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         Returns:
             Table update response.
         """
-        params = as_params(req)
-        updates = list(params["updates"])
+        # The updates may be any iterable, so read them once; rows are normalized
+        # here because the request model that used to do it is no longer built.
+        params = dict(as_params(req))
+        updates = to_jsonable_python(list(params["updates"]), inf_nan_mode="null")
+        params["updates"] = updates
         # Handle large requests by splitting
         estimated_bytes = len(to_json(params, inf_nan_mode="null"))
         if estimated_bytes > self.remote_request_bytes_limit and len(updates) > 1:
