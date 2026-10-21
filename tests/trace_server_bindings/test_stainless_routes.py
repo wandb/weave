@@ -47,6 +47,7 @@ from weave.vendor.weave_server_sdk.types import (
     ThreadStreamQueryResponse,
     TraceUsageParams,
 )
+from weave.vendor.weave_server_sdk.types.call_read_response import Call
 from weave.vendor.weave_server_sdk.types.call_upsert_batch_response import (
     ReCallStartRes,
 )
@@ -2352,3 +2353,76 @@ def test_list_sends_limit_and_offset(
         expected_path,
     )
     assert dict(mock_server.requests[0].url.params) == {"limit": "10", "offset": "5"}
+
+
+def _streamed_call_line(**overrides: Any) -> dict[str, Any]:
+    line: dict[str, Any] = {
+        "id": "call-1",
+        "project_id": PROJECT,
+        "op_name": "weave:///entity/project/op/predict:abc",
+        "display_name": "predict",
+        "trace_id": "trace-1",
+        "parent_id": None,
+        "started_at": "2026-10-21T12:00:00.123456+00:00",
+        "ended_at": "2026-10-21T12:00:01+00:00",
+        "exception": None,
+        "attributes": {"weave": {"client_version": "0.53.12"}},
+        "inputs": {"messages": [{"role": "user", "content": "hi"}]},
+        "output": {"choices": [{"message": {"content": "hello"}}]},
+        "summary": {
+            "usage": {"gpt-4o": {"prompt_tokens": 1, "total_tokens": 2}},
+            "weave": {"status": "success", "feedback": [{"id": "fb-1"}]},
+        },
+        "wb_user_id": "user-1",
+    }
+    line.update(overrides)
+    return line
+
+
+def _stream_calls(*lines: dict[str, Any]) -> list[Call]:
+    mock_server = _mock_server(
+        httpx.Response(
+            200,
+            content="\n".join(json.dumps(line) for line in lines).encode(),
+            headers={"content-type": "application/x-ndjson"},
+        )
+    )
+    return list(
+        mock_server.server.calls_query_stream(CallStreamQueryParams(project_id=PROJECT))
+    )
+
+
+def test_calls_query_stream_validates_lines_like_construct():
+    """A valid line validates into the same Call that Call.construct builds."""
+    line = _streamed_call_line()
+
+    (call,) = _stream_calls(line)
+    constructed = Call.construct(**line)
+
+    assert isinstance(call, Call)
+    for name in Call.model_fields:
+        assert getattr(call, name) == getattr(constructed, name), name
+    assert call.started_at == datetime.datetime(
+        2026, 10, 21, 12, 0, 0, 123456, tzinfo=datetime.timezone.utc
+    )
+    assert call.ended_at == datetime.datetime(
+        2026, 10, 21, 12, 0, 1, tzinfo=datetime.timezone.utc
+    )
+    assert call.summary == line["summary"]
+    assert call.model_dump(mode="json") == constructed.model_dump(mode="json")
+
+
+def test_calls_query_stream_falls_back_to_construct_on_invalid_line():
+    """A line the vendored model rejects still parses through Call.construct."""
+    bad = _streamed_call_line(id=None, started_at="not a datetime")
+    good = _streamed_call_line(id="call-2")
+
+    first, second = _stream_calls(bad, good)
+
+    assert first.id is None
+    assert first.started_at == "not a datetime"
+    assert first.summary == bad["summary"]
+    assert second.id == "call-2"
+    assert second.started_at == datetime.datetime(
+        2026, 10, 21, 12, 0, 0, 123456, tzinfo=datetime.timezone.utc
+    )

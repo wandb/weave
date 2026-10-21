@@ -7,7 +7,7 @@ from collections.abc import Callable, Iterator, Mapping
 from typing import Any, TypeVar, cast
 from zoneinfo import ZoneInfo
 
-from pydantic import BaseModel, validate_call
+from pydantic import BaseModel, ValidationError, validate_call
 from pydantic_core import to_json, to_jsonable_python
 from typing_extensions import Self
 
@@ -79,6 +79,20 @@ TReq = TypeVar("TReq", bound=BaseModel)
 TRes = TypeVar("TRes", bound=BaseModel)
 
 logger = logging.getLogger(__name__)
+
+
+def _parse_streamed_call(item: dict[str, Any]) -> Call:
+    """Parse one streamed call line into the vendored Call model.
+
+    Validation runs in compiled pydantic-core and is several times faster than
+    Call.construct, which walks every field in Python. A line the vendored model
+    rejects falls back to construct so it still parses as leniently as the
+    generated client parses every other response.
+    """
+    try:
+        return Call.model_validate(item)
+    except ValidationError:
+        return Call.construct(**item)
 
 
 class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
@@ -830,7 +844,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         response = self._stainless_client.calls.stream_query(**as_params(req))
         for item in response:
             # The route's lines are generated as bare objects; each one is a call.
-            yield Call.construct(**cast(dict[str, Any], item))
+            yield _parse_streamed_call(cast(dict[str, Any], item))
 
     def calls_query_stats(
         self, req: CallQueryStatsParams | tsi.CallsQueryStatsReq
