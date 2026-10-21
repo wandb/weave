@@ -17,7 +17,7 @@ import httpx
 import pytest
 import requests
 import tenacity
-from pydantic import ValidationError
+from pydantic import BaseModel, ValidationError
 
 from tests.trace_server_bindings.conftest import generate_id, generate_start
 from weave.trace.display.term import configure_logger
@@ -506,6 +506,52 @@ def test_batched_feedback_that_fails_on_the_client_is_not_sent():
     (request,) = requests
     batch = json.loads(request.read())["batch"]
     assert [item["payload"] for item in batch] == [{"note": "ok"}]
+
+
+def test_feedback_payload_keeps_nested_model_defaults():
+    """Unbatched, batched and replace sends carry a nested model's default fields."""
+
+    class Rating(BaseModel):
+        score: float = 1.0
+
+    feedback = {
+        "project_id": PROJECT,
+        "weave_ref": f"weave:///{PROJECT}/call/call-id",
+        "feedback_type": "quality",
+        "payload": {"rating": Rating()},
+    }
+    created = {
+        "id": "feedback-id",
+        "created_at": "2026-01-01T00:00:00Z",
+        "wb_user_id": "user",
+        "payload": {},
+    }
+
+    sent: list[httpx.Request] = []
+
+    def handle(request: httpx.Request) -> httpx.Response:
+        sent.append(request)
+        body = {"res": []} if request.url.path.endswith("/batch/create") else created
+        return httpx.Response(200, json=body, request=request)
+
+    with _batching_server(handle) as (server, _):
+        server.feedback_create(feedback)
+        assert server.feedback_processor is not None
+        server.feedback_processor.stop_accepting_new_work_and_flush_queue()
+    (batched,) = json.loads(sent[-1].read())["batch"]
+
+    unbatched_server = StainlessRemoteHTTPTraceServer("http://example.com")
+    unbatched_server._stainless_client = unbatched_server._stainless_client.copy(
+        http_client=httpx.Client(transport=httpx.MockTransport(handle))
+    )
+    unbatched_server.feedback_create(feedback)
+    unbatched = json.loads(sent[-1].read())
+    unbatched_server.feedback_replace({**feedback, "feedback_id": "feedback-id"})
+    replaced = json.loads(sent[-1].read())
+
+    assert unbatched == batched
+    assert unbatched["payload"] == {"rating": {"score": 1.0}}
+    assert replaced["payload"] == {"rating": {"score": 1.0}}
 
 
 def test_calls_complete_needs_batching(monkeypatch):

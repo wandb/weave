@@ -157,13 +157,21 @@ logger = logging.getLogger(__name__)
 def _feedback_body(
     req: Mapping[str, Any] | BaseModel,
 ) -> feedback_batch_create_params.Batch:
-    """The feedback fields this binding sends: those set, but not id or created_at."""
+    """The feedback fields this binding sends: those set, but not id or created_at.
+
+    The body is dumped to plain JSON values first, so a nested Pydantic model in
+    a user payload keeps its default-valued fields. The generated client dumps
+    nested models with exclude_unset and would drop them.
+    """
     body = {
         key: value
         for key, value in as_params(req).items()
         if value is not None and key not in {"id", "created_at"}
     }
-    return cast(feedback_batch_create_params.Batch, body)
+    return cast(
+        feedback_batch_create_params.Batch,
+        to_jsonable_python(body, inf_nan_mode="null"),
+    )
 
 
 class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
@@ -1414,8 +1422,11 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         Returns:
             Feedback replace response.
         """
+        # Same normalization as _feedback_body: the user payload must not lose
+        # the default fields of a nested model to the client's exclude_unset dump.
         return self._stainless_client.feedback.replace(
-            extra_headers=self._compose_headers(), **as_params(req)
+            extra_headers=self._compose_headers(),
+            **to_jsonable_python(as_params(req), inf_nan_mode="null"),
         )
 
     def feedback_stats(
