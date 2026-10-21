@@ -405,7 +405,7 @@ def test_call_readers_parse_the_summary():
 
 
 def test_get_calls_sends_column_iterables_as_lists():
-    """get_calls sends columns and expand_columns given as a set or tuple as lists."""
+    """get_calls and get_call send columns given as a set or tuple as lists."""
     bodies: dict[str, dict] = {}
 
     def handle(request: httpx.Request) -> httpx.Response:
@@ -427,6 +427,11 @@ def test_get_calls_sends_column_iterables_as_lists():
     assert bodies["/calls/stream_query"]["columns"] == ["inputs"]
     assert bodies["/calls/stream_query"]["expand_columns"] == ["inputs.model"]
     assert bodies["/calls/query_stats"]["expand_columns"] == ["inputs.model"]
+
+    bodies.clear()
+    with pytest.raises(ValueError, match="Call not found"):
+        client.get_call("call-id", columns={"inputs"})
+    assert bodies["/calls/stream_query"]["columns"] == ["inputs"]
 
 
 def test_get_calls_sends_every_keyword():

@@ -911,6 +911,9 @@ class WeaveClient:
         Returns:
             A call object.
         """
+        # The request is JSON, so a set or other iterable of names goes as a list.
+        if columns is not None and not isinstance(columns, (list, str)):
+            columns = list(columns)
         calls = list(
             self.server.calls_query_stream(
                 {
