@@ -20,6 +20,7 @@ from weave.chat.inference_models import InferenceModels
 from weave.durability.wal_manager import WALManager
 from weave.telemetry import trace_sentry
 from weave.trace import settings
+from weave.trace.builtin_object_classes.query import Query
 from weave.trace.call import (
     DEFAULT_CALLS_PAGE_SIZE,
     Call,
@@ -233,7 +234,6 @@ except ImportError:
 if TYPE_CHECKING:
     from weave.evaluation.eval import Evaluation
     from weave.shared.agents import types as agent_types
-    from weave.shared.interface.query import Query
     from weave.shared.trace_server_interface import ObjectVersionFilter
 
 # Controls if objects can have refs to projects not the WeaveClient project.
