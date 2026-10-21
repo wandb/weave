@@ -7,7 +7,7 @@ from collections.abc import Callable, Iterator, Mapping
 from typing import Any, TypeVar, cast
 from zoneinfo import ZoneInfo
 
-from pydantic import BaseModel, validate_call
+from pydantic import BaseModel, ValidationError, validate_call
 from pydantic_core import to_json, to_jsonable_python
 from typing_extensions import Self
 
@@ -32,6 +32,8 @@ from weave.trace_server_bindings.client_interface import (
     TraceServerClientInterface,
 )
 from weave.trace_server_bindings.http_utils import (
+    CLIENT_CAPABILITIES,
+    CLIENT_CAPABILITIES_HEADER,
     REMOTE_REQUEST_BYTES_LIMIT,
     TRACE_ID_HEADER,
     CallsCompleteModeRequired,
@@ -208,15 +210,40 @@ logger = logging.getLogger(__name__)
 
 
 def _feedback_body(
-    req: Mapping[str, Any] | BaseModel,
+    req: Mapping[str, Any] | BaseModel, *, keep_id: bool = True
 ) -> feedback_batch_create_params.Batch:
-    """The feedback fields this binding sends: those set, but not id or created_at."""
+    """The feedback fields this binding sends: those set, but not created_at.
+
+    The id goes too, so the stored feedback has the id the client returned.
+    Only the per-item fallback, for a server without the batch route, drops it.
+
+    The body is dumped to plain JSON values first, so a nested Pydantic model in
+    a user payload keeps its default-valued fields. The generated client dumps
+    nested models with exclude_unset and would drop them.
+    """
     body = {
         key: value
         for key, value in as_params(req).items()
-        if value is not None and key not in {"id", "created_at"}
+        if value is not None and key != "created_at" and (keep_id or key != "id")
     }
-    return cast(feedback_batch_create_params.Batch, body)
+    return cast(
+        feedback_batch_create_params.Batch,
+        to_jsonable_python(body, inf_nan_mode="null"),
+    )
+
+
+def _parse_streamed_call(item: dict[str, Any]) -> Call:
+    """Parse one streamed call line into the vendored Call model.
+
+    Validation runs in compiled pydantic-core and is several times faster than
+    Call.construct, which walks every field in Python. A line the vendored model
+    rejects falls back to construct so it still parses as leniently as the
+    generated client parses every other response.
+    """
+    try:
+        return Call.model_validate(item)
+    except ValidationError:
+        return Call.construct(**item)
 
 
 class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
@@ -301,6 +328,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
 
     def _compose_headers(self, trace_id: str | None = None) -> dict[str, str]:
         headers = self._extra_headers.copy()
+        headers[CLIENT_CAPABILITIES_HEADER] = CLIENT_CAPABILITIES
         if self._credentials is not None:
             headers["Authorization"] = self._credentials.authorization_header()
         if retry_id := get_current_retry_id():
@@ -559,6 +587,27 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
             project, entity=entity, batch=json.loads(encoded_data)["batch"]
         )
 
+    def calls_complete(
+        self, req: Mapping[str, Any] | tsi.CallsUpsertCompleteReq
+    ) -> object:
+        """Upsert a batch of completed calls.
+
+        Args:
+            req: Calls upsert complete request.
+
+        Returns:
+            Calls upsert complete response.
+        """
+        batch = [as_params(item) for item in as_params(req)["batch"]]
+        if not batch:
+            return {}
+        entity, project = from_project_id(batch[0]["project_id"])
+        # The same body the batch processor sends (_flush_calls_complete).
+        self._send_calls_complete_to_server(
+            entity, project, to_json({"batch": batch}, inf_nan_mode="null")
+        )
+        return {}
+
     def _flush_calls_complete(
         self,
         batch: list[CompleteBatchItem],
@@ -638,7 +687,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
                     for item in items:
                         try:
                             self._stainless_client.feedback.create(
-                                **_feedback_body(item)
+                                **_feedback_body(item, keep_id=False)
                             )
                         except Exception as individual_error:
                             logger.warning(
@@ -947,7 +996,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         response = self._stainless_client.calls.stream_query(**as_params(req))
         for item in response:
             # The route's lines are generated as bare objects; each one is a call.
-            yield Call.construct(**cast(dict[str, Any], item))
+            yield _parse_streamed_call(cast(dict[str, Any], item))
 
     def calls_query_stats(
         self, req: CallQueryStatsParams | tsi.CallsQueryStatsReq
@@ -1448,8 +1497,11 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         Returns:
             Feedback replace response.
         """
+        # Same normalization as _feedback_body: the user payload must not lose
+        # the default fields of a nested model to the client's exclude_unset dump.
         return self._stainless_client.feedback.replace(
-            extra_headers=self._compose_headers(), **as_params(req)
+            extra_headers=self._compose_headers(),
+            **to_jsonable_python(as_params(req), inf_nan_mode="null"),
         )
 
     def feedback_stats(
