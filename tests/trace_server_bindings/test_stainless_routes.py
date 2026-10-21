@@ -36,11 +36,21 @@ from weave.vendor.weave_server_sdk import Client as StainlessClient
 from weave.vendor.weave_server_sdk.types import (
     CallDeleteParams,
     CallEndParams,
+    CallQueryStatsParams,
+    CallReadParams,
     CallStartParams,
+    CallStatsParams,
+    CallStatsResponse,
+    CallStreamQueryParams,
     CallUpdateParams,
     CallUpsertBatchParams,
     CallUpsertBatchResponse,
+    CallUsageParams,
+    ThreadStreamQueryParams,
+    ThreadStreamQueryResponse,
+    TraceUsageParams,
 )
+from weave.vendor.weave_server_sdk.types.call_read_response import Call
 from weave.vendor.weave_server_sdk.types.call_upsert_batch_response import (
     ReCallStartRes,
 )
@@ -528,7 +538,7 @@ def test_v2_method_reaches_its_flat_route(
             tsi.CallStatsReq(project_id=PROJECT, start=START, end=END),
             "POST",
             "/calls/stats",
-            tsi.CallStatsRes,
+            CallStatsResponse,
             id="call_stats",
         ),
         pytest.param(
@@ -1771,6 +1781,28 @@ def _leaves(value: Any, here: str = "") -> Iterator[tuple[str, Any]]:
         ),
         pytest.param("call_update", CallUpdateParams, "POST", "/call/update"),
         pytest.param("calls_delete", CallDeleteParams, "POST", "/calls/delete"),
+        pytest.param("call_read", CallReadParams, "POST", "/call/read"),
+        pytest.param(
+            "calls_query", CallStreamQueryParams, "POST", "/calls/stream_query"
+        ),
+        pytest.param(
+            "calls_query_stream",
+            CallStreamQueryParams,
+            "POST",
+            "/calls/stream_query",
+        ),
+        pytest.param(
+            "calls_query_stats", CallQueryStatsParams, "POST", "/calls/query_stats"
+        ),
+        pytest.param("call_stats", CallStatsParams, "POST", "/calls/stats"),
+        pytest.param("trace_usage", TraceUsageParams, "POST", "/trace/usage"),
+        pytest.param("calls_usage", CallUsageParams, "POST", "/calls/usage"),
+        pytest.param(
+            "threads_query_stream",
+            ThreadStreamQueryParams,
+            "POST",
+            "/threads/stream_query",
+        ),
     ],
 )
 def test_every_params_key_reaches_the_request(
@@ -1791,14 +1823,23 @@ def test_every_params_key_reaches_the_request(
     )
     params = _sentinel_params(params_type)
 
-    getattr(mock_server.server, method_name)(params)
+    res = getattr(mock_server.server, method_name)(params)
+    if isinstance(res, Iterator):
+        list(res)
 
     assert len(mock_server.requests) == 1
     request = mock_server.requests[0]
     assert (request.method, request.url.path) == (expected_method, expected_path)
     body = dict(_leaves(json.loads(request.content)))
+    # A header parameter (the stream's `accept`) joins the generated default.
+    headers = [v for h in request.headers.values() for v in h.split(", ")]
     sent = sorted(
-        [*body.values(), *request.url.params.values(), *request.url.path.split("/")]
+        [
+            *body.values(),
+            *request.url.params.values(),
+            *request.url.path.split("/"),
+            *headers,
+        ]
     )
     assert [s for s in sent if s.startswith("<")] == sorted(
         value for _, value in _leaves(params)
@@ -1893,7 +1934,7 @@ def test_call_records_written_from_models_replay(should_batch: bool, monkeypatch
                 },
             ],
             [
-                tsi.ThreadSchema(
+                ThreadStreamQueryResponse(
                     thread_id="t1",
                     turn_count=1,
                     start_time="2026-08-20T00:00:00Z",
@@ -1903,7 +1944,7 @@ def test_call_records_written_from_models_replay(should_batch: bool, monkeypatch
                     p50_turn_duration_ms=None,
                     p99_turn_duration_ms=None,
                 ),
-                tsi.ThreadSchema(
+                ThreadStreamQueryResponse(
                     thread_id="t2",
                     turn_count=2,
                     start_time="2026-08-20T00:00:00Z",
@@ -2372,3 +2413,76 @@ def test_list_sends_limit_and_offset(
         expected_path,
     )
     assert dict(mock_server.requests[0].url.params) == {"limit": "10", "offset": "5"}
+
+
+def _streamed_call_line(**overrides: Any) -> dict[str, Any]:
+    line: dict[str, Any] = {
+        "id": "call-1",
+        "project_id": PROJECT,
+        "op_name": "weave:///entity/project/op/predict:abc",
+        "display_name": "predict",
+        "trace_id": "trace-1",
+        "parent_id": None,
+        "started_at": "2026-10-21T12:00:00.123456+00:00",
+        "ended_at": "2026-10-21T12:00:01+00:00",
+        "exception": None,
+        "attributes": {"weave": {"client_version": "0.53.12"}},
+        "inputs": {"messages": [{"role": "user", "content": "hi"}]},
+        "output": {"choices": [{"message": {"content": "hello"}}]},
+        "summary": {
+            "usage": {"gpt-4o": {"prompt_tokens": 1, "total_tokens": 2}},
+            "weave": {"status": "success", "feedback": [{"id": "fb-1"}]},
+        },
+        "wb_user_id": "user-1",
+    }
+    line.update(overrides)
+    return line
+
+
+def _stream_calls(*lines: dict[str, Any]) -> list[Call]:
+    mock_server = _mock_server(
+        httpx.Response(
+            200,
+            content="\n".join(json.dumps(line) for line in lines).encode(),
+            headers={"content-type": "application/x-ndjson"},
+        )
+    )
+    return list(
+        mock_server.server.calls_query_stream(CallStreamQueryParams(project_id=PROJECT))
+    )
+
+
+def test_calls_query_stream_validates_lines_like_construct():
+    """A valid line validates into the same Call that Call.construct builds."""
+    line = _streamed_call_line()
+
+    (call,) = _stream_calls(line)
+    constructed = Call.construct(**line)
+
+    assert isinstance(call, Call)
+    for name in Call.model_fields:
+        assert getattr(call, name) == getattr(constructed, name), name
+    assert call.started_at == datetime.datetime(
+        2026, 10, 21, 12, 0, 0, 123456, tzinfo=datetime.timezone.utc
+    )
+    assert call.ended_at == datetime.datetime(
+        2026, 10, 21, 12, 0, 1, tzinfo=datetime.timezone.utc
+    )
+    assert call.summary == line["summary"]
+    assert call.model_dump(mode="json") == constructed.model_dump(mode="json")
+
+
+def test_calls_query_stream_falls_back_to_construct_on_invalid_line():
+    """A line the vendored model rejects still parses through Call.construct."""
+    bad = _streamed_call_line(id=None, started_at="not a datetime")
+    good = _streamed_call_line(id="call-2")
+
+    first, second = _stream_calls(bad, good)
+
+    assert first.id is None
+    assert first.started_at == "not a datetime"
+    assert first.summary == bad["summary"]
+    assert second.id == "call-2"
+    assert second.started_at == datetime.datetime(
+        2026, 10, 21, 12, 0, 0, 123456, tzinfo=datetime.timezone.utc
+    )

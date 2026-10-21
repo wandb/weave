@@ -38,8 +38,6 @@ from weave.shared.trace_server_interface import (
     AnnotationQueuesStatsReq,
     AnnotationQueueStatsSchema,
     AnnotationQueueUpdateReq,
-    CallsFilter,
-    CallsQueryReq,
     CostCreateInput,
     CostCreateReq,
     CostCreateRes,
@@ -89,7 +87,14 @@ from weave.trace.call import (
     make_client_call,
 )
 from weave.trace.call_request_validation import validate_call_end, validate_call_start
-from weave.trace.casting import CallsFilterLike, QueryLike, SortByLike
+from weave.trace.casting import (
+    CallsFilterLike,
+    QueryLike,
+    SortByLike,
+    cast_to_calls_filter,
+    cast_to_query,
+    cast_to_sort_by,
+)
 from weave.trace.concurrent.futures import FutureExecutor
 from weave.trace.constants import (
     INVOKING_SPAN_ATTR_KEY,
@@ -294,8 +299,8 @@ def _invoking_span_attr() -> dict[str, str] | None:
 
 
 def _add_scored_by_to_calls_query(
-    scored_by: list[str] | str | None, query: Query | None
-) -> Query | None:
+    scored_by: list[str] | str | None, query: Mapping[str, Any] | None
+) -> Mapping[str, Any] | None:
     # This logic might be pushed down to the server soon, but for now it lives here:
     if not scored_by:
         return query
@@ -324,7 +329,7 @@ def _add_scored_by_to_calls_query(
             exprs.append(
                 exists_expr(get_field_expr(runnable_feedback_output_selector(name)))
             )
-    return Query.model_validate({"$expr": {"$and": exprs}})
+    return {"$expr": {"$and": exprs}}
 
 
 def _build_agent_spans_query(
@@ -798,7 +803,6 @@ class WeaveClient:
         return lst
 
     @trace_sentry.global_trace_sentry.watch()
-    @pydantic.validate_call
     def get_calls(
         self,
         *,
@@ -857,17 +861,24 @@ class WeaveClient:
             ```
         """
         if filter is None:
-            filter = CallsFilter()
+            filter = {}
+        # The request is JSON, so a set or other iterable of names goes as a list.
+        if columns is not None and not isinstance(columns, (list, str)):
+            columns = list(columns)
+        if expand_columns is not None and not isinstance(expand_columns, (list, str)):
+            expand_columns = list(expand_columns)
 
-        query = _add_scored_by_to_calls_query(scored_by, query)
+        query = _add_scored_by_to_calls_query(
+            scored_by, None if query is None else cast_to_query(query)
+        )
 
         return _make_calls_iterator(
             self.server,
             self.project_id,
-            filter=filter,
+            filter=cast_to_calls_filter(filter),
             limit_override=limit,
             offset_override=offset,
-            sort_by=sort_by,
+            sort_by=None if sort_by is None else [cast_to_sort_by(s) for s in sort_by],
             query=query,
             include_costs=include_costs,
             include_feedback=include_feedback,
@@ -901,15 +912,28 @@ class WeaveClient:
         Returns:
             A call object.
         """
+        # The request is JSON, so a set or other iterable of names goes as a list.
+        if columns is not None and not isinstance(columns, (list, str)):
+            columns = list(columns)
         calls = list(
             self.server.calls_query_stream(
-                CallsQueryReq(
-                    project_id=self.project_id,
-                    filter=CallsFilter(call_ids=[call_id]),
-                    include_costs=include_costs,
-                    include_feedback=include_feedback,
-                    columns=columns,
-                )
+                {
+                    "project_id": self.project_id,
+                    "filter": cast_to_calls_filter({"call_ids": [call_id]}),
+                    "limit": None,
+                    "offset": None,
+                    "latest_only": False,
+                    "sort_by": None,
+                    "query": None,
+                    "include_costs": include_costs,
+                    "include_feedback": include_feedback,
+                    "include_storage_size": False,
+                    "include_total_storage_size": False,
+                    "include_usernames": False,
+                    "columns": columns,
+                    "expand_columns": None,
+                    "return_expanded_column_values": True,
+                }
             )
         )
         if not calls:
@@ -3251,7 +3275,7 @@ class WeaveClient:
         op_ref = get_ref(op)
         if op_ref is None:
             raise ValueError(f"Can't get runs for unpublished op: {op}")
-        return self.get_calls(filter=CallsFilter(op_names=[op_ref.uri]))
+        return self.get_calls(filter={"op_names": [op_ref.uri]})
 
     @trace_sentry.global_trace_sentry.watch()
     def _objects(self, filter: ObjectVersionFilter | None = None) -> list[ObjSchema]:

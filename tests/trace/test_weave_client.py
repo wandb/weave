@@ -1,4 +1,5 @@
 import datetime
+import inspect
 import json
 import platform
 import re
@@ -74,7 +75,7 @@ from weave.trace_server_bindings.http_utils import (
 from weave.trace_server_bindings.stainless_remote_http_trace_server import (
     StainlessRemoteHTTPTraceServer,
 )
-from weave.vendor.weave_server_sdk import UnprocessableEntityError
+from weave.vendor.weave_server_sdk import APIStatusError, UnprocessableEntityError
 
 
 @pytest.mark.flaky(reruns=3, reruns_delay=0.2)
@@ -308,9 +309,9 @@ def test_filter_sort_by_query_validation(client):
     client.get_calls(filter={"trace_ids": ["some_trace_id"]})
 
     # now order_by
-    with pytest.raises(ValidationError):
+    with pytest.raises(TypeError):
         client.get_calls(sort_by="not a sort_by")
-    with pytest.raises(ValidationError):
+    with pytest.raises(TypeError):
         client.get_calls(sort_by=1)
     with pytest.raises(TypeError):
         client.get_calls(sort_by=["not a sort_by"])
@@ -326,11 +327,11 @@ def test_filter_sort_by_query_validation(client):
     with pytest.raises(TypeError):
         client.get_calls(query=["not a query"])
 
-    with pytest.raises(
-        ValidationError,
-        match=r"\d+ validation errors for WeaveClient.get_calls",
-    ):
-        client.get_calls(query={"$expr": {"$invalid_field": "invalid_value"}})
+    # A malformed query is rejected by whoever parses the request (the
+    # hand-written client or the server), when the calls are read.
+    calls = client.get_calls(query={"$expr": {"$invalid_field": "invalid_value"}})
+    with pytest.raises((ValidationError, APIStatusError)):
+        list(calls)
 
     # test valid
     client.get_calls(
@@ -354,6 +355,187 @@ def test_get_calls_forwards_include_usernames(client, monkeypatch):
 
     assert captured_kwargs["project_id"] == client.project_id
     assert captured_kwargs["include_usernames"] is True
+
+
+def test_call_readers_parse_the_summary():
+    """get_call and get_calls give a summary's statuses and feedback times parsed."""
+    stamp = "2026-10-20T12:34:56.123456Z"
+    row = {
+        "id": "call-id",
+        "project_id": "entity/project",
+        "op_name": "op",
+        "trace_id": "trace-id",
+        "started_at": stamp,
+        "attributes": {},
+        "inputs": {},
+        "summary": {
+            "status_counts": {"success": 1, "error": 0},
+            "weave": {
+                "status": "success",
+                "feedback": [
+                    {
+                        "id": "fb",
+                        "feedback_type": "custom",
+                        "payload": {},
+                        "created_at": stamp,
+                    }
+                ],
+            },
+        },
+    }
+
+    def handle(request: httpx.Request) -> httpx.Response:
+        if request.url.path == "/calls/query_stats":
+            return httpx.Response(200, json={"count": 1}, request=request)
+        return httpx.Response(200, content=json.dumps(row) + "\n", request=request)
+
+    server = StainlessRemoteHTTPTraceServer("http://example.com")
+    server._stainless_client = server._stainless_client.copy(
+        http_client=httpx.Client(transport=httpx.MockTransport(handle))
+    )
+    client = weave_client.WeaveClient(
+        "entity", "project", server, ensure_project_exists=False
+    )
+
+    expected = tsi.CallSchema.model_validate(row).summary
+    for call in (client.get_call("call-id"), next(iter(client.get_calls()))):
+        summary = call.summary
+        assert summary == expected
+        assert type(summary["weave"]["status"]) is tsi.TraceStatus
+        assert {type(status) for status in summary["status_counts"]} == {
+            tsi.TraceStatus
+        }
+        created_at = summary["weave"]["feedback"][0]["created_at"]
+        assert created_at.isoformat() == "2026-10-20T12:34:56.123456+00:00"
+
+
+def test_get_calls_sends_column_iterables_as_lists():
+    """get_calls and get_call send columns given as a set or tuple as lists."""
+    bodies: dict[str, dict] = {}
+
+    def handle(request: httpx.Request) -> httpx.Response:
+        bodies[request.url.path] = json.loads(request.content)
+        if request.url.path == "/calls/query_stats":
+            return httpx.Response(200, json={"count": 0}, request=request)
+        return httpx.Response(200, content=b"", request=request)
+
+    server = StainlessRemoteHTTPTraceServer("http://example.com")
+    server._stainless_client = server._stainless_client.copy(
+        http_client=httpx.Client(transport=httpx.MockTransport(handle))
+    )
+    client = weave_client.WeaveClient(
+        "entity", "project", server, ensure_project_exists=False
+    )
+
+    list(client.get_calls(columns={"inputs"}, expand_columns=("inputs.model",)))
+
+    assert bodies["/calls/stream_query"]["columns"] == ["inputs"]
+    assert bodies["/calls/stream_query"]["expand_columns"] == ["inputs.model"]
+    assert bodies["/calls/query_stats"]["expand_columns"] == ["inputs.model"]
+
+    bodies.clear()
+    with pytest.raises(ValueError, match="Call not found"):
+        client.get_call("call-id", columns={"inputs"})
+    assert bodies["/calls/stream_query"]["columns"] == ["inputs"]
+
+
+def test_get_calls_sends_every_keyword():
+    """Every get_calls keyword reaches the requests that read and count the calls."""
+    requests: list[httpx.Request] = []
+
+    def handle(request: httpx.Request) -> httpx.Response:
+        requests.append(request)
+        if request.url.path == "/calls/query_stats":
+            return httpx.Response(200, json={"count": 0}, request=request)
+        return httpx.Response(200, content=b"", request=request)
+
+    server = StainlessRemoteHTTPTraceServer("http://example.com")
+    server._stainless_client = server._stainless_client.copy(
+        http_client=httpx.Client(transport=httpx.MockTransport(handle))
+    )
+    client = weave_client.WeaveClient(
+        "entity", "project", server, ensure_project_exists=False
+    )
+    user_expr = {"$eq": [{"$getField": "op_name"}, {"$literal": "op"}]}
+    kwargs = {
+        "filter": {"op_names": ["op"]},
+        "limit": 5,
+        "offset": 2,
+        "sort_by": [{"field": "started_at", "direction": "desc"}],
+        "query": {"$expr": user_expr},
+        "include_costs": True,
+        "include_feedback": True,
+        "include_storage_size": True,
+        "include_total_storage_size": True,
+        "include_usernames": True,
+        "columns": ["inputs"],
+        "expand_columns": ["inputs.model"],
+        "return_expanded_column_values": False,
+        "scored_by": "my_scorer",
+        "page_size": 3,
+    }
+    # A new keyword has to be added here, so the test checks it reaches the request.
+    assert set(kwargs) == set(inspect.signature(client.get_calls).parameters)
+
+    list(client.get_calls(**kwargs))
+
+    sent: dict[str, list] = {}
+    for r in requests:
+        sent.setdefault(r.url.path, []).append(json.loads(r.content))
+    calls_filter = {
+        "op_names": ["op"],
+        "input_refs": None,
+        "output_refs": None,
+        "parent_ids": None,
+        "trace_ids": None,
+        "call_ids": None,
+        "thread_ids": None,
+        "turn_ids": None,
+        "trace_roots_only": None,
+        "wb_user_ids": None,
+        "wb_run_ids": None,
+    }
+    scored_expr = {
+        "$not": [
+            {
+                "$eq": [
+                    {"$getField": "feedback.[wandb.runnable.my_scorer].payload.output"},
+                    {"$literal": ""},
+                ]
+            }
+        ]
+    }
+    query = {"$expr": {"$and": [user_expr, scored_expr]}}
+    assert sorted(sent) == ["/calls/query_stats", "/calls/stream_query"]
+    assert sent["/calls/stream_query"] == [
+        {
+            "project_id": "entity/project",
+            "filter": calls_filter,
+            "limit": 3,
+            "offset": 2,
+            "latest_only": False,
+            "sort_by": [{"field": "started_at", "direction": "desc"}],
+            "query": query,
+            "include_costs": True,
+            "include_feedback": True,
+            "include_storage_size": True,
+            "include_total_storage_size": True,
+            "include_usernames": True,
+            "columns": ["inputs"],
+            "expand_columns": ["inputs.model"],
+            "return_expanded_column_values": False,
+        }
+    ]
+    assert sent["/calls/query_stats"] == [
+        {
+            "project_id": "entity/project",
+            "filter": calls_filter,
+            "query": query,
+            "limit": None,
+            "include_total_storage_size": False,
+            "expand_columns": ["inputs.model"],
+        }
+    ]
 
 
 def test_call_create(client, wb_user_id):

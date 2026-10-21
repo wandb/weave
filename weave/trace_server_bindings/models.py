@@ -9,6 +9,7 @@ from weave.vendor.weave_server_sdk.types import (
     CallStartParams,
     v2_call_complete_params,
 )
+from weave.vendor.weave_server_sdk.types.call_read_response import Call
 
 
 @dataclass(kw_only=True)
@@ -29,6 +30,13 @@ class CompleteBatchItem:
 
     mode: Literal["complete"] = "complete"
     req: v2_call_complete_params.Batch | tsi.CompletedCallSchemaForInsert
+
+
+@dataclass(kw_only=True)
+class CallsQueryRes:
+    """The response of `calls_query`, which the generated client has no type for."""
+
+    calls: list[Call]
 
 
 class EntityProjectInfo(BaseModel):

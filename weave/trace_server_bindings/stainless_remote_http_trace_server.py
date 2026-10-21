@@ -7,7 +7,7 @@ from collections.abc import Callable, Iterator, Mapping
 from typing import Any, TypeVar, cast
 from zoneinfo import ZoneInfo
 
-from pydantic import BaseModel, validate_call
+from pydantic import BaseModel, ValidationError, validate_call
 from pydantic_core import to_json, to_jsonable_python
 from typing_extensions import Self
 
@@ -38,6 +38,7 @@ from weave.trace_server_bindings.http_utils import (
     process_batch_with_retry,
 )
 from weave.trace_server_bindings.models import (
+    CallsQueryRes,
     CompleteBatchItem,
     EndBatchItem,
     StartBatchItem,
@@ -51,12 +52,26 @@ from weave.vendor.weave_server_sdk.types import (
     CallDeleteParams,
     CallDeleteResponse,
     CallEndParams,
+    CallQueryStatsParams,
+    CallQueryStatsResponse,
+    CallReadParams,
+    CallReadResponse,
     CallStartParams,
     CallStartResponse,
+    CallStatsParams,
+    CallStatsResponse,
+    CallStreamQueryParams,
     CallUpdateParams,
     CallUpsertBatchParams,
     CallUpsertBatchResponse,
+    CallUsageParams,
+    CallUsageResponse,
+    ThreadStreamQueryParams,
+    ThreadStreamQueryResponse,
+    TraceUsageParams,
+    TraceUsageResponse,
 )
+from weave.vendor.weave_server_sdk.types.call_read_response import Call
 from weave.wandb_interface import project_creator
 from weave.wandb_interface.auth import (
     ApiKeyCredentials,
@@ -67,6 +82,20 @@ TReq = TypeVar("TReq", bound=BaseModel)
 TRes = TypeVar("TRes", bound=BaseModel)
 
 logger = logging.getLogger(__name__)
+
+
+def _parse_streamed_call(item: dict[str, Any]) -> Call:
+    """Parse one streamed call line into the vendored Call model.
+
+    Validation runs in compiled pydantic-core and is several times faster than
+    Call.construct, which walks every field in Python. A line the vendored model
+    rejects falls back to construct so it still parses as leniently as the
+    generated client parses every other response.
+    """
+    try:
+        return Call.model_validate(item)
+    except ValidationError:
+        return Call.construct(**item)
 
 
 class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
@@ -802,8 +831,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
             extra_headers=self._compose_headers(), **as_params(req)
         )
 
-    @validate_call
-    def call_read(self, req: tsi.CallReadReq) -> tsi.CallReadRes:
+    def call_read(self, req: CallReadParams | tsi.CallReadReq) -> CallReadResponse:
         """Read a call.
 
         Args:
@@ -812,12 +840,13 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         Returns:
             Call read response.
         """
-        return self._stainless_request(
-            req, tsi.CallReadRes, self._stainless_client.calls.read
+        return self._stainless_client.calls.read(
+            extra_headers=self._compose_headers(), **as_params(req)
         )
 
-    @validate_call
-    def calls_query(self, req: tsi.CallsQueryReq) -> tsi.CallsQueryRes:
+    def calls_query(
+        self, req: CallStreamQueryParams | tsi.CallsQueryReq
+    ) -> CallsQueryRes:
         """Query calls.
 
         Args:
@@ -826,27 +855,29 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         Returns:
             Calls query response.
         """
-        return tsi.CallsQueryRes(calls=list(self.calls_query_stream(req)))
+        return CallsQueryRes(calls=list(self.calls_query_stream(req)))
 
-    @validate_call
-    def calls_query_stream(self, req: tsi.CallsQueryReq) -> Iterator[tsi.CallSchema]:
+    def calls_query_stream(
+        self, req: CallStreamQueryParams | tsi.CallsQueryReq
+    ) -> Iterator[Call]:
         """Stream query calls.
 
         Args:
             req: Calls query request.
 
         Yields:
-            CallSchema instances.
+            Call instances.
         """
         self._update_client_headers()
-        req_dict = req.model_dump(by_alias=True)
         # Use stream_query endpoint
-        response = self._stainless_client.calls.stream_query(**req_dict)
+        response = self._stainless_client.calls.stream_query(**as_params(req))
         for item in response:
-            yield tsi.CallSchema.model_validate(item)
+            # The route's lines are generated as bare objects; each one is a call.
+            yield _parse_streamed_call(cast(dict[str, Any], item))
 
-    @validate_call
-    def calls_query_stats(self, req: tsi.CallsQueryStatsReq) -> tsi.CallsQueryStatsRes:
+    def calls_query_stats(
+        self, req: CallQueryStatsParams | tsi.CallsQueryStatsReq
+    ) -> CallQueryStatsResponse:
         """Query call statistics.
 
         Args:
@@ -855,14 +886,11 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         Returns:
             Calls query stats response.
         """
-        return self._stainless_request(
-            req,
-            tsi.CallsQueryStatsRes,
-            self._stainless_client.calls.query_stats,
+        return self._stainless_client.calls.query_stats(
+            extra_headers=self._compose_headers(), **as_params(req)
         )
 
-    @validate_call
-    def call_stats(self, req: tsi.CallStatsReq) -> tsi.CallStatsRes:
+    def call_stats(self, req: CallStatsParams | tsi.CallStatsReq) -> CallStatsResponse:
         """Query call statistics bucketed over time.
 
         Args:
@@ -871,14 +899,13 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         Returns:
             Call stats response.
         """
-        return self._stainless_request(
-            req,
-            tsi.CallStatsRes,
-            self._stainless_client.calls.stats,
+        return self._stainless_client.calls.stats(
+            extra_headers=self._compose_headers(), **as_params(req)
         )
 
-    @validate_call
-    def trace_usage(self, req: tsi.TraceUsageReq) -> tsi.TraceUsageRes:
+    def trace_usage(
+        self, req: TraceUsageParams | tsi.TraceUsageReq
+    ) -> TraceUsageResponse:
         """Compute per-call usage with descendant rollup.
 
         Args:
@@ -892,14 +919,13 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
             >>> req = tsi.TraceUsageReq(project_id="entity/project")
             >>> _ = server.trace_usage(req)  # doctest: +SKIP
         """
-        return self._stainless_request(
-            req,
-            tsi.TraceUsageRes,
-            self._stainless_client.trace.usage,
+        return self._stainless_client.trace.usage(
+            extra_headers=self._compose_headers(), **as_params(req)
         )
 
-    @validate_call
-    def calls_usage(self, req: tsi.CallsUsageReq) -> tsi.CallsUsageRes:
+    def calls_usage(
+        self, req: CallUsageParams | tsi.CallsUsageReq
+    ) -> CallUsageResponse:
         """Compute aggregated usage for multiple root calls.
 
         Args:
@@ -908,10 +934,8 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         Returns:
             Calls usage response.
         """
-        return self._stainless_request(
-            req,
-            tsi.CallsUsageRes,
-            self._stainless_client.calls.usage,
+        return self._stainless_client.calls.usage(
+            extra_headers=self._compose_headers(), **as_params(req)
         )
 
     def calls_delete(
@@ -1649,23 +1673,19 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
             self._stainless_client.dataset_sources.source_datasets_query,
         )
 
-    @validate_call
     def threads_query_stream(
-        self, req: tsi.ThreadsQueryReq
-    ) -> Iterator[tsi.ThreadSchema]:
+        self, req: ThreadStreamQueryParams | tsi.ThreadsQueryReq
+    ) -> Iterator[ThreadStreamQueryResponse]:
         """Stream query threads.
 
         Args:
             req: Threads query request.
 
         Yields:
-            ThreadSchema instances.
+            ThreadStreamQueryResponse instances.
         """
         self._update_client_headers()
-        req_dict = req.model_dump(by_alias=True)
-        response: Any = self._stainless_client.threads.stream_query(**req_dict)
-        for item in response:
-            yield tsi.ThreadSchema.model_validate(item.model_dump())
+        yield from self._stainless_client.threads.stream_query(**as_params(req))
 
     # Annotation Queue API
     @validate_call

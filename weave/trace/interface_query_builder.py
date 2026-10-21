@@ -1,31 +1,23 @@
+from collections.abc import Mapping
 from typing import Any
 
-from weave.shared.interface.query import (
-    GetFieldOperator,
-    LiteralOperation,
-    NotOperation,
-    Operand,
-)
+
+def get_field_expr(field: str) -> dict[str, Any]:
+    return {"$getField": field}
 
 
-def get_field_expr(field: str) -> GetFieldOperator:
-    return GetFieldOperator.model_validate({"$getField": field})
+def literal_expr(value: Any) -> dict[str, Any]:
+    return {"$literal": value}
 
 
-def literal_expr(value: Any) -> LiteralOperation:
-    return LiteralOperation.model_validate({"$literal": value})
-
-
-def exists_expr(expr: Operand) -> NotOperation:
-    return NotOperation.model_validate(
-        {
-            "$not": [
-                {
-                    "$eq": [
-                        expr,
-                        literal_expr(""),
-                    ]
-                }
-            ]
-        }
-    )
+def exists_expr(expr: Mapping[str, Any]) -> dict[str, Any]:
+    return {
+        "$not": [
+            {
+                "$eq": [
+                    expr,
+                    literal_expr(""),
+                ]
+            }
+        ]
+    }

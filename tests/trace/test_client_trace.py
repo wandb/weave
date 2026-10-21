@@ -198,6 +198,9 @@ def test_trace_server_call_start_and_end(client, wb_user_id):
             },
         },
         "wb_user_id": MaybeStringMatcher(wb_user_id),
+        # The generated `Call` declares `wb_username`, which the server leaves
+        # out unless usernames are asked for.
+        "wb_username": None,
         "wb_run_id": None,
         "wb_run_step": None,
         "wb_run_step_end": None,
@@ -251,6 +254,7 @@ def test_trace_server_call_start_and_end(client, wb_user_id):
             },
         },
         "wb_user_id": MaybeStringMatcher(wb_user_id),
+        "wb_username": None,
         "wb_run_id": None,
         "wb_run_step": None,
         "wb_run_step_end": None,
