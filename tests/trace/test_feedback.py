@@ -1,4 +1,5 @@
 import datetime
+import logging
 from unittest.mock import MagicMock
 
 import pytest
@@ -10,6 +11,7 @@ from weave.trace.errors import (
     InvalidRequest,
     QueryIllegalTypeofArgumentError,
 )
+from weave.trace.feedback import Feedback, _warned_feedback_fields
 from weave.trace.weave_client import WeaveClient, get_ref
 from weave.trace_server_bindings.client_interface import TraceServerClientInterface
 from weave.vendor.weave_server_sdk.types import (
@@ -17,6 +19,30 @@ from weave.vendor.weave_server_sdk.types import (
     FeedbackQueryResponse,
 )
 from weave.vendor.weave_server_sdk.types.feedback_aggregate_response import Bucket
+
+
+@pytest.mark.trace_server
+def test_feedback_warns_once_for_an_unknown_field(caplog) -> None:
+    _warned_feedback_fields.clear()
+    row = {
+        "id": "f",
+        "project_id": "e/p",
+        "weave_ref": "weave:///e/p/object/name:digest",
+        "feedback_type": "note",
+        "payload": {},
+        "created_at": datetime.datetime.now(datetime.timezone.utc),
+        "newer_field": 1,
+    }
+
+    with caplog.at_level(logging.WARNING, logger="weave.trace_server.common_interface"):
+        first = Feedback.model_validate(row)
+        Feedback.model_validate(row)
+
+    assert first.model_dump()["id"] == "f"
+    assert "newer_field" not in first.model_dump()
+    assert caplog.messages == [
+        "Ignoring unexpected fields while validating Feedback: newer_field"
+    ]
 
 
 def test_client_feedback(client) -> None:

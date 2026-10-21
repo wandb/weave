@@ -4,10 +4,11 @@ from __future__ import annotations
 
 import datetime
 import json
+import logging
 from collections.abc import Iterable, Iterator, Mapping
 from typing import Any, cast
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 from weave.trace import util
 from weave.trace.context import weave_client_context
@@ -38,6 +39,10 @@ from weave.vendor.weave_server_sdk.types import (
 # Reason the Agent UI records for human reactions; keep in sync with Reactions.tsx.
 AGENT_REACTION_REASON = "Set by user"
 
+# The old warning used this logger name, not this module's.
+logger = logging.getLogger("weave.trace_server.common_interface")
+_warned_feedback_fields: set[tuple[str, ...]] = set()
+
 
 class Feedback(BaseModel):
     """A feedback row, as a feedback query returns it."""
@@ -67,6 +72,30 @@ class Feedback(BaseModel):
     scorer_trace_id: str = ""
     wb_user_id: str | None = None
     created_at: datetime.datetime
+
+    @model_validator(mode="before")
+    @classmethod
+    def warn_on_extra_fields(cls, values: Any) -> Any:
+        if not isinstance(values, dict):
+            return values
+        known = set(cls.model_fields)
+        known.update(
+            field.alias
+            for field in cls.model_fields.values()
+            if field.alias is not None
+        )
+        extra_fields = set(values) - known
+        if not extra_fields or not logger.isEnabledFor(logging.WARNING):
+            return values
+        fields = tuple(sorted(extra_fields))
+        if fields not in _warned_feedback_fields:
+            _warned_feedback_fields.add(fields)
+            logger.warning(
+                "Ignoring unexpected fields while validating %s: %s",
+                cls.__name__,
+                ", ".join(fields),
+            )
+        return values
 
 
 class Feedbacks(AbstractRichContainer[Feedback]):
