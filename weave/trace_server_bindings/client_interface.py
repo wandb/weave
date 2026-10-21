@@ -6,7 +6,11 @@ from typing import Any, Protocol
 from weave.shared import trace_server_interface as tsi
 from weave.shared.agents import types as agent_types
 from weave.shared.service_interface import ProjectsInfoReq
-from weave.trace_server_bindings.models import CallsQueryRes, EnsureProjectExistsRes
+from weave.trace_server_bindings.models import (
+    CallsQueryRes,
+    DatasetSourcesLinkDeleteRes,
+    EnsureProjectExistsRes,
+)
 from weave.vendor.weave_server_sdk.types import (
     AnnotationQueueCreateParams,
     AnnotationQueueCreateResponse,
@@ -372,8 +376,8 @@ class TraceServerClientInterface(Protocol):
     ) -> DatasetSourceLinkResponse: ...
 
     def dataset_sources_link_delete(
-        self, req: tsi.DatasetSourcesLinkDeleteReq
-    ) -> tsi.DatasetSourcesLinkDeleteRes: ...
+        self, req: Mapping[str, Any] | tsi.DatasetSourcesLinkDeleteReq
+    ) -> DatasetSourcesLinkDeleteRes: ...
 
     def dataset_sources_query(
         self, req: DatasetSourceQueryParams | tsi.DatasetSourcesQueryReq

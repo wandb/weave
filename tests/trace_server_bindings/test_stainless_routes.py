@@ -30,6 +30,7 @@ from weave.trace_server.agents import types as agent_types
 from weave.trace_server_bindings import (
     stainless_remote_http_trace_server as stainless_binding,
 )
+from weave.trace_server_bindings.models import DatasetSourcesLinkDeleteRes
 from weave.trace_server_bindings.stainless_remote_http_trace_server import (
     StainlessRemoteHTTPTraceServer,
 )
@@ -696,7 +697,7 @@ def test_v2_method_reaches_its_flat_route(
             tsi.DatasetSourcesLinkDeleteReq(project_id=PROJECT, link_ids=["l1"]),
             "POST",
             "/dataset_sources/link_delete",
-            tsi.DatasetSourcesLinkDeleteRes,
+            DatasetSourcesLinkDeleteRes,
             id="dataset_sources_link_delete",
         ),
         pytest.param(
@@ -2538,6 +2539,26 @@ def test_typed_stream_reads_one_item_per_line(
     assert len(mock_server.requests) == 1
     assert mock_server.requests[0].url.path == expected_path
     assert res == expected
+
+
+def test_dataset_sources_link_delete_reads_the_entries():
+    mock_server = _mock_server(
+        httpx.Response(200, json={"entries": [{"link_id": "l1", "deleted": True}]})
+    )
+
+    res = mock_server.server.dataset_sources_link_delete(
+        {"project_id": PROJECT, "link_ids": ["l1"]}
+    )
+
+    assert [(r.method, r.url.path) for r in mock_server.requests] == [
+        ("POST", "/dataset_sources/link_delete")
+    ]
+    assert json.loads(mock_server.requests[0].content) == {
+        "project_id": PROJECT,
+        "link_ids": ["l1"],
+    }
+    assert res.entries[0].link_id == "l1"
+    assert res.entries[0].deleted is True
 
 
 def test_file_content_read_keeps_bytes():
