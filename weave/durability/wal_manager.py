@@ -3,9 +3,11 @@ from __future__ import annotations
 import atexit
 import logging
 import os
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
+from typing import Any
 
 from pydantic import BaseModel
+from pydantic_core import to_jsonable_python
 
 from weave.durability.wal import WALRecord, WALRecordType, WALWriter
 from weave.durability.wal_client_id import WAL_ROOT, compute_client_id
@@ -79,14 +81,18 @@ class WALManager:
         atexit.register(mgr.close)
         return mgr
 
-    def write(self, record_type: WALRecordType, req: BaseModel) -> None:
+    def write(
+        self, record_type: WALRecordType, req: BaseModel | Mapping[str, Any]
+    ) -> None:
         """Write a request to the WAL.  Never raises."""
         if self._writer is None:
             return
         try:
-            self._writer.write(
-                {"type": record_type, "req": req.model_dump(mode="json")}
-            )
+            if isinstance(req, BaseModel):
+                payload = req.model_dump(mode="json")
+            else:
+                payload = to_jsonable_python(req, inf_nan_mode="null")
+            self._writer.write({"type": record_type, "req": payload})
             logger.debug("WAL write: %s -> %s", record_type, self.wal_dir)
         except Exception:
             log_warning(f"WAL write failed for {record_type}")

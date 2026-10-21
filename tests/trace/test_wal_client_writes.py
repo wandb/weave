@@ -499,11 +499,12 @@ class TestTraceServerHandlers:
         assert call_arg.content == original_content
 
     def test_call_start_roundtrips_through_handler(self):
-        """call_start handler validates the dict directly (no json.dumps).
+        """call_start handler replays the record's dict as written.
 
         Regression guard for the dominant WAL replay path — every traced
-        op produces a call_start record.  datetime, dict, and string
-        fields must all round-trip correctly via model_validate(dict).
+        op produces a call_start record, and records written from a request
+        model must still replay.  datetime, dict, and string fields must all
+        round-trip.
         """
         mock_server = MagicMock()
         handlers = TraceServerHandlers(mock_server).as_dict()
@@ -524,11 +525,8 @@ class TestTraceServerHandlers:
 
         mock_server.call_start.assert_called_once()
         call_arg = mock_server.call_start.call_args[0][0]
-        assert isinstance(call_arg, tsi.CallStartReq)
-        assert call_arg.start.op_name == "predict"
-        assert call_arg.start.started_at == started
-        assert call_arg.start.attributes == {"k": "v"}
-        assert call_arg.start.inputs == {"x": 1}
+        assert call_arg == record["req"]
+        assert tsi.CallStartReq.model_validate(call_arg) == req
 
     def test_convenience_function_matches_class(self):
         """build_trace_server_handlers should return the same keys as the class."""

@@ -8,21 +8,42 @@ the default one.
 
 from __future__ import annotations
 
+import collections.abc
 import datetime
 import json
+import types
+import typing
+from collections.abc import Iterator
 from dataclasses import dataclass
+from typing import Any
 
 import httpx
 import pytest
+import typing_extensions
 from pydantic import BaseModel
 
 from tests.trace_server_bindings.conftest import generate_call_start_end_pair
+from weave.durability.wal_sender import build_trace_server_handlers
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.agents import types as agent_types
+from weave.trace_server_bindings import (
+    stainless_remote_http_trace_server as stainless_binding,
+)
 from weave.trace_server_bindings.stainless_remote_http_trace_server import (
     StainlessRemoteHTTPTraceServer,
 )
 from weave.vendor.weave_server_sdk import Client as StainlessClient
+from weave.vendor.weave_server_sdk.types import (
+    CallDeleteParams,
+    CallEndParams,
+    CallStartParams,
+    CallUpdateParams,
+    CallUpsertBatchParams,
+    CallUpsertBatchResponse,
+)
+from weave.vendor.weave_server_sdk.types.call_upsert_batch_response import (
+    ReCallStartRes,
+)
 
 BASE_URL = "http://example.com"
 PROJECT = "entity/project"
@@ -1621,10 +1642,11 @@ def test_call_end_reads_an_empty_response_body():
 
     assert len(mock_server.requests) == 1
     assert mock_server.requests[0].url.path == "/call/end"
-    assert res == tsi.CallEndRes()
+    assert res == {}
 
 
-def test_calls_complete_sends_the_batch_to_the_v2_route():
+@pytest.mark.parametrize("as_dict", [False, True], ids=["model", "dict"])
+def test_calls_complete_sends_the_batch_to_the_v2_route(as_dict):
     """Test that calls_complete posts the whole batch to the project's v2 route."""
     mock_server = _mock_server(httpx.Response(200, json={}))
     req = tsi.CallsUpsertCompleteReq(
@@ -1644,13 +1666,13 @@ def test_calls_complete_sends_the_batch_to_the_v2_route():
         ]
     )
 
-    res = mock_server.server.calls_complete(req)
+    res = mock_server.server.calls_complete(req.model_dump() if as_dict else req)
 
     assert [(r.method, r.url.path) for r in mock_server.requests] == [
         ("POST", f"{V2}/calls/complete")
     ]
     assert json.loads(mock_server.requests[0].content) == req.model_dump(mode="json")
-    assert res == tsi.CallsUpsertCompleteRes()
+    assert res == {}
 
 
 def test_call_start_batch_reads_the_response_list():
@@ -1673,10 +1695,172 @@ def test_call_start_batch_reads_the_response_list():
 
     assert len(mock_server.requests) == 1
     assert mock_server.requests[0].url.path == "/call/upsert_batch"
-    assert res.res == [
-        tsi.CallStartRes(id="call-id", trace_id="trace-id"),
-        tsi.CallEndRes(),
+    assert isinstance(res, CallUpsertBatchResponse)
+    assert res.res == [ReCallStartRes(id="call-id", trace_id="trace-id"), {}]
+
+
+def _strip(hint: Any) -> tuple[Any, list[Any]]:
+    """Drop `Required`, `NotRequired` and `Annotated`; return the type and metadata."""
+    metadata: list[Any] = []
+    while typing_extensions.get_origin(hint) in {
+        typing_extensions.Required,
+        typing_extensions.NotRequired,
+        typing_extensions.Annotated,
+    }:
+        if typing_extensions.get_origin(hint) is typing_extensions.Annotated:
+            metadata.extend(hint.__metadata__)
+        hint = typing_extensions.get_args(hint)[0]
+    return hint, metadata
+
+
+def _typed_dicts(hint: Any) -> list[type]:
+    """The TypedDicts a value of type `hint` can be, in declaration order."""
+    hint, _ = _strip(hint)
+    if typing_extensions.get_origin(hint) in {typing.Union, types.UnionType}:
+        return [
+            t for arg in typing_extensions.get_args(hint) for t in _typed_dicts(arg)
+        ]
+    return [hint] if typing_extensions.is_typeddict(hint) else []
+
+
+def _sentinel_params(typed_dict: type, here: str = "") -> dict[str, Any]:
+    """A value for every key of `typed_dict`, each naming its own place on the wire.
+
+    Nested TypedDicts, and lists of them, are filled the same way; every other
+    value is the string `<path>`, which the generated client sends unchanged.
+    """
+    params: dict[str, Any] = {}
+    hints = typing_extensions.get_type_hints(typed_dict, include_extras=True)
+    for key, hint in hints.items():
+        stripped, metadata = _strip(hint)
+        wire_key = next((m.alias for m in metadata if getattr(m, "alias", None)), key)
+        path = f"{here}.{wire_key}" if here else wire_key
+        origin = typing_extensions.get_origin(stripped)
+        if origin in {list, collections.abc.Iterable, collections.abc.Sequence}:
+            members = _typed_dicts(typing_extensions.get_args(stripped)[0])
+            params[key] = (
+                [_sentinel_params(t, f"{path}[{i}]") for i, t in enumerate(members)]
+                if members
+                else f"<{path}>"
+            )
+        elif members := _typed_dicts(stripped):
+            params[key] = _sentinel_params(members[0], path)
+        else:
+            params[key] = f"<{path}>"
+    return params
+
+
+def _leaves(value: Any, here: str = "") -> Iterator[tuple[str, Any]]:
+    if isinstance(value, dict):
+        for key, item in value.items():
+            yield from _leaves(item, f"{here}.{key}" if here else key)
+    elif isinstance(value, list):
+        for i, item in enumerate(value):
+            yield from _leaves(item, f"{here}[{i}]")
+    else:
+        yield here, value
+
+
+@pytest.mark.parametrize(
+    ("method_name", "params_type", "expected_method", "expected_path"),
+    [
+        pytest.param("call_start", CallStartParams, "POST", "/call/start"),
+        pytest.param("call_end", CallEndParams, "POST", "/call/end"),
+        pytest.param(
+            "call_start_batch", CallUpsertBatchParams, "POST", "/call/upsert_batch"
+        ),
+        pytest.param("call_update", CallUpdateParams, "POST", "/call/update"),
+        pytest.param("calls_delete", CallDeleteParams, "POST", "/calls/delete"),
+    ],
+)
+def test_every_params_key_reaches_the_request(
+    method_name: str,
+    params_type: type,
+    expected_method: str,
+    expected_path: str,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    """A binding method given the generated client's params must lose no key."""
+    # The sentinel values are strings in every field, so skip request validation.
+    for name in ("validate_call_start", "validate_call_end"):
+        monkeypatch.setattr(stainless_binding, name, lambda req: None)
+    mock_server = _mock_server(
+        httpx.Response(
+            200, json={"id": "c1", "trace_id": "t1", "num_deleted": 0, "res": []}
+        )
+    )
+    params = _sentinel_params(params_type)
+
+    getattr(mock_server.server, method_name)(params)
+
+    assert len(mock_server.requests) == 1
+    request = mock_server.requests[0]
+    assert (request.method, request.url.path) == (expected_method, expected_path)
+    body = dict(_leaves(json.loads(request.content)))
+    sent = sorted(
+        [*body.values(), *request.url.params.values(), *request.url.path.split("/")]
+    )
+    assert [s for s in sent if s.startswith("<")] == sorted(
+        value for _, value in _leaves(params)
+    )
+    # Each value sits under the key path it names.
+    assert all(value == f"<{path}>" for path, value in body.items())
+
+
+@pytest.mark.parametrize("should_batch", [False, True])
+def test_call_records_written_from_models_replay(should_batch: bool, monkeypatch):
+    """A WAL record holds a request model's JSON dump; replaying sends it."""
+    monkeypatch.setenv("WEAVE_USE_CALLS_COMPLETE", "true")
+    requests: list[httpx.Request] = []
+
+    def handle(request: httpx.Request) -> httpx.Response:
+        requests.append(request)
+        return httpx.Response(200, json={"id": "call-id", "trace_id": "test_trace_id"})
+
+    server = StainlessRemoteHTTPTraceServer(BASE_URL, should_batch=should_batch)
+    server._stainless_client = StainlessClient(
+        base_url=BASE_URL,
+        username="",
+        password="",
+        http_client=httpx.Client(transport=httpx.MockTransport(handle)),
+    )
+    start, end = generate_call_start_end_pair(id="call-id", project_id=PROJECT)
+    records = [
+        {"type": "call_start", "req": start.model_dump(mode="json")},
+        {"type": "call_end", "req": end.model_dump(mode="json")},
     ]
+
+    handlers = build_trace_server_handlers(server)
+    for record in records:
+        handlers[record["type"]](record)
+    if server.call_processor is not None:
+        server.call_processor.stop_accepting_new_work_and_flush_queue()
+
+    sent = [(r.url.path, json.loads(r.content)) for r in requests]
+    if not should_batch:
+        assert sent == [
+            ("/call/start", records[0]["req"]),
+            ("/call/end", records[1]["req"]),
+        ]
+    else:
+        paired = tsi.CompletedCallSchemaForInsert(
+            project_id=PROJECT,
+            id="call-id",
+            trace_id=start.start.trace_id,
+            op_name=start.start.op_name,
+            parent_id=start.start.parent_id,
+            started_at=start.start.started_at,
+            attributes=start.start.attributes,
+            inputs=start.start.inputs,
+            ended_at=end.end.ended_at,
+            summary=end.end.summary,
+        )
+        assert sent == [
+            (
+                f"{V2}/calls/complete",
+                tsi.CallsUpsertCompleteReq(batch=[paired]).model_dump(mode="json"),
+            )
+        ]
 
 
 @pytest.mark.parametrize(

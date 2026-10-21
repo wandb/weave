@@ -13,6 +13,7 @@ from functools import cached_property
 from typing import TYPE_CHECKING, Any, TypedDict, TypeVar, cast
 
 import pydantic
+from pydantic_core import to_jsonable_python
 
 from weave.chat.chat import Chat
 from weave.chat.inference_models import InferenceModels
@@ -37,12 +38,8 @@ from weave.shared.trace_server_interface import (
     AnnotationQueuesStatsReq,
     AnnotationQueueStatsSchema,
     AnnotationQueueUpdateReq,
-    CallEndReq,
-    CallsDeleteReq,
     CallsFilter,
     CallsQueryReq,
-    CallStartReq,
-    CallUpdateReq,
     CostCreateInput,
     CostCreateReq,
     CostCreateRes,
@@ -52,7 +49,6 @@ from weave.shared.trace_server_interface import (
     CustomRuntimeApplyReq,
     CustomRuntimeApplyRes,
     CustomRuntimeID,
-    EndedCallSchemaForInsertWithStartedAt,
     FeedbackCreateReq,
     FileCreateReq,
     FileCreateRes,
@@ -70,7 +66,6 @@ from weave.shared.trace_server_interface import (
     ObjSetAliasesReq,
     Query,
     RefsReadBatchReq,
-    StartedCallSchemaForInsert,
     TableAppendSpec,
     TableAppendSpecPayload,
     TableCreateFromDigestsReq,
@@ -93,6 +88,7 @@ from weave.trace.call import (
     is_eval_call,
     make_client_call,
 )
+from weave.trace.call_request_validation import validate_call_end, validate_call_start
 from weave.trace.casting import CallsFilterLike, QueryLike, SortByLike
 from weave.trace.concurrent.futures import FutureExecutor
 from weave.trace.constants import (
@@ -208,6 +204,12 @@ from weave.utils.paginated_iterator import PaginatedIterator
 from weave.utils.project_id import from_project_id, to_project_id
 from weave.utils.retry import _http_response
 from weave.utils.sanitize import REDACTED_VALUE, redact_dataclass_fields, should_redact
+from weave.vendor.weave_server_sdk.types import (
+    CallEndParams,
+    CallStartParams,
+    CallUpdateParams,
+)
+from weave.vendor.weave_server_sdk.types.call_end_params import EndSummary
 
 # OTel imports — kept top-level under a try/except guard so the module
 # loads cleanly when opentelemetry is not installed. When unavailable,
@@ -1631,23 +1633,27 @@ class WeaveClient:
             inputs_json = to_json(
                 maybe_redacted_inputs_with_refs, project_id, self, use_dictify=False
             )
-            call_start_req = CallStartReq(
-                start=StartedCallSchemaForInsert(
-                    project_id=project_id,
-                    id=call_id,
-                    op_name=op_def_ref.uri,
-                    display_name=call.display_name,
-                    trace_id=trace_id,
-                    started_at=started_at,
-                    parent_id=parent_id,
-                    inputs=inputs_json,
-                    attributes=attributes_dict.unwrap(),
-                    wb_run_id=current_wb_run_id,
-                    wb_run_step=current_wb_run_step,
-                    thread_id=thread_id,
-                    turn_id=turn_id,
-                )
-            )
+            call_start_req: CallStartParams = {
+                "start": {
+                    "project_id": project_id,
+                    "id": call_id,
+                    "op_name": op_def_ref.uri,
+                    "display_name": cast("str | None", call.display_name),
+                    "trace_id": trace_id,
+                    "parent_id": parent_id,
+                    "thread_id": thread_id,
+                    "turn_id": turn_id,
+                    "started_at": started_at,
+                    "attributes": to_jsonable_python(attributes_dict.unwrap()),
+                    "inputs": to_jsonable_python(inputs_json),
+                    "otel_dump": None,
+                    "wb_user_id": None,
+                    "wb_run_id": current_wb_run_id,
+                    "wb_run_step": current_wb_run_step,
+                }
+            }
+
+            validate_call_start(call_start_req)
 
             # WAL path: persist to disk; the sender replays to the server.
             if self._wal is not None:
@@ -1818,20 +1824,22 @@ class WeaveClient:
                 wb_run_context_end.step if wb_run_context_end else None
             )
 
-            call_end_req = CallEndReq(
-                end=EndedCallSchemaForInsertWithStartedAt(
-                    project_id=project_id,
-                    id=call.id,
-                    trace_id=call.trace_id,
-                    is_eval=is_eval_call(call),
-                    started_at=call.started_at,
-                    ended_at=ended_at,
-                    output=output_json,
-                    summary=merged_summary,
-                    exception=exception_str,
-                    wb_run_step_end=current_wb_run_step_end,
-                )
-            )
+            call_end_req: CallEndParams = {
+                "end": {
+                    "project_id": project_id,
+                    "id": cast(str, call.id),
+                    "trace_id": call.trace_id,
+                    "is_eval": is_eval_call(call),
+                    "ended_at": ended_at,
+                    "started_at": call.started_at,
+                    "exception": exception_str,
+                    "output": to_jsonable_python(output_json),
+                    "summary": cast(EndSummary, to_jsonable_python(merged_summary)),
+                    "wb_run_step_end": current_wb_run_step_end,
+                }
+            }
+            validate_call_end(call_end_req)
+
             # WAL path: persist to disk; the sender replays to the server.
             if self._wal is not None:
                 self._wal.write("call_end", call_end_req)
@@ -1940,10 +1948,11 @@ class WeaveClient:
     @trace_sentry.global_trace_sentry.watch()
     def delete_call(self, call: Call) -> None:
         self.server.calls_delete(
-            CallsDeleteReq(
-                project_id=self.project_id,
-                call_ids=[call.id],
-            )
+            {
+                "project_id": self.project_id,
+                "call_ids": [cast(str, call.id)],
+                "wb_user_id": None,
+            }
         )
 
     @trace_sentry.global_trace_sentry.watch()
@@ -1956,10 +1965,7 @@ class WeaveClient:
             call_ids: A list of call IDs to delete. Ex: ["2F0193e107-8fcf-7630-b576-977cc3062e2e"]
         """
         self.server.calls_delete(
-            CallsDeleteReq(
-                project_id=self.project_id,
-                call_ids=call_ids,
-            )
+            {"project_id": self.project_id, "call_ids": call_ids, "wb_user_id": None}
         )
 
     @trace_sentry.global_trace_sentry.watch()
@@ -3271,11 +3277,12 @@ class WeaveClient:
         # Removing call display name, use "" for db representation
         if display_name is None:
             display_name = ""
-        req = CallUpdateReq(
-            project_id=self.project_id,
-            call_id=call.id,
-            display_name=elide_display_name(display_name),
-        )
+        req: CallUpdateParams = {
+            "project_id": self.project_id,
+            "call_id": cast(str, call.id),
+            "display_name": elide_display_name(display_name),
+            "wb_user_id": None,
+        }
 
         def send_call_update() -> None:
             self.server.call_update(req)

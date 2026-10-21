@@ -20,7 +20,11 @@ import requests
 import tenacity
 from pydantic import ValidationError
 
-from tests.trace_server_bindings.conftest import generate_id, generate_start
+from tests.trace_server_bindings.conftest import (
+    generate_end,
+    generate_id,
+    generate_start,
+)
 from weave.trace.display.term import configure_logger
 from weave.trace.refs import ObjectRef
 from weave.trace.weave_client import WeaveClient
@@ -43,6 +47,7 @@ from weave.trace_server_bindings.stainless_remote_http_trace_server import (
 )
 from weave.utils.retry import with_retry
 from weave.vendor.weave_server_sdk import APIStatusError, DefaultHttpxClient
+from weave.vendor.weave_server_sdk.types import CallStartResponse
 from weave.wandb_interface.auth import ApiKeyCredentials, WandbCredentials
 
 
@@ -100,21 +105,14 @@ def test_call_start_ok(unbatched_server):
     """Test successful call_start request."""
     call_id = generate_id()
 
-    mock_response = MagicMock()
-    mock_response.model_dump.return_value = {
-        "id": call_id,
-        "trace_id": "test_trace_id",
-    }
-    unbatched_server._stainless_client.calls.start = MagicMock(
-        return_value=mock_response
-    )
+    response = CallStartResponse(id=call_id, trace_id="test_trace_id")
+    unbatched_server._stainless_client.calls.start = MagicMock(return_value=response)
 
     start = generate_start(call_id)
     result = unbatched_server.call_start(tsi.CallStartReq(start=start))
 
     unbatched_server._stainless_client.calls.start.assert_called_once()
-    assert result.id == call_id
-    assert result.trace_id == "test_trace_id"
+    assert result == CallStartResponse(id=call_id, trace_id="test_trace_id")
 
 
 def test_400_no_retry(unbatched_server):
@@ -142,6 +140,37 @@ def test_invalid_no_retry(unbatched_server):
     """Test that validation errors are not retried."""
     with pytest.raises(ValidationError):
         unbatched_server.call_start(tsi.CallStartReq(start={"invalid": "broken"}))
+
+
+@pytest.mark.parametrize("should_batch", [False, True], ids=["unbatched", "batched"])
+def test_a_bad_dict_start_or_end_is_rejected_before_it_is_sent(should_batch):
+    """A start or end passed as a dict with a bad field fails like a request model did."""
+    requests: list[httpx.Request] = []
+
+    def handle(request: httpx.Request) -> httpx.Response:
+        requests.append(request)
+        return httpx.Response(200, json={}, request=request)
+
+    server = StainlessRemoteHTTPTraceServer(
+        "http://example.com", should_batch=should_batch
+    )
+    server._stainless_client = server._stainless_client.copy(
+        http_client=httpx.Client(transport=httpx.MockTransport(handle))
+    )
+    start = {**generate_start("call-id").model_dump(), "display_name": 5}
+    end = {**generate_end("call-id").model_dump(), "exception": 5}
+    try:
+        with pytest.raises(ValidationError):
+            server.call_start({"start": start})
+        with pytest.raises(ValidationError):
+            server.call_end({"end": end})
+    finally:
+        if server.call_processor:
+            server.call_processor.stop_accepting_new_work_and_flush_queue()
+        if server.feedback_processor:
+            server.feedback_processor.stop_accepting_new_work_and_flush_queue()
+
+    assert requests == []
 
 
 @pytest.mark.disable_logging_error_check
@@ -229,14 +258,7 @@ def test_post_timeout(success_response, fast_retrying_server, log_collector):
         if call_count == 1:
             raise requests.exceptions.Timeout("Connection timed out")
         else:
-            mock_response = MagicMock()
-            mock_response.id = "test_id"
-            mock_response.trace_id = "test_trace_id"
-            mock_response.model_dump.return_value = {
-                "id": "test_id",
-                "trace_id": "test_trace_id",
-            }
-            return mock_response
+            return CallStartResponse(id="test_id", trace_id="test_trace_id")
 
     # Create a new server since the old one has shutdown its batch processor
     new_server = StainlessRemoteHTTPTraceServer(
@@ -247,9 +269,7 @@ def test_post_timeout(success_response, fast_retrying_server, log_collector):
         stop=tenacity.stop_after_attempt(2),
         reraise=True,
     )
-    original_stainless_request = new_server._stainless_request
-    new_server._stainless_request = fast_retry(original_stainless_request)
-    new_server._stainless_client.calls.start = mock_start_success
+    new_server._stainless_client.calls.start = fast_retry(mock_start_success)
 
     # Should succeed with retry
     start_req = tsi.CallStartReq(start=generate_start())

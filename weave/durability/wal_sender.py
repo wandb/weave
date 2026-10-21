@@ -293,10 +293,10 @@ class BackgroundWALSender:
 
 # Static mapping from WAL record type to its request class.
 # Prefer this over dynamic getattr — type checkers and humans can
-# verify correctness at a glance.
-_RECORD_TYPE_TO_REQ: dict[str, type[BaseModel]] = {
-    "call_start": tsi.CallStartReq,
-    "call_end": tsi.CallEndReq,
+# verify correctness at a glance.  ``None`` replays the record's dict as is.
+_RECORD_TYPE_TO_REQ: dict[str, type[BaseModel] | None] = {
+    "call_start": None,
+    "call_end": None,
     "obj_create": tsi.ObjCreateReq,
     "table_create": tsi.TableCreateReq,
     "file_create": tsi.FileCreateReq,
@@ -319,7 +319,7 @@ class TraceServerHandlers:
             def _handler(
                 record: WALRecord,
                 _m: Callable = method,
-                _rc: type[BaseModel] = req_cls,
+                _rc: type[BaseModel] | None = req_cls,
                 _rt: str = record_type,
             ) -> None:
                 # We already have a parsed dict in ``record["req"]`` (the WAL
@@ -335,7 +335,7 @@ class TraceServerHandlers:
                 # Non-utf8 content can't reach the WAL at all because the
                 # write-side model_dump(mode="json") raises before the record
                 # is persisted.
-                _m(_rc.model_validate(record["req"]))
+                _m(record["req"] if _rc is None else _rc.model_validate(record["req"]))
                 if on_success is not None:
                     on_success(_rt, record)
 

@@ -1,17 +1,20 @@
 from __future__ import annotations
 
 import datetime
+import json
 import logging
-from collections.abc import Callable, Iterator
+from collections.abc import Callable, Iterator, Mapping
 from typing import Any, TypeVar, cast
 from zoneinfo import ZoneInfo
 
 from pydantic import BaseModel, validate_call
+from pydantic_core import to_json, to_jsonable_python
 from typing_extensions import Self
 
 from weave.shared import trace_server_interface as tsi
 from weave.shared.service_interface import ServerInfoRes
 from weave.shared.trace_server_interface import agent_types
+from weave.trace.call_request_validation import validate_call_end, validate_call_start
 from weave.trace.env import ssl_verify, weave_trace_server_url
 from weave.trace.settings import (
     http_timeout,
@@ -28,13 +31,13 @@ from weave.trace_server_bindings.http_utils import (
     REMOTE_REQUEST_BYTES_LIMIT,
     TRACE_ID_HEADER,
     CallsCompleteModeRequired,
+    as_params,
     is_calls_complete_mode_error,
     log_dropped_call_batch,
     log_dropped_feedback_batch,
     process_batch_with_retry,
 )
 from weave.trace_server_bindings.models import (
-    Batch,
     CompleteBatchItem,
     EndBatchItem,
     StartBatchItem,
@@ -44,6 +47,16 @@ from weave.utils.project_id import from_project_id
 from weave.utils.retry import get_current_retry_id, with_retry
 from weave.vendor.weave_server_sdk import APIStatusError, DefaultHttpxClient
 from weave.vendor.weave_server_sdk import Client as StainlessClient
+from weave.vendor.weave_server_sdk.types import (
+    CallDeleteParams,
+    CallDeleteResponse,
+    CallEndParams,
+    CallStartParams,
+    CallStartResponse,
+    CallUpdateParams,
+    CallUpsertBatchParams,
+    CallUpsertBatchResponse,
+)
 from weave.wandb_interface import project_creator
 from weave.wandb_interface.auth import (
     ApiKeyCredentials,
@@ -195,11 +208,13 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
             response = response.model_dump()
         return res_type.model_validate(response)
 
-    def _prepare_v2_request(self, req: BaseModel) -> tuple[str, str]:
+    def _prepare_v2_request(
+        self, req: Mapping[str, Any] | BaseModel
+    ) -> tuple[str, str]:
         """Prepare v2 API request by updating headers and splitting project_id.
 
         Args:
-            req: Request object with project_id attribute.
+            req: Request with a project_id.
 
         Returns:
             Tuple of (entity, project) from split project_id.
@@ -208,7 +223,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
             >>> entity, project = self._prepare_v2_request(req)
         """
         self._update_client_headers()
-        return from_project_id(req.project_id)
+        return from_project_id(as_params(req)["project_id"])
 
     @with_retry
     def _send_batch_to_server(self, encoded_data: bytes) -> None:
@@ -218,25 +233,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
             encoded_data: Encoded batch data to send.
         """
         self._update_client_headers()
-        # Parse the batch and convert to stainless format
-        batch_data = Batch.model_validate_json(encoded_data.decode("utf-8"))
-        stainless_batch = []
-        for item in batch_data.batch:
-            if isinstance(item, StartBatchItem):
-                stainless_batch.append(
-                    {
-                        "mode": "start",
-                        "req": item.req.model_dump(by_alias=True),
-                    }
-                )
-            elif isinstance(item, EndBatchItem):
-                stainless_batch.append(
-                    {
-                        "mode": "end",
-                        "req": item.req.model_dump(by_alias=True),
-                    }
-                )
-        self._upsert_calls_batch(stainless_batch)
+        self._upsert_calls_batch(json.loads(encoded_data)["batch"])
 
     def _upsert_calls_batch(self, stainless_batch: list[Any]) -> Any:
         """Send a legacy batch, mapping the calls_complete signal onto our own type.
@@ -269,14 +266,18 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
 
         def get_item_id(item: StartBatchItem | EndBatchItem) -> str:
             if isinstance(item, StartBatchItem):
-                return f"{item.req.start.id}-start"
+                return f"{as_params(item.req)['start'].get('id')}-start"
             elif isinstance(item, EndBatchItem):
-                return f"{item.req.end.id}-end"
+                return f"{as_params(item.req)['end'].get('id')}-end"
             return "unknown"
 
         def encode_batch(batch: list[StartBatchItem | EndBatchItem]) -> bytes:
-            data = Batch(batch=batch).model_dump_json()
-            return data.encode("utf-8")
+            body = {
+                "batch": [
+                    {"mode": item.mode, "req": as_params(item.req)} for item in batch
+                ]
+            }
+            return to_json(body, inf_nan_mode="null")
 
         try:
             process_batch_with_retry(
@@ -357,34 +358,34 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         for item in batch:
             try:
                 if isinstance(item, StartBatchItem):
-                    self._send_call_start_v2(item.req.start)
+                    self._send_call_start_v2(as_params(item.req)["start"])
                 elif isinstance(item, EndBatchItem):
-                    self._send_call_end_v2(item.req.end)
+                    self._send_call_end_v2(as_params(item.req)["end"])
             except Exception as e:
                 log_dropped_call_batch([item], e)
 
     @with_retry
-    def _send_call_start_v2(self, start: tsi.StartedCallSchemaForInsert) -> None:
+    def _send_call_start_v2(self, start: Mapping[str, Any]) -> None:
         """Send a single call start to the v2 endpoint."""
         entity, project = self._prepare_v2_request(start)
         # The v2 single-call routes are hidden from the OpenAPI spec, so the
         # generator emits no method for them.
         self._stainless_client.post(
             f"/v2/{entity}/{project}/call/start",
-            body=tsi.CallStartV2Req(start=start).model_dump(mode="json"),
+            body=to_jsonable_python({"start": start}, inf_nan_mode="null"),
             cast_to=object,
-            options={"headers": self._compose_headers(trace_id=start.trace_id)},
+            options={"headers": self._compose_headers(trace_id=start.get("trace_id"))},
         )
 
     @with_retry
-    def _send_call_end_v2(self, end: tsi.EndedCallSchemaForInsertWithStartedAt) -> None:
+    def _send_call_end_v2(self, end: Mapping[str, Any]) -> None:
         """Send a single call end to the v2 endpoint."""
         entity, project = self._prepare_v2_request(end)
         self._stainless_client.post(
             f"/v2/{entity}/{project}/call/end",
-            body=tsi.CallEndV2Req(end=end).model_dump(mode="json"),
+            body=to_jsonable_python({"end": end}, inf_nan_mode="null"),
             cast_to=object,
-            options={"headers": self._compose_headers(trace_id=end.trace_id)},
+            options={"headers": self._compose_headers(trace_id=end.get("trace_id"))},
         )
 
     @with_retry
@@ -394,19 +395,13 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         """Send a batch of completed calls to the server with retry logic."""
         # The generated method takes objects, not the bytes the batch splitter works in.
         self._update_client_headers()
-        req = tsi.CallsUpsertCompleteReq.model_validate_json(
-            encoded_data.decode("utf-8")
-        )
         self._stainless_client.v2_calls.complete(
-            project,
-            entity=entity,
-            batch=[item.model_dump(mode="json") for item in req.batch],  # type: ignore[misc]
+            project, entity=entity, batch=json.loads(encoded_data)["batch"]
         )
 
-    @validate_call
     def calls_complete(
-        self, req: tsi.CallsUpsertCompleteReq
-    ) -> tsi.CallsUpsertCompleteRes:
+        self, req: Mapping[str, Any] | tsi.CallsUpsertCompleteReq
+    ) -> object:
         """Upsert a batch of completed calls.
 
         Args:
@@ -415,13 +410,15 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         Returns:
             Calls upsert complete response.
         """
-        if not req.batch:
-            return tsi.CallsUpsertCompleteRes()
-        entity, project = from_project_id(req.batch[0].project_id)
+        batch = [as_params(item) for item in as_params(req)["batch"]]
+        if not batch:
+            return {}
+        entity, project = from_project_id(batch[0]["project_id"])
+        # The same body the batch processor sends (_flush_calls_complete).
         self._send_calls_complete_to_server(
-            entity, project, req.model_dump_json().encode("utf-8")
+            entity, project, to_json({"batch": batch}, inf_nan_mode="null")
         )
-        return tsi.CallsUpsertCompleteRes()
+        return {}
 
     def _flush_calls_complete(
         self,
@@ -434,15 +431,14 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         if not batch:
             return
 
-        entity, project = from_project_id(batch[0].req.project_id)
+        entity, project = from_project_id(as_params(batch[0].req)["project_id"])
 
         def get_item_id(item: CompleteBatchItem) -> str:
-            return f"{item.req.id}-complete"
+            return f"{as_params(item.req)['id']}-complete"
 
         def encode_batch(batch: list[CompleteBatchItem]) -> bytes:
-            api_batch = [item.req for item in batch]
-            req = tsi.CallsUpsertCompleteReq(batch=api_batch)
-            return req.model_dump_json().encode("utf-8")
+            body = {"batch": [as_params(item.req) for item in batch]}
+            return to_json(body, inf_nan_mode="null")
 
         process_batch_with_retry(
             batch_name="calls_complete",
@@ -746,8 +742,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         )
 
     # Call API
-    @validate_call
-    def call_start(self, req: tsi.CallStartReq) -> tsi.CallStartRes:
+    def call_start(self, req: CallStartParams | tsi.CallStartReq) -> CallStartResponse:
         """Start a call.
 
         Args:
@@ -756,21 +751,26 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         Returns:
             Call start response.
         """
+        params = as_params(req)
+        if not isinstance(req, BaseModel):
+            validate_call_start(params)
         if self.should_batch:
             assert self.call_processor is not None
-            if req.start.id is None or req.start.trace_id is None:
+            start = params["start"]
+            if start.get("id") is None or start.get("trace_id") is None:
                 raise ValueError(
                     "CallStartReq must have id and trace_id when batching."
                 )
             self.call_processor.enqueue_start(StartBatchItem(req=req))
-            return tsi.CallStartRes(id=req.start.id, trace_id=req.start.trace_id)
+            return CallStartResponse(id=start["id"], trace_id=start["trace_id"])
 
-        return self._stainless_request(
-            req, tsi.CallStartRes, self._stainless_client.calls.start
+        return self._stainless_client.calls.start(
+            extra_headers=self._compose_headers(), **params
         )
 
-    @validate_call
-    def call_start_batch(self, req: tsi.CallCreateBatchReq) -> tsi.CallCreateBatchRes:
+    def call_start_batch(
+        self, req: CallUpsertBatchParams | tsi.CallCreateBatchReq
+    ) -> CallUpsertBatchResponse:
         """Start a batch of calls.
 
         Args:
@@ -780,36 +780,9 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
             Batch create response.
         """
         self._update_client_headers()
-        # Convert to stainless format
-        stainless_batch = []
-        for item in req.batch:
-            if item.mode == "start":
-                stainless_batch.append(
-                    {
-                        "mode": "start",
-                        "req": item.req.model_dump(by_alias=True),
-                    }
-                )
-            elif item.mode == "end":
-                stainless_batch.append(
-                    {
-                        "mode": "end",
-                        "req": item.req.model_dump(by_alias=True),
-                    }
-                )
-        response = self._upsert_calls_batch(stainless_batch)
-        # Convert response back
-        res_items = []
-        for res_item in response.res:
-            # A start result is generated as a model, an end result as an empty object.
-            if isinstance(res_item, BaseModel):
-                res_items.append(tsi.CallStartRes.model_validate(res_item.model_dump()))
-            else:
-                res_items.append(tsi.CallEndRes())
-        return tsi.CallCreateBatchRes(res=res_items)
+        return self._upsert_calls_batch(as_params(req)["batch"])
 
-    @validate_call
-    def call_end(self, req: tsi.CallEndReq) -> tsi.CallEndRes:
+    def call_end(self, req: CallEndParams | tsi.CallEndReq) -> object:
         """End a call.
 
         Args:
@@ -818,13 +791,15 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         Returns:
             Call end response.
         """
+        if not isinstance(req, BaseModel):
+            validate_call_end(req)
         if self.should_batch:
             assert self.call_processor is not None
             self.call_processor.enqueue([EndBatchItem(req=req)])
-            return tsi.CallEndRes()
+            return {}
 
-        return self._stainless_request(
-            req, tsi.CallEndRes, self._stainless_client.calls.end
+        return self._stainless_client.calls.end(
+            extra_headers=self._compose_headers(), **as_params(req)
         )
 
     @validate_call
@@ -939,8 +914,9 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
             self._stainless_client.calls.usage,
         )
 
-    @validate_call
-    def calls_delete(self, req: tsi.CallsDeleteReq) -> tsi.CallsDeleteRes:
+    def calls_delete(
+        self, req: CallDeleteParams | tsi.CallsDeleteReq
+    ) -> CallDeleteResponse:
         """Delete calls.
 
         Args:
@@ -949,14 +925,11 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         Returns:
             Calls delete response.
         """
-        return self._stainless_request(
-            req,
-            tsi.CallsDeleteRes,
-            self._stainless_client.calls.delete,
+        return self._stainless_client.calls.delete(
+            extra_headers=self._compose_headers(), **as_params(req)
         )
 
-    @validate_call
-    def call_update(self, req: tsi.CallUpdateReq) -> tsi.CallUpdateRes:
+    def call_update(self, req: CallUpdateParams | tsi.CallUpdateReq) -> object:
         """Update a call.
 
         Args:
@@ -965,10 +938,8 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         Returns:
             Call update response.
         """
-        return self._stainless_request(
-            req,
-            tsi.CallUpdateRes,
-            self._stainless_client.calls.update,
+        return self._stainless_client.calls.update(
+            extra_headers=self._compose_headers(), **as_params(req)
         )
 
     # Obj API
