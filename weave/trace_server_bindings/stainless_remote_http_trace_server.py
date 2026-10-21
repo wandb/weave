@@ -14,6 +14,7 @@ from typing_extensions import Self
 from weave.shared import trace_server_interface as tsi
 from weave.shared.service_interface import ServerInfoRes
 from weave.shared.trace_server_interface import agent_types
+from weave.trace.call_request_validation import validate_call_end, validate_call_start
 from weave.trace.env import ssl_verify, weave_trace_server_url
 from weave.trace.settings import (
     http_timeout,
@@ -751,6 +752,8 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
             Call start response.
         """
         params = as_params(req)
+        if not isinstance(req, BaseModel):
+            validate_call_start(params)
         if self.should_batch:
             assert self.call_processor is not None
             start = params["start"]
@@ -788,6 +791,8 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         Returns:
             Call end response.
         """
+        if not isinstance(req, BaseModel):
+            validate_call_end(req)
         if self.should_batch:
             assert self.call_processor is not None
             self.call_processor.enqueue([EndBatchItem(req=req)])

@@ -26,6 +26,9 @@ from tests.trace_server_bindings.conftest import generate_call_start_end_pair
 from weave.durability.wal_sender import build_trace_server_handlers
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.agents import types as agent_types
+from weave.trace_server_bindings import (
+    stainless_remote_http_trace_server as stainless_binding,
+)
 from weave.trace_server_bindings.stainless_remote_http_trace_server import (
     StainlessRemoteHTTPTraceServer,
 )
@@ -1751,9 +1754,16 @@ def _leaves(value: Any, here: str = "") -> Iterator[tuple[str, Any]]:
     ],
 )
 def test_every_params_key_reaches_the_request(
-    method_name: str, params_type: type, expected_method: str, expected_path: str
+    method_name: str,
+    params_type: type,
+    expected_method: str,
+    expected_path: str,
+    monkeypatch: pytest.MonkeyPatch,
 ):
     """A binding method given the generated client's params must lose no key."""
+    # The sentinel values are strings in every field, so skip request validation.
+    for name in ("validate_call_start", "validate_call_end"):
+        monkeypatch.setattr(stainless_binding, name, lambda req: None)
     mock_server = _mock_server(
         httpx.Response(
             200, json={"id": "c1", "trace_id": "t1", "num_deleted": 0, "res": []}

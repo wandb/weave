@@ -88,6 +88,7 @@ from weave.trace.call import (
     is_eval_call,
     make_client_call,
 )
+from weave.trace.call_request_validation import validate_call_end, validate_call_start
 from weave.trace.casting import CallsFilterLike, QueryLike, SortByLike
 from weave.trace.concurrent.futures import FutureExecutor
 from weave.trace.constants import (
@@ -1652,6 +1653,8 @@ class WeaveClient:
                 }
             }
 
+            validate_call_start(call_start_req)
+
             # WAL path: persist to disk; the sender replays to the server.
             if self._wal is not None:
                 self._wal.write("call_start", call_start_req)
@@ -1835,6 +1838,8 @@ class WeaveClient:
                     "wb_run_step_end": current_wb_run_step_end,
                 }
             }
+            validate_call_end(call_end_req)
+
             # WAL path: persist to disk; the sender replays to the server.
             if self._wal is not None:
                 self._wal.write("call_end", call_end_req)
