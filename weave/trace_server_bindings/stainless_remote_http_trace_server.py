@@ -14,6 +14,7 @@ from typing_extensions import Self
 from weave.shared import trace_server_interface as tsi
 from weave.shared.trace_server_interface import agent_types
 from weave.trace.env import ssl_verify, weave_trace_server_url
+from weave.trace.serialization.json_dict_keys import to_jsonable_with_json_keys
 from weave.trace.settings import (
     http_timeout,
     max_calls_queue_size,
@@ -1098,8 +1099,14 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         Returns:
             Object create response.
         """
+        # The value goes out the way the client encodes it before computing its digest.
+        params = dict(as_params(req))
+        params["obj"] = {
+            **params["obj"],
+            "val": to_jsonable_with_json_keys(params["obj"]["val"]),
+        }
         return self._stainless_client.objects.create(
-            extra_headers=self._compose_headers(), **as_params(req)
+            extra_headers=self._compose_headers(), **params
         )
 
     def obj_read(self, req: ObjectReadParams | tsi.ObjReadReq) -> ObjectReadResponse:
@@ -1207,7 +1214,9 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         params = dict(as_params(req))
         params["table"] = {
             **params["table"],
-            "rows": to_jsonable_python(params["table"]["rows"], inf_nan_mode="null"),
+            "rows": to_jsonable_with_json_keys(
+                params["table"]["rows"], inf_nan_mode="null"
+            ),
         }
         return self._stainless_client.tables.create(
             extra_headers=self._compose_headers(), **params
@@ -1227,7 +1236,9 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         # The updates may be any iterable, so read them once; rows are normalized
         # here because the request model that used to do it is no longer built.
         params = dict(as_params(req))
-        updates = to_jsonable_python(list(params["updates"]), inf_nan_mode="null")
+        updates = to_jsonable_with_json_keys(
+            list(params["updates"]), inf_nan_mode="null"
+        )
         params["updates"] = updates
         # Handle large requests by splitting
         estimated_bytes = len(to_json(params, inf_nan_mode="null"))

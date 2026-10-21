@@ -119,6 +119,7 @@ from weave.trace.serialization.digest import (
     compute_row_digest,
     compute_table_digest,
 )
+from weave.trace.serialization.json_dict_keys import to_jsonable_with_json_keys
 from weave.trace.serialization.serialize import (
     from_json,
     isinstance_namedtuple,
@@ -2984,7 +2985,7 @@ class WeaveClient:
                     "obj": {
                         "project_id": self.entity + "/" + self.project,
                         "object_id": name,
-                        "val": to_jsonable_python(json_val),
+                        "val": to_jsonable_with_json_keys(json_val),
                         "builtin_object_class": None,
                         "expected_digest": None,
                         "wb_user_id": None,
@@ -2999,7 +3000,7 @@ class WeaveClient:
                 "obj": {
                     "project_id": self.entity + "/" + self.project,
                     "object_id": name,
-                    "val": to_jsonable_python(json_val),
+                    "val": to_jsonable_with_json_keys(json_val),
                     "builtin_object_class": None,
                     "expected_digest": expected_digest,
                     "wb_user_id": None,
@@ -3076,7 +3077,7 @@ class WeaveClient:
             req: TableCreateParams = {
                 "table": {
                     "project_id": self.project_id,
-                    "rows": json_rows,
+                    "rows": to_jsonable_with_json_keys(json_rows),
                     "expected_digest": None,
                 }
             }

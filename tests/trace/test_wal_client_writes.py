@@ -31,6 +31,7 @@ from weave.durability.wal_sender import (
 )
 from weave.durability.wal_writer import JSONLWALWriter
 from weave.trace import weave_client
+from weave.trace.serialization.digest import compute_row_digest
 from weave.trace.settings import UserSettings, override_settings
 from weave.trace_server import trace_server_interface as tsi
 
@@ -142,6 +143,16 @@ class TestWALClientWrites:
                 }
             },
         }
+
+    def test_table_create_keeps_json_dict_keys(self, wal_client):
+        """A row key that is not a str is written as json.dumps writes it."""
+        res = wal_client._send_table_create([{None: "first", "None": "second"}])
+        wal_client._flush()
+
+        records = _read_all_wal_records(wal_client)
+        rows = records[0]["req"]["table"]["rows"]
+        assert rows == [{"null": "first", "None": "second"}]
+        assert res.row_digests == [compute_row_digest(rows[0])]
 
     def test_file_create(self, wal_client):
         img = Image.new("RGB", (2, 2), color="red")

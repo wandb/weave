@@ -1150,6 +1150,18 @@ def test_edited_object_publishes_again():
     assert creates[1]["val"]["_type"]["name"] == "thing"
 
 
+def test_saved_object_sends_dict_keys_the_way_the_digest_reads_them():
+    """A dict key that is not a str goes out as json.dumps writes it."""
+    sent: list[tuple[str, dict]] = []
+    client = _client_storing_objects(sent)
+
+    client._save_object({None: "first", "None": "second"}, "keys")
+    client._flush()
+
+    creates = [body["obj"] for path, body in sent if path == "/obj/create"]
+    assert [obj["val"] for obj in creates] == [{"null": "first", "None": "second"}]
+
+
 def test_dataset_calls(client):
     rows = [{"doc": "xx", "label": "c"}, {"doc": "yy", "label": "d"}]
     op_name = ""
