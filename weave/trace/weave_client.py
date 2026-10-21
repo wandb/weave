@@ -22,14 +22,7 @@ from weave.shared.constants import (
     INVOKING_SPAN_ATTR_KEY,
     MAX_OBJECT_NAME_LENGTH,
 )
-from weave.shared.digest import (
-    compute_file_digest,
-    compute_object_digest,
-    compute_row_digest,
-    compute_table_digest,
-)
 from weave.shared.errors import DigestMismatchError, InvalidExternalRef
-from weave.shared.ids import generate_id
 from weave.shared.interface.feedback_types import (
     RUNNABLE_FEEDBACK_TYPE_PREFIX,
     runnable_feedback_output_selector,
@@ -158,6 +151,12 @@ from weave.trace.registry_links import (
     parse_registry_target_path,
     resolve_prompt_ref,
 )
+from weave.trace.serialization.digest import (
+    compute_file_digest,
+    compute_object_digest,
+    compute_row_digest,
+    compute_table_digest,
+)
 from weave.trace.serialization.serialize import (
     from_json,
     isinstance_namedtuple,
@@ -201,6 +200,7 @@ from weave.utils.attributes_dict import AttributesDict
 from weave.utils.capture_info import get_capture_info
 from weave.utils.dict_utils import sum_dict_leaves, zip_dicts
 from weave.utils.exception import exception_to_json_str
+from weave.utils.ids import generate_id
 from weave.utils.paginated_iterator import PaginatedIterator
 from weave.utils.project_id import from_project_id, to_project_id
 from weave.utils.retry import _http_response
@@ -213,7 +213,7 @@ try:
     from opentelemetry import context as otel_context
     from opentelemetry import trace as otel_trace
 
-    from weave.shared.otel_context_keys import WEAVE_SERVER_SPAN_KEY
+    from weave.trace.otel_context_keys import WEAVE_SERVER_SPAN_KEY
 
     _OTEL_AVAILABLE = True
 except ImportError:

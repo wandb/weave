@@ -1,23 +1,57 @@
 """Utilities shared between the Weave client and trace server implementations."""
 
-from weave.shared.digest import (
-    ObjectDigestResult,
-    bytes_digest,
-    compute_file_digest,
-    compute_object_digest,
-    compute_object_digest_result,
-    compute_row_digest,
-    compute_table_digest,
-    str_digest,
-)
+import importlib
+import sys
+import warnings
+from typing import Any
 
+# The digest helpers this package re-exported; they moved to weave.trace.serialization.digest.
 __all__ = [
-    "ObjectDigestResult",
-    "bytes_digest",
-    "compute_file_digest",
-    "compute_object_digest",
-    "compute_object_digest_result",
-    "compute_row_digest",
-    "compute_table_digest",
-    "str_digest",
+    "ObjectDigestResult",  # noqa: F822  # resolved lazily by __getattr__ below
+    "bytes_digest",  # noqa: F822
+    "compute_file_digest",  # noqa: F822
+    "compute_object_digest",  # noqa: F822
+    "compute_object_digest_result",  # noqa: F822
+    "compute_row_digest",  # noqa: F822
+    "compute_table_digest",  # noqa: F822
+    "str_digest",  # noqa: F822
 ]
+
+# Submodules that moved into the client, by new path. Their weave.shared paths are aliases that warn.
+_MOVED_MODULES = {
+    "digest": "weave.trace.serialization.digest",
+    "ids": "weave.utils.ids",
+    "object_class_util": "weave.trace.serialization.object_class_util",
+    "otel_context_keys": "weave.trace.otel_context_keys",
+    "otel_span_attrs": "weave.trace.otel_span_attrs",
+    "pydantic_util": "weave.utils.pydantic_util",
+    "tracing": "weave.trace.server_tracing",
+}
+
+
+def __getattr__(name: str) -> Any:
+    """Resolve the names that moved out of this package on access, so each one warns."""
+    if name in _MOVED_MODULES:
+        new_path = _MOVED_MODULES[name]
+        value = importlib.import_module(new_path)
+        advice = f"import {new_path} instead."
+    elif name in __all__:
+        # Imported here, not at the top: digest imports the builtin object registry, which loads this package.
+        from weave.trace.serialization import digest
+
+        value = getattr(digest, name)
+        advice = "import it from weave.trace.serialization.digest instead."
+    else:
+        raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+    warnings.warn(
+        f"weave.shared.{name} is deprecated and will be removed in a future release; "
+        + advice,
+        FutureWarning,
+        stacklevel=2,
+    )
+    if name in _MOVED_MODULES:
+        # A later `import weave.shared.<name>` then finds the module and does not warn again.
+        sys.modules[f"{__name__}.{name}"] = value
+    # `from weave.shared import name` looks the name up twice; the second lookup finds it here.
+    globals()[name] = value
+    return value

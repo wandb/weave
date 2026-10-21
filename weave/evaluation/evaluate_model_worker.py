@@ -5,9 +5,9 @@ from weave.evaluation.eval import Evaluation
 from weave.flow.llm_structured_model import LLMStructuredCompletionModel
 from weave.scorers.llm_as_a_judge_scorer import LLMAsAJudgeScorer
 from weave.shared.trace_server_interface import EvaluateModelArgs
-from weave.shared.tracing import traced
 from weave.trace.context.weave_client_context import require_secure_weave_client
 from weave.trace.refs import Ref
+from weave.trace.server_tracing import traced
 from weave.trace.weave_client import WeaveClient
 
 EVALUATE_MODEL_WORKER_MARKER = {"_weave_eval_meta": {"evaluate_model_worker": True}}
