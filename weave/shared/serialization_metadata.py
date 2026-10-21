@@ -1,14 +1,18 @@
-from typing import Any
+"""Canonical location is ``weave.trace.serialization.serialization_metadata``. This module is that module."""
 
-# Metadata keys added by weave serialization that are not real model fields.
-# They must be stripped before validating a model that uses extra="forbid".
-# Pydantic forbids underscore-prefixed fields by default, so there's no risk of collision.
-_WEAVE_SERIALIZATION_METADATA_KEYS = {"_type", "_class_name", "_bases"}
+import sys
+import warnings
 
+from weave.trace.serialization import serialization_metadata as _canonical
+from weave.trace.serialization.serialization_metadata import *  # noqa: F403
 
-def strip_weave_serialization_metadata(data: Any) -> Any:
-    if isinstance(data, dict):
-        return {
-            k: v for k, v in data.items() if k not in _WEAVE_SERIALIZATION_METADATA_KEYS
-        }
-    return data
+# TODO: delete this alias together with weave.shared.
+warnings.warn(
+    "weave.shared.serialization_metadata is deprecated and will be removed in a"
+    " future release; import weave.trace.serialization.serialization_metadata "
+    "instead.",
+    FutureWarning,
+    stacklevel=2,
+)
+
+sys.modules[__name__] = _canonical

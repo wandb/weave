@@ -2,7 +2,7 @@ from typing import Any, TypedDict
 
 from pydantic import BaseModel
 
-from weave.shared.interface.builtin_object_classes.builtin_object_registry import (
+from weave.trace.builtin_object_classes.builtin_object_registry import (
     BUILTIN_OBJECT_REGISTRY,
 )
 from weave.utils.pydantic_util import pydantic_asdict_one_level

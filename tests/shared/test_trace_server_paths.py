@@ -16,7 +16,6 @@ from weave.shared import (
 )
 from weave.shared.agents import constants, semconv
 from weave.shared.agents import types as agent_types
-from weave.shared.helpers import url_safety
 from weave.shared.interface import feedback_types
 from weave.shared.sensitive_data import policy
 from weave.trace import server_tracing
@@ -35,6 +34,7 @@ from weave.trace_server.helpers import url_safety as url_safety_legacy
 from weave.trace_server.ids import generate_id as generate_id_legacy
 from weave.trace_server.interface import feedback_types as feedback_types_legacy
 from weave.trace_server.sensitive_data import policy as policy_legacy
+from weave.utils import url_safety
 from weave.utils.ids import generate_id
 
 pytestmark = pytest.mark.trace_server
@@ -87,7 +87,38 @@ _SERVER_TYPE_MODULES = {
 
 # Modules that already left weave.shared for the client.
 _MOVED_MODULES = {
+    "weave.trace_server.helpers.url_safety": "weave.utils.url_safety",
     "weave.trace_server.ids": "weave.utils.ids",
+    "weave.trace_server.interface.builtin_object_classes.agent_dashboard": (
+        "weave.trace.builtin_object_classes.agent_dashboard"
+    ),
+    "weave.trace_server.interface.builtin_object_classes.alert_spec": (
+        "weave.trace.builtin_object_classes.alert_spec"
+    ),
+    "weave.trace_server.interface.builtin_object_classes.annotation_spec": (
+        "weave.trace.builtin_object_classes.annotation_spec"
+    ),
+    "weave.trace_server.interface.builtin_object_classes.base_object_def": (
+        "weave.trace.builtin_object_classes.base_object_def"
+    ),
+    "weave.trace_server.interface.builtin_object_classes.builtin_object_registry": (
+        "weave.trace.builtin_object_classes.builtin_object_registry"
+    ),
+    "weave.trace_server.interface.builtin_object_classes.comparison_view": (
+        "weave.trace.builtin_object_classes.comparison_view"
+    ),
+    "weave.trace_server.interface.builtin_object_classes.leaderboard": (
+        "weave.trace.builtin_object_classes.leaderboard"
+    ),
+    "weave.trace_server.interface.builtin_object_classes.provider": (
+        "weave.trace.builtin_object_classes.provider"
+    ),
+    "weave.trace_server.interface.builtin_object_classes.saved_view": (
+        "weave.trace.builtin_object_classes.saved_view"
+    ),
+    "weave.trace_server.interface.builtin_object_classes.test_only_example": (
+        "weave.trace.builtin_object_classes.test_only_example"
+    ),
     "weave.trace_server.tracing": "weave.trace.server_tracing",
 }
 

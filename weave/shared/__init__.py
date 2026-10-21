@@ -25,12 +25,16 @@ _MOVED_MODULES = {
     "otel_context_keys": "weave.trace.otel_context_keys",
     "otel_span_attrs": "weave.trace.otel_span_attrs",
     "pydantic_util": "weave.utils.pydantic_util",
+    "serialization_metadata": "weave.trace.serialization.serialization_metadata",
     "tracing": "weave.trace.server_tracing",
 }
 
 
 def __getattr__(name: str) -> Any:
     """Resolve the names that moved out of this package on access, so each one warns."""
+    if name == "helpers":
+        # Its only module moved, so nothing imports it; its own __getattr__ warns.
+        return importlib.import_module(f"{__name__}.helpers")
     if name in _MOVED_MODULES:
         new_path = _MOVED_MODULES[name]
         value = importlib.import_module(new_path)
