@@ -4,6 +4,7 @@ from unittest.mock import MagicMock, patch
 
 import httpx
 import pytest
+from pydantic_core import PydanticSerializationError
 
 from weave.utils import retry
 from weave.vendor.weave_server_sdk import APIStatusError
@@ -91,4 +92,12 @@ def test_status_errors_are_classified_by_status_code(status_code, retryable):
             httpx.HTTPStatusError(str(status_code), request=request, response=response)
         )
         is retryable
+    )
+
+
+def test_serialization_error_is_not_retryable():
+    """A value that cannot be serialized fails the same way on every attempt."""
+    assert (
+        retry._is_retryable_exception(PydanticSerializationError("Unable to serialize"))
+        is False
     )
