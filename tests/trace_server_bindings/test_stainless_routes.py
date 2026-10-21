@@ -9,6 +9,7 @@ the default one.
 from __future__ import annotations
 
 import collections.abc
+import dataclasses
 import datetime
 import inspect
 import json
@@ -26,8 +27,12 @@ from pydantic import BaseModel
 
 from tests.trace_server_bindings.conftest import generate_call_start_end_pair
 from weave.durability.wal_sender import build_trace_server_handlers
+from weave.trace.serialization.digest import compute_object_digest, compute_row_digest
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.agents import types as agent_types
+from weave.trace_server_bindings import (
+    stainless_remote_http_trace_server as stainless_binding,
+)
 from weave.trace_server_bindings.client_interface import (
     ObjAddTagsParams,
     ObjRemoveAliasesParams,
@@ -2132,9 +2137,16 @@ def _leaves(value: Any, here: str = "") -> Iterator[tuple[str, Any]]:
     ],
 )
 def test_every_params_key_reaches_the_request(
-    method_name: str, params_type: type, expected_method: str, expected_path: str
+    method_name: str,
+    params_type: type,
+    expected_method: str,
+    expected_path: str,
+    monkeypatch: pytest.MonkeyPatch,
 ):
     """A binding method given the generated client's params must lose no key."""
+    # The sentinel values are strings in every field, so skip request validation.
+    for name in ("validate_call_start", "validate_call_end"):
+        monkeypatch.setattr(stainless_binding, name, lambda req: None)
     mock_server = _mock_server(
         httpx.Response(
             200, json={"id": "c1", "trace_id": "t1", "num_deleted": 0, "res": []}
@@ -2973,6 +2985,98 @@ def test_table_create_sends_a_dataclass_row_as_a_dict():
 
     body = json.loads(mock_server.requests[0].content)
     assert body["table"]["rows"] == [{"nested": {"n": 1}}]
+
+
+def test_obj_create_sends_a_dataclass_value_as_a_dict():
+    """An object value holding a dataclass encodes the way the request model encoded it."""
+    mock_server = _mock_server(httpx.Response(200, json={"digest": "d"}))
+
+    mock_server.server.obj_create(
+        {
+            "obj": {
+                "project_id": PROJECT,
+                "object_id": "o",
+                "val": {"nested": _Payload(1)},
+            }
+        }
+    )
+
+    body = json.loads(mock_server.requests[0].content)
+    assert body["obj"]["val"] == {"nested": {"n": 1}}
+
+
+_NON_STR_KEYS = {None: "first", "None": "second", True: "t"}
+_JSON_KEYS = {"null": "first", "None": "second", "true": "t"}
+
+
+def test_obj_create_sends_dict_keys_the_way_the_digest_reads_them():
+    """A non-str key goes out as json.dumps writes it, so the digest still matches."""
+    mock_server = _mock_server(httpx.Response(200, json={"digest": "d"}))
+
+    mock_server.server.obj_create(
+        {"obj": {"project_id": PROJECT, "object_id": "o", "val": dict(_NON_STR_KEYS)}}
+    )
+
+    sent = json.loads(mock_server.requests[0].content)["obj"]["val"]
+    assert sent == _JSON_KEYS
+    assert compute_object_digest(sent) == compute_object_digest(dict(_NON_STR_KEYS))
+
+
+def test_table_rows_send_dict_keys_the_way_the_digest_reads_them():
+    """A row with a non-str key goes out as json.dumps writes it, on create and update."""
+    create_server = _mock_server(httpx.Response(200, json={"digest": "d"}))
+    update_server = _mock_server(_table_update_response())
+
+    create_server.server.table_create(
+        {"table": {"project_id": PROJECT, "rows": [dict(_NON_STR_KEYS)]}}
+    )
+    update_server.server.table_update(
+        {
+            "project_id": PROJECT,
+            "base_digest": "b",
+            "updates": [{"append": {"row": dict(_NON_STR_KEYS)}}],
+        }
+    )
+
+    created = json.loads(create_server.requests[0].content)["table"]["rows"]
+    updated = json.loads(update_server.requests[0].content)["updates"]
+    assert created == [_JSON_KEYS]
+    assert updated == [{"append": {"row": _JSON_KEYS}}]
+    assert compute_row_digest(created[0]) == compute_row_digest(dict(_NON_STR_KEYS))
+
+
+@dataclasses.dataclass
+class _KeyHolder:
+    m: dict
+
+
+def test_dict_keys_inside_a_dataclass_go_out_the_way_the_digest_reads_them():
+    """Keys inside a dataclass are converted too, in object values and table rows."""
+    obj_server = _mock_server(httpx.Response(200, json={"digest": "d"}))
+    table_server = _mock_server(httpx.Response(200, json={"digest": "d"}))
+
+    obj_server.server.obj_create(
+        {
+            "obj": {
+                "project_id": PROJECT,
+                "object_id": "o",
+                "val": {"holder": _KeyHolder(dict(_NON_STR_KEYS))},
+            }
+        }
+    )
+    table_server.server.table_create(
+        {
+            "table": {
+                "project_id": PROJECT,
+                "rows": [{"holder": _KeyHolder(dict(_NON_STR_KEYS))}],
+            }
+        }
+    )
+
+    sent_val = json.loads(obj_server.requests[0].content)["obj"]["val"]
+    sent_rows = json.loads(table_server.requests[0].content)["table"]["rows"]
+    assert sent_val == {"holder": {"m": _JSON_KEYS}}
+    assert sent_rows == [{"holder": {"m": _JSON_KEYS}}]
 
 
 def test_custom_runtime_name_keeps_its_colon():

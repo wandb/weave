@@ -14,6 +14,7 @@ from typing_extensions import Self
 
 from weave import version
 from weave.trace.refs import ObjectRef, Ref
+from weave.trace.serialization.json_dict_keys import to_jsonable_with_json_keys
 from weave.trace.settings import (
     server_cache_dir,
     server_cache_size_limit,
@@ -625,6 +626,7 @@ def _obj_read_cache_key(req: ObjectReadParams | tsi.ObjReadReq) -> str:
 
 def _obj_create_cache_key(req: ObjectCreateParams | tsi.ObjCreateReq) -> str:
     obj = as_params(req)["obj"]
+    obj = {**obj, "val": to_jsonable_with_json_keys(obj["val"])}
     # The invalidation prefix matches these fields first, in this order.
     leading = {k: obj[k] for k in ("project_id", "object_id")}
     return pydantic_bytes_safe_dump({"obj": {**leading, **obj}})
