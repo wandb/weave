@@ -4351,6 +4351,8 @@ def test_feedback_batching_on_the_generated_client(client, stainless_recording_s
     paths.clear()
 
     # Feedback goes through the global client, so make the recording one global.
+    # The setter only replaces an unset client, hence the None first.
+    weave_client_context.set_weave_client_global(None)
     weave_client_context.set_weave_client_global(remote_weave_client)
     try:
         feedback_ids = [
@@ -4362,6 +4364,7 @@ def test_feedback_batching_on_the_generated_client(client, stainless_recording_s
         ]
         remote_weave_client.flush()
     finally:
+        weave_client_context.set_weave_client_global(None)
         weave_client_context.set_weave_client_global(client)
 
     assert remote_client.get_feedback_processor() is not None
