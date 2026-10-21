@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING, Any, TypeVar
 
 import httpx
 import tenacity
-from pydantic import BaseModel, ValidationError
+from pydantic import BaseModel
 from typing_extensions import ParamSpec
 
 from weave.shared import trace_server_interface as tsi
@@ -265,9 +265,9 @@ def process_batch_with_retry(
 
     try:
         encoded_data = encode_batch_fn(batch)
-    except ValidationError as e:
-        # The hand-written binding builds its batch request model here, so an
-        # item that model rejects fails before anything is sent.
+    except Exception as e:
+        # Encoding sends nothing, so a failure here repeats on every attempt: the
+        # item that fails is dropped rather than requeued.
         if len(batch) > 1:
             logger.warning(
                 "%s batch of %s items failed validation, splitting and retrying",

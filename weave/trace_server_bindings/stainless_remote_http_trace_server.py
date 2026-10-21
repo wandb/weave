@@ -13,6 +13,7 @@ from typing_extensions import Self
 
 from weave.shared import trace_server_interface as tsi
 from weave.shared.trace_server_interface import agent_types
+from weave.trace.call_request_validation import validate_call_end, validate_call_start
 from weave.trace.env import ssl_verify, weave_trace_server_url
 from weave.trace.serialization.json_dict_keys import to_jsonable_with_json_keys
 from weave.trace.settings import (
@@ -906,6 +907,8 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
             Call start response.
         """
         params = as_params(req)
+        if not isinstance(req, BaseModel):
+            validate_call_start(params)
         if self.should_batch:
             assert self.call_processor is not None
             start = params["start"]
@@ -943,6 +946,8 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         Returns:
             Call end response.
         """
+        if not isinstance(req, BaseModel):
+            validate_call_end(req)
         if self.should_batch:
             assert self.call_processor is not None
             self.call_processor.enqueue([EndBatchItem(req=req)])
@@ -1435,6 +1440,10 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
                 created_at=datetime.datetime.now(ZoneInfo("UTC")),
                 wb_user_id=params.get("wb_user_id") or "",
                 payload=params["payload"],
+            )
+            # Snapshot the payload so a caller's later edits do not reach the queue.
+            params["payload"] = to_jsonable_python(
+                params["payload"], inf_nan_mode="null"
             )
             self.feedback_processor.enqueue([params])
             return res
