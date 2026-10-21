@@ -11,10 +11,10 @@ from tests.conftest_lib.http_error_decoding import HTTPErrorDecodingTraceServer
 from tests.trace.server_utils import TEST_ENTITY
 from weave.shared import common_interface
 from weave.shared import trace_server_interface as tsi
-from weave.shared.ids import generate_id
 from weave.trace_server_bindings.stainless_remote_http_trace_server import (
     StainlessRemoteHTTPTraceServer,
 )
+from weave.utils.ids import generate_id
 from weave.wandb_interface import project_creator
 
 

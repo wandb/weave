@@ -9,13 +9,13 @@ from typing_extensions import Self
 from weave.shared import trace_server_interface as tsi
 from weave.shared.common_interface import SortBy
 from weave.shared.interface import query as tsi_query
-from weave.shared.interface.builtin_object_classes.saved_view import Column, Pin
-from weave.shared.interface.builtin_object_classes.saved_view import (
-    SavedView as SavedViewBase,
-)
 from weave.trace import urls
 from weave.trace.api import publish as weave_publish
 from weave.trace.api import ref as weave_ref
+from weave.trace.builtin_object_classes.saved_view import Column, Pin
+from weave.trace.builtin_object_classes.saved_view import (
+    SavedView as SavedViewBase,
+)
 from weave.trace.call import CallsIter
 from weave.trace.context import weave_client_context
 from weave.trace.display import display

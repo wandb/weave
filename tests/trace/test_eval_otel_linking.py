@@ -10,7 +10,7 @@ import weave
 from weave import Evaluation
 from weave.conversation import start_conversation
 from weave.evaluation.otel_eval_linker import EvalLinkSpanProcessor
-from weave.shared.digest import compute_row_digest
+from weave.trace.serialization.digest import compute_row_digest
 from weave.trace_server import constants
 from weave.trace_server import trace_server_interface as tsi
 

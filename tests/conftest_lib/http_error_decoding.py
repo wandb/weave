@@ -21,15 +21,20 @@ from collections.abc import Callable, Iterator
 from typing import Any
 
 import httpx
+from gql.transport.exceptions import TransportQueryError, TransportServerError
 
-from weave.shared import errors
 from weave.shared import trace_server_interface as tsi
-from weave.shared.refs_internal import InvalidInternalRef
+from weave.shared.validation_util import CHValidationError
+from weave.trace import errors
+from weave.trace.refs_internal import InvalidInternalRef
 from weave.vendor.weave_server_sdk import APIStatusError
 
-# Registered error classes that do not live in weave.shared.errors.
+# Registered error classes that do not live in weave.trace.errors.
 _OTHER_ERRORS: dict[str, type[Exception]] = {
+    "CHValidationError": CHValidationError,
     "InvalidInternalRef": InvalidInternalRef,
+    "TransportQueryError": TransportQueryError,
+    "TransportServerError": TransportServerError,
 }
 
 # Fallback for a server whose error body carries no `error_type`.

@@ -1,6 +1,6 @@
 import pytest
 
-from weave.shared import constants
+from weave.trace import constants
 from weave.trace_server import constants as constants_legacy
 
 pytestmark = pytest.mark.trace_server

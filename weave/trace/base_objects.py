@@ -1,8 +1,8 @@
 from pydantic import BaseModel
 
 from weave.flow.llm_structured_model import LLMStructuredCompletionModel
-from weave.shared.interface.builtin_object_classes import builtin_object_registry
-from weave.shared.interface.builtin_object_classes.builtin_object_registry import (
+from weave.trace.builtin_object_classes import builtin_object_registry
+from weave.trace.builtin_object_classes.builtin_object_registry import (
     AlertSpec,
     AnnotationSpec,
     BaseObject,

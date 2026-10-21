@@ -1,15 +1,15 @@
-"""Canonical location is ``weave.shared.tracing``. This module is that module."""
+"""Canonical location is ``weave.trace.server_tracing``. This module is that module."""
 
 import sys
 import warnings
 
-from weave.shared import tracing as _canonical
-from weave.shared.tracing import *  # noqa: F403
+from weave.trace import server_tracing as _canonical
+from weave.trace.server_tracing import *  # noqa: F403
 
-# TODO: delete this alias after weave 0.53.13.
+# TODO: delete this alias together with weave.shared.
 warnings.warn(
     "weave.trace_server.tracing is deprecated since weave 0.53.13 and will be "
-    "removed after weave 0.53.13; import weave.shared.tracing instead.",
+    "removed in a future release; import weave.trace.server_tracing instead.",
     FutureWarning,
     stacklevel=2,
 )

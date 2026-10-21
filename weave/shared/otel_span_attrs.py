@@ -1,9 +1,17 @@
-"""OTel span attribute keys shared by the Weave client and trace server.
+"""Canonical location is ``weave.trace.otel_span_attrs``. This module is that module."""
 
-They live here rather than beside the eval keys in
-``weave.trace_server.constants`` because the writer is ``weave.trace``, which
-may not import the trace server.
-"""
+import sys
+import warnings
 
-PARENT_CALL_ID_SPAN_ATTR = "weave.parent_call.id"
-PARENT_CALL_TRACE_ID_SPAN_ATTR = "weave.parent_call.trace_id"
+from weave.trace import otel_span_attrs as _canonical
+from weave.trace.otel_span_attrs import *  # noqa: F403
+
+# TODO: delete this alias together with weave.shared.
+warnings.warn(
+    "weave.shared.otel_span_attrs is deprecated and will be removed in a future"
+    " release; import weave.trace.otel_span_attrs instead.",
+    FutureWarning,
+    stacklevel=2,
+)
+
+sys.modules[__name__] = _canonical

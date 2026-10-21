@@ -1,7 +1,7 @@
 import base64
 import uuid
 
-from weave.shared import refs_internal
+from weave.trace import refs_internal
 
 # OTel trace ID: 16 bytes encoded as 32 hex characters
 OTEL_TRACE_ID_HEX_LENGTH = 32

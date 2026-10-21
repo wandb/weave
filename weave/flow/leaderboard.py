@@ -3,8 +3,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
-from weave.shared.interface.builtin_object_classes import leaderboard
 from weave.shared.trace_server_interface import CallsFilter
+from weave.trace.builtin_object_classes import leaderboard
 from weave.trace.refs import OpRef
 from weave.trace.weave_client import WeaveClient, get_ref
 from weave.utils.project_id import from_project_id

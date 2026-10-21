@@ -17,13 +17,13 @@ from weave import Evaluation
 from weave.conversation import start_conversation
 from weave.conversation.types import Message
 from weave.evaluation.otel_eval_linker import EvalLinkSpanProcessor
-from weave.shared.otel_span_attrs import (
-    PARENT_CALL_ID_SPAN_ATTR,
-    PARENT_CALL_TRACE_ID_SPAN_ATTR,
-)
 from weave.trace.call import Call, NoOpCall
 from weave.trace.context import call_context
 from weave.trace.otel_op_linker import OpLinkSpanProcessor
+from weave.trace.otel_span_attrs import (
+    PARENT_CALL_ID_SPAN_ATTR,
+    PARENT_CALL_TRACE_ID_SPAN_ATTR,
+)
 from weave.trace_server import constants
 
 

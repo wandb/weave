@@ -12,7 +12,7 @@ from PIL import Image
 
 import weave
 from tests.trace.server_utils import find_server_layer
-from weave.shared.digest import (
+from weave.trace.serialization.digest import (
     compute_file_digest,
     compute_object_digest,
     compute_row_digest,

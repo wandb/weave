@@ -1,6 +1,6 @@
 import pytest
 
-from weave.shared.helpers.url_safety import is_publicly_routable_url
+from weave.utils.url_safety import is_publicly_routable_url
 
 
 @pytest.mark.parametrize(

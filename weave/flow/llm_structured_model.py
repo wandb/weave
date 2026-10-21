@@ -5,11 +5,16 @@ from pydantic import BeforeValidator, Field
 
 from weave.flow.model import Model
 from weave.prompt.prompt import format_message_with_template_vars
-from weave.shared.interface.builtin_object_classes import base_object_def
-from weave.shared.interface.builtin_object_classes import (
+from weave.shared.trace_server_interface import (
+    CompletionsCreateReq,
+    CompletionsCreateRequestInputs,
+)
+from weave.trace import vals
+from weave.trace.builtin_object_classes import base_object_def
+from weave.trace.builtin_object_classes import (
     llm_structured_model as llm_structured_model_schema,
 )
-from weave.shared.interface.builtin_object_classes.llm_structured_model import (
+from weave.trace.builtin_object_classes.llm_structured_model import (
     LLMStructuredCompletionModelDefaultParams,
     Message,
     MessageListLike,
@@ -18,11 +23,6 @@ from weave.shared.interface.builtin_object_classes.llm_structured_model import (
     parse_params_to_litellm_params,
     parse_response,
 )
-from weave.shared.trace_server_interface import (
-    CompletionsCreateReq,
-    CompletionsCreateRequestInputs,
-)
-from weave.trace import vals
 from weave.trace.context.weave_client_context import WeaveInitError, get_weave_client
 from weave.trace.op import op
 from weave.utils.project_id import to_project_id
