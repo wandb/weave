@@ -10,29 +10,29 @@ Weave is a toolkit for tracing and evaluating AI agents, built by [Weights & Bia
 
 You can use Weave to:
 
-- **Trace agents.** Conversations, turns, LLM calls, and tool calls show up in the Agents tab.
+- **Trace agents.** Inspect conversations, turns, LLM calls, and tool calls in **CoreWeave Agent Lens**.
 - **Evaluate** agents and LLM applications.
-- **Trace functions** with `@weave.op` when you want the Calls tab, not the Agents tab.
+- **Trace functions** with `@weave.op` for the Weave **Calls** workflow.
 
 ## Documentation
 
-Our documentation site can be found [here](https://wandb.me/weave).
+Read the [Weave documentation](https://docs.coreweave.com/products/wandb/weave) for function tracing and evaluations.
 
 Start here for agents:
 
-- [Choose an agent integration](https://docs.wandb.ai/weave/agent-integration-quickstart) — OpenAI Agents SDK, Claude Agent SDK, and Google ADK. `weave.init()` is enough for those SDKs.
-- [Custom agents](https://docs.wandb.ai/weave/custom-agents-quickstart) — wrap your own loop with `start_conversation`, `start_turn`, `start_llm`, and `start_tool`.
+- [Choose an Agent Lens integration](https://docs.coreweave.com/products/agent-lens/get-started/integrations?utm_source=github&utm_medium=referral&utm_campaign=agent-lens-integrations-2026q4&utm_content=weave-readme-agent-quickstart) — choose the guide for your provider SDK, agent SDK, or harness. OpenAI Agents SDK, Claude Agent SDK, Google ADK, and Pi still use Weave; each guide explains conversation grouping.
+- [Custom agents](https://docs.coreweave.com/products/agent-lens/get-started/custom-agents) — instrument a multi-turn agent with the Forge SDK. Existing Weave Conversation SDK instrumentation can also send agent spans to Agent Lens.
 
 ## Prerequisites
 
 - Python 3.10 or higher
-- A [Weights & Biases account](https://wandb.ai/signup) (free tier available)
-- A W&B API key from [https://wandb.ai/authorize](https://wandb.ai/authorize). Set `WANDB_API_KEY`.
+- A [CoreWeave Forge account](https://forge.coreweave.com) with access to the destination project
+- A W&B API key from [https://forge.coreweave.com/settings#apikeys](https://forge.coreweave.com/settings#apikeys). Set `WANDB_API_KEY`.
 - An [OpenAI API key](https://platform.openai.com/api-keys) in `OPENAI_API_KEY`, for the example below.
 
 ## Quick start: trace an agent
 
-This example uses the [OpenAI Agents SDK](https://docs.wandb.ai/weave/guides/integrations/agents/openai-agents-sdk). The Python import is `agents`; the package name is `openai-agents`. Weave autopatches it after `weave.init()`. Traces land in the **Agents** tab, not the Calls tab.
+This example uses the [OpenAI Agents SDK](https://docs.coreweave.com/products/agent-lens/integrations/openai-agents-sdk). The Python import is `agents`; the package name is `openai-agents`. Weave autopatches it after `weave.init()`. The resulting turns appear in Agent Lens **Conversations**.
 
 ```bash
 pip install weave openai-agents requests
@@ -40,9 +40,10 @@ pip install weave openai-agents requests
 
 ```python
 import asyncio
+import uuid
 import requests
 import weave
-from agents import Agent, Runner, function_tool
+from agents import Agent, RunConfig, Runner, function_tool
 
 weave.init("<your-team>/<your-project-name>")
 
@@ -79,6 +80,7 @@ agent = Agent(
 
 
 async def main():
+    run_config = RunConfig(group_id=str(uuid.uuid4()))
     history = []
     for question in [
         "Who founded Anthropic?",
@@ -87,21 +89,26 @@ async def main():
     ]:
         history.append({"role": "user", "content": question})
         print(f"USER: {question}")
-        result = await Runner.run(agent, input=history)
+        result = await Runner.run(agent, input=history, run_config=run_config)
         print(f"AGENT: {result.final_output}\n")
         history = result.to_input_list()
 
 
 asyncio.run(main())
+weave.finish()
 ```
 
-`weave.init()` prints a project URL. Open the **Agents** tab.
+Open `https://forge.coreweave.com/agent-lens/<your-team>/<your-project-name>` and select **Conversations**. The shared `group_id` groups all three turns into one conversation; `history` carries context between turns.
 
-Claude Agent SDK works the same way: install the framework, call `weave.init()`, run the agent. For Google ADK, import `google.adk` before `weave.init()`. See [Choose an agent integration](https://docs.wandb.ai/weave/agent-integration-quickstart).
+![OpenAI Agents SDK conversation in Agent Lens with a calculator tool's arguments and result expanded](docs/assets/agent-lens/2026-10/openai-agents-tool-detail.png)
+
+This October 22, 2026 capture uses a synthetic calculator example with OpenAI Agents SDK 0.24.0 and Weave 0.53.12. Model responses are fixtures; tool execution and Agent Lens export are real. It illustrates the conversation view, not the Wikipedia example's output.
+
+For Claude Agent SDK, resume the same session on later turns. For Google ADK, import `google.adk` before `weave.init()` and reuse the ADK session ID. Follow the [matching integration guide](https://docs.coreweave.com/products/agent-lens/get-started/integrations) for setup and grouping.
 
 ## Custom agents
 
-If you are not using a supported agent SDK, wrap your own loop. This is the Conversation SDK, not the `@weave.op` path.
+The Weave Conversation SDK can wrap your own agent loop. For a new integration, start with the [Forge SDK custom-agent quickstart](https://docs.coreweave.com/products/agent-lens/get-started/custom-agents). The following Weave example remains supported.
 
 Use `start_conversation`, `start_turn`, and `start_llm`. In Python they are context managers and close on exceptions. `start_session` and `Session` still exist; they emit a `DeprecationWarning`. Do not use them in new code.
 
@@ -122,11 +129,11 @@ with weave.start_conversation(agent_name="research-bot"):
 
 Always pass `provider_name`. Weave does not infer it from the model name.
 
-For a multi-turn loop with tools, see the [custom agents quickstart](https://docs.wandb.ai/weave/custom-agents-quickstart).
+For a multi-turn loop with tools, see the [custom agents quickstart](https://docs.coreweave.com/products/agent-lens/get-started/custom-agents).
 
 ## Function tracing
 
-`@weave.op` traces a function. Those traces land in the **Calls** tab, not the Agents tab. Use it for evaluations, scorers, and LLM calls that are not an agent loop.
+`@weave.op` traces a function. Those traces land in the Weave **Calls** tab. Use it for evaluations, scorers, and LLM calls that are not an agent loop.
 
 Plain `openai` is also auto-traced into the Calls tab after `weave.init()`. `@weave.op` wraps the call in a parent function, so the OpenAI request sits under `extract_fruit`.
 
