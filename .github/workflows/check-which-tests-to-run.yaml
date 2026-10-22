@@ -5,13 +5,10 @@ on:
     outputs:
       weave_js_tests:
         value: ${{ jobs.check.outputs.weave_js_tests }}
-      trace_server_tests:
-        value: ${{ jobs.check.outputs.trace_server_tests }}
       weave_ts_sdk_tests:
         value: ${{ jobs.check.outputs.weave_ts_sdk_tests }}
 
 env:
-  TRACE_SERVER_PATHS: "weave/trace_server/ weave/shared/ weave/utils/ids.py weave/utils/pydantic_util.py weave/trace/serialization/digest.py weave/trace/serialization/object_class_util.py weave/trace/server_tracing.py weave/trace/otel_context_keys.py weave/trace/otel_span_attrs.py weave/flow/llm_structured_model.py"
   WEAVE_TS_SDK_PATHS: "sdks/node/"
   # Everything else is implicitly trace SDK
 
@@ -19,7 +16,6 @@ jobs:
   check:
     runs-on: ubuntu-latest
     outputs:
-      trace_server_tests: ${{ steps.trace_server.outputs.run_tests }}
       weave_ts_sdk_tests: ${{ steps.weave_ts_sdk.outputs.run_tests }}
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
@@ -53,7 +49,7 @@ jobs:
             changed_files=$(git diff --name-only "$MERGE_BASE" "$CURRENT_COMMIT")
           else
             echo "::warning::Could not find merge base in shallow checkout; running gated tests"
-            changed_files=$(printf "%s\n" $TRACE_SERVER_PATHS $WEAVE_TS_SDK_PATHS)
+            changed_files=$(printf "%s\n" $WEAVE_TS_SDK_PATHS)
           fi
 
           echo "Changed files:"
@@ -62,16 +58,6 @@ jobs:
           echo "$changed_files" >> $GITHUB_ENV
           echo "EOF" >> $GITHUB_ENV
 
-      - id: trace_server
-        name: Weave Trace Server Checks
-        run: |
-          for path in ${{ env.TRACE_SERVER_PATHS }}; do
-            if echo "$changed_files" | grep -q "$path"; then
-              echo "run_tests=true" >> $GITHUB_OUTPUT
-              exit 0
-            fi
-          done
-          echo "run_tests=false" >> $GITHUB_OUTPUT
       - id: weave_ts_sdk
         name: Weave TS SDK Checks
         run: |

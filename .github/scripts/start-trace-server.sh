@@ -2,10 +2,9 @@
 # Start TRACE_SERVER_COUNT copies of core's resettable trace server from core's
 # source, each on its own ClickHouse database, for the weave tests.
 #
-# Expects wandb/core at $CORE_DIR with this weave commit checked out at
-# $CORE_DIR/services/weave-trace/weave-public, COMPOSE_FILE set to core's
-# compose file, uv on PATH and Docker logged in to Artifact Registry. Servers
-# listen on 127.0.0.1:6345 and up and log to $RUNNER_TEMP/trace-server. Writes
+# Expects wandb/core at $CORE_DIR, COMPOSE_FILE set to core's compose file, uv
+# on PATH and Docker logged in to Artifact Registry. Servers listen on
+# 127.0.0.1:6345 and up and log to $RUNNER_TEMP/trace-server. Writes
 # WANDB_API_KEY and WEAVE_TEST_TRACE_SERVER_URLS to $GITHUB_ENV.
 set -euo pipefail
 
