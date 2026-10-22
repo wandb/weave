@@ -1,3 +1,5 @@
+from enum import Enum
+
 TRACE_CALL_EMOJI = "🍩"
 TRACE_OBJECT_EMOJI = "📦"
 
@@ -64,3 +66,22 @@ EVAL_ROW_DIGEST_SPAN_ATTR = "weave.eval.row_digest"
 EVAL_EXAMPLE_ID_SPAN_ATTR = "weave.eval.example_id"
 EVAL_TRIAL_INDEX_SPAN_ATTR = "weave.eval.trial_index"
 EVAL_EVALUATION_NAME_SPAN_ATTR = "weave.eval.evaluation_name"
+
+
+class TraceStatus(str, Enum):
+    """A call's status, as the trace server reports it in `summary.weave.status`."""
+
+    SUCCESS = "success"
+    ERROR = "error"
+    RUNNING = "running"
+    DESCENDANT_ERROR = "descendant_error"
+
+
+# The trace server's defaults for agent queries, which the client sends when the
+# caller gives no value.
+DEFAULT_AGENT_QUERY_LIMIT = 100
+DEFAULT_AGENT_CUSTOM_ATTR_SCHEMA_LIMIT = 200
+DEFAULT_SEARCH_LIMIT = 20
+DEFAULT_AGENT_STATS_GROUP_LIMIT = 50
+# Maximum number of traces to render in the multi-turn conversation chat view.
+MAX_CONVERSATION_CHAT_TURNS = 50

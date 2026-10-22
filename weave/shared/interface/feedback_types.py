@@ -1,6 +1,27 @@
+import warnings
 from typing import Any, Literal
 
 from pydantic import BaseModel, Field
+
+# Re-exported, so the old import path keeps working.
+from weave.trace.feedback_types import (  # noqa: F401
+    AGENT_USER_FEEDBACK_TYPE,
+    NOTE_FEEDBACK_TYPE,
+    REACTION_FEEDBACK_TYPE,
+    RUNNABLE_FEEDBACK_TYPE_PREFIX,
+    runnable_feedback_output_selector,
+    runnable_feedback_runnable_ref_selector,
+    runnable_feedback_selector,
+)
+
+# TODO: delete this module together with weave.shared.
+warnings.warn(
+    "weave.shared.interface.feedback_types is deprecated and will be removed in a "
+    "future release; import the feedback type names and selectors from "
+    "weave.trace.feedback_types instead.",
+    FutureWarning,
+    stacklevel=2,
+)
 
 MAX_FEEDBACK_NOTE_LENGTH = 1024
 
@@ -13,13 +34,7 @@ class FeedbackPayloadNoteReq(BaseModel):
     note: str = Field(min_length=1, max_length=MAX_FEEDBACK_NOTE_LENGTH)
 
 
-REACTION_FEEDBACK_TYPE = "wandb.reaction.1"
-NOTE_FEEDBACK_TYPE = "wandb.note.1"
 AGENT_MONITOR_FEEDBACK_TYPE = "wandb.agent_monitor"
-# Human-applied tags on agents (vs scorer-applied wandb.agent_monitor tags),
-# stored in scorer_tags. Covers any human tag, e.g. an emoji reaction or a
-# manual label like "low-quality".
-AGENT_USER_FEEDBACK_TYPE = "wandb.agent_user_feedback"
 
 # The agent feedback types that carry tags/ratings: human-applied
 # (agent_user_feedback) and scorer-applied (agent_monitor).
@@ -43,7 +58,6 @@ FEEDBACK_PAYLOAD_SCHEMAS: dict[str, type[BaseModel]] = {
 }
 
 ANNOTATION_FEEDBACK_TYPE_PREFIX = "wandb.annotation"
-RUNNABLE_FEEDBACK_TYPE_PREFIX = "wandb.runnable"
 
 
 # Making the decision to use `value` & `payload` as nested keys so that
@@ -72,15 +86,3 @@ def feedback_type_is_agent_monitor(feedback_type: str) -> bool:
 
 def feedback_type_is_agent_user_feedback(feedback_type: str) -> bool:
     return feedback_type == AGENT_USER_FEEDBACK_TYPE
-
-
-def runnable_feedback_selector(name: str) -> str:
-    return f"feedback.[{RUNNABLE_FEEDBACK_TYPE_PREFIX}.{name}]"
-
-
-def runnable_feedback_output_selector(name: str) -> str:
-    return f"{runnable_feedback_selector(name)}.payload.output"
-
-
-def runnable_feedback_runnable_ref_selector(name: str) -> str:
-    return f"{runnable_feedback_selector(name)}.runnable_ref"

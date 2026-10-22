@@ -3,6 +3,7 @@
 import importlib
 import sys
 import warnings
+from types import ModuleType
 from typing import Any
 
 # The digest helpers this package re-exported; they moved to weave.trace.serialization.digest.
@@ -34,8 +35,52 @@ _MOVED_MODULES = {
 }
 
 
+# The API type modules, and the packages holding more, that `import weave` loaded
+# before the client stopped using them.
+_TYPE_MODULES = frozenset(
+    {
+        "common_interface",
+        "http_service_interface",
+        "service_interface",
+        "trace_server_interface",
+        "validation",
+        "validation_util",
+    }
+)
+_TYPE_PACKAGES = frozenset({"agents", "interface", "sensitive_data"})
+
+
+def _import_type_module(name: str) -> ModuleType:
+    """Import a deprecated API type module on attribute access, warning at the caller.
+
+    The module warns when it is imported, but that warning would point at importlib,
+    so its own message is emitted again from the caller's line.
+    """
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always", FutureWarning)
+        module = importlib.import_module(name)
+    for caught_warning in caught:
+        if issubclass(caught_warning.category, FutureWarning) and str(
+            caught_warning.message
+        ).startswith(f"{name} "):
+            warnings.warn(caught_warning.message, stacklevel=3)
+        else:
+            warnings.warn_explicit(
+                caught_warning.message,
+                caught_warning.category,
+                caught_warning.filename,
+                caught_warning.lineno,
+            )
+    return module
+
+
 def __getattr__(name: str) -> Any:
     """Resolve the names that moved out of this package on access, so each one warns."""
+    if name in _TYPE_MODULES:
+        return _import_type_module(f"{__name__}.{name}")
+    if name in _TYPE_PACKAGES:
+        # Their modules warn on access.
+        return importlib.import_module(f"{__name__}.{name}")
     if name == "helpers":
         # Its only module moved, so nothing imports it; its own __getattr__ warns.
         return importlib.import_module(f"{__name__}.helpers")

@@ -1,6 +1,15 @@
 """Closed deployment policy for trace-ingest sensitive-data handling."""
 
+import warnings
 from enum import Enum
+
+# TODO: delete this module together with weave.shared.
+warnings.warn(
+    "weave.shared.sensitive_data.policy is deprecated and will be removed in a "
+    "future release.",
+    FutureWarning,
+    stacklevel=2,
+)
 
 
 class SensitiveDataPolicy(str, Enum):

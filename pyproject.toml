@@ -554,19 +554,25 @@ not-iterable = "ignore"
 # when the last aliases are deleted, which happens together with
 # `weave.shared`.
 #
+# The client does not import the `weave.shared` API type modules at all: it
+# sends plain dicts and reads the generated client's types.
+#
 # The only `ignore_imports` entries are the deprecated aliases for modules that
-# moved from `weave.shared` into the client, each importing its new home, and
-# the `weave.shared` modules that stay until the package is deleted, which
-# import what moved. Fix any other violation in the code rather than adding an
-# ignore.
+# moved from `weave.shared` into the client, each importing its new home, the
+# `weave.shared` modules that stay until the package is deleted, which import
+# what moved, and the frozen legacy HTTP client, which still speaks the
+# `weave.shared` types. Fix any other violation in the code rather than adding
+# an ignore.
 #
 # `allow_indirect_imports = true` keeps each contract focused on *direct*
 # imports, so every violation maps to a concrete `import` statement to fix.
-# The `weave.shared` contract sets it to `false`: both sides import that
-# package, so an indirect path out of it couples them just the same.
+# The two `weave.shared` contracts set it to `false`: an indirect path into or
+# out of that package couples the sides just the same.
 # ---------------------------------------------------------------------------
 [tool.importlinter]
 root_package = "weave"
+# Imports under `if TYPE_CHECKING:` load nothing at runtime, so no contract counts them.
+exclude_type_checking_imports = true
 
 [[tool.importlinter.contracts]]
 name = "Trace server must not import the Weave client SDK"
@@ -684,12 +690,62 @@ ignore_imports = [
   "weave.shared.trace_server_converter -> weave.trace.trace_server_converter",
   "weave.shared.tracing -> weave.trace.server_tracing",
   # The API type modules stay until weave.shared is deleted, and import what moved.
+  "weave.shared.common_interface -> weave.trace.builtin_object_classes.query",
+  "weave.shared.interface.feedback_types -> weave.trace.feedback_types",
+  "weave.shared.interface.query -> weave.trace.builtin_object_classes.query",
+  "weave.shared.trace_server_interface -> weave.trace.builtin_object_classes.query",
   "weave.shared.trace_server_interface -> weave.trace.constants",
+  "weave.shared.trace_server_interface -> weave.trace.custom_runtime",
   "weave.shared.trace_server_interface -> weave.trace.errors",
   "weave.shared.trace_server_interface_util -> weave.trace.refs_internal",
   "weave.shared.validation -> weave.trace.constants",
   "weave.shared.validation -> weave.trace.errors",
   "weave.shared.validation -> weave.trace.refs_internal",
   "weave.shared.validation_util -> weave.trace.refs_internal",
+]
+allow_indirect_imports = false
+
+[[tool.importlinter.contracts]]
+name = "Weave client SDK must not import the weave.shared API types"
+type = "forbidden"
+source_modules = [
+  "weave.agent",
+  "weave.chat",
+  "weave.compat",
+  "weave.conversation",
+  "weave.dataset",
+  "weave.durability",
+  "weave.evaluation",
+  "weave.flow",
+  "weave.initialization",
+  "weave.integrations",
+  "weave.object",
+  "weave.prompt",
+  "weave.scorers",
+  "weave.session",
+  "weave.telemetry",
+  "weave.trace",
+  "weave.trace_server_bindings",
+  "weave.type_handlers",
+  "weave.type_wrappers",
+  "weave.utils",
+  "weave.wandb_interface",
+]
+forbidden_modules = [
+  "weave.shared.agents",
+  "weave.shared.common_interface",
+  "weave.shared.http_service_interface",
+  "weave.shared.interface.feedback_types",
+  "weave.shared.interface.query",
+  "weave.shared.sensitive_data",
+  "weave.shared.service_interface",
+  "weave.shared.trace_server_interface",
+  "weave.shared.trace_server_interface_util",
+  "weave.shared.validation",
+  "weave.shared.validation_util",
+]
+ignore_imports = [
+  # The frozen legacy client still speaks these types; it goes with weave.shared.
+  "weave.trace_server_bindings.remote_http_trace_server -> weave.shared.**",
 ]
 allow_indirect_imports = false

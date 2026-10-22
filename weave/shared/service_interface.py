@@ -1,10 +1,22 @@
 from __future__ import annotations
 
+import warnings
 from typing import Protocol
 
 from pydantic import BaseModel, Field
 
-from weave.shared.common_interface import BaseModelStrict
+# Sibling modules warn too; one warning, this module's, is enough.
+with warnings.catch_warnings():
+    warnings.simplefilter("ignore", FutureWarning)
+    from weave.shared.common_interface import BaseModelStrict
+
+# TODO: delete this module together with weave.shared.
+warnings.warn(
+    "weave.shared.service_interface is deprecated and will be removed in a future "
+    "release.",
+    FutureWarning,
+    stacklevel=2,
+)
 
 
 class ServerInfoRes(BaseModel):

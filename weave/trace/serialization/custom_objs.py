@@ -72,9 +72,9 @@ OP_CUSTOM_WEAVE_TYPE = "Op"
 
 # Custom types whose serializer reconstructs data only, using code already in this
 # process. "Op" and unknown types instead load and run a user `.py`, so a client with
-# unsafe decode off (server workers) refuses them; the `load_op` fallback is gated
-# separately in `_decode_custom_obj`. Kept in sync with KNOWN_TYPES minus
-# `OP_CUSTOM_WEAVE_TYPE` by `test_safe_custom_weave_types_in_sync`.
+# unsafe decode off refuses them; the `load_op` fallback is gated separately in
+# `_decode_custom_obj`. Kept in sync with KNOWN_TYPES minus `OP_CUSTOM_WEAVE_TYPE` by
+# `test_safe_custom_weave_types_in_sync`.
 SAFE_CUSTOM_WEAVE_TYPES = frozenset(
     {
         "PIL.Image.Image",
@@ -98,10 +98,10 @@ class UnsafeDeserializationError(Exception):
 def is_safe_to_decode(weave_type_id: str, *, allow_unsafe: bool) -> bool:
     """Whether reconstructing this custom type is permitted.
 
-    `allow_unsafe` is the active client's policy. When False (server-side workers)
-    only data-only types decode, via their in-process serializer. `Op` and unknown
-    types load and run user-uploaded code, so they are refused here; the packaged
-    `load_op` fallback is blocked separately in `_decode_custom_obj`.
+    `allow_unsafe` is the active client's policy. When False only data-only types
+    decode, via their in-process serializer. `Op` and unknown types load and run
+    user-uploaded code, so they are refused here; the packaged `load_op` fallback is
+    blocked separately in `_decode_custom_obj`.
     """
     return allow_unsafe or weave_type_id in SAFE_CUSTOM_WEAVE_TYPES
 
@@ -242,9 +242,9 @@ def _decode_custom_obj(
 
     # Unsafe decode requires BOTH gates open: the `WEAVE_ALLOW_UNSAFE_CUSTOM_OBJ_DECODE`
     # setting (deployments/users can force-close it globally) and the active client's
-    # flag (workers force-close it in code via `require_secure_weave_client`). Either
-    # closed -> only data-only types decode. With no client we also fail closed, so a
-    # missing process-global client never opens the gate.
+    # `_allow_unsafe_custom_obj_decode` flag. Either closed -> only data-only types
+    # decode. With no client we also fail closed, so a missing process-global client
+    # never opens the gate.
     client = get_weave_client()
     allow_unsafe = (
         should_allow_unsafe_custom_obj_decode()
