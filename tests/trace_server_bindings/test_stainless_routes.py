@@ -1026,8 +1026,10 @@ def test_objs_query_drops_a_query_key():
         "include_tags_and_aliases": False,
     }
 
+    with_query = {**copy.deepcopy(req), "query": {"$expr": {}}}
+
     mock_server.server.objs_query(req)
-    mock_server.server.objs_query({**req, "query": {"$expr": {}}})
+    mock_server.server.objs_query(with_query)
 
     first, second = (json.loads(r.content) for r in mock_server.requests)
     assert first == second
@@ -1918,12 +1920,14 @@ def test_calls_complete_sends_the_batch_to_the_v2_route():
         ]
     }
 
+    expected_body = to_jsonable_python(req)
+
     res = mock_server.server.calls_complete(req)
 
     assert [(r.method, r.url.path) for r in mock_server.requests] == [
         ("POST", f"{V2}/calls/complete")
     ]
-    assert json.loads(mock_server.requests[0].content) == to_jsonable_python(req)
+    assert json.loads(mock_server.requests[0].content) == expected_body
     assert res == {}
 
 
