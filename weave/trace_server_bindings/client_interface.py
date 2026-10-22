@@ -5,6 +5,7 @@ from typing import Any, Protocol
 
 from weave.trace_server_bindings.models import (
     CallsQueryRes,
+    DatasetSourcesLinkDeleteRes,
     EnsureProjectExistsRes,
     FileContentReadRes,
 )

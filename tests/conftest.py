@@ -13,11 +13,19 @@ from tests.trace.util import DummyTestException
 from weave.trace import weave_client
 from weave.trace.context import weave_client_context
 from weave.trace.context.call_context import set_call_stack
+from weave.trace.env import ssl_verify
 from weave.trace.settings import replace_settings
+from weave.trace_server_bindings import stainless_remote_http_trace_server
+from weave.trace_server_bindings.async_batch_processor import AsyncBatchProcessor
 from weave.trace_server_bindings.caching_middleware_trace_server import (
     CachingMiddlewareTraceServer,
 )
+from weave.trace_server_bindings.call_batch_processor import CallBatchProcessor
 from weave.trace_server_bindings.client_interface import TraceServerClientInterface
+from weave.trace_server_bindings.stainless_remote_http_trace_server import (
+    StainlessRemoteHTTPTraceServer,
+)
+from weave.vendor.weave_server_sdk import DefaultHttpxClient
 
 pytest_plugins = ["tests.conftest_lib.http_trace_server"]
 
@@ -542,6 +550,52 @@ def client_creator(zero_stack, trace_server, caching_client_isolation):
             _teardown_test_client(client, reset_settings=True, close_cache_only=True)
 
     return client
+
+
+@pytest.fixture
+def stainless_recording_server(client, monkeypatch):
+    """A batching `StainlessRemoteHTTPTraceServer` on the test server, recording its requests.
+
+    It covers the generated client's batching and splitting against the real
+    server, and yields the server with the path of every request it sent.
+    """
+
+    def make_fast_async_batch_processor(*args, **kwargs):
+        kwargs.setdefault("min_batch_interval", 0)
+        return AsyncBatchProcessor(*args, **kwargs)
+
+    def make_fast_call_batch_processor(*args, **kwargs):
+        kwargs.setdefault("min_batch_interval", 0)
+        return CallBatchProcessor(*args, **kwargs)
+
+    monkeypatch.setattr(
+        stainless_remote_http_trace_server,
+        "AsyncBatchProcessor",
+        make_fast_async_batch_processor,
+    )
+    monkeypatch.setattr(
+        stainless_remote_http_trace_server,
+        "CallBatchProcessor",
+        make_fast_call_batch_processor,
+    )
+    server = StainlessRemoteHTTPTraceServer(
+        os.environ["WF_TRACE_SERVER_URL"],
+        should_batch=True,
+        password=os.environ["WANDB_API_KEY"],
+    )
+    paths: list[str] = []
+    server._stainless_client = server._stainless_client.copy(
+        http_client=DefaultHttpxClient(
+            verify=ssl_verify(),
+            event_hooks={"request": [lambda request: paths.append(request.url.path)]},
+        )
+    )
+    try:
+        yield server, paths
+    finally:
+        server.call_processor.stop_accepting_new_work_and_flush_queue()
+        if server.feedback_processor is not None:
+            server.feedback_processor.stop_accepting_new_work_and_flush_queue()
 
 
 @pytest.fixture(autouse=True)
