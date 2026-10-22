@@ -100,9 +100,8 @@ def init(
                     This includes connection time, data transfer, and server processing. Increase for
                     slow networks or when working with large payloads.
                     Default: `30.0`
-                - `use_stainless_server` (bool): Uses the Stainless-generated HTTP client which
-                    provides better type safety, automatic retries, and improved error handling. This is
-                    experimental and may become the default in future versions.
+                - `use_stainless_server` (bool): Deprecated and ignored: Weave always uses the
+                    Stainless-generated HTTP client, and warns once if this is set to False.
                     Default: `True`
                 - `use_calls_complete` (bool): Uses an optimized write path that batches complete
                     call data (start and end) into a single request instead of separate start/end requests.

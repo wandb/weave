@@ -12,6 +12,7 @@ import logging
 import re
 from collections.abc import Callable, Iterator
 from contextlib import contextmanager
+from typing import Any
 from unittest.mock import MagicMock
 
 import httpx
@@ -19,6 +20,7 @@ import pytest
 import requests
 import tenacity
 from pydantic import BaseModel, ValidationError
+from pydantic_core import to_jsonable_python
 
 from tests.trace_server_bindings.conftest import (
     generate_end,
@@ -28,7 +30,6 @@ from tests.trace_server_bindings.conftest import (
 from weave.trace.display.term import configure_logger
 from weave.trace.refs import ObjectRef
 from weave.trace.weave_client import WeaveClient
-from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server_bindings.async_batch_processor import AsyncBatchProcessor
 from weave.trace_server_bindings.call_batch_processor import CallBatchProcessor
 from weave.trace_server_bindings.http_utils import (
@@ -83,7 +84,7 @@ def test_federated_auth_refreshes_headers(unbatched_server):
         return_value=mock_response
     )
 
-    unbatched_server.call_start(tsi.CallStartReq(start=generate_start("call-id")))
+    unbatched_server.call_start({"start": generate_start("call-id")})
 
     request_headers = unbatched_server._stainless_client.calls.start.call_args.kwargs[
         "extra_headers"
@@ -109,7 +110,7 @@ def test_call_start_ok(unbatched_server):
     unbatched_server._stainless_client.calls.start = MagicMock(return_value=response)
 
     start = generate_start(call_id)
-    result = unbatched_server.call_start(tsi.CallStartReq(start=start))
+    result = unbatched_server.call_start({"start": start})
 
     unbatched_server._stainless_client.calls.start.assert_called_once()
     assert result == CallStartResponse(id=call_id, trace_id="test_trace_id")
@@ -130,16 +131,10 @@ def test_400_no_retry(unbatched_server):
 
     start = generate_start(call_id)
     with pytest.raises(APIStatusError):
-        unbatched_server.call_start(tsi.CallStartReq(start=start))
+        unbatched_server.call_start({"start": start})
 
     # Should only be called once (no retry for 400)
     assert unbatched_server._stainless_client.calls.start.call_count == 1
-
-
-def test_invalid_no_retry(unbatched_server):
-    """Test that validation errors are not retried."""
-    with pytest.raises(ValidationError):
-        unbatched_server.call_start(tsi.CallStartReq(start={"invalid": "broken"}))
 
 
 @pytest.mark.parametrize("should_batch", [False, True], ids=["unbatched", "batched"])
@@ -157,8 +152,8 @@ def test_a_bad_dict_start_or_end_is_rejected_before_it_is_sent(should_batch):
     server._stainless_client = server._stainless_client.copy(
         http_client=httpx.Client(transport=httpx.MockTransport(handle))
     )
-    start = {**generate_start("call-id").model_dump(), "display_name": 5}
-    end = {**generate_end("call-id").model_dump(), "exception": 5}
+    start = {**generate_start("call-id"), "display_name": 5}
+    end = {**generate_end("call-id"), "exception": 5}
     try:
         with pytest.raises(ValidationError):
             server.call_start({"start": start})
@@ -196,7 +191,7 @@ def test_timeout_retry_mechanism(success_response, monkeypatch):
     server._send_batch_to_server = with_retry(mock_send_batch)
 
     # Trying to send a batch should fail 2 times, then succeed
-    server.call_start(tsi.CallStartReq(start=generate_start()))
+    server.call_start({"start": generate_start()})
     server.call_processor.stop_accepting_new_work_and_flush_queue()
 
     # Verify that _send_batch_to_server was called 3 times (2 failures + 1 success)
@@ -234,7 +229,7 @@ def test_post_timeout(success_response, batched_server, log_collector):
     batched_server._send_batch_to_server = with_retry(mock_send_batch_timeout)
 
     # Phase 1: Try but fail to process the first batch
-    batched_server.call_start(tsi.CallStartReq(start=generate_start()))
+    batched_server.call_start({"start": generate_start()})
     batched_server.call_processor.stop_accepting_new_work_and_flush_queue()
     logs = log_collector.get_warning_logs()
     assert len(logs) >= 1
@@ -265,7 +260,7 @@ def test_post_timeout(success_response, batched_server, log_collector):
     new_server._stainless_client.calls.start = fast_retry(mock_start_success)
 
     # Should succeed with retry
-    start_req = tsi.CallStartReq(start=generate_start())
+    start_req = {"start": generate_start()}
     response = new_server.call_start(start_req)
     assert response.id == "test_id"
     assert response.trace_id == "test_trace_id"
@@ -325,21 +320,36 @@ def _calls_complete_required(request: httpx.Request) -> httpx.Response:
 
 def _start_end_pair() -> tuple[StartBatchItem, EndBatchItem]:
     ended_at = datetime.datetime.now(tz=datetime.timezone.utc)
-    start = generate_start("call-id", PROJECT)
+    # Every key the client sends, unset ones as None, so the bodies below are
+    # the full requests.
+    start = {
+        **generate_start("call-id", PROJECT),
+        "display_name": None,
+        "thread_id": None,
+        "turn_id": None,
+        "otel_dump": None,
+        "wb_user_id": None,
+        "wb_run_id": None,
+        "wb_run_step": None,
+    }
     # Distinct trace ids so the header assertions prove each request stamps its
     # own item's trace_id rather than one shared value.
-    start.trace_id = "trace-eager-start"
-    end = tsi.EndedCallSchemaForInsertWithStartedAt(
-        project_id=PROJECT,
-        id="call-id",
-        trace_id="trace-eager-end",
-        ended_at=ended_at,
-        started_at=ended_at - datetime.timedelta(seconds=1),
-        summary={"result": "Test summary"},
-    )
+    start["trace_id"] = "trace-eager-start"
+    end = {
+        "project_id": PROJECT,
+        "id": "call-id",
+        "trace_id": "trace-eager-end",
+        "is_eval": None,
+        "ended_at": ended_at,
+        "started_at": ended_at - datetime.timedelta(seconds=1),
+        "exception": None,
+        "output": None,
+        "summary": {"result": "Test summary"},
+        "wb_run_step_end": None,
+    }
     return (
-        StartBatchItem(req=tsi.CallStartReq(start=start)),
-        EndBatchItem(req=tsi.CallEndReq(end=end)),
+        StartBatchItem(req={"start": start}),
+        EndBatchItem(req={"end": end}),
     )
 
 
@@ -368,27 +378,36 @@ def test_calls_complete_batch_endpoint_and_payload(monkeypatch):
     """Paired calls go to the v2 calls/complete route with the full payload."""
     monkeypatch.setenv("WEAVE_USE_CALLS_COMPLETE", "true")
     now = datetime.datetime.now(tz=datetime.timezone.utc)
-    complete = tsi.CompletedCallSchemaForInsert(
-        project_id=PROJECT,
-        id="call-id",
-        trace_id="trace-id",
-        op_name="test_op",
-        started_at=now,
-        ended_at=now,
-        attributes={"a": 1},
-        inputs={"b": 2},
-        output={"c": 3},
-        summary={"result": "ok"},
-    )
+    # Every key a paired call carries, unset ones as None.
+    complete = {
+        "project_id": PROJECT,
+        "id": "call-id",
+        "trace_id": "trace-id",
+        "op_name": "test_op",
+        "started_at": now,
+        "ended_at": now,
+        "display_name": None,
+        "parent_id": None,
+        "thread_id": None,
+        "turn_id": None,
+        "attributes": {"a": 1},
+        "inputs": {"b": 2},
+        "output": {"c": 3},
+        "summary": {"result": "ok"},
+        "otel_dump": None,
+        "exception": None,
+        "wb_user_id": None,
+        "wb_run_id": None,
+        "wb_run_step": None,
+        "wb_run_step_end": None,
+    }
 
     with _batching_server(_ok) as (server, requests):
         server._flush_calls_complete([CompleteBatchItem(req=complete)])
 
         assert [r.url.path for r in requests] == [f"{V2}/calls/complete"]
         payload = json.loads(requests[0].read().decode("utf-8"))
-        assert payload == tsi.CallsUpsertCompleteReq(batch=[complete]).model_dump(
-            mode="json"
-        )
+        assert payload == to_jsonable_python({"batch": [complete]})
 
 
 def test_eager_calls_use_v2_start_end_endpoints(monkeypatch):
@@ -410,12 +429,8 @@ def test_eager_calls_use_v2_start_end_endpoints(monkeypatch):
         ]
         start_body = json.loads(requests[0].read().decode("utf-8"))
         end_body = json.loads(requests[1].read().decode("utf-8"))
-        assert start_body == tsi.CallStartV2Req(start=start_item.req.start).model_dump(
-            mode="json"
-        )
-        assert end_body == tsi.CallEndV2Req(end=end_item.req.end).model_dump(
-            mode="json"
-        )
+        assert start_body == to_jsonable_python({"start": start_item.req["start"]})
+        assert end_body == to_jsonable_python({"end": end_item.req["end"]})
 
 
 def test_call_writes_send_client_capabilities_header(monkeypatch):
@@ -426,17 +441,17 @@ def test_call_writes_send_client_capabilities_header(monkeypatch):
     """
     monkeypatch.setenv("WEAVE_USE_CALLS_COMPLETE", "true")
     now = datetime.datetime.now(tz=datetime.timezone.utc)
-    complete = tsi.CompletedCallSchemaForInsert(
-        project_id=PROJECT,
-        id="call-id",
-        trace_id="trace-id",
-        op_name="test_op",
-        started_at=now,
-        ended_at=now,
-        attributes={},
-        inputs={},
-        summary={"result": "ok"},
-    )
+    complete = {
+        "project_id": PROJECT,
+        "id": "call-id",
+        "trace_id": "trace-id",
+        "op_name": "test_op",
+        "started_at": now,
+        "ended_at": now,
+        "attributes": {},
+        "inputs": {},
+        "summary": {"result": "ok"},
+    }
     start_item, end_item = _start_end_pair()
 
     with _batching_server(_ok) as (server, requests):
@@ -457,9 +472,7 @@ def test_other_routes_send_client_capabilities_header():
     """The header describes the client, not a trace, so every route carries it."""
     with _batching_server(_ok) as (server, requests):
         server.call_update(
-            tsi.CallUpdateReq(
-                project_id=PROJECT, call_id="call-id", display_name="renamed"
-            )
+            {"project_id": PROJECT, "call_id": "call-id", "display_name": "renamed"}
         )
 
     assert [r.url.path for r in requests] == ["/call/update"]
@@ -514,20 +527,32 @@ def test_auto_upgrade_to_calls_complete_on_error(monkeypatch):
 
         complete = [r for r in requests if r.url.path == f"{V2}/calls/complete"]
         assert len(complete) == 1
-        paired = tsi.CompletedCallSchemaForInsert(
-            project_id=PROJECT,
-            id="call-id",
-            trace_id=start_item.req.start.trace_id,
-            op_name=start_item.req.start.op_name,
-            parent_id=start_item.req.start.parent_id,
-            started_at=start_item.req.start.started_at,
-            attributes=start_item.req.start.attributes,
-            inputs=start_item.req.start.inputs,
-            ended_at=end_item.req.end.ended_at,
-            summary=end_item.req.end.summary,
-        )
+        start = start_item.req["start"]
+        end = end_item.req["end"]
+        paired = {
+            "project_id": PROJECT,
+            "id": "call-id",
+            "trace_id": start["trace_id"],
+            "op_name": start["op_name"],
+            "started_at": start["started_at"],
+            "ended_at": end["ended_at"],
+            "display_name": None,
+            "parent_id": start["parent_id"],
+            "thread_id": None,
+            "turn_id": None,
+            "attributes": start["attributes"],
+            "inputs": start["inputs"],
+            "output": None,
+            "summary": end["summary"],
+            "otel_dump": None,
+            "exception": None,
+            "wb_user_id": None,
+            "wb_run_id": None,
+            "wb_run_step": None,
+            "wb_run_step_end": None,
+        }
         assert json.loads(complete[0].read().decode("utf-8")) == (
-            tsi.CallsUpsertCompleteReq(batch=[paired]).model_dump(mode="json")
+            to_jsonable_python({"batch": [paired]})
         )
 
 
@@ -537,8 +562,8 @@ def test_a_second_rejected_batch_lands_on_the_upgraded_processor(monkeypatch):
     monkeypatch.setenv("WEAVE_USE_CALLS_COMPLETE", "false")
     first_start, first_end = _start_end_pair()
     second_start, second_end = _start_end_pair()
-    second_start.req.start.id = "call-id-2"
-    second_end.req.end.id = "call-id-2"
+    second_start.req["start"]["id"] = "call-id-2"
+    second_end.req["end"]["id"] = "call-id-2"
 
     with _batching_server(_calls_complete_required) as (server, requests):
         # The first batch upgrades the processor; the second arrives after the swap
@@ -768,6 +793,52 @@ def test_generated_client_gets_our_ssl_and_timeout_settings(monkeypatch):
     assert server._stainless_client.timeout == 7.0
 
 
+def test_table_update_over_the_byte_limit_is_split():
+    """A table update over the byte limit goes out in parts, each on the last digest.
+
+    Rows are appended in order, every part fits the limit, and the response
+    has the last digest and every updated row digest.
+    """
+    bodies: list[dict] = []
+    sizes: list[int] = []
+
+    def handle(request: httpx.Request) -> httpx.Response:
+        body = json.loads(request.content)
+        bodies.append(body)
+        sizes.append(len(request.content))
+        n = len(bodies)
+        return httpx.Response(
+            200,
+            json={
+                "digest": f"d{n}",
+                "updated_row_digests": [
+                    f"r{n}.{i}" for i in range(len(body["updates"]))
+                ],
+            },
+            request=request,
+        )
+
+    server = StainlessRemoteHTTPTraceServer("http://example.com")
+    server._stainless_client = server._stainless_client.copy(
+        http_client=httpx.Client(transport=httpx.MockTransport(handle))
+    )
+    server.remote_request_bytes_limit = 4 * 1024
+    updates = [{"append": {"row": {"a": i, "b": "x" * 1024}}} for i in range(8)]
+
+    res = server.table_update(
+        {"project_id": "e/p", "base_digest": "d0", "updates": updates}
+    )
+
+    assert len(bodies) == 4
+    assert all(size <= server.remote_request_bytes_limit for size in sizes)
+    assert [u for body in bodies for u in body["updates"]] == updates
+    assert [body["base_digest"] for body in bodies] == ["d0", "d1", "d2", "d3"]
+    assert res.digest == "d4"
+    assert res.updated_row_digests == [
+        f"r{n}.{i}" for n in range(1, 5) for i in range(2)
+    ]
+
+
 # =============================================================================
 # Feedback ids
 #
@@ -777,14 +848,14 @@ def test_generated_client_gets_our_ssl_and_timeout_settings(monkeypatch):
 # =============================================================================
 
 
-def _feedback_req(**kwargs: str) -> tsi.FeedbackCreateReq:
-    return tsi.FeedbackCreateReq(
-        project_id=PROJECT,
-        weave_ref=f"weave:///{PROJECT}/call/call-id",
-        feedback_type="wandb.note.1",
-        payload={"note": "hello"},
+def _feedback_req(**kwargs: str) -> dict[str, Any]:
+    return {
+        "project_id": PROJECT,
+        "weave_ref": f"weave:///{PROJECT}/call/call-id",
+        "feedback_type": "wandb.note.1",
+        "payload": {"note": "hello"},
         **kwargs,
-    )
+    }
 
 
 def _store_feedback(request: httpx.Request) -> httpx.Response:
@@ -850,9 +921,7 @@ def test_feedback_create_sends_an_explicit_id(should_batch):
 def test_feedback_create_batch_sends_explicit_ids():
     """The public batch route keeps caller-chosen ids too."""
     with _batching_server(_store_feedback) as (server, requests):
-        res = server.feedback_create_batch(
-            tsi.FeedbackCreateBatchReq(batch=[_feedback_req(id="explicit-id")])
-        )
+        res = server.feedback_create_batch({"batch": [_feedback_req(id="explicit-id")]})
 
     assert [row.id for row in res.res] == ["explicit-id"]
     sent = json.loads(requests[0].read())["batch"]

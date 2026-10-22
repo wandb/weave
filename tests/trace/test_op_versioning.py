@@ -9,23 +9,23 @@ import weave as wv
 from weave.trace.op import as_op
 from weave.trace.serialization.mem_artifact import MemTraceFilesArtifact
 from weave.trace.serialization.op_type import save_instance
-from weave.trace_server.trace_server_interface import FileContentReadReq, ObjReadReq
 from weave.utils.project_id import to_project_id
 
 
 def get_saved_code(client, ref):
     resp = client.server.obj_read(
-        ObjReadReq(
-            project_id=to_project_id(ref.entity, ref.project),
-            object_id=ref.name,
-            digest=ref.digest,
-        )
+        {
+            "project_id": to_project_id(ref.entity, ref.project),
+            "object_id": ref.name,
+            "digest": ref.digest,
+        }
     )
     files = resp.obj.val["files"]
     file_read_resp = client.server.file_content_read(
-        FileContentReadReq(
-            project_id=to_project_id(ref.entity, ref.project), digest=files["obj.py"]
-        )
+        {
+            "project_id": to_project_id(ref.entity, ref.project),
+            "digest": files["obj.py"],
+        }
     )
     return file_read_resp.content.decode()
 

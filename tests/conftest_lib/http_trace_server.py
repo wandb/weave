@@ -9,25 +9,11 @@ import pytest
 
 from tests.conftest_lib.http_error_decoding import HTTPErrorDecodingTraceServer
 from tests.trace.server_utils import TEST_ENTITY
-from weave.shared import common_interface
-from weave.shared import trace_server_interface as tsi
 from weave.trace_server_bindings.stainless_remote_http_trace_server import (
     StainlessRemoteHTTPTraceServer,
 )
 from weave.utils.ids import generate_id
 from weave.wandb_interface import project_creator
-
-
-def pytest_addoption(parser):
-    try:
-        parser.addoption(
-            "--remote-http-trace-server",
-            action="store",
-            default="remote",
-            help="Specify the remote HTTP trace server implementation: remote or stainless",
-        )
-    except ValueError:
-        pass
 
 
 def pytest_configure(config):
@@ -73,18 +59,9 @@ def pytest_sessionfinish(session):
 
 def pytest_collection_modifyitems(config, items):
     # Add the trace_server marker to all tests that use the trace_server fixture.
-    # Note: Filtering based on remote-http-trace-server flag is handled in tests/trace_server_bindings/conftest.py
     for item in items:
         if "trace_server" in item.fixturenames:
             item.add_marker(pytest.mark.trace_server)
-
-
-@pytest.fixture(autouse=True)
-def reset_extra_field_warnings():
-    """The memo of reported ignored-field sets would silence later tests."""
-    common_interface._warned_field_sets.clear()
-    yield
-    common_interface._warned_field_sets.clear()
 
 
 # The user id the HTTP server stamps on writes, keyed by server url. The
@@ -97,20 +74,20 @@ def _probe_http_user_id(server: StainlessRemoteHTTPTraceServer) -> str:
     project_id = f"{TEST_ENTITY}/test-project"
     call_id = generate_id()
     server.call_start(
-        tsi.CallStartReq(
-            start=tsi.StartedCallSchemaForInsert(
-                project_id=project_id,
-                id=call_id,
-                op_name="probe_user_id",
-                trace_id=generate_id(),
-                started_at=datetime.datetime.now(datetime.timezone.utc),
-                attributes={},
-                inputs={},
-            )
-        )
+        {
+            "start": {
+                "project_id": project_id,
+                "id": call_id,
+                "op_name": "probe_user_id",
+                "trace_id": generate_id(),
+                "started_at": datetime.datetime.now(datetime.timezone.utc),
+                "attributes": {},
+                "inputs": {},
+            }
+        }
     )
     user_id = server.call_read(
-        tsi.CallReadReq(project_id=project_id, id=call_id)
+        {"project_id": project_id, "id": call_id}
     ).call.wb_user_id
     assert user_id is not None
     return user_id

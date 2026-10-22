@@ -10,7 +10,6 @@ from weave.trace.builtin_object_classes.llm_structured_model import (
 )
 from weave.trace.object_record import pydantic_object_record
 from weave.trace.refs import ObjectRef
-from weave.trace_server import trace_server_interface as tsi
 
 
 def test_publish_and_load_scorer_with_prompt_ref(weave_active):
@@ -160,7 +159,7 @@ def test_llm_as_a_judge_scorer_publish_has_no_op_refs(client):
 
     def stored_val(name: str, digest: str) -> dict:
         res = client.server.obj_read(
-            tsi.ObjReadReq(project_id=client.project_id, object_id=name, digest=digest)
+            {"project_id": client.project_id, "object_id": name, "digest": digest}
         )
         return res.obj.val
 

@@ -1,9 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Literal
-
-from pydantic import BaseModel
+from typing import Literal
 
 from weave.vendor.weave_server_sdk.types import (
     CallEndParams,
@@ -12,20 +10,17 @@ from weave.vendor.weave_server_sdk.types import (
 )
 from weave.vendor.weave_server_sdk.types.call_read_response import Call
 
-if TYPE_CHECKING:
-    from weave.shared import trace_server_interface as tsi
-
 
 @dataclass(kw_only=True)
 class StartBatchItem:
     mode: Literal["start"] = "start"
-    req: CallStartParams | tsi.CallStartReq
+    req: CallStartParams
 
 
 @dataclass(kw_only=True)
 class EndBatchItem:
     mode: Literal["end"] = "end"
-    req: CallEndParams | tsi.CallEndReq
+    req: CallEndParams
 
 
 @dataclass(kw_only=True)
@@ -33,7 +28,7 @@ class CompleteBatchItem:
     """A complete call ready to be sent to calls_complete endpoint."""
 
     mode: Literal["complete"] = "complete"
-    req: v2_call_complete_params.Batch | tsi.CompletedCallSchemaForInsert
+    req: v2_call_complete_params.Batch
 
 
 @dataclass(kw_only=True)
@@ -70,11 +65,3 @@ class FileContentReadRes:
     """A file's content; the generated client has no model for a binary body."""
 
     content: bytes
-
-
-class EntityProjectInfo(BaseModel):
-    """Extracted entity and project information from a project_id."""
-
-    entity: str
-    project: str
-    project_id: str

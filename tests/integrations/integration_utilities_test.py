@@ -5,7 +5,7 @@ from weave.integrations.integration_utilities import (
     _truncated_str,
     truncate_op_name,
 )
-from weave.trace_server.constants import MAX_OP_NAME_LENGTH
+from weave.trace.constants import MAX_OP_NAME_LENGTH
 
 NON_HASH_LIMIT = 5
 

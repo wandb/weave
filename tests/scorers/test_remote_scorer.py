@@ -13,7 +13,6 @@ from weave.scorers.remote_scorer import (
 )
 from weave.trace.api import publish
 from weave.trace.object_record import pydantic_object_record
-from weave.trace_server import trace_server_interface as tsi
 
 pytestmark = pytest.mark.trace_server
 
@@ -446,11 +445,7 @@ def test_remote_scorer_from_ui_shape_with_extra_fields_loads(client) -> None:
         },
     }
     res = client.server.obj_create(
-        tsi.ObjCreateReq(
-            obj=tsi.ObjSchemaForInsert(
-                project_id=client.project_id, object_id=object_id, val=val
-            )
-        )
+        {"obj": {"project_id": client.project_id, "object_id": object_id, "val": val}}
     )
     uri = f"weave:///{client.entity}/{client.project}/object/{object_id}:{res.digest}"
 

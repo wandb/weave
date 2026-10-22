@@ -53,9 +53,8 @@ from weave.integrations.google_adk.google_adk_sdk import (
     _wrap_trace_tool_call,
     get_google_adk_patcher,
 )
+from weave.trace.constants import INVOKING_SPAN_ATTR_KEY
 from weave.trace.weave_client import WeaveClient
-from weave.trace_server.agents import semconv as server_semconv
-from weave.trace_server.constants import INVOKING_SPAN_ATTR_KEY
 
 # The mocks below mirror the duck-typed surface our extractors inspect on
 # ``google.genai.types.*`` objects and ADK's ``LlmRequest`` / ``LlmResponse``
@@ -710,25 +709,9 @@ class TestVendoredSemconv:
     """The integration vendors its GenAI semconv keys (``_semconv``) instead of
     importing them from ``opentelemetry.semconv._incubating`` so ``weave`` stays
     installable alongside ``google-adk`` (which pins an older
-    ``opentelemetry-sdk``). These guard the two ways the vendored literals could
-    silently go wrong: drifting from the server's extraction keys, or drifting
+    ``opentelemetry-sdk``). This guards against the vendored literals drifting
     from the upstream spec values.
     """
-
-    def test_every_vendored_key_is_a_server_extraction_key(self) -> None:
-        """Each ``gen_ai.*`` key the integration emits must be one the trace
-        server recognises, or the attribute silently never lands in a column.
-        """
-        vendored = {
-            name: value
-            for name, value in vars(_semconv).items()
-            if name.startswith("GEN_AI_")
-        }
-        assert vendored, "no vendored GEN_AI_* constants found"
-        for name, value in vendored.items():
-            assert server_semconv.resolve_alias_to_canonical(value) is not None, (
-                f"{name}={value!r} is not a recognised server extraction key"
-            )
 
     def test_vendored_values_match_upstream_when_available(self) -> None:
         """When the upstream package defines a GenAI constant, our vendored

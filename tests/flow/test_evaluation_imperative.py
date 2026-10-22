@@ -17,7 +17,6 @@ from weave.evaluation.eval_imperative import (
 from weave.integrations.integration_utilities import op_name_from_call
 from weave.trace.context import call_context
 from weave.trace.serialization.serialize import to_json
-from weave.trace_server.trace_server_interface import ObjectVersionFilter
 
 
 class ExampleRow(TypedDict):
@@ -245,17 +244,13 @@ def test_evaluation_with_custom_models_and_scorers(
     def make_assertions():
         client.flush()
 
-        models = client._objects(
-            filter=ObjectVersionFilter(base_object_classes=["Model"])
-        )
+        models = client._objects(filter={"base_object_classes": ["Model"]})
         assert len(models) == 3
         assert models[0].object_id == "MyModel"
         assert models[1].object_id == "dict_model"
         assert models[2].object_id == "string_model"
 
-        scorers = client._objects(
-            filter=ObjectVersionFilter(base_object_classes=["Scorer"])
-        )
+        scorers = client._objects(filter={"base_object_classes": ["Scorer"]})
         assert len(scorers) == 3
         assert scorers[0].object_id == "gt2_scorer"
         assert scorers[1].object_id == "gt4_scorer"
@@ -292,14 +287,12 @@ def test_evaluation_with_custom_models_and_scorers(
 
     ev4.log_summary({"avg_score": 1.0, "total_examples": 3})
 
-    models = client._objects(filter=ObjectVersionFilter(base_object_classes=["Model"]))
+    models = client._objects(filter={"base_object_classes": ["Model"]})
     assert len(models) == 4
     assert models[3].object_id == "new_string_model"
 
     # No change to scorers
-    scorers = client._objects(
-        filter=ObjectVersionFilter(base_object_classes=["Scorer"])
-    )
+    scorers = client._objects(filter={"base_object_classes": ["Scorer"]})
     assert len(scorers) == 3
 
     # Run a new evaluation using the same models, but different scorers
@@ -317,12 +310,10 @@ def test_evaluation_with_custom_models_and_scorers(
     ev5.log_summary({"avg_score": 1.0, "total_examples": 3})
 
     # No change to models
-    models = client._objects(filter=ObjectVersionFilter(base_object_classes=["Model"]))
+    models = client._objects(filter={"base_object_classes": ["Model"]})
     assert len(models) == 4
 
-    scorers = client._objects(
-        filter=ObjectVersionFilter(base_object_classes=["Scorer"])
-    )
+    scorers = client._objects(filter={"base_object_classes": ["Scorer"]})
     assert len(scorers) == 4
     assert scorers[3].object_id == "gt8_scorer"
 
@@ -352,16 +343,12 @@ def test_evaluation_version_reuse(
         client.flush()
 
     # Only 1 version of the dataset should exist (it's the same one)
-    evaluations = client._objects(
-        filter=ObjectVersionFilter(base_object_classes=["Dataset"])
-    )
+    evaluations = client._objects(filter={"base_object_classes": ["Dataset"]})
     assert len(evaluations) == 1
 
     # Check that only one version of the evaluation exists (none of the methods
     # nor any of the attributes should have changed)
-    evaluations = client._objects(
-        filter=ObjectVersionFilter(base_object_classes=["Evaluation"])
-    )
+    evaluations = client._objects(filter={"base_object_classes": ["Evaluation"]})
     assert len(evaluations) == 1
 
 

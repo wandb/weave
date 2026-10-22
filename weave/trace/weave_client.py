@@ -235,8 +235,6 @@ except ImportError:
 
 if TYPE_CHECKING:
     from weave.evaluation.eval import Evaluation
-    from weave.shared.agents import types as agent_types
-    from weave.shared.trace_server_interface import ObjectVersionFilter
 
 # Controls if objects can have refs to projects not the WeaveClient project.
 # If False, object refs with with mismatching projects will be recreated.
@@ -570,7 +568,7 @@ class WeaveClient:
         self._server_feedback_processor: AsyncBatchProcessor | None = None
         # This is a short-term hack to get around the fact that we are reaching into
         # the underlying implementation of the specific server to get the feedback processor.
-        # The `RemoteHTTPTraceServer` contains a feedback processor and we use that to control
+        # The `StainlessRemoteHTTPTraceServer` contains a feedback processor and we use that to control
         # some client-side flushing mechanics. We should move this to the interface layer. However,
         # we don't really want the server-side implementations to need to define no-ops as that is
         # even uglier. So we are using this "hasattr" check to avoid forcing the server-side implementations
@@ -960,7 +958,7 @@ class WeaveClient:
         self,
         *,
         agent_name: str | None = None,
-        sort_by: list[agent_types.AgentSortBy] | None = None,
+        sort_by: list[agent_query_params.SortBy] | None = None,
         limit: int | None = None,
         offset: int | None = None,
         page_size: int = DEFAULT_AGENT_QUERY_LIMIT,
@@ -1022,7 +1020,7 @@ class WeaveClient:
         self,
         *,
         agent_name: str,
-        sort_by: list[agent_types.AgentSortBy] | None = None,
+        sort_by: list[agent_version_query_params.SortBy] | None = None,
         limit: int | None = None,
         offset: int | None = None,
         page_size: int = DEFAULT_AGENT_QUERY_LIMIT,
@@ -1082,7 +1080,7 @@ class WeaveClient:
         *,
         agent_name: str | None = None,
         query: Query | None = None,
-        sort_by: list[agent_types.AgentSortBy] | None = None,
+        sort_by: list[span_query_params.SortBy] | None = None,
         limit: int | None = None,
         offset: int | None = None,
         page_size: int = DEFAULT_AGENT_QUERY_LIMIT,
@@ -1242,10 +1240,10 @@ class WeaveClient:
         self,
         *,
         start: datetime.datetime,
-        metrics: list[agent_types.AgentSpanStatsMetricSpec],
+        metrics: list[span_stats_params.Metric],
         end: datetime.datetime | None = None,
         query: Query | None = None,
-        group_by: list[agent_types.AgentGroupByRef] | None = None,
+        group_by: list[span_stats_params.GroupBy] | None = None,
         granularity: int | None = None,
         timezone: str = "UTC",
     ) -> SpanStatsResponse:
@@ -2865,7 +2863,7 @@ class WeaveClient:
         """
         # DigestMismatchError: raised directly by in-process servers (ClickHouse).
         is_local_mismatch = isinstance(e, DigestMismatchError)
-        # HTTP 409 from either remote client: the server rejected expected_digest.
+        # HTTP 409 from the remote client: the server rejected expected_digest.
         response = _http_response(e)
         is_remote_mismatch = response is not None and response.status_code == 409
         is_mismatch = is_local_mismatch or is_remote_mismatch
@@ -3347,7 +3345,7 @@ class WeaveClient:
 
     @trace_sentry.global_trace_sentry.watch()
     def _objects(
-        self, filter: object_query_params.Filter | ObjectVersionFilter | None = None
+        self, filter: object_query_params.Filter | None = None
     ) -> list[object_query_response.Obj]:
         # Every filter key, null when unset.
         query_filter: object_query_params.Filter = {
@@ -3824,8 +3822,8 @@ def _warn_if_object_name_truncated(name: str, object_id: str) -> None:
 def _get_call_processor(server: Any) -> Any:
     """Get the call processor from a server, traversing through middleware wrappers.
 
-    Most production clients (RemoteHTTPTraceServer, StainlessRemoteHTTPTraceServer)
-    use batching and have a call_processor. This traverses through middleware like
+    The production client (StainlessRemoteHTTPTraceServer) uses batching and
+    has a call_processor. This traverses through middleware like
     CachingMiddlewareTraceServer to find it.
 
     Returns None for direct backend servers (used in tests).

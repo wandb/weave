@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import TypeVar
 
-from weave.shared import trace_server_interface as tsi
+from weave.trace_server_bindings.client_interface import TraceServerClientInterface
 
 T = TypeVar("T")
 
@@ -14,14 +14,14 @@ TEST_ENTITY = "shawn"
 _NEXT_SERVER_ATTRS = ("server", "_next_trace_server")
 
 
-def find_server_layer(server: tsi.TraceServerInterface, layer_type: type[T]) -> T:
+def find_server_layer(server: TraceServerClientInterface, layer_type: type[T]) -> T:
     """Walk the middleware chain and return the first instance of layer_type.
 
     Each wrapper in the test server stack stores its inner server under a
     different attribute name.  This function checks them all so callers
     don't need to know the wrapping order.
     """
-    current: tsi.TraceServerInterface | None = server
+    current: TraceServerClientInterface | None = server
     visited: set[int] = set()
     while current is not None:
         if isinstance(current, layer_type):

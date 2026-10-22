@@ -19,7 +19,6 @@ from weave.integrations.integration_utilities import (
 )
 from weave.trace.op import OpCallError
 from weave.trace.weave_client import WeaveClient
-from weave.trace_server.trace_server_interface import CallsFilter
 
 
 @pytest.fixture(autouse=True)
@@ -123,7 +122,7 @@ def main():
 def test_fastmcp_client(client: WeaveClient) -> None:
     main()
 
-    calls = list(client.get_calls(filter=CallsFilter(trace_roots_only=True)))
+    calls = list(client.get_calls(filter={"trace_roots_only": True}))
     # Integration-tracking metadata is stamped on the integration's patched calls.
     stamped = [
         c.attributes["integration"] for c in calls if "integration" in c.attributes
@@ -201,7 +200,7 @@ async def test_fastmcp_server(client: WeaveClient) -> None:
         == "Please review this code:\\n\\nprint('Hello, world!')"
     )
 
-    calls = list(client.get_calls(filter=CallsFilter(trace_roots_only=True)))
+    calls = list(client.get_calls(filter={"trace_roots_only": True}))
     assert len(calls) == 3
 
     flattened_calls = flatten_calls(calls)

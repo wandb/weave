@@ -1,8 +1,6 @@
 import hashlib
 import json
 
-import pytest
-
 from weave.trace.serialization.digest import (
     bytes_digest,
     compute_file_digest,
@@ -13,8 +11,6 @@ from weave.trace.serialization.digest import (
     str_digest,
 )
 from weave.trace.serialization.object_class_util import process_incoming_object_val
-
-pytestmark = pytest.mark.trace_server
 
 
 def test_compute_object_digest_matches_server_formula() -> None:

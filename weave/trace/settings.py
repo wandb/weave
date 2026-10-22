@@ -245,10 +245,9 @@ class UserSettings:
 
     use_stainless_server: bool = True
     """
-    Toggles use of the stainless-generated HTTP client for trace server communication.
+    Deprecated and ignored: Weave always uses the stainless-generated HTTP client,
+    and warns once if this is set to False.
 
-    If True, uses StainlessRemoteHTTPTraceServer instead of RemoteHTTPTraceServer.
-    This provides better type safety and automatic client generation from OpenAPI specs.
     Can be overridden with the environment variable `WEAVE_USE_STAINLESS_SERVER`
     """
 
@@ -613,7 +612,7 @@ def http_timeout() -> float:
 
 
 def should_use_stainless_server() -> bool:
-    """Returns whether the stainless-generated HTTP client should be used."""
+    """Returns the deprecated `use_stainless_server` setting, which Weave ignores."""
     return _env_or_default(
         "use_stainless_server", _current_settings.get().use_stainless_server
     )

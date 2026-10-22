@@ -2,7 +2,6 @@ import pytest
 
 import weave
 from weave import Evaluation
-from weave.trace_server.common_interface import SortBy
 
 
 def test_filter_calls_by_ref_properties(client, no_autoflush):
@@ -287,10 +286,10 @@ def test_filter_calls_by_ref_properties(client, no_autoflush):
     calls = list(
         client.get_calls(
             sort_by=[
-                SortBy(
-                    field="inputs.worker_config.config.nested.nested key with spaces.one",
-                    direction="asc",
-                )
+                {
+                    "field": "inputs.worker_config.config.nested.nested key with spaces.one",
+                    "direction": "asc",
+                }
             ],
             expand_columns=[
                 "inputs.worker_config",
@@ -316,10 +315,10 @@ def test_filter_calls_by_ref_properties(client, no_autoflush):
     calls = list(
         client.get_calls(
             sort_by=[
-                SortBy(
-                    field="inputs.worker_config.config.nested.nested key with spaces.one",
-                    direction="desc",
-                )
+                {
+                    "field": "inputs.worker_config.config.nested.nested key with spaces.one",
+                    "direction": "desc",
+                }
             ],
             expand_columns=[
                 "inputs.worker_config",
@@ -418,7 +417,7 @@ async def test_filter_calls_by_ref_properties_with_table_rows_simple(
     # now order by a table row ref field
     calls = list(
         client.get_calls(
-            sort_by=[SortBy(field="inputs.example.target", direction="asc")],
+            sort_by=[{"field": "inputs.example.target", "direction": "asc"}],
             expand_columns=["inputs.example"],
         )
     )
@@ -431,7 +430,7 @@ async def test_filter_calls_by_ref_properties_with_table_rows_simple(
     # now order by a table row ref field desc
     calls = list(
         client.get_calls(
-            sort_by=[SortBy(field="inputs.example.target", direction="desc")],
+            sort_by=[{"field": "inputs.example.target", "direction": "desc"}],
             expand_columns=["inputs.example"],
         )
     )

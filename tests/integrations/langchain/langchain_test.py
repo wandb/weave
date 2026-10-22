@@ -18,7 +18,6 @@ from weave.integrations.openai.openai_sdk import get_openai_patcher
 from weave.trace.call import Call
 from weave.trace.context import call_context
 from weave.trace.weave_client import WeaveClient
-from weave.trace_server import trace_server_interface as tsi
 
 
 @pytest.fixture(autouse=True)
@@ -91,7 +90,7 @@ def test_simple_chain_invoke(
     llm_chain = prompt | llm
     _ = llm_chain.invoke({"number": 2})
 
-    calls = list(client.get_calls(filter=tsi.CallsFilter(trace_roots_only=True)))
+    calls = list(client.get_calls(filter={"trace_roots_only": True}))
     assert_correct_calls_for_chain_invoke(calls, exp_name)
 
     # Integration-tracking metadata is stamped on the integration's patched calls.
@@ -155,7 +154,7 @@ async def test_simple_chain_ainvoke(
     llm_chain = prompt | llm
     _ = await llm_chain.ainvoke({"number": 2})
 
-    calls = list(client.get_calls(filter=tsi.CallsFilter(trace_roots_only=True)))
+    calls = list(client.get_calls(filter={"trace_roots_only": True}))
     assert_correct_calls_for_chain_invoke(calls)
 
 
@@ -178,7 +177,7 @@ def test_simple_chain_stream(
     for _ in llm_chain.stream({"number": 2}):
         pass
 
-    calls = list(client.get_calls(filter=tsi.CallsFilter(trace_roots_only=True)))
+    calls = list(client.get_calls(filter={"trace_roots_only": True}))
     assert_correct_calls_for_chain_invoke(calls)
 
 
@@ -202,7 +201,7 @@ async def test_simple_chain_astream(
     async for _ in llm_chain.astream({"number": 2}):
         pass
 
-    calls = list(client.get_calls(filter=tsi.CallsFilter(trace_roots_only=True)))
+    calls = list(client.get_calls(filter={"trace_roots_only": True}))
     assert_correct_calls_for_chain_invoke(calls)
 
 
@@ -247,7 +246,7 @@ def test_simple_chain_batch(client: WeaveClient) -> None:
     llm_chain = prompt | llm
     _ = llm_chain.batch([{"number": 2}, {"number": 3}])
 
-    calls = list(client.get_calls(filter=tsi.CallsFilter(trace_roots_only=True)))
+    calls = list(client.get_calls(filter={"trace_roots_only": True}))
     assert_correct_calls_for_chain_batch(calls)
 
 
@@ -270,7 +269,7 @@ async def test_simple_chain_abatch(
     llm_chain = prompt | llm
     _ = await llm_chain.abatch([{"number": 2}, {"number": 3}])
 
-    calls = list(client.get_calls(filter=tsi.CallsFilter(trace_roots_only=True)))
+    calls = list(client.get_calls(filter={"trace_roots_only": True}))
     assert_correct_calls_for_chain_batch(calls)
 
 
@@ -339,7 +338,7 @@ def test_simple_chain_batch_inside_op(client: WeaveClient) -> None:
 
     run_batch([{"number": 2}, {"number": 3}])
 
-    calls = list(client.get_calls(filter=tsi.CallsFilter(trace_roots_only=True)))
+    calls = list(client.get_calls(filter={"trace_roots_only": True}))
     assert_correct_calls_for_chain_batch_from_op(calls)
 
 
@@ -465,7 +464,7 @@ def test_simple_rag_chain(client: WeaveClient, fix_chroma_ci: None) -> None:
         input="What is the essay about?",
     )
 
-    calls = list(client.get_calls(filter=tsi.CallsFilter(trace_roots_only=True)))
+    calls = list(client.get_calls(filter={"trace_roots_only": True}))
     assert_correct_calls_for_rag_chain(calls)
 
 
@@ -578,7 +577,7 @@ def test_agent_run_with_tools(
     _ = agent_executor.invoke(
         {"input": "What is 3 times 4 ?", "chat_history": []},
     )
-    calls = list(client.get_calls(filter=tsi.CallsFilter(trace_roots_only=True)))
+    calls = list(client.get_calls(filter={"trace_roots_only": True}))
     assert_correct_calls_for_agent_with_tool(calls)
 
 
@@ -692,7 +691,7 @@ def test_agent_run_with_function_call(
     _ = agent_executor.invoke(
         {"input": "What is 3 times 4 ?", "chat_history": []},
     )
-    calls = list(client.get_calls(filter=tsi.CallsFilter(trace_roots_only=True)))
+    calls = list(client.get_calls(filter={"trace_roots_only": True}))
     assert_correct_calls_for_agent_with_function_call(calls)
 
 
@@ -713,7 +712,7 @@ def test_weave_attributes_in_call(client: WeaveClient) -> None:
     with weave.attributes({"call_attr": 1}):
         _ = llm_chain.invoke({"number": 2})
 
-    calls = list(client.get_calls(filter=tsi.CallsFilter(trace_roots_only=True)))
+    calls = list(client.get_calls(filter={"trace_roots_only": True}))
     assert len(calls) > 0
     call_attrs = calls[0].attributes
     assert call_attrs["call_attr"] == 1
@@ -755,7 +754,7 @@ def test_langchain_google_vertexai_usage(client: WeaveClient) -> None:
 
         llm.invoke(messages)
 
-    calls = list(client.get_calls(filter=tsi.CallsFilter(trace_roots_only=True)))
+    calls = list(client.get_calls(filter={"trace_roots_only": True}))
     assert len(calls) > 0
     call = calls[0]
     # Assert that the call has usage metadata
@@ -785,7 +784,7 @@ def test_langchain_google_genai_usage(client: WeaveClient) -> None:
         ]
     )
 
-    calls = list(client.get_calls(filter=tsi.CallsFilter(trace_roots_only=True)))
+    calls = list(client.get_calls(filter={"trace_roots_only": True}))
     assert len(calls) > 0
     call = calls[0]
     # Assert that the call has usage metadata
@@ -815,7 +814,7 @@ def test_langchain_google_chat_genai_usage(client: WeaveClient) -> None:
         ]
     )
 
-    calls = list(client.get_calls(filter=tsi.CallsFilter(trace_roots_only=True)))
+    calls = list(client.get_calls(filter={"trace_roots_only": True}))
     assert len(calls) > 0
     call = calls[0]
     # Assert that the call has usage metadata
@@ -849,7 +848,7 @@ def test_langchain_anthropic_usage(client: WeaveClient) -> None:
         ]
     )
 
-    calls = list(client.get_calls(filter=tsi.CallsFilter(trace_roots_only=True)))
+    calls = list(client.get_calls(filter={"trace_roots_only": True}))
     assert len(calls) > 0
     call = calls[0]
     # Assert that the call has usage metadata
@@ -883,7 +882,7 @@ def test_langchain_cohere_usage(client: WeaveClient) -> None:
         ]
     )
 
-    calls = list(client.get_calls(filter=tsi.CallsFilter(trace_roots_only=True)))
+    calls = list(client.get_calls(filter={"trace_roots_only": True}))
     assert len(calls) > 0
     call = calls[0]
     # Assert that the call has usage metadata
@@ -916,7 +915,7 @@ def test_langchain_litellm_usage(client: WeaveClient) -> None:
         ]
     )
 
-    calls = list(client.get_calls(filter=tsi.CallsFilter(trace_roots_only=True)))
+    calls = list(client.get_calls(filter={"trace_roots_only": True}))
     assert len(calls) > 0
     call = calls[0]
     # Assert that the call has usage metadata

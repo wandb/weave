@@ -2,13 +2,13 @@
 
 These tests drive the binding through the vendored generated client over an
 httpx.MockTransport, so what they assert is the request the generated resource
-builds. The file is not gated to the stainless shard, so it also runs against
-the default one.
+builds.
 """
 
 from __future__ import annotations
 
 import collections.abc
+import copy
 import dataclasses
 import datetime
 import inspect
@@ -24,12 +24,16 @@ import httpx
 import pytest
 import typing_extensions
 from pydantic import BaseModel
+from pydantic_core import to_jsonable_python
 
-from tests.trace_server_bindings.conftest import generate_call_start_end_pair
+from tests.trace_server_bindings.conftest import (
+    generate_call_start_end_pair,
+    request_model,
+)
 from weave.durability.wal_sender import build_trace_server_handlers
+from weave.trace.constants import MAX_CONVERSATION_CHAT_TURNS
+from weave.trace.custom_runtime import CustomRuntimeID
 from weave.trace.serialization.digest import compute_object_digest, compute_row_digest
-from weave.trace_server import trace_server_interface as tsi
-from weave.trace_server.agents import types as agent_types
 from weave.trace_server_bindings import (
     stainless_remote_http_trace_server as stainless_binding,
 )
@@ -379,9 +383,11 @@ def _mock_server(
     [
         pytest.param(
             "op_create",
-            tsi.OpCreateReq(
-                project_id=PROJECT, name="my-object", source_code="def f(): pass"
-            ),
+            {
+                "project_id": PROJECT,
+                "name": "my-object",
+                "source_code": "def f(): pass",
+            },
             "POST",
             f"{V2}/ops",
             V2OpCreateResponse,
@@ -389,7 +395,7 @@ def _mock_server(
         ),
         pytest.param(
             "op_read",
-            tsi.OpReadReq(project_id=PROJECT, object_id="my-object", digest="abc123"),
+            {"project_id": PROJECT, "object_id": "my-object", "digest": "abc123"},
             "GET",
             f"{V2}/ops/my-object/versions/abc123",
             V2OpReadResponse,
@@ -397,7 +403,7 @@ def _mock_server(
         ),
         pytest.param(
             "dataset_create",
-            tsi.DatasetCreateReq(project_id=PROJECT, name="my-object", rows=[]),
+            {"project_id": PROJECT, "name": "my-object", "rows": []},
             "POST",
             f"{V2}/datasets",
             V2DatasetCreateResponse,
@@ -405,9 +411,7 @@ def _mock_server(
         ),
         pytest.param(
             "dataset_read",
-            tsi.DatasetReadReq(
-                project_id=PROJECT, object_id="my-object", digest="abc123"
-            ),
+            {"project_id": PROJECT, "object_id": "my-object", "digest": "abc123"},
             "GET",
             f"{V2}/datasets/my-object/versions/abc123",
             V2DatasetReadResponse,
@@ -415,9 +419,11 @@ def _mock_server(
         ),
         pytest.param(
             "scorer_create",
-            tsi.ScorerCreateReq(
-                project_id=PROJECT, name="my-object", op_source_code="def f(): pass"
-            ),
+            {
+                "project_id": PROJECT,
+                "name": "my-object",
+                "op_source_code": "def f(): pass",
+            },
             "POST",
             f"{V2}/scorers",
             V2ScorerCreateResponse,
@@ -425,9 +431,7 @@ def _mock_server(
         ),
         pytest.param(
             "scorer_read",
-            tsi.ScorerReadReq(
-                project_id=PROJECT, object_id="my-object", digest="abc123"
-            ),
+            {"project_id": PROJECT, "object_id": "my-object", "digest": "abc123"},
             "GET",
             f"{V2}/scorers/my-object/versions/abc123",
             V2ScorerReadResponse,
@@ -435,9 +439,7 @@ def _mock_server(
         ),
         pytest.param(
             "evaluation_create",
-            tsi.EvaluationCreateReq(
-                project_id=PROJECT, name="my-object", dataset="ds-ref"
-            ),
+            {"project_id": PROJECT, "name": "my-object", "dataset": "ds-ref"},
             "POST",
             f"{V2}/evaluations",
             V2EvaluationCreateResponse,
@@ -445,9 +447,7 @@ def _mock_server(
         ),
         pytest.param(
             "evaluation_read",
-            tsi.EvaluationReadReq(
-                project_id=PROJECT, object_id="my-object", digest="abc123"
-            ),
+            {"project_id": PROJECT, "object_id": "my-object", "digest": "abc123"},
             "GET",
             f"{V2}/evaluations/my-object/versions/abc123",
             V2EvaluationReadResponse,
@@ -455,9 +455,11 @@ def _mock_server(
         ),
         pytest.param(
             "model_create",
-            tsi.ModelCreateReq(
-                project_id=PROJECT, name="my-object", source_code="def f(): pass"
-            ),
+            {
+                "project_id": PROJECT,
+                "name": "my-object",
+                "source_code": "def f(): pass",
+            },
             "POST",
             f"{V2}/models",
             V2ModelCreateResponse,
@@ -465,9 +467,7 @@ def _mock_server(
         ),
         pytest.param(
             "model_read",
-            tsi.ModelReadReq(
-                project_id=PROJECT, object_id="my-object", digest="abc123"
-            ),
+            {"project_id": PROJECT, "object_id": "my-object", "digest": "abc123"},
             "GET",
             f"{V2}/models/my-object/versions/abc123",
             V2ModelReadResponse,
@@ -475,9 +475,7 @@ def _mock_server(
         ),
         pytest.param(
             "evaluation_run_create",
-            tsi.EvaluationRunCreateReq(
-                project_id=PROJECT, evaluation="ev-ref", model="m-ref"
-            ),
+            {"project_id": PROJECT, "evaluation": "ev-ref", "model": "m-ref"},
             "POST",
             f"{V2}/evaluation_runs",
             V2EvaluationRunCreateResponse,
@@ -485,7 +483,7 @@ def _mock_server(
         ),
         pytest.param(
             "evaluation_run_read",
-            tsi.EvaluationRunReadReq(project_id=PROJECT, evaluation_run_id="run-id"),
+            {"project_id": PROJECT, "evaluation_run_id": "run-id"},
             "GET",
             f"{V2}/evaluation_runs/run-id",
             V2EvaluationRunReadResponse,
@@ -493,9 +491,7 @@ def _mock_server(
         ),
         pytest.param(
             "evaluation_run_delete",
-            tsi.EvaluationRunDeleteReq(
-                project_id=PROJECT, evaluation_run_ids=["run-id"]
-            ),
+            {"project_id": PROJECT, "evaluation_run_ids": ["run-id"]},
             "DELETE",
             f"{V2}/evaluation_runs",
             V2EvaluationRunDeleteResponse,
@@ -503,7 +499,7 @@ def _mock_server(
         ),
         pytest.param(
             "evaluation_run_finish",
-            tsi.EvaluationRunFinishReq(project_id=PROJECT, evaluation_run_id="run-id"),
+            {"project_id": PROJECT, "evaluation_run_id": "run-id"},
             "POST",
             f"{V2}/evaluation_runs/run-id/finish",
             V2EvaluationRunFinishResponse,
@@ -511,9 +507,7 @@ def _mock_server(
         ),
         pytest.param(
             "prediction_create",
-            tsi.PredictionCreateReq(
-                project_id=PROJECT, model="m-ref", inputs={}, output=None
-            ),
+            {"project_id": PROJECT, "model": "m-ref", "inputs": {}, "output": None},
             "POST",
             f"{V2}/predictions",
             V2PredictionCreateResponse,
@@ -521,7 +515,7 @@ def _mock_server(
         ),
         pytest.param(
             "prediction_read",
-            tsi.PredictionReadReq(project_id=PROJECT, prediction_id="prediction-id"),
+            {"project_id": PROJECT, "prediction_id": "prediction-id"},
             "GET",
             f"{V2}/predictions/prediction-id",
             V2PredictionReadResponse,
@@ -529,9 +523,7 @@ def _mock_server(
         ),
         pytest.param(
             "prediction_delete",
-            tsi.PredictionDeleteReq(
-                project_id=PROJECT, prediction_ids=["prediction-id"]
-            ),
+            {"project_id": PROJECT, "prediction_ids": ["prediction-id"]},
             "DELETE",
             f"{V2}/predictions",
             V2PredictionDeleteResponse,
@@ -539,7 +531,7 @@ def _mock_server(
         ),
         pytest.param(
             "prediction_finish",
-            tsi.PredictionFinishReq(project_id=PROJECT, prediction_id="prediction-id"),
+            {"project_id": PROJECT, "prediction_id": "prediction-id"},
             "POST",
             f"{V2}/predictions/prediction-id/finish",
             V2PredictionFinishResponse,
@@ -547,12 +539,12 @@ def _mock_server(
         ),
         pytest.param(
             "score_create",
-            tsi.ScoreCreateReq(
-                project_id=PROJECT,
-                prediction_id="prediction-id",
-                scorer="s-ref",
-                value=None,
-            ),
+            {
+                "project_id": PROJECT,
+                "prediction_id": "prediction-id",
+                "scorer": "s-ref",
+                "value": None,
+            },
             "POST",
             f"{V2}/scores",
             V2ScoreCreateResponse,
@@ -560,7 +552,7 @@ def _mock_server(
         ),
         pytest.param(
             "score_read",
-            tsi.ScoreReadReq(project_id=PROJECT, score_id="score-id"),
+            {"project_id": PROJECT, "score_id": "score-id"},
             "GET",
             f"{V2}/scores/score-id",
             V2ScoreReadResponse,
@@ -568,7 +560,7 @@ def _mock_server(
         ),
         pytest.param(
             "score_delete",
-            tsi.ScoreDeleteReq(project_id=PROJECT, score_ids=["score-id"]),
+            {"project_id": PROJECT, "score_ids": ["score-id"]},
             "DELETE",
             f"{V2}/scores",
             V2ScoreDeleteResponse,
@@ -599,7 +591,7 @@ def test_v2_method_reaches_its_flat_route(
     [
         pytest.param(
             "agent_spans_query",
-            agent_types.AgentSpansQueryReq(project_id=PROJECT),
+            {"project_id": PROJECT},
             "POST",
             "/agents/spans/query",
             SpanQueryResponse,
@@ -607,7 +599,7 @@ def test_v2_method_reaches_its_flat_route(
         ),
         pytest.param(
             "agent_traces_chat",
-            agent_types.AgentTraceChatReq(project_id=PROJECT, trace_id="t1"),
+            {"project_id": PROJECT, "trace_id": "t1"},
             "POST",
             "/agents/traces/chat",
             AgentTraceChatRes,
@@ -615,9 +607,7 @@ def test_v2_method_reaches_its_flat_route(
         ),
         pytest.param(
             "agent_conversation_chat",
-            agent_types.AgentConversationChatReq(
-                project_id=PROJECT, conversation_id="conv1"
-            ),
+            {"project_id": PROJECT, "conversation_id": "conv1"},
             "POST",
             "/agents/conversations/chat",
             ConversationChatResponse,
@@ -625,7 +615,7 @@ def test_v2_method_reaches_its_flat_route(
         ),
         pytest.param(
             "agent_conversation_spans",
-            agent_types.AgentConversationSpansReq(project_id=PROJECT),
+            {"project_id": PROJECT},
             "POST",
             "/agents/conversations/spans",
             ConversationSpansResponse,
@@ -633,7 +623,7 @@ def test_v2_method_reaches_its_flat_route(
         ),
         pytest.param(
             "agent_agents_query",
-            agent_types.AgentsQueryReq(project_id=PROJECT),
+            {"project_id": PROJECT},
             "POST",
             "/agents/query",
             AgentQueryResponse,
@@ -641,9 +631,7 @@ def test_v2_method_reaches_its_flat_route(
         ),
         pytest.param(
             "agent_versions_query",
-            agent_types.AgentVersionsQueryReq(
-                project_id=PROJECT, agent_name="my-agent"
-            ),
+            {"project_id": PROJECT, "agent_name": "my-agent"},
             "POST",
             "/agents/agent-versions/query",
             AgentVersionQueryResponse,
@@ -651,31 +639,29 @@ def test_v2_method_reaches_its_flat_route(
         ),
         pytest.param(
             "agent_spans_stats",
-            agent_types.AgentSpanStatsReq(
-                project_id=PROJECT,
-                start=START,
-                end=END,
-                metrics=[
-                    agent_types.AgentSpanStatsMetricSpec(
-                        alias="input_tokens",
-                        value_type="number",
-                        value=agent_types.AgentSpanValueRef(
-                            source="field", key="usage.input_tokens"
-                        ),
-                        aggregations=["sum"],
-                    )
+            {
+                "project_id": PROJECT,
+                "start": START,
+                "end": END,
+                "metrics": [
+                    {
+                        "alias": "input_tokens",
+                        "value_type": "number",
+                        "value": {"source": "field", "key": "usage.input_tokens"},
+                        "aggregations": ["sum"],
+                    }
                 ],
-                insight_filters=[
-                    agent_types.AgentInsightFilter(
-                        field="failure_severity",
-                        values=["major"],
-                    ),
-                    agent_types.AgentInsightFilter(
-                        field="intent_topic_id",
-                        values=["01994634-c680-7dc3-a40b-0383b5008d70"],
-                    ),
+                "insight_filters": [
+                    {
+                        "field": "failure_severity",
+                        "values": ["major"],
+                    },
+                    {
+                        "field": "intent_topic_id",
+                        "values": ["01994634-c680-7dc3-a40b-0383b5008d70"],
+                    },
                 ],
-            ),
+            },
             "POST",
             "/agents/spans/stats",
             SpanStatsResponse,
@@ -683,7 +669,7 @@ def test_v2_method_reaches_its_flat_route(
         ),
         pytest.param(
             "agent_custom_attrs_schema",
-            agent_types.AgentCustomAttrsSchemaReq(project_id=PROJECT),
+            {"project_id": PROJECT},
             "POST",
             "/agents/spans/custom-attrs/schema",
             SpanCustomAttrsSchemaResponse,
@@ -691,7 +677,7 @@ def test_v2_method_reaches_its_flat_route(
         ),
         pytest.param(
             "agent_search",
-            agent_types.AgentSearchReq(project_id=PROJECT),
+            {"project_id": PROJECT},
             "POST",
             "/agents/search",
             AgentSearchResponse,
@@ -699,7 +685,7 @@ def test_v2_method_reaches_its_flat_route(
         ),
         pytest.param(
             "call_stats",
-            tsi.CallStatsReq(project_id=PROJECT, start=START, end=END),
+            {"project_id": PROJECT, "start": START, "end": END},
             "POST",
             "/calls/stats",
             CallStatsResponse,
@@ -707,7 +693,7 @@ def test_v2_method_reaches_its_flat_route(
         ),
         pytest.param(
             "feedback_stats",
-            tsi.FeedbackStatsReq(project_id=PROJECT, start=START, end=END),
+            {"project_id": PROJECT, "start": START, "end": END},
             "POST",
             "/feedback/stats",
             FeedbackStatsResponse,
@@ -715,7 +701,7 @@ def test_v2_method_reaches_its_flat_route(
         ),
         pytest.param(
             "feedback_aggregate",
-            tsi.FeedbackAggregateReq(project_id=PROJECT, after_ms=0, before_ms=1),
+            {"project_id": PROJECT, "after_ms": 0, "before_ms": 1},
             "POST",
             "/feedback/aggregate",
             FeedbackAggregateResponse,
@@ -723,7 +709,7 @@ def test_v2_method_reaches_its_flat_route(
         ),
         pytest.param(
             "feedback_payload_schema",
-            tsi.FeedbackPayloadSchemaReq(project_id=PROJECT, start=START, end=END),
+            {"project_id": PROJECT, "start": START, "end": END},
             "POST",
             "/feedback/payload_schema",
             FeedbackPayloadSchemaResponse,
@@ -731,7 +717,7 @@ def test_v2_method_reaches_its_flat_route(
         ),
         pytest.param(
             "completions_create",
-            tsi.CompletionsCreateReq(project_id=PROJECT, inputs={"model": "gpt-4o"}),
+            {"project_id": PROJECT, "inputs": {"model": "gpt-4o"}},
             "POST",
             "/completions/create",
             CompletionCreateResponse,
@@ -739,9 +725,7 @@ def test_v2_method_reaches_its_flat_route(
         ),
         pytest.param(
             "image_create",
-            tsi.ImageGenerationCreateReq(
-                project_id=PROJECT, inputs={"model": "dall-e-3", "prompt": "a cat"}
-            ),
+            {"project_id": PROJECT, "inputs": {"model": "dall-e-3", "prompt": "a cat"}},
             "POST",
             "/image/create",
             ImageCreateResponse,
@@ -749,7 +733,7 @@ def test_v2_method_reaches_its_flat_route(
         ),
         pytest.param(
             "project_stats",
-            tsi.ProjectStatsReq(project_id=PROJECT),
+            {"project_id": PROJECT},
             "POST",
             "/project/stats",
             ProjectStatsResponse,
@@ -757,7 +741,7 @@ def test_v2_method_reaches_its_flat_route(
         ),
         pytest.param(
             "project_ttl_settings_read",
-            tsi.ProjectTTLSettingsReadReq(project_id=PROJECT),
+            {"project_id": PROJECT},
             "POST",
             "/project/ttl_settings/read",
             TtlSettingReadResponse,
@@ -765,7 +749,7 @@ def test_v2_method_reaches_its_flat_route(
         ),
         pytest.param(
             "project_ttl_settings_update",
-            tsi.ProjectTTLSettingsUpdateReq(project_id=PROJECT, retention_days=30),
+            {"project_id": PROJECT, "retention_days": 30},
             "POST",
             "/project/ttl_settings/update",
             TtlSettingUpdateResponse,
@@ -773,23 +757,23 @@ def test_v2_method_reaches_its_flat_route(
         ),
         pytest.param(
             "dataset_sources_link",
-            tsi.DatasetSourcesLinkReq(
-                project_id=PROJECT,
-                dataset_object_id="ds",
-                dataset_digest="abc123",
-                links=[
-                    tsi.DatasetSourceLinkPayload(
-                        row_digest="row1",
-                        sources=[
-                            tsi.SourceRef(
-                                source_kind=tsi.SourceKind.CALL,
-                                source_id="c1",
-                                source_trace_id="t1",
-                            )
+            {
+                "project_id": PROJECT,
+                "dataset_object_id": "ds",
+                "dataset_digest": "abc123",
+                "links": [
+                    {
+                        "row_digest": "row1",
+                        "sources": [
+                            {
+                                "source_kind": "call",
+                                "source_id": "c1",
+                                "source_trace_id": "t1",
+                            }
                         ],
-                    )
+                    }
                 ],
-            ),
+            },
             "POST",
             "/dataset_sources/link",
             DatasetSourceLinkResponse,
@@ -797,7 +781,7 @@ def test_v2_method_reaches_its_flat_route(
         ),
         pytest.param(
             "dataset_sources_link_delete",
-            tsi.DatasetSourcesLinkDeleteReq(project_id=PROJECT, link_ids=["l1"]),
+            {"project_id": PROJECT, "link_ids": ["l1"]},
             "POST",
             "/dataset_sources/link_delete",
             DatasetSourcesLinkDeleteRes,
@@ -805,7 +789,7 @@ def test_v2_method_reaches_its_flat_route(
         ),
         pytest.param(
             "dataset_sources_query",
-            tsi.DatasetSourcesQueryReq(project_id=PROJECT, dataset_object_id="ds"),
+            {"project_id": PROJECT, "dataset_object_id": "ds"},
             "POST",
             "/dataset_sources/query",
             DatasetSourceQueryResponse,
@@ -813,16 +797,16 @@ def test_v2_method_reaches_its_flat_route(
         ),
         pytest.param(
             "source_datasets_query",
-            tsi.SourceDatasetsQueryReq(
-                project_id=PROJECT,
-                sources=[
-                    tsi.SourceRef(
-                        source_kind=tsi.SourceKind.CALL,
-                        source_id="c1",
-                        source_trace_id="t1",
-                    )
+            {
+                "project_id": PROJECT,
+                "sources": [
+                    {
+                        "source_kind": "call",
+                        "source_id": "c1",
+                        "source_trace_id": "t1",
+                    }
                 ],
-            ),
+            },
             "POST",
             "/dataset_sources/source_datasets_query",
             DatasetSourceSourceDatasetsQueryResponse,
@@ -830,11 +814,11 @@ def test_v2_method_reaches_its_flat_route(
         ),
         pytest.param(
             "evaluate_model",
-            tsi.EvaluateModelReq(
-                project_id=PROJECT,
-                evaluation_ref="weave:///entity/project/object/ev:abc123",
-                model_ref="weave:///entity/project/object/m:abc123",
-            ),
+            {
+                "project_id": PROJECT,
+                "evaluation_ref": "weave:///entity/project/object/ev:abc123",
+                "model_ref": "weave:///entity/project/object/m:abc123",
+            },
             "POST",
             "/evaluations/evaluate_model",
             EvaluationEvaluateModelResponse,
@@ -842,7 +826,7 @@ def test_v2_method_reaches_its_flat_route(
         ),
         pytest.param(
             "evaluation_status",
-            tsi.EvaluationStatusReq(project_id=PROJECT, call_id="c1"),
+            {"project_id": PROJECT, "call_id": "c1"},
             "POST",
             "/evaluations/status",
             EvaluationStatusResponse,
@@ -850,11 +834,11 @@ def test_v2_method_reaches_its_flat_route(
         ),
         pytest.param(
             "rescore",
-            tsi.RescoreReq(
-                project_id=PROJECT,
-                source_evaluation_run_id="run-id",
-                scorer_refs=["weave:///entity/project/object/s:abc123"],
-            ),
+            {
+                "project_id": PROJECT,
+                "source_evaluation_run_id": "run-id",
+                "scorer_refs": ["weave:///entity/project/object/s:abc123"],
+            },
             "POST",
             "/evaluations/rescore",
             EvaluationRescoreResponse,
@@ -862,11 +846,11 @@ def test_v2_method_reaches_its_flat_route(
         ),
         pytest.param(
             "calls_score",
-            tsi.CallsScoreReq(
-                project_id=PROJECT,
-                call_ids=["c1"],
-                scorer_refs=["weave:///entity/project/object/s:abc123"],
-            ),
+            {
+                "project_id": PROJECT,
+                "call_ids": ["c1"],
+                "scorer_refs": ["weave:///entity/project/object/s:abc123"],
+            },
             "POST",
             "/calls/score",
             dict,
@@ -874,9 +858,7 @@ def test_v2_method_reaches_its_flat_route(
         ),
         pytest.param(
             "annotation_queue_create",
-            tsi.AnnotationQueueCreateReq(
-                project_id=PROJECT, name="my-queue", scorer_refs=[]
-            ),
+            {"project_id": PROJECT, "name": "my-queue", "scorer_refs": []},
             "POST",
             "/annotation_queues",
             AnnotationQueueCreateResponse,
@@ -884,7 +866,7 @@ def test_v2_method_reaches_its_flat_route(
         ),
         pytest.param(
             "annotation_queue_read",
-            tsi.AnnotationQueueReadReq(project_id=PROJECT, queue_id="q1"),
+            {"project_id": PROJECT, "queue_id": "q1"},
             "GET",
             "/annotation_queues/q1",
             AnnotationQueueReadResponse,
@@ -892,7 +874,7 @@ def test_v2_method_reaches_its_flat_route(
         ),
         pytest.param(
             "annotation_queue_items_query",
-            tsi.AnnotationQueueItemsQueryReq(project_id=PROJECT, queue_id="q1"),
+            {"project_id": PROJECT, "queue_id": "q1"},
             "POST",
             "/annotation_queues/q1/items/query",
             ItemQueryResponse,
@@ -900,7 +882,7 @@ def test_v2_method_reaches_its_flat_route(
         ),
         pytest.param(
             "annotation_queues_stats",
-            tsi.AnnotationQueuesStatsReq(project_id=PROJECT, queue_ids=["q1"]),
+            {"project_id": PROJECT, "queue_ids": ["q1"]},
             "POST",
             "/annotation_queues/stats",
             AnnotationQueueStatsResponse,
@@ -908,12 +890,12 @@ def test_v2_method_reaches_its_flat_route(
         ),
         pytest.param(
             "custom_runtime_apply",
-            tsi.CustomRuntimeApplyReq(
-                project_id=PROJECT,
-                runtime_name="my-runtime",
-                base_url="http://example.com",
-                runtime_ids=[],
-            ),
+            {
+                "project_id": PROJECT,
+                "runtime_name": "my-runtime",
+                "base_url": "http://example.com",
+                "runtime_ids": [],
+            },
             "PUT",
             f"{V2}/runtimes/my-runtime",
             V2RuntimeApplyResponse,
@@ -921,7 +903,7 @@ def test_v2_method_reaches_its_flat_route(
         ),
         pytest.param(
             "eval_results_query",
-            tsi.EvalResultsQueryReq(project_id=PROJECT, evaluation_call_ids=["c1"]),
+            {"project_id": PROJECT, "evaluation_call_ids": ["c1"]},
             "POST",
             f"{V2}/eval_results/query",
             V2EvalResultQueryResponse,
@@ -952,13 +934,13 @@ def test_route_reaches_its_path(
     [
         pytest.param(
             "obj_add_tags",
-            tsi.ObjAddTagsReq(
-                project_id=PROJECT,
-                object_id="my-obj",
-                digest="abc123",
-                tags=["production"],
-                wb_user_id="user-id",
-            ),
+            {
+                "project_id": PROJECT,
+                "object_id": "my-obj",
+                "digest": "abc123",
+                "tags": ["production"],
+                "wb_user_id": "user-id",
+            },
             "PUT",
             "/objs/my-obj/versions/abc123/tags",
             {"project_id": PROJECT, "tags": ["production"]},
@@ -966,13 +948,13 @@ def test_route_reaches_its_path(
         ),
         pytest.param(
             "obj_remove_tags",
-            tsi.ObjRemoveTagsReq(
-                project_id=PROJECT,
-                object_id="my-obj",
-                digest="abc123",
-                tags=["production"],
-                wb_user_id="user-id",
-            ),
+            {
+                "project_id": PROJECT,
+                "object_id": "my-obj",
+                "digest": "abc123",
+                "tags": ["production"],
+                "wb_user_id": "user-id",
+            },
             "POST",
             "/objs/my-obj/versions/abc123/tags/remove",
             {"project_id": PROJECT, "tags": ["production"]},
@@ -980,13 +962,13 @@ def test_route_reaches_its_path(
         ),
         pytest.param(
             "obj_set_aliases",
-            tsi.ObjSetAliasesReq(
-                project_id=PROJECT,
-                object_id="my-obj",
-                digest="abc123",
-                aliases=["prod"],
-                wb_user_id="user-id",
-            ),
+            {
+                "project_id": PROJECT,
+                "object_id": "my-obj",
+                "digest": "abc123",
+                "aliases": ["prod"],
+                "wb_user_id": "user-id",
+            },
             "PUT",
             "/objs/my-obj/aliases",
             {"project_id": PROJECT, "digest": "abc123", "aliases": ["prod"]},
@@ -994,12 +976,12 @@ def test_route_reaches_its_path(
         ),
         pytest.param(
             "obj_remove_aliases",
-            tsi.ObjRemoveAliasesReq(
-                project_id=PROJECT,
-                object_id="my-obj",
-                aliases=["prod"],
-                wb_user_id="user-id",
-            ),
+            {
+                "project_id": PROJECT,
+                "object_id": "my-obj",
+                "aliases": ["prod"],
+                "wb_user_id": "user-id",
+            },
             "POST",
             "/objs/my-obj/aliases/remove",
             {"project_id": PROJECT, "aliases": ["prod"]},
@@ -1019,7 +1001,7 @@ def test_tag_and_alias_method_omits_wb_user_id(
     """Test that the server-populated wb_user_id stays out of the request."""
     mock_server = _mock_server(httpx.Response(200, json={}))
 
-    getattr(mock_server.server, method_name)(req.model_dump() if as_dict else req)
+    getattr(mock_server.server, method_name)(req if as_dict else request_model(req))
 
     assert len(mock_server.requests) == 1
     assert (mock_server.requests[0].method, mock_server.requests[0].url.path) == (
@@ -1030,12 +1012,23 @@ def test_tag_and_alias_method_omits_wb_user_id(
 
 
 def test_objs_query_drops_a_query_key():
-    """A dict with a `query` key, which the route lacks, sends the model's body."""
+    """A dict with a `query` key, which the route lacks, sends the same body."""
     mock_server = _mock_server(httpx.Response(200, json={"objs": []}))
-    req = tsi.ObjQueryReq(project_id=PROJECT)
+    req = {
+        "project_id": PROJECT,
+        "filter": None,
+        "limit": None,
+        "offset": None,
+        "sort_by": None,
+        "metadata_only": False,
+        "include_storage_size": False,
+        "include_tags_and_aliases": False,
+    }
+
+    with_query = {**copy.deepcopy(req), "query": {"$expr": {}}}
 
     mock_server.server.objs_query(req)
-    mock_server.server.objs_query({**req.model_dump(), "query": {"$expr": {}}})
+    mock_server.server.objs_query(with_query)
 
     first, second = (json.loads(r.content) for r in mock_server.requests)
     assert first == second
@@ -1046,13 +1039,13 @@ def test_objs_query_drops_a_query_key():
     [
         pytest.param(
             "tags_list",
-            tsi.TagsListReq(project_id=PROJECT, wb_user_id="user-id"),
+            {"project_id": PROJECT, "wb_user_id": "user-id"},
             "/tags",
             id="tags_list",
         ),
         pytest.param(
             "aliases_list",
-            tsi.AliasesListReq(project_id=PROJECT, wb_user_id="user-id"),
+            {"project_id": PROJECT, "wb_user_id": "user-id"},
             "/aliases",
             id="aliases_list",
         ),
@@ -1064,7 +1057,7 @@ def test_tag_and_alias_list_omits_wb_user_id(
     """Test that the server-populated wb_user_id stays out of the query."""
     mock_server = _mock_server(httpx.Response(200, json={"tags": [], "aliases": []}))
 
-    getattr(mock_server.server, method_name)(req)
+    getattr(mock_server.server, method_name)(request_model(req))
 
     assert len(mock_server.requests) == 1
     assert (mock_server.requests[0].method, mock_server.requests[0].url.path) == (
@@ -1079,9 +1072,14 @@ def test_tag_and_alias_list_omits_wb_user_id(
     [
         pytest.param(
             "annotation_queue_update",
-            tsi.AnnotationQueueUpdateReq(
-                project_id=PROJECT, queue_id="q1", wb_user_id="user-id"
-            ),
+            {
+                "project_id": PROJECT,
+                "queue_id": "q1",
+                "name": None,
+                "description": None,
+                "scorer_refs": None,
+                "wb_user_id": "user-id",
+            },
             "PUT",
             "/annotation_queues/q1",
             {
@@ -1094,13 +1092,13 @@ def test_tag_and_alias_list_omits_wb_user_id(
         ),
         pytest.param(
             "annotation_queue_add_calls",
-            tsi.AnnotationQueueAddCallsReq(
-                project_id=PROJECT,
-                queue_id="q1",
-                call_ids=["c1"],
-                display_fields=[],
-                wb_user_id="user-id",
-            ),
+            {
+                "project_id": PROJECT,
+                "queue_id": "q1",
+                "call_ids": ["c1"],
+                "display_fields": [],
+                "wb_user_id": "user-id",
+            },
             "POST",
             "/annotation_queues/q1/items",
             {"project_id": PROJECT, "call_ids": ["c1"], "display_fields": []},
@@ -1108,13 +1106,13 @@ def test_tag_and_alias_list_omits_wb_user_id(
         ),
         pytest.param(
             "annotator_queue_items_progress_update",
-            tsi.AnnotatorQueueItemsProgressUpdateReq(
-                project_id=PROJECT,
-                queue_id="q1",
-                item_id="i1",
-                annotation_state="completed",
-                wb_user_id="user-id",
-            ),
+            {
+                "project_id": PROJECT,
+                "queue_id": "q1",
+                "item_id": "i1",
+                "annotation_state": "completed",
+                "wb_user_id": "user-id",
+            },
             "POST",
             "/annotation_queues/q1/items/i1/progress",
             {"project_id": PROJECT, "annotation_state": "completed"},
@@ -1134,7 +1132,7 @@ def test_annotation_queue_method_omits_wb_user_id(
     """Test that the server-populated wb_user_id stays out of the request."""
     mock_server = _mock_server(httpx.Response(200, json=V1_RESPONSE))
 
-    getattr(mock_server.server, method_name)(req.model_dump() if as_dict else req)
+    getattr(mock_server.server, method_name)(req if as_dict else request_model(req))
 
     assert len(mock_server.requests) == 1
     assert (mock_server.requests[0].method, mock_server.requests[0].url.path) == (
@@ -1149,15 +1147,13 @@ def test_annotation_queue_method_omits_wb_user_id(
     [
         pytest.param(
             "annotation_queue_read",
-            tsi.AnnotationQueueReadReq(project_id=PROJECT, queue_id="q1"),
+            {"project_id": PROJECT, "queue_id": "q1"},
             "GET",
             id="annotation_queue_read",
         ),
         pytest.param(
             "annotation_queue_delete",
-            tsi.AnnotationQueueDeleteReq(
-                project_id=PROJECT, queue_id="q1", wb_user_id="user-id"
-            ),
+            {"project_id": PROJECT, "queue_id": "q1", "wb_user_id": "user-id"},
             "DELETE",
             id="annotation_queue_delete",
         ),
@@ -1169,7 +1165,7 @@ def test_annotation_queue_read_and_delete_send_project_id_in_the_query(
     """Test that a bodyless annotation queue route carries project_id in the query."""
     mock_server = _mock_server(httpx.Response(200, json=V1_RESPONSE))
 
-    getattr(mock_server.server, method_name)(req)
+    getattr(mock_server.server, method_name)(request_model(req))
 
     assert len(mock_server.requests) == 1
     assert (mock_server.requests[0].method, mock_server.requests[0].url.path) == (
@@ -1185,41 +1181,31 @@ def test_annotation_queue_read_and_delete_send_project_id_in_the_query(
     [
         pytest.param(
             "op_delete",
-            tsi.OpDeleteReq(
-                project_id=PROJECT, object_id="my-object", digests=["abc123"]
-            ),
+            {"project_id": PROJECT, "object_id": "my-object", "digests": ["abc123"]},
             f"{V2}/ops/my-object",
             id="op_delete",
         ),
         pytest.param(
             "dataset_delete",
-            tsi.DatasetDeleteReq(
-                project_id=PROJECT, object_id="my-object", digests=["abc123"]
-            ),
+            {"project_id": PROJECT, "object_id": "my-object", "digests": ["abc123"]},
             f"{V2}/datasets/my-object",
             id="dataset_delete",
         ),
         pytest.param(
             "scorer_delete",
-            tsi.ScorerDeleteReq(
-                project_id=PROJECT, object_id="my-object", digests=["abc123"]
-            ),
+            {"project_id": PROJECT, "object_id": "my-object", "digests": ["abc123"]},
             f"{V2}/scorers/my-object",
             id="scorer_delete",
         ),
         pytest.param(
             "evaluation_delete",
-            tsi.EvaluationDeleteReq(
-                project_id=PROJECT, object_id="my-object", digests=["abc123"]
-            ),
+            {"project_id": PROJECT, "object_id": "my-object", "digests": ["abc123"]},
             f"{V2}/evaluations/my-object",
             id="evaluation_delete",
         ),
         pytest.param(
             "model_delete",
-            tsi.ModelDeleteReq(
-                project_id=PROJECT, object_id="my-object", digests=["abc123"]
-            ),
+            {"project_id": PROJECT, "object_id": "my-object", "digests": ["abc123"]},
             f"{V2}/models/my-object",
             id="model_delete",
         ),
@@ -1246,13 +1232,16 @@ def test_delete_sends_the_requested_digests(
     [
         pytest.param(
             "evaluation_create",
-            tsi.EvaluationCreateReq(
-                project_id=PROJECT,
-                name="my-object",
-                dataset="ds-ref",
-                evaluation_name="my evaluation",
-                eval_attributes={"k": "v"},
-            ),
+            {
+                "project_id": PROJECT,
+                "name": "my-object",
+                "description": None,
+                "dataset": "ds-ref",
+                "scorers": None,
+                "trials": 1,
+                "evaluation_name": "my evaluation",
+                "eval_attributes": {"k": "v"},
+            },
             {
                 "dataset": "ds-ref",
                 "description": None,
@@ -1266,12 +1255,12 @@ def test_delete_sends_the_requested_digests(
         ),
         pytest.param(
             "evaluation_run_create",
-            tsi.EvaluationRunCreateReq(
-                project_id=PROJECT,
-                evaluation="ev-ref",
-                model="m-ref",
-                source_evaluation_run_id="source-run-id",
-            ),
+            {
+                "project_id": PROJECT,
+                "evaluation": "ev-ref",
+                "model": "m-ref",
+                "source_evaluation_run_id": "source-run-id",
+            },
             {
                 "evaluation": "ev-ref",
                 "model": "m-ref",
@@ -1281,15 +1270,14 @@ def test_delete_sends_the_requested_digests(
         ),
         pytest.param(
             "prediction_create",
-            tsi.PredictionCreateReq(
-                project_id=PROJECT,
-                model="m-ref",
-                inputs={"a": 1},
-                output="out",
-                genai_span_ref=[
-                    tsi.GenAISpanRef(trace_id="trace-id", span_id="span-id")
-                ],
-            ),
+            {
+                "project_id": PROJECT,
+                "model": "m-ref",
+                "inputs": {"a": 1},
+                "output": "out",
+                "evaluation_run_id": None,
+                "genai_span_ref": [{"trace_id": "trace-id", "span_id": "span-id"}],
+            },
             {
                 "evaluation_run_id": None,
                 "genai_span_ref": [{"trace_id": "trace-id", "span_id": "span-id"}],
@@ -1313,55 +1301,65 @@ def test_create_sends_every_supported_field(
     assert json.loads(mock_server.requests[0].content) == expected_body
 
 
+# Every key of the completion inputs, unset ones as None.
+COMPLETION_INPUTS = {
+    "model": "gpt-4o",
+    "messages": [{"role": "user"}],
+    "timeout": None,
+    "temperature": None,
+    "top_p": None,
+    "n": None,
+    "stop": None,
+    "max_completion_tokens": None,
+    "max_tokens": None,
+    "modalities": None,
+    "presence_penalty": None,
+    "frequency_penalty": None,
+    "stream": None,
+    "logit_bias": None,
+    "user": None,
+    "response_format": None,
+    "seed": None,
+    "tools": None,
+    "tool_choice": None,
+    "logprobs": None,
+    "top_logprobs": None,
+    "parallel_tool_calls": None,
+    "reasoning_effort": None,
+    "extra_headers": None,
+    "functions": None,
+    "function_call": None,
+    "api_version": None,
+    "prompt": None,
+    "template_vars": None,
+    "vertex_credentials": None,
+}
+
+
 @pytest.mark.parametrize(
     ("method_name", "req", "expected_body"),
     [
         pytest.param(
             "completions_create",
-            tsi.CompletionsCreateReq(
-                project_id=PROJECT,
-                inputs={"model": "gpt-4o", "messages": [{"role": "user"}]},
-                inference_route=tsi.DedicatedInferenceRoute(
-                    connection_type="dedicated",
-                    connection="dedicated_cwc38d",
-                    base_url="https://cw.cwc38d.gw.cwinference.com/v1",
-                ),
-                wb_user_id="user-id",
-            ),
             {
                 "project_id": PROJECT,
-                "inputs": {
-                    "model": "gpt-4o",
-                    "messages": [{"role": "user"}],
-                    "timeout": None,
-                    "temperature": None,
-                    "top_p": None,
-                    "n": None,
-                    "stop": None,
-                    "max_completion_tokens": None,
-                    "max_tokens": None,
-                    "modalities": None,
-                    "presence_penalty": None,
-                    "frequency_penalty": None,
-                    "stream": None,
-                    "logit_bias": None,
-                    "user": None,
-                    "response_format": None,
-                    "seed": None,
-                    "tools": None,
-                    "tool_choice": None,
-                    "logprobs": None,
-                    "top_logprobs": None,
-                    "parallel_tool_calls": None,
-                    "reasoning_effort": None,
-                    "extra_headers": None,
-                    "functions": None,
-                    "function_call": None,
-                    "api_version": None,
-                    "prompt": None,
-                    "template_vars": None,
-                    "vertex_credentials": None,
+                "inputs": copy.deepcopy(COMPLETION_INPUTS),
+                "inference_route": {
+                    "connection_type": "dedicated",
+                    "connection": "dedicated_cwc38d",
+                    "base_url": "https://cw.cwc38d.gw.cwinference.com/v1",
                 },
+                "wb_user_id": "user-id",
+                "track_llm_call": True,
+                "trace_id": None,
+                "parent_id": None,
+                "conversation_id": None,
+                "conversation_name": None,
+                "source": None,
+            },
+            {
+                "project_id": PROJECT,
+                "inputs": COMPLETION_INPUTS,
                 "inference_route": {
                     "connection_type": "dedicated",
                     "connection": "dedicated_cwc38d",
@@ -1379,11 +1377,12 @@ def test_create_sends_every_supported_field(
         ),
         pytest.param(
             "image_create",
-            tsi.ImageGenerationCreateReq(
-                project_id=PROJECT,
-                inputs={"model": "dall-e-3", "prompt": "a cat"},
-                wb_user_id="user-id",
-            ),
+            {
+                "project_id": PROJECT,
+                "inputs": {"model": "dall-e-3", "prompt": "a cat", "n": None},
+                "track_llm_call": True,
+                "wb_user_id": "user-id",
+            },
             {
                 "project_id": PROJECT,
                 "inputs": {"model": "dall-e-3", "prompt": "a cat", "n": None},
@@ -1394,10 +1393,13 @@ def test_create_sends_every_supported_field(
         ),
         pytest.param(
             "project_stats",
-            tsi.ProjectStatsReq(
-                project_id=PROJECT,
-                include_file_storage_size=False,
-            ),
+            {
+                "project_id": PROJECT,
+                "include_trace_storage_size": True,
+                "include_object_storage_size": True,
+                "include_table_storage_size": True,
+                "include_file_storage_size": False,
+            },
             {
                 "project_id": PROJECT,
                 "include_trace_storage_size": True,
@@ -1409,9 +1411,7 @@ def test_create_sends_every_supported_field(
         ),
         pytest.param(
             "project_ttl_settings_update",
-            tsi.ProjectTTLSettingsUpdateReq(
-                project_id=PROJECT, retention_days=30, wb_user_id="user-id"
-            ),
+            {"project_id": PROJECT, "retention_days": 30, "wb_user_id": "user-id"},
             {
                 "project_id": PROJECT,
                 "retention_days": 30,
@@ -1421,26 +1421,26 @@ def test_create_sends_every_supported_field(
         ),
         pytest.param(
             "dataset_sources_link",
-            tsi.DatasetSourcesLinkReq(
-                project_id=PROJECT,
-                dataset_object_id="ds",
-                dataset_digest="abc123",
-                links=[
-                    tsi.DatasetSourceLinkPayload(
-                        row_digest="row1",
-                        sources=[
-                            tsi.SourceRef(
-                                source_kind=tsi.SourceKind.CALL,
-                                source_id="c1",
-                                source_trace_id="t1",
-                            )
+            {
+                "project_id": PROJECT,
+                "dataset_object_id": "ds",
+                "dataset_digest": "abc123",
+                "links": [
+                    {
+                        "row_digest": "row1",
+                        "sources": [
+                            {
+                                "source_kind": "call",
+                                "source_id": "c1",
+                                "source_trace_id": "t1",
+                            }
                         ],
-                        link_metadata={"note": "from-call"},
-                    )
+                        "link_metadata": {"note": "from-call"},
+                    }
                 ],
-                include_created_status=True,
-                wb_user_id="user-id",
-            ),
+                "include_created_status": True,
+                "wb_user_id": "user-id",
+            },
             {
                 "project_id": PROJECT,
                 "dataset_object_id": "ds",
@@ -1465,9 +1465,11 @@ def test_create_sends_every_supported_field(
         ),
         pytest.param(
             "dataset_sources_link_delete",
-            tsi.DatasetSourcesLinkDeleteReq(
-                project_id=PROJECT, link_ids=["l1", "l2"], wb_user_id="user-id"
-            ),
+            {
+                "project_id": PROJECT,
+                "link_ids": ["l1", "l2"],
+                "wb_user_id": "user-id",
+            },
             {
                 "project_id": PROJECT,
                 "link_ids": ["l1", "l2"],
@@ -1477,16 +1479,16 @@ def test_create_sends_every_supported_field(
         ),
         pytest.param(
             "dataset_sources_query",
-            tsi.DatasetSourcesQueryReq(
-                project_id=PROJECT,
-                dataset_object_id="ds",
-                row_digests=["row1"],
-                source_kinds=[tsi.SourceKind.CALL],
-                include_deleted=True,
-                limit=10,
-                offset=2,
-                wb_user_id="user-id",
-            ),
+            {
+                "project_id": PROJECT,
+                "dataset_object_id": "ds",
+                "row_digests": ["row1"],
+                "source_kinds": ["call"],
+                "include_deleted": True,
+                "limit": 10,
+                "offset": 2,
+                "wb_user_id": "user-id",
+            },
             {
                 "project_id": PROJECT,
                 "dataset_object_id": "ds",
@@ -1501,18 +1503,18 @@ def test_create_sends_every_supported_field(
         ),
         pytest.param(
             "source_datasets_query",
-            tsi.SourceDatasetsQueryReq(
-                project_id=PROJECT,
-                sources=[
-                    tsi.SourceRef(
-                        source_kind=tsi.SourceKind.SPAN,
-                        source_id="s1",
-                        source_trace_id="t1",
-                    )
+            {
+                "project_id": PROJECT,
+                "sources": [
+                    {
+                        "source_kind": "span",
+                        "source_id": "s1",
+                        "source_trace_id": "t1",
+                    }
                 ],
-                include_deleted=True,
-                wb_user_id="user-id",
-            ),
+                "include_deleted": True,
+                "wb_user_id": "user-id",
+            },
             {
                 "project_id": PROJECT,
                 "sources": [
@@ -1529,9 +1531,16 @@ def test_create_sends_every_supported_field(
         ),
         pytest.param(
             "call_stats",
-            tsi.CallStatsReq(
-                project_id=PROJECT, start=START, end=END, granularity=3600
-            ),
+            {
+                "project_id": PROJECT,
+                "start": START,
+                "end": END,
+                "granularity": 3600,
+                "usage_metrics": None,
+                "call_metrics": None,
+                "filter": None,
+                "timezone": "UTC",
+            },
             {
                 "project_id": PROJECT,
                 "start": "2026-08-20T00:00:00+00:00",
@@ -1546,13 +1555,13 @@ def test_create_sends_every_supported_field(
         ),
         pytest.param(
             "annotation_queue_create",
-            tsi.AnnotationQueueCreateReq(
-                project_id=PROJECT,
-                name="my-queue",
-                description="notes",
-                scorer_refs=["weave:///entity/project/object/s:abc123"],
-                wb_user_id="user-id",
-            ),
+            {
+                "project_id": PROJECT,
+                "name": "my-queue",
+                "description": "notes",
+                "scorer_refs": ["weave:///entity/project/object/s:abc123"],
+                "wb_user_id": "user-id",
+            },
             {
                 "project_id": PROJECT,
                 "name": "my-queue",
@@ -1564,9 +1573,9 @@ def test_create_sends_every_supported_field(
         ),
         pytest.param(
             "agent_spans_query",
-            agent_types.AgentSpansQueryReq(
-                project_id=PROJECT,
-                query={
+            {
+                "project_id": PROJECT,
+                "query": {
                     "$expr": {
                         "$eq": [
                             {"$getField": "attributes.model"},
@@ -1574,20 +1583,34 @@ def test_create_sends_every_supported_field(
                         ]
                     }
                 },
-                group_by=[
-                    agent_types.AgentGroupByRef(source="column", key="conversation_id")
+                "custom_attr_columns": [],
+                "group_by": [
+                    {"alias": None, "key": "conversation_id", "source": "column"}
                 ],
-                insight_filters=[
-                    agent_types.AgentInsightFilter(
-                        field="failure_severity",
-                        values=["major"],
-                    ),
-                    agent_types.AgentInsightFilter(
-                        field="intent_topic_id",
-                        values=["01994634-c680-7dc3-a40b-0383b5008d70"],
-                    ),
+                "group_distributions": [],
+                "group_filters": [],
+                "include_costs": False,
+                "include_details": False,
+                "insight_filters": [
+                    {
+                        "exclude": False,
+                        "field": "failure_severity",
+                        "values": ["major"],
+                    },
+                    {
+                        "exclude": False,
+                        "field": "intent_topic_id",
+                        "values": ["01994634-c680-7dc3-a40b-0383b5008d70"],
+                    },
                 ],
-            ),
+                "limit": 100,
+                "measures": [],
+                "offset": 0,
+                "signal_filters": None,
+                "sort_by": None,
+                "started_after": None,
+                "started_before": None,
+            },
             {
                 "project_id": PROJECT,
                 "query": {
@@ -1634,12 +1657,17 @@ def test_create_sends_every_supported_field(
         ),
         pytest.param(
             "custom_runtime_apply",
-            tsi.CustomRuntimeApplyReq(
-                project_id=PROJECT,
-                runtime_name="my-runtime",
-                base_url="http://example.com",
-                runtime_ids=[tsi.CustomRuntimeID(id="my-model")],
-                wb_user_id="user-id",
+            # A model input: the binding drops its server-populated wb_user_id.
+            request_model(
+                {
+                    "project_id": PROJECT,
+                    "runtime_name": "my-runtime",
+                    "base_url": "http://example.com",
+                    "api_key_secret": None,
+                    "headers": {},
+                    "runtime_ids": [CustomRuntimeID(id="my-model")],
+                    "wb_user_id": "user-id",
+                }
             ),
             {
                 "base_url": "http://example.com",
@@ -1651,20 +1679,33 @@ def test_create_sends_every_supported_field(
         ),
         pytest.param(
             "eval_results_query",
-            tsi.EvalResultsQueryReq(
-                project_id=PROJECT,
-                evaluation_call_ids=["c1"],
-                filters=[
-                    tsi.EvalResultsFilter(
-                        evaluation_call_id="c1",
-                        query={
+            {
+                "project_id": PROJECT,
+                "evaluation_call_ids": ["c1"],
+                "evaluation_run_ids": None,
+                "filter_logic_operator": "or",
+                "filters": [
+                    {
+                        "evaluation_call_id": "c1",
+                        "query": {
                             "$expr": {
                                 "$eq": [{"$getField": "output.x"}, {"$literal": 1}]
                             }
                         },
-                    )
+                    }
                 ],
-            ),
+                "include_costs": False,
+                "include_predict_and_score_children": True,
+                "include_raw_data_rows": False,
+                "include_rows": True,
+                "include_summary": False,
+                "limit": None,
+                "offset": 0,
+                "require_intersection": False,
+                "resolve_row_refs": False,
+                "sort_by": None,
+                "summary_require_intersection": None,
+            },
             {
                 "evaluation_call_ids": ["c1"],
                 "evaluation_run_ids": None,
@@ -1716,19 +1757,29 @@ def test_chat_tool_call_option_reaches_http(
     include_model_tool_calls: bool | None, as_dict: bool
 ) -> None:
     mock_server = _mock_server(httpx.Response(200, json=V1_RESPONSE))
-    trace_req = agent_types.AgentTraceChatReq(project_id=PROJECT, trace_id="t1")
-    conversation_req = agent_types.AgentConversationChatReq(
-        project_id=PROJECT, conversation_id="conv1"
-    )
+    trace_req = {
+        "project_id": PROJECT,
+        "trace_id": "t1",
+        "include_feedback": False,
+        "include_model_tool_calls": False,
+    }
+    conversation_req = {
+        "project_id": PROJECT,
+        "conversation_id": "conv1",
+        "limit": MAX_CONVERSATION_CHAT_TURNS,
+        "offset": 0,
+        "include_feedback": False,
+        "include_model_tool_calls": False,
+    }
     if include_model_tool_calls is not None:
-        trace_req.include_model_tool_calls = include_model_tool_calls
-        conversation_req.include_model_tool_calls = include_model_tool_calls
+        trace_req["include_model_tool_calls"] = include_model_tool_calls
+        conversation_req["include_model_tool_calls"] = include_model_tool_calls
 
     trace = mock_server.server.agent_traces_chat(
-        trace_req.model_dump() if as_dict else trace_req
+        trace_req if as_dict else request_model(trace_req)
     )
     conversation = mock_server.server.agent_conversation_chat(
-        conversation_req.model_dump() if as_dict else conversation_req
+        conversation_req if as_dict else request_model(conversation_req)
     )
 
     assert isinstance(trace, AgentTraceChatRes)
@@ -1743,7 +1794,7 @@ def test_chat_tool_call_option_reaches_http(
             "project_id": PROJECT,
             "conversation_id": "conv1",
             "include_feedback": False,
-            "limit": conversation_req.limit,
+            "limit": MAX_CONVERSATION_CHAT_TURNS,
             "offset": 0,
         },
     ]
@@ -1757,29 +1808,31 @@ def test_chat_tool_call_option_reaches_http(
 
 def test_agent_spans_stats_sends_insight_filters() -> None:
     mock_server = _mock_server(httpx.Response(200, json=V1_RESPONSE))
-    req = agent_types.AgentSpanStatsReq(
-        project_id=PROJECT,
-        start=START,
-        end=END,
-        metrics=[
-            agent_types.AgentSpanStatsMetricSpec(
-                alias="spans",
-                value_type="datetime",
-                value=agent_types.AgentSpanValueRef(source="field", key="started_at"),
-                aggregations=["count"],
-            )
+    req = {
+        "project_id": PROJECT,
+        "start": START,
+        "end": END,
+        "metrics": [
+            {
+                "alias": "spans",
+                "value_type": "datetime",
+                "value": {"source": "field", "key": "started_at"},
+                "aggregations": ["count"],
+            }
         ],
-        insight_filters=[
-            agent_types.AgentInsightFilter(
-                field="failure_severity",
-                values=["major"],
-            ),
-            agent_types.AgentInsightFilter(
-                field="intent_topic_id",
-                values=["01994634-c680-7dc3-a40b-0383b5008d70"],
-            ),
+        "insight_filters": [
+            {
+                "exclude": False,
+                "field": "failure_severity",
+                "values": ["major"],
+            },
+            {
+                "exclude": False,
+                "field": "intent_topic_id",
+                "values": ["01994634-c680-7dc3-a40b-0383b5008d70"],
+            },
         ],
-    )
+    }
 
     mock_server.server.agent_spans_stats(req)
 
@@ -1806,7 +1859,13 @@ def test_stream_route_sends_every_supported_field():
 
     list(
         mock_server.server.annotation_queues_query_stream(
-            tsi.AnnotationQueuesQueryReq(project_id=PROJECT)
+            {
+                "project_id": PROJECT,
+                "limit": None,
+                "offset": None,
+                "name": None,
+                "sort_by": None,
+            }
         )
     )
 
@@ -1825,14 +1884,14 @@ def test_call_end_reads_an_empty_response_body():
     mock_server = _mock_server(httpx.Response(200, json={}))
 
     res = mock_server.server.call_end(
-        tsi.CallEndReq(
-            end=tsi.EndedCallSchemaForInsert(
-                project_id=PROJECT,
-                id="call-id",
-                ended_at="2026-08-20T00:00:00Z",
-                summary={},
-            )
-        )
+        {
+            "end": {
+                "project_id": PROJECT,
+                "id": "call-id",
+                "ended_at": "2026-08-20T00:00:00Z",
+                "summary": {},
+            }
+        }
     )
 
     assert len(mock_server.requests) == 1
@@ -1840,33 +1899,34 @@ def test_call_end_reads_an_empty_response_body():
     assert res == {}
 
 
-@pytest.mark.parametrize("as_dict", [False, True], ids=["model", "dict"])
-def test_calls_complete_sends_the_batch_to_the_v2_route(as_dict):
+def test_calls_complete_sends_the_batch_to_the_v2_route():
     """Test that calls_complete posts the whole batch to the project's v2 route."""
     mock_server = _mock_server(httpx.Response(200, json={}))
-    req = tsi.CallsUpsertCompleteReq(
-        batch=[
-            tsi.CompletedCallSchemaForInsert(
-                project_id=PROJECT,
-                id="call-id",
-                trace_id="trace-id",
-                op_name="my-op",
-                started_at=START,
-                ended_at=END,
-                attributes={},
-                inputs={"x": 1},
-                output={"y": 2},
-                summary={},
-            )
+    req = {
+        "batch": [
+            {
+                "project_id": PROJECT,
+                "id": "call-id",
+                "trace_id": "trace-id",
+                "op_name": "my-op",
+                "started_at": START,
+                "ended_at": END,
+                "attributes": {},
+                "inputs": {"x": 1},
+                "output": {"y": 2},
+                "summary": {},
+            }
         ]
-    )
+    }
 
-    res = mock_server.server.calls_complete(req.model_dump() if as_dict else req)
+    expected_body = to_jsonable_python(req)
+
+    res = mock_server.server.calls_complete(req)
 
     assert [(r.method, r.url.path) for r in mock_server.requests] == [
         ("POST", f"{V2}/calls/complete")
     ]
-    assert json.loads(mock_server.requests[0].content) == req.model_dump(mode="json")
+    assert json.loads(mock_server.requests[0].content) == expected_body
     assert res == {}
 
 
@@ -1880,12 +1940,12 @@ def test_call_start_batch_reads_the_response_list():
     start, end = generate_call_start_end_pair(id="call-id")
 
     res = mock_server.server.call_start_batch(
-        tsi.CallCreateBatchReq(
-            batch=[
-                tsi.CallBatchStartMode(req=start),
-                tsi.CallBatchEndMode(req=end),
+        {
+            "batch": [
+                {"mode": "start", "req": start},
+                {"mode": "end", "req": end},
             ]
-        )
+        }
     )
 
     assert len(mock_server.requests) == 1
@@ -2448,13 +2508,15 @@ def test_evaluation_run_list_sends_the_filter_as_query_params():
     )
 
     res = mock_server.server.evaluation_run_list(
-        tsi.EvaluationRunListReq(
-            project_id=PROJECT,
-            filter=tsi.EvaluationRunFilter(
-                evaluations=["ev-ref"], models=["m1", "m2"], evaluation_run_ids=["r1"]
-            ),
-            limit=10,
-        )
+        {
+            "project_id": PROJECT,
+            "filter": {
+                "evaluations": ["ev-ref"],
+                "models": ["m1", "m2"],
+                "evaluation_run_ids": ["r1"],
+            },
+            "limit": 10,
+        }
     )
 
     assert list(res) == []
@@ -2487,9 +2549,37 @@ def test_call_records_written_from_models_replay(should_batch: bool, monkeypatch
         http_client=httpx.Client(transport=httpx.MockTransport(handle)),
     )
     start, end = generate_call_start_end_pair(id="call-id", project_id=PROJECT)
+    # The JSON dump of each request model: every key, unset ones as None.
+    start_defaults = dict.fromkeys(
+        [
+            "display_name",
+            "thread_id",
+            "turn_id",
+            "otel_dump",
+            "wb_user_id",
+            "wb_run_id",
+            "wb_run_step",
+        ]
+    )
+    end_defaults = dict.fromkeys(
+        [
+            "trace_id",
+            "is_eval",
+            "started_at",
+            "exception",
+            "output",
+            "wb_run_step_end",
+        ]
+    )
     records = [
-        {"type": "call_start", "req": start.model_dump(mode="json")},
-        {"type": "call_end", "req": end.model_dump(mode="json")},
+        {
+            "type": "call_start",
+            "req": to_jsonable_python({"start": {**start_defaults, **start["start"]}}),
+        },
+        {
+            "type": "call_end",
+            "req": to_jsonable_python({"end": {**end_defaults, **end["end"]}}),
+        },
     ]
 
     handlers = build_trace_server_handlers(server)
@@ -2505,24 +2595,31 @@ def test_call_records_written_from_models_replay(should_batch: bool, monkeypatch
             ("/call/end", records[1]["req"]),
         ]
     else:
-        paired = tsi.CompletedCallSchemaForInsert(
-            project_id=PROJECT,
-            id="call-id",
-            trace_id=start.start.trace_id,
-            op_name=start.start.op_name,
-            parent_id=start.start.parent_id,
-            started_at=start.start.started_at,
-            attributes=start.start.attributes,
-            inputs=start.start.inputs,
-            ended_at=end.end.ended_at,
-            summary=end.end.summary,
-        )
-        assert sent == [
-            (
-                f"{V2}/calls/complete",
-                tsi.CallsUpsertCompleteReq(batch=[paired]).model_dump(mode="json"),
-            )
-        ]
+        started = records[0]["req"]["start"]
+        ended = records[1]["req"]["end"]
+        paired = {
+            "project_id": PROJECT,
+            "id": "call-id",
+            "trace_id": started["trace_id"],
+            "op_name": started["op_name"],
+            "started_at": started["started_at"],
+            "ended_at": ended["ended_at"],
+            "display_name": None,
+            "parent_id": started["parent_id"],
+            "thread_id": None,
+            "turn_id": None,
+            "attributes": started["attributes"],
+            "inputs": started["inputs"],
+            "output": ended["output"],
+            "summary": ended["summary"],
+            "otel_dump": None,
+            "exception": None,
+            "wb_user_id": None,
+            "wb_run_id": None,
+            "wb_run_step": None,
+            "wb_run_step_end": None,
+        }
+        assert sent == [(f"{V2}/calls/complete", {"batch": [paired]})]
 
 
 def _sent(request: httpx.Request) -> tuple[str, str, bytes]:
@@ -2535,31 +2632,48 @@ def _sent(request: httpx.Request) -> tuple[str, str, bytes]:
 
 
 def test_object_records_written_from_models_replay():
-    """WAL records hold a request model's JSON dump; replaying sends what the model did."""
-    models: dict[str, BaseModel] = {
-        "obj_create": tsi.ObjCreateReq(
-            obj=tsi.ObjSchemaForInsert(
-                project_id=PROJECT, object_id="o", val={"a": [1, "b", None]}
-            )
-        ),
-        "table_create": tsi.TableCreateReq(
-            table=tsi.TableSchemaForInsert(project_id=PROJECT, rows=[{"x": 1.5}])
-        ),
-        "file_create": tsi.FileCreateReq(
-            project_id=PROJECT,
-            name="f.txt",
-            content="café".encode(),
-            expected_digest="d",
+    """WAL records hold a request model's JSON dump; replaying sends what the client does."""
+    obj = {
+        "obj": {
+            "project_id": PROJECT,
+            "object_id": "o",
+            "val": {"a": [1, "b", None]},
+            "builtin_object_class": None,
+            "expected_digest": None,
+            "wb_user_id": None,
+        }
+    }
+    table = {
+        "table": {
+            "project_id": PROJECT,
+            "rows": [{"x": 1.5}],
+            "expected_digest": None,
+        }
+    }
+    content = "café".encode()
+    # What the client sends, and the record an earlier version's request model
+    # wrote for it, every key with unset ones as None.
+    cases = {
+        "obj_create": (obj, to_jsonable_python(obj)),
+        "table_create": (table, to_jsonable_python(table)),
+        "file_create": (
+            {"project_id": PROJECT, "file": ("f.txt", content), "expected_digest": "d"},
+            {
+                "project_id": PROJECT,
+                "name": "f.txt",
+                "content": content.decode(),
+                "expected_digest": "d",
+            },
         ),
     }
     direct = _mock_server(httpx.Response(200, json={"digest": "d"}))
-    for method_name, req in models.items():
+    for method_name, (req, _) in cases.items():
         getattr(direct.server, method_name)(req)
 
     replayed = _mock_server(httpx.Response(200, json={"digest": "d"}))
     handlers = build_trace_server_handlers(replayed.server)
-    for record_type, req in models.items():
-        handlers[record_type]({"type": record_type, "req": req.model_dump(mode="json")})
+    for record_type, (_, record) in cases.items():
+        handlers[record_type]({"type": record_type, "req": record})
 
     assert len(direct.requests) == 3
     assert [_sent(r) for r in replayed.requests] == [_sent(r) for r in direct.requests]
@@ -2570,7 +2684,7 @@ def test_object_records_written_from_models_replay():
     [
         pytest.param(
             "threads_query_stream",
-            tsi.ThreadsQueryReq(project_id=PROJECT),
+            {"project_id": PROJECT},
             "/threads/stream_query",
             [
                 {
@@ -2620,7 +2734,7 @@ def test_object_records_written_from_models_replay():
         ),
         pytest.param(
             "op_list",
-            tsi.OpListReq(project_id=PROJECT),
+            {"project_id": PROJECT},
             f"{V2}/ops",
             [
                 {
@@ -2658,7 +2772,7 @@ def test_object_records_written_from_models_replay():
         ),
         pytest.param(
             "dataset_list",
-            tsi.DatasetListReq(project_id=PROJECT),
+            {"project_id": PROJECT},
             f"{V2}/datasets",
             [
                 {
@@ -2700,7 +2814,7 @@ def test_object_records_written_from_models_replay():
         ),
         pytest.param(
             "scorer_list",
-            tsi.ScorerListReq(project_id=PROJECT),
+            {"project_id": PROJECT},
             f"{V2}/scorers",
             [
                 {
@@ -2742,7 +2856,7 @@ def test_object_records_written_from_models_replay():
         ),
         pytest.param(
             "evaluation_list",
-            tsi.EvaluationListReq(project_id=PROJECT),
+            {"project_id": PROJECT},
             f"{V2}/evaluations",
             [
                 {
@@ -2792,7 +2906,7 @@ def test_object_records_written_from_models_replay():
         ),
         pytest.param(
             "model_list",
-            tsi.ModelListReq(project_id=PROJECT),
+            {"project_id": PROJECT},
             f"{V2}/models",
             [
                 {
@@ -2834,7 +2948,7 @@ def test_object_records_written_from_models_replay():
         ),
         pytest.param(
             "evaluation_run_list",
-            tsi.EvaluationRunListReq(project_id=PROJECT),
+            {"project_id": PROJECT},
             f"{V2}/evaluation_runs",
             [
                 {"evaluation_run_id": "r1", "evaluation": "ev-ref", "model": "m-ref"},
@@ -2852,7 +2966,7 @@ def test_object_records_written_from_models_replay():
         ),
         pytest.param(
             "prediction_list",
-            tsi.PredictionListReq(project_id=PROJECT),
+            {"project_id": PROJECT},
             f"{V2}/predictions",
             [
                 {"prediction_id": "p1", "model": "m-ref", "inputs": {}, "output": None},
@@ -2870,7 +2984,7 @@ def test_object_records_written_from_models_replay():
         ),
         pytest.param(
             "score_list",
-            tsi.ScoreListReq(project_id=PROJECT),
+            {"project_id": PROJECT},
             f"{V2}/scores",
             [
                 {"score_id": "s1", "scorer": "s-ref", "value": 1},
@@ -2884,7 +2998,7 @@ def test_object_records_written_from_models_replay():
         ),
         pytest.param(
             "annotation_queues_query_stream",
-            tsi.AnnotationQueuesQueryReq(project_id=PROJECT),
+            {"project_id": PROJECT},
             "/annotation_queues/query",
             [QUEUE, {**QUEUE, "id": "q2"}],
             [
@@ -2948,7 +3062,7 @@ def test_file_content_read_keeps_bytes():
     )
 
     res = mock_server.server.file_content_read(
-        tsi.FileContentReadReq(project_id=PROJECT, digest="abc123")
+        {"project_id": PROJECT, "digest": "abc123"}
     )
 
     assert len(mock_server.requests) == 1
@@ -3125,12 +3239,12 @@ def test_custom_runtime_name_keeps_its_colon():
     mock_server = _mock_server(httpx.Response(200, json=V1_RESPONSE))
 
     mock_server.server.custom_runtime_apply(
-        tsi.CustomRuntimeApplyReq(
-            project_id=PROJECT,
-            runtime_name="foo:bar",
-            base_url="http://example.com",
-            runtime_ids=[],
-        )
+        {
+            "project_id": PROJECT,
+            "runtime_name": "foo:bar",
+            "base_url": "http://example.com",
+            "runtime_ids": [],
+        }
     )
 
     assert len(mock_server.requests) == 1
@@ -3142,7 +3256,7 @@ def test_custom_runtime_name_keeps_its_colon():
     [
         pytest.param(
             "otel_export",
-            tsi.OTelExportReq(project_id=PROJECT, processed_spans=[]),
+            {"project_id": PROJECT, "processed_spans": []},
             id="otel_export",
         ),
     ],
@@ -3174,11 +3288,11 @@ def test_completions_create_stream_reads_ndjson_chunks():
 
     chunks = list(
         mock_server.server.completions_create_stream(
-            tsi.CompletionsCreateReq(
-                project_id=PROJECT,
-                inputs={"model": "gpt-4o", "messages": [{"role": "user"}]},
-                wb_user_id="user-id",
-            )
+            {
+                "project_id": PROJECT,
+                "inputs": {"model": "gpt-4o", "messages": [{"role": "user"}]},
+                "wb_user_id": "user-id",
+            }
         )
     )
 
@@ -3195,33 +3309,17 @@ def test_completions_create_stream_reads_ndjson_chunks():
     assert json.loads(request.content)["wb_user_id"] == "user-id"
 
 
-@pytest.mark.parametrize(
-    "req",
-    [
-        pytest.param(
-            tsi.FileCreateReq(
-                project_id=PROJECT,
-                name="pic.png",
-                content=b"\x89PNG",
-                expected_digest="deadbeef",
-            ),
-            id="model",
-        ),
-        pytest.param(
-            {
-                "project_id": PROJECT,
-                "file": ("pic.png", b"\x89PNG"),
-                "expected_digest": "deadbeef",
-            },
-            id="dict",
-        ),
-    ],
-)
-def test_file_create_sends_the_filename(req):
+def test_file_create_sends_the_filename():
     """Test that the upload keeps the filename on the multipart part."""
     mock_server = _mock_server(httpx.Response(200, json={"digest": "abc123"}))
 
-    res = mock_server.server.file_create(req)
+    res = mock_server.server.file_create(
+        {
+            "project_id": PROJECT,
+            "file": ("pic.png", b"\x89PNG"),
+            "expected_digest": "deadbeef",
+        }
+    )
 
     assert len(mock_server.requests) == 1
     assert (mock_server.requests[0].method, mock_server.requests[0].url.path) == (
@@ -3241,13 +3339,13 @@ def test_file_create_sends_the_filename(req):
     [
         pytest.param(
             "scorer_list",
-            tsi.ScorerListReq(project_id=PROJECT, limit=10, offset=5),
+            {"project_id": PROJECT, "limit": 10, "offset": 5},
             f"{V2}/scorers",
             id="scorer_list",
         ),
         pytest.param(
             "evaluation_list",
-            tsi.EvaluationListReq(project_id=PROJECT, limit=10, offset=5),
+            {"project_id": PROJECT, "limit": 10, "offset": 5},
             f"{V2}/evaluations",
             id="evaluation_list",
         ),

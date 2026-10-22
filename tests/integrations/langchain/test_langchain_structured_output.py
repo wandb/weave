@@ -18,7 +18,6 @@ from pydantic import BaseModel, Field
 
 from weave.integrations.langchain.langchain import WeaveTracer, langchain_patcher
 from weave.trace.weave_client import WeaveClient
-from weave.trace_server import trace_server_interface as tsi
 
 
 @pytest.fixture(autouse=True)
@@ -72,7 +71,7 @@ def _run_tracer_lifecycle(
     )
     tracer._finish_run(end_run)
 
-    return list(client.get_calls(filter=tsi.CallsFilter(trace_roots_only=True)))
+    return list(client.get_calls(filter={"trace_roots_only": True}))
 
 
 def test_tracer_traces_call_when_kwargs_contain_pydantic_model_class(

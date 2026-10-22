@@ -9,7 +9,6 @@ from weave.integrations.integration_utilities import (
 )
 from weave.integrations.notdiamond.tracing import get_notdiamond_patcher
 from weave.trace.weave_client import WeaveClient
-from weave.trace_server import trace_server_interface as tsi
 
 
 @pytest.fixture(autouse=True)
@@ -40,7 +39,7 @@ def test_notdiamond_quickstart(
         max_model_depth=4,
         hash_content=False,
     )
-    calls = list(client.get_calls(filter=tsi.CallsFilter(trace_roots_only=True)))
+    calls = list(client.get_calls(filter={"trace_roots_only": True}))
     # Integration-tracking metadata is stamped on the integration's patched calls.
     stamped = [
         c.attributes["integration"] for c in calls if "integration" in c.attributes

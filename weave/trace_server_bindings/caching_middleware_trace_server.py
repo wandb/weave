@@ -6,7 +6,7 @@ import logging
 import os
 import tempfile
 from collections.abc import Callable, Mapping
-from typing import TYPE_CHECKING, Any, TypedDict, TypeVar, cast
+from typing import Any, TypedDict, TypeVar, cast
 
 from pydantic import BaseModel
 from pydantic_core import to_json
@@ -56,9 +56,6 @@ from weave.vendor.weave_server_sdk.types import (
     V2DatasetReadResponse,
     V2OpReadResponse,
 )
-
-if TYPE_CHECKING:
-    from weave.shared import trace_server_interface as tsi
 
 logger = logging.getLogger(__name__)
 
@@ -325,7 +322,7 @@ class CachingMiddlewareTraceServer(
         return disk_layer._cache.volume()
 
     # Cacheable Methods:
-    def obj_read(self, req: ObjectReadParams | tsi.ObjReadReq) -> ObjectReadResponse:
+    def obj_read(self, req: ObjectReadParams) -> ObjectReadResponse:
         if not digest_is_cacheable(as_params(req)["digest"]):
             return self._next_trace_server.obj_read(req)
         return self._with_cache_pydantic(
@@ -336,9 +333,7 @@ class CachingMiddlewareTraceServer(
         )
 
     # Obj API
-    def obj_create(
-        self, req: ObjectCreateParams | tsi.ObjCreateReq
-    ) -> ObjectCreateResponse:
+    def obj_create(self, req: ObjectCreateParams) -> ObjectCreateResponse:
         # All obj_create requests are cacheable!
         return self._with_cache_pydantic(
             self._next_trace_server.obj_create,
@@ -347,9 +342,7 @@ class CachingMiddlewareTraceServer(
             _obj_create_cache_key,
         )
 
-    def obj_delete(
-        self, req: ObjectDeleteParams | tsi.ObjDeleteReq
-    ) -> ObjectDeleteResponse:
+    def obj_delete(self, req: ObjectDeleteParams) -> ObjectDeleteResponse:
         params = as_params(req)
         obj_fields: dict[str, Any] = {
             "project_id": params["project_id"],
@@ -397,7 +390,7 @@ class CachingMiddlewareTraceServer(
             )
         )
 
-    def obj_add_tags(self, req: ObjAddTagsParams | tsi.ObjAddTagsReq) -> object:
+    def obj_add_tags(self, req: ObjAddTagsParams) -> object:
         # Capture fields before forwarding — downstream adapters may mutate req
         params = as_params(req)
         project_id, object_id, digest = (
@@ -409,9 +402,7 @@ class CachingMiddlewareTraceServer(
         self._invalidate_obj_read_cache_version(project_id, object_id, digest)
         return res
 
-    def obj_remove_tags(
-        self, req: ObjRemoveTagsParams | tsi.ObjRemoveTagsReq
-    ) -> object:
+    def obj_remove_tags(self, req: ObjRemoveTagsParams) -> object:
         # Capture fields before forwarding — downstream adapters may mutate req
         params = as_params(req)
         project_id, object_id, digest = (
@@ -423,9 +414,7 @@ class CachingMiddlewareTraceServer(
         self._invalidate_obj_read_cache_version(project_id, object_id, digest)
         return res
 
-    def obj_set_aliases(
-        self, req: ObjSetAliasesParams | tsi.ObjSetAliasesReq
-    ) -> object:
+    def obj_set_aliases(self, req: ObjSetAliasesParams) -> object:
         # Capture fields before forwarding — downstream adapters may mutate req.
         # Alias assignment may move the alias from another version, so
         # invalidate all versions of this object.
@@ -435,9 +424,7 @@ class CachingMiddlewareTraceServer(
         self._invalidate_obj_read_cache_all(project_id, object_id)
         return res
 
-    def obj_remove_aliases(
-        self, req: ObjRemoveAliasesParams | tsi.ObjRemoveAliasesReq
-    ) -> object:
+    def obj_remove_aliases(self, req: ObjRemoveAliasesParams) -> object:
         # Capture fields before forwarding — downstream adapters may mutate req.
         # Alias removal doesn't include digest; invalidate all versions for this object.
         params = as_params(req)
@@ -446,9 +433,7 @@ class CachingMiddlewareTraceServer(
         self._invalidate_obj_read_cache_all(project_id, object_id)
         return res
 
-    def table_query(
-        self, req: TableQueryParams | tsi.TableQueryReq
-    ) -> TableQueryResponse:
+    def table_query(self, req: TableQueryParams) -> TableQueryResponse:
         if not digest_is_cacheable(as_params(req)["digest"]):
             return self._next_trace_server.table_query(req)
         return self._with_cache_pydantic(
@@ -456,9 +441,7 @@ class CachingMiddlewareTraceServer(
         )
 
     # This is a legacy endpoint, it should be removed once the client is mostly updated
-    def table_query_stats(
-        self, req: TableQueryStatsParams | tsi.TableQueryStatsReq
-    ) -> TableQueryStatsResponse:
+    def table_query_stats(self, req: TableQueryStatsParams) -> TableQueryStatsResponse:
         if not digest_is_cacheable(as_params(req)["digest"]):
             return self._next_trace_server.table_query_stats(req)
         return self._with_cache_pydantic(
@@ -466,7 +449,7 @@ class CachingMiddlewareTraceServer(
         )
 
     def table_query_stats_batch(
-        self, req: TableQueryStatsBatchParams | tsi.TableQueryStatsBatchReq
+        self, req: TableQueryStatsBatchParams
     ) -> TableQueryStatsBatchResponse:
         digests = as_params(req).get("digests") or []
         if any(not digest_is_cacheable(digest) for digest in digests):
@@ -477,9 +460,7 @@ class CachingMiddlewareTraceServer(
             TableQueryStatsBatchResponse,
         )
 
-    def refs_read_batch(
-        self, req: RefReadBatchParams | tsi.RefsReadBatchReq
-    ) -> RefReadBatchResponse:
+    def refs_read_batch(self, req: RefReadBatchParams) -> RefReadBatchResponse:
         """Read multiple refs, utilizing cache for individual refs.
 
         This method implements special caching logic to:
@@ -534,9 +515,7 @@ class CachingMiddlewareTraceServer(
         return RefReadBatchResponse(vals=final_results)
 
     # File API
-    def file_create(
-        self, req: FileCreateParams | tsi.FileCreateReq
-    ) -> FileCreateResponse:
+    def file_create(self, req: FileCreateParams) -> FileCreateResponse:
         # All file_create requests are cacheable!
         return self._with_cache_pydantic(
             self._next_trace_server.file_create,
@@ -545,9 +524,7 @@ class CachingMiddlewareTraceServer(
             _file_create_cache_key,
         )
 
-    def file_content_read(
-        self, req: FileContentParams | tsi.FileContentReadReq
-    ) -> FileContentReadRes:
+    def file_content_read(self, req: FileContentParams) -> FileContentReadRes:
         return self._with_cache(
             self._next_trace_server.file_content_read,
             req,
@@ -557,9 +534,7 @@ class CachingMiddlewareTraceServer(
             lambda content: FileContentReadRes(content=cast(bytes, content)),
         )
 
-    def files_stats(
-        self, req: FileStatsParams | tsi.FilesStatsReq
-    ) -> FileStatsResponse:
+    def files_stats(self, req: FileStatsParams) -> FileStatsResponse:
         return self._with_cache_pydantic(
             self._next_trace_server.files_stats,
             req,
@@ -567,16 +542,14 @@ class CachingMiddlewareTraceServer(
         )
 
     # Object APIs
-    def op_read(self, req: Mapping[str, Any] | tsi.OpReadReq) -> V2OpReadResponse:
+    def op_read(self, req: Mapping[str, Any]) -> V2OpReadResponse:
         if not digest_is_cacheable(as_params(req)["digest"]):
             return self._next_trace_server.op_read(req)
         return self._with_cache_pydantic(
             self._next_trace_server.op_read, req, V2OpReadResponse
         )
 
-    def dataset_read(
-        self, req: Mapping[str, Any] | tsi.DatasetReadReq
-    ) -> V2DatasetReadResponse:
+    def dataset_read(self, req: Mapping[str, Any]) -> V2DatasetReadResponse:
         if not digest_is_cacheable(as_params(req)["digest"]):
             return self._next_trace_server.dataset_read(req)
         return self._with_cache_pydantic(
@@ -617,14 +590,14 @@ def pydantic_bytes_safe_dump(obj: BaseModel | Mapping[str, Any]) -> str:
     return json.dumps(processed_dict, ensure_ascii=False)
 
 
-def _obj_read_cache_key(req: ObjectReadParams | tsi.ObjReadReq) -> str:
+def _obj_read_cache_key(req: ObjectReadParams) -> str:
     params = as_params(req)
     # The invalidation prefixes match these fields first, in this order.
     leading = {k: params[k] for k in ("project_id", "object_id", "digest")}
     return pydantic_bytes_safe_dump({**leading, **params})
 
 
-def _obj_create_cache_key(req: ObjectCreateParams | tsi.ObjCreateReq) -> str:
+def _obj_create_cache_key(req: ObjectCreateParams) -> str:
     obj = as_params(req)["obj"]
     obj = {**obj, "val": to_jsonable_with_json_keys(obj["val"])}
     # The invalidation prefix matches these fields first, in this order.
@@ -632,10 +605,8 @@ def _obj_create_cache_key(req: ObjectCreateParams | tsi.ObjCreateReq) -> str:
     return pydantic_bytes_safe_dump({"obj": {**leading, **obj}})
 
 
-def _file_create_cache_key(req: FileCreateParams | tsi.FileCreateReq) -> str:
+def _file_create_cache_key(req: FileCreateParams) -> str:
     """The key uploads have always been cached by, so a cached digest still applies."""
-    if isinstance(req, BaseModel):
-        return pydantic_bytes_safe_dump(req)
     name, content = cast("tuple[str, bytes]", req["file"])
     return pydantic_bytes_safe_dump(
         {

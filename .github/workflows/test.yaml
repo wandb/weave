@@ -136,7 +136,7 @@ jobs:
       TRACE_SERVER_COUNT: 8
       # Longest first, so the parallel shards finish together.
       INTEGRATION_SHARDS: >-
-        llamaindex langchain autogen_tests stainless trace_server_bindings flow
+        llamaindex langchain autogen_tests trace_server_bindings flow
         scorers crewai openai dspy anthropic verifiers_test vertexai litellm
         openai_agents mistral instructor smolagents google_genai pandas_test
         claude_agent_sdk typesafe bedrock fastmcp cohere cerebras groq

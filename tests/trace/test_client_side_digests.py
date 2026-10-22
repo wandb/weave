@@ -14,6 +14,7 @@ from PIL import Image
 
 import weave
 from tests.trace.server_utils import find_server_layer
+from weave.trace.errors import DigestMismatchError
 from weave.trace.serialization.digest import (
     compute_file_digest,
     compute_object_digest,
@@ -30,10 +31,13 @@ from weave.trace.weave_client import (
     NoInternalProjectIDError,
     WeaveClient,
 )
-from weave.trace_server import trace_server_interface as tsi
-from weave.trace_server.errors import DigestMismatchError
 from weave.trace_server_bindings.stainless_remote_http_trace_server import (
     StainlessRemoteHTTPTraceServer,
+)
+from weave.vendor.weave_server_sdk.types import (
+    FileCreateResponse,
+    ObjectCreateResponse,
+    TableCreateResponse,
 )
 
 
@@ -199,12 +203,12 @@ class TestClientServerDigestConsistency:
         client_row_digests = [compute_row_digest(r) for r in rows]
         client_table_digest = compute_table_digest(client_row_digests)
 
-        req = tsi.TableCreateReq(
-            table=tsi.TableSchemaForInsert(
-                project_id=client.project_id,
-                rows=rows,
-            )
-        )
+        req = {
+            "table": {
+                "project_id": client.project_id,
+                "rows": rows,
+            }
+        }
         res = client.server.table_create(req)
 
         assert res.row_digests == client_row_digests
@@ -307,14 +311,14 @@ class TestServerDigestValidation:
         val = {"hello": "world"}
         expected_digest = compute_object_digest(val) if correct else "definitely_wrong"
 
-        req = tsi.ObjCreateReq(
-            obj=tsi.ObjSchemaForInsert(
-                project_id=client.project_id,
-                object_id="digest_obj",
-                val=val,
-                expected_digest=expected_digest,
-            )
-        )
+        req = {
+            "obj": {
+                "project_id": client.project_id,
+                "object_id": "digest_obj",
+                "val": val,
+                "expected_digest": expected_digest,
+            }
+        }
 
         if correct:
             res = client.server.obj_create(req)
@@ -331,13 +335,13 @@ class TestServerDigestValidation:
             compute_table_digest(row_digests) if correct else "definitely_wrong"
         )
 
-        req = tsi.TableCreateReq(
-            table=tsi.TableSchemaForInsert(
-                project_id=client.project_id,
-                rows=rows,
-                expected_digest=expected_digest,
-            )
-        )
+        req = {
+            "table": {
+                "project_id": client.project_id,
+                "rows": rows,
+                "expected_digest": expected_digest,
+            }
+        }
 
         if correct:
             res = client.server.table_create(req)
@@ -354,12 +358,11 @@ class TestServerDigestValidation:
             compute_file_digest(content) if correct else "definitely_wrong"
         )
 
-        req = tsi.FileCreateReq(
-            project_id=client.project_id,
-            name="test.txt",
-            content=content,
-            expected_digest=expected_digest,
-        )
+        req = {
+            "project_id": client.project_id,
+            "file": ("test.txt", content),
+            "expected_digest": expected_digest,
+        }
 
         if correct:
             res = client.server.file_create(req)
@@ -457,7 +460,7 @@ class TestDigestMismatchAutoDisable:
         seen_digests: list[str | None] = []
         injected = False
 
-        def mismatch_once(req: dict[str, Any]) -> tsi.ObjCreateRes:
+        def mismatch_once(req: dict[str, Any]) -> ObjectCreateResponse:
             nonlocal injected
             seen_digests.append(req["obj"]["expected_digest"])
             if not injected and req["obj"]["expected_digest"] is not None:
@@ -491,7 +494,7 @@ class TestDigestMismatchAutoDisable:
         original = adapter.table_create
         injected = False
 
-        def mismatch_once(req: dict[str, Any]) -> tsi.TableCreateRes:
+        def mismatch_once(req: dict[str, Any]) -> TableCreateResponse:
             nonlocal injected
             if not injected and req["table"]["expected_digest"] is not None:
                 injected = True
@@ -520,7 +523,7 @@ class TestDigestMismatchAutoDisable:
         original = adapter.file_create
         injected = False
 
-        def mismatch_once(req: dict[str, Any]) -> tsi.FileCreateRes:
+        def mismatch_once(req: dict[str, Any]) -> FileCreateResponse:
             nonlocal injected
             if not injected and req["expected_digest"] is not None:
                 injected = True

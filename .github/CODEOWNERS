@@ -6,11 +6,11 @@
 # that a PR adding files under the old paths needs their review and does not
 # quietly recreate the deleted code.
 /weave/trace_server/ @wandb/weave-sdk
+/weave/shared/ @wandb/weave-sdk
 /tests/trace_server/ @wandb/weave-sdk
 /tests/trace_server_migrator/ @wandb/weave-sdk
 
-# The trace server has its own copy of weave/shared in wandb/core. These owners
-# make sure that a change here that the server needs is made in core too.
-/weave/shared/ @wandb/weave-sdk
-# The builtin object classes moved here from weave/shared; core keeps its own copy.
+# The builtin object classes moved here from weave/shared, and the trace server
+# in wandb/core has its own copy. These owners make sure that a change here that
+# the server needs is made in core too.
 /weave/trace/builtin_object_classes/ @wandb/weave-sdk

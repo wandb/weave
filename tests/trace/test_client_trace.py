@@ -19,38 +19,36 @@ from pydantic import BaseModel, ValidationError
 
 import weave
 import weave.trace.call
+from tests.conftest_lib.http_error_decoding import CHValidationError
 from tests.trace.util import (
+    WILDCARD_ARTIFACT_VERSION_AND_PATH,
     AnyIntMatcher,
     DatetimeMatcher,
     FuzzyDateTimeMatcher,
     MaybeStringMatcher,
-)
-from weave import Thread, ThreadPoolExecutor
-from weave.shared.trace_server_interface_util import (
-    TRACE_REF_SCHEME,
-    WILDCARD_ARTIFACT_VERSION_AND_PATH,
     extract_refs_from_values,
 )
+from weave import Thread, ThreadPoolExecutor
 from weave.trace import weave_client
+from weave.trace.constants import TraceStatus
 from weave.trace.context.call_context import require_current_call
 from weave.trace.context.weave_client_context import (
     get_weave_client,
     set_weave_client_global,
 )
-from weave.trace.refs import TableRef
-from weave.trace.refs_internal import extra_value_quoter
-from weave.trace.util import LOG_ONCE_MESSAGE_SUFFIX, logged_messages
-from weave.trace.vals import MissingSelfInstanceError
-from weave.trace.weave_client import sanitize_object_name
-from weave.trace_server import trace_server_interface as tsi
-from weave.trace_server.common_interface import SortBy
-from weave.trace_server.errors import (
+from weave.trace.errors import (
     InvalidFieldError,
     InvalidRequest,
     ObjectNameTypeCollision,
 )
-from weave.trace_server.ids import generate_id
-from weave.trace_server.validation_util import CHValidationError
+from weave.trace.refs import TableRef
+from weave.trace.refs_internal import WEAVE_SCHEME, extra_value_quoter
+from weave.trace.util import LOG_ONCE_MESSAGE_SUFFIX, logged_messages
+from weave.trace.vals import MissingSelfInstanceError
+from weave.trace.weave_client import sanitize_object_name
+from weave.trace_server_bindings.client_interface import TraceServerClientInterface
+from weave.trace_server_bindings.models import CallsQueryRes
+from weave.utils.ids import generate_id
 from weave.utils.project_id import from_project_id, to_project_id
 
 ## Hacky interface compatibility helpers
@@ -81,7 +79,7 @@ class ComplexAttribute:
 
 def get_client_trace_server(
     client: weave_client.WeaveClient,
-) -> tsi.TraceServerInterface:
+) -> TraceServerClientInterface:
     return client.server
 
 
@@ -109,7 +107,7 @@ def test_simple_op(client, wb_user_id):
     fetched_call = calls[0]
     digest = "VAjc7UcWtXC9OiUr6jrzM6CURhBaMiBr0gqOddcCxY4"
     expected_name = (
-        f"{TRACE_REF_SCHEME}:///{client.entity}/{client.project}/op/my_op:{digest}"
+        f"{WEAVE_SCHEME}:///{client.entity}/{client.project}/op/my_op:{digest}"
     )
     assert fetched_call == weave.trace.call.Call(
         _op_name=expected_name,
@@ -155,28 +153,28 @@ def test_trace_server_call_start_and_end(client, wb_user_id):
     call_id = generate_id()
     trace_id = generate_id()
     parent_id = generate_id()
-    start = tsi.StartedCallSchemaForInsert(
-        project_id=client.project_id,
-        id=call_id,
-        op_name="test_name",
-        trace_id=trace_id,
-        parent_id=parent_id,
-        started_at=datetime.datetime.now(tz=datetime.timezone.utc)
+    start = {
+        "project_id": client.project_id,
+        "id": call_id,
+        "op_name": "test_name",
+        "trace_id": trace_id,
+        "parent_id": parent_id,
+        "started_at": datetime.datetime.now(tz=datetime.timezone.utc)
         - datetime.timedelta(seconds=1),
-        attributes={"a": 5},
-        inputs={"b": 5},
-    )
-    client.server.call_start(tsi.CallStartReq(start=start))
+        "attributes": {"a": 5},
+        "inputs": {"b": 5},
+    }
+    client.server.call_start({"start": start})
 
     res = client.server.call_read(
-        tsi.CallReadReq(
-            project_id=client.project_id,
-            id=call_id,
-        )
+        {
+            "project_id": client.project_id,
+            "id": call_id,
+        }
     )
 
     exp_started_at = datetime.datetime.fromisoformat(
-        start.started_at.isoformat(timespec="milliseconds")
+        start["started_at"].isoformat(timespec="milliseconds")
     )
 
     assert res.call.model_dump() == {
@@ -185,7 +183,7 @@ def test_trace_server_call_start_and_end(client, wb_user_id):
         "op_name": "test_name",
         "trace_id": trace_id,
         "parent_id": parent_id,
-        "started_at": FuzzyDateTimeMatcher(start.started_at),
+        "started_at": FuzzyDateTimeMatcher(start["started_at"]),
         "ended_at": None,
         "exception": None,
         "attributes": {"a": 5},
@@ -213,24 +211,24 @@ def test_trace_server_call_start_and_end(client, wb_user_id):
         "turn_id": None,
     }
 
-    end = tsi.EndedCallSchemaForInsert(
-        project_id=client.project_id,
-        id=call_id,
-        ended_at=datetime.datetime.now(tz=datetime.timezone.utc),
-        summary={"c": 5},
-        output={"d": 5},
-    )
-    client.server.call_end(tsi.CallEndReq(end=end))
+    end = {
+        "project_id": client.project_id,
+        "id": call_id,
+        "ended_at": datetime.datetime.now(tz=datetime.timezone.utc),
+        "summary": {"c": 5},
+        "output": {"d": 5},
+    }
+    client.server.call_end({"end": end})
 
     res = client.server.call_read(
-        tsi.CallReadReq(
-            project_id=client.project_id,
-            id=call_id,
-        )
+        {
+            "project_id": client.project_id,
+            "id": call_id,
+        }
     )
 
     exp_ended_at = datetime.datetime.fromisoformat(
-        end.ended_at.isoformat(timespec="milliseconds")
+        end["ended_at"].isoformat(timespec="milliseconds")
     )
 
     assert res.call.model_dump() == {
@@ -239,8 +237,8 @@ def test_trace_server_call_start_and_end(client, wb_user_id):
         "op_name": "test_name",
         "trace_id": trace_id,
         "parent_id": parent_id,
-        "started_at": FuzzyDateTimeMatcher(start.started_at),
-        "ended_at": FuzzyDateTimeMatcher(end.ended_at),
+        "started_at": FuzzyDateTimeMatcher(start["started_at"]),
+        "ended_at": FuzzyDateTimeMatcher(end["ended_at"]),
         "exception": None,
         "attributes": {"a": 5},
         "inputs": {"b": 5},
@@ -271,10 +269,10 @@ def test_trace_server_call_start_and_end(client, wb_user_id):
 def test_call_read_not_found(client):
     call_id = generate_id()
     res = client.server.call_read(
-        tsi.CallReadReq(
-            project_id=client.project_id,
-            id=call_id,
-        )
+        {
+            "project_id": client.project_id,
+            "id": call_id,
+        }
     )
     assert res.call is None
 
@@ -423,9 +421,9 @@ def test_trace_call_query_filter_op_version_refs(client, no_autoflush):
     # this only reason we are doing this assertion is to make sure the
     # manually constructed wildcard string is correct
     assert ref_str(call_summaries["adder"].op).startswith(
-        f"{TRACE_REF_SCHEME}:///{client.entity}/{client.project}/op/adder:"
+        f"{WEAVE_SCHEME}:///{client.entity}/{client.project}/op/adder:"
     )
-    wildcard_adder_ref_str = f"{TRACE_REF_SCHEME}:///{client.entity}/{client.project}/op/adder{WILDCARD_ARTIFACT_VERSION_AND_PATH}"
+    wildcard_adder_ref_str = f"{WEAVE_SCHEME}:///{client.entity}/{client.project}/op/adder{WILDCARD_ARTIFACT_VERSION_AND_PATH}"
 
     for i, (op_version_refs, exp_count) in enumerate(
         [
@@ -465,10 +463,10 @@ def test_trace_call_query_filter_op_version_refs(client, no_autoflush):
         ]
     ):
         res = get_client_trace_server(client).calls_query(
-            tsi.CallsQueryReq(
-                project_id=get_client_project_id(client),
-                filter=tsi.CallsFilter(op_names=op_version_refs),
-            )
+            {
+                "project_id": get_client_project_id(client),
+                "filter": {"op_names": op_version_refs},
+            }
         )
         print(f"TEST CASE [{i}]", op_version_refs, exp_count)
 
@@ -485,11 +483,11 @@ def unique_vals(list_a: list[str]) -> list[str]:
 
 def get_all_calls_asserting_finished(
     client: ClientType, call_spec: OpCallSpec
-) -> tsi.CallsQueryRes:
+) -> CallsQueryRes:
     res = get_client_trace_server(client).calls_query(
-        tsi.CallsQueryReq(
-            project_id=get_client_project_id(client),
-        )
+        {
+            "project_id": get_client_project_id(client),
+        }
     )
     assert len(res.calls) == call_spec.total_calls
     assert all(call.ended_at for call in res.calls)
@@ -545,10 +543,10 @@ def test_trace_call_query_filter_input_object_version_refs(client):
         ),
     ]:
         inner_res = get_client_trace_server(client).calls_query(
-            tsi.CallsQueryReq(
-                project_id=get_client_project_id(client),
-                filter=tsi.CallsFilter(input_refs=input_refs),
-            )
+            {
+                "project_id": get_client_project_id(client),
+                "filter": {"input_refs": input_refs},
+            }
         )
 
         assert len(inner_res.calls) == exp_count
@@ -569,9 +567,7 @@ def test_trace_call_wb_run_step_query(client):
         call_spec = simple_line_call_bootstrap()
 
     server = get_client_trace_server(client)
-    res = server.calls_query(
-        tsi.CallsQueryReq(project_id=get_client_project_id(client))
-    )
+    res = server.calls_query({"project_id": get_client_project_id(client)})
     exp_start_steps = []
     exp_end_steps = []
     counter = 0
@@ -588,66 +584,58 @@ def test_trace_call_wb_run_step_query(client):
     found_end_steps_set = {c.wb_run_step_end for c in res.calls}
     assert found_end_steps_set == exp_end_steps_set
 
-    query = tsi.Query(
-        **{"$expr": {"$eq": [{"$getField": "wb_run_step"}, {"$literal": 0}]}}
-    )
+    query = {"$expr": {"$eq": [{"$getField": "wb_run_step"}, {"$literal": 0}]}}
     res = server.calls_query(
-        tsi.CallsQueryReq(project_id=get_client_project_id(client), query=query)
+        {"project_id": get_client_project_id(client), "query": query}
     )
     assert len(res.calls) == 1
 
     count = 2
     compare_step = exp_start_steps[-count]
-    range_query = tsi.Query(
-        **{
-            "$expr": {
-                "$gte": [{"$getField": "wb_run_step"}, {"$literal": compare_step}]
-            }
-        }
-    )
+    range_query = {
+        "$expr": {"$gte": [{"$getField": "wb_run_step"}, {"$literal": compare_step}]}
+    }
     res = server.calls_query(
-        tsi.CallsQueryReq(project_id=get_client_project_id(client), query=range_query)
+        {"project_id": get_client_project_id(client), "query": range_query}
     )
     assert len(res.calls) == count
 
-    lt_query = tsi.Query(
-        **{"$expr": {"$lt": [{"$getField": "wb_run_step"}, {"$literal": compare_step}]}}
-    )
+    lt_query = {
+        "$expr": {"$lt": [{"$getField": "wb_run_step"}, {"$literal": compare_step}]}
+    }
     res = server.calls_query(
-        tsi.CallsQueryReq(project_id=get_client_project_id(client), query=lt_query)
+        {"project_id": get_client_project_id(client), "query": lt_query}
     )
     exp_lt_count = len([step for step in exp_start_steps if step < compare_step])
     assert len(res.calls) == exp_lt_count
 
     count = 4
     compare_step = exp_end_steps[-count]
-    range_query = tsi.Query(
-        **{
-            "$expr": {
-                "$gte": [{"$getField": "wb_run_step_end"}, {"$literal": compare_step}]
-            }
+    range_query = {
+        "$expr": {
+            "$gte": [{"$getField": "wb_run_step_end"}, {"$literal": compare_step}]
         }
-    )
+    }
     res = server.calls_query(
-        tsi.CallsQueryReq(project_id=get_client_project_id(client), query=range_query)
+        {"project_id": get_client_project_id(client), "query": range_query}
     )
     assert len(res.calls) == count
 
     res = server.calls_query(
-        tsi.CallsQueryReq(
-            project_id=get_client_project_id(client),
-            sort_by=[SortBy(field="wb_run_step", direction="desc")],
-        )
+        {
+            "project_id": get_client_project_id(client),
+            "sort_by": [{"field": "wb_run_step", "direction": "desc"}],
+        }
     )
     exp_steps = sorted(exp_start_steps, reverse=True)
     found_steps = [c.wb_run_step for c in res.calls]
     assert found_steps == exp_steps
 
     res = server.calls_query(
-        tsi.CallsQueryReq(
-            project_id=get_client_project_id(client),
-            sort_by=[SortBy(field="wb_run_step_end", direction="desc")],
-        )
+        {
+            "project_id": get_client_project_id(client),
+            "sort_by": [{"field": "wb_run_step_end", "direction": "desc"}],
+        }
     )
     exp_steps = sorted(exp_end_steps, reverse=True)
     found_steps = [c.wb_run_step_end for c in res.calls]
@@ -664,9 +652,7 @@ def test_trace_call_wb_run_context_override(client):
 
     # Query the calls to verify the override worked
     server = get_client_trace_server(client)
-    res = server.calls_query(
-        tsi.CallsQueryReq(project_id=get_client_project_id(client))
-    )
+    res = server.calls_query({"project_id": get_client_project_id(client)})
 
     # All calls should have the overridden wb_run_id
     expected_wb_run_id = f"{client.entity}/{client.project}/test-run"
@@ -679,30 +665,28 @@ def test_trace_call_wb_run_context_override(client):
         assert call.wb_run_step_end == 0
 
     # Test querying by wb_run_step
-    query = tsi.Query(
-        **{"$expr": {"$eq": [{"$getField": "wb_run_step"}, {"$literal": 0}]}}
-    )
+    query = {"$expr": {"$eq": [{"$getField": "wb_run_step"}, {"$literal": 0}]}}
     res = server.calls_query(
-        tsi.CallsQueryReq(project_id=get_client_project_id(client), query=query)
+        {"project_id": get_client_project_id(client), "query": query}
     )
     # All calls should match since they all have step 0
     assert len(res.calls) == call_spec.total_calls
 
     # Test sorting by wb_run_step (all should be 0)
     res = server.calls_query(
-        tsi.CallsQueryReq(
-            project_id=get_client_project_id(client),
-            sort_by=[SortBy(field="wb_run_step", direction="desc")],
-        )
+        {
+            "project_id": get_client_project_id(client),
+            "sort_by": [{"field": "wb_run_step", "direction": "desc"}],
+        }
     )
     assert all(c.wb_run_step == 0 for c in res.calls)
 
     # Test sorting by wb_run_step_end (all should be 0)
     res = server.calls_query(
-        tsi.CallsQueryReq(
-            project_id=get_client_project_id(client),
-            sort_by=[SortBy(field="wb_run_step_end", direction="desc")],
-        )
+        {
+            "project_id": get_client_project_id(client),
+            "sort_by": [{"field": "wb_run_step_end", "direction": "desc"}],
+        }
     )
     assert all(c.wb_run_step_end == 0 for c in res.calls)
 
@@ -718,11 +702,11 @@ def test_trace_call_wb_run_context_override(client):
 
     # Get the latest call (should be the one we just created)
     res = server.calls_query(
-        tsi.CallsQueryReq(
-            project_id=get_client_project_id(client),
-            sort_by=[SortBy(field="started_at", direction="desc")],
-            limit=1,
-        )
+        {
+            "project_id": get_client_project_id(client),
+            "sort_by": [{"field": "started_at", "direction": "desc"}],
+            "limit": 1,
+        }
     )
     assert len(res.calls) == 1
     latest_call = res.calls[0]
@@ -781,10 +765,10 @@ def test_trace_call_query_filter_output_object_version_refs(client):
         ),
     ]:
         inner_res = get_client_trace_server(client).calls_query(
-            tsi.CallsQueryReq(
-                project_id=get_client_project_id(client),
-                filter=tsi.CallsFilter(output_refs=output_refs),
-            )
+            {
+                "project_id": get_client_project_id(client),
+                "filter": {"output_refs": output_refs},
+            }
         )
 
         assert len(inner_res.calls) == exp_count
@@ -817,10 +801,10 @@ def test_trace_call_query_filter_parent_ids(client):
         ),
     ]:
         inner_res = get_client_trace_server(client).calls_query(
-            tsi.CallsQueryReq(
-                project_id=get_client_project_id(client),
-                filter=tsi.CallsFilter(parent_ids=parent_id_list),
-            )
+            {
+                "project_id": get_client_project_id(client),
+                "filter": {"parent_ids": parent_id_list},
+            }
         )
 
         assert len(inner_res.calls) == exp_count
@@ -844,10 +828,10 @@ def test_trace_call_query_filter_trace_ids(client):
         (trace_ids[:3], 3),
     ]:
         inner_res = get_client_trace_server(client).calls_query(
-            tsi.CallsQueryReq(
-                project_id=get_client_project_id(client),
-                filter=tsi.CallsFilter(trace_ids=trace_id_list),
-            )
+            {
+                "project_id": get_client_project_id(client),
+                "filter": {"trace_ids": trace_id_list},
+            }
         )
 
         assert len(inner_res.calls) == exp_count
@@ -871,10 +855,10 @@ def test_trace_call_query_filter_call_ids(client):
         (call_ids[:3], 3),
     ]:
         inner_res = get_client_trace_server(client).calls_query(
-            tsi.CallsQueryReq(
-                project_id=get_client_project_id(client),
-                filter=tsi.CallsFilter(call_ids=call_id_list),
-            )
+            {
+                "project_id": get_client_project_id(client),
+                "filter": {"call_ids": call_id_list},
+            }
         )
 
         assert len(inner_res.calls) == exp_count
@@ -893,10 +877,10 @@ def test_trace_call_query_filter_trace_roots_only(client, no_autoflush):
         (False, call_spec.total_calls),
     ]:
         inner_res = get_client_trace_server(client).calls_query(
-            tsi.CallsQueryReq(
-                project_id=get_client_project_id(client),
-                filter=tsi.CallsFilter(trace_roots_only=trace_roots_only),
-            )
+            {
+                "project_id": get_client_project_id(client),
+                "filter": {"trace_roots_only": trace_roots_only},
+            }
         )
 
         assert len(inner_res.calls) == exp_count
@@ -941,10 +925,10 @@ def test_trace_call_query_filter_wb_run_ids(client, no_autoflush):
         ([f"{client.entity}/{client.project}/NOT_A_RUN"], 0),
     ]:
         inner_res = get_client_trace_server(client).calls_query(
-            tsi.CallsQueryReq(
-                project_id=get_client_project_id(client),
-                filter=tsi.CallsFilter(wb_run_ids=wb_run_ids),
-            )
+            {
+                "project_id": get_client_project_id(client),
+                "filter": {"wb_run_ids": wb_run_ids},
+            }
         )
 
         assert len(inner_res.calls) == exp_count
@@ -959,13 +943,13 @@ def test_trace_call_query_filter_wb_run_ids(client, no_autoflush):
             call_spec_1.total_calls + call_spec_2.total_calls,
         ),
     ]:
-        got = list(client.get_calls(filter=tsi.CallsFilter(wb_run_ids=wb_run_ids)))
+        got = list(client.get_calls(filter={"wb_run_ids": wb_run_ids}))
         assert len(got) == exp_count
         stats = get_client_trace_server(client).calls_query_stats(
-            tsi.CallsQueryStatsReq(
-                project_id=get_client_project_id(client),
-                filter=tsi.CallsFilter(wb_run_ids=wb_run_ids),
-            )
+            {
+                "project_id": get_client_project_id(client),
+                "filter": {"wb_run_ids": wb_run_ids},
+            }
         )
         assert stats.count == exp_count
 
@@ -983,10 +967,10 @@ def test_trace_call_query_limit(client, no_autoflush):
         (10, 10),
     ]:
         inner_res = get_client_trace_server(client).calls_query(
-            tsi.CallsQueryReq(
-                project_id=get_client_project_id(client),
-                limit=limit,
-            )
+            {
+                "project_id": get_client_project_id(client),
+                "limit": limit,
+            }
         )
 
         assert len(inner_res.calls) == exp_count
@@ -1005,10 +989,10 @@ def test_trace_call_query_offset(client, no_autoflush):
         (10, call_spec.total_calls - 10),
     ]:
         inner_res = get_client_trace_server(client).calls_query(
-            tsi.CallsQueryReq(
-                project_id=get_client_project_id(client),
-                offset=offset,
-            )
+            {
+                "project_id": get_client_project_id(client),
+                "offset": offset,
+            }
         )
 
         assert len(inner_res.calls) == exp_count
@@ -1055,16 +1039,16 @@ def test_trace_call_query_timings(client, no_autoflush):
 
     def query_server():
         result = get_client_trace_server(client).calls_query_stream(
-            tsi.CallsQueryReq(
-                project_id=get_client_project_id(client),
-                sort_by=[SortBy(field="started_at", direction="desc")],
-            )
+            {
+                "project_id": get_client_project_id(client),
+                "sort_by": [{"field": "started_at", "direction": "desc"}],
+            }
         )
         return list(result)
 
     def query_client(page_size):
         res = client.get_calls(
-            sort_by=[SortBy(field="started_at", direction="desc")],
+            sort_by=[{"field": "started_at", "direction": "desc"}],
             page_size=page_size,
         )
         return list(res)
@@ -1104,19 +1088,19 @@ def test_trace_call_sort(client):
         basic_op({"prim": i, "list": [i], "dict": {"inner": i}}, i / 10)
 
     for first, last, sort_by in [
-        (2, 0, [SortBy(field="started_at", direction="desc")]),
-        (2, 0, [SortBy(field="inputs.in_val.prim", direction="desc")]),
-        (2, 0, [SortBy(field="inputs.in_val.list.0", direction="desc")]),
-        (2, 0, [SortBy(field="inputs.in_val.dict.inner", direction="desc")]),
-        (2, 0, [SortBy(field="output.prim", direction="desc")]),
-        (2, 0, [SortBy(field="output.list.0", direction="desc")]),
-        (2, 0, [SortBy(field="output.dict.inner", direction="desc")]),
+        (2, 0, [{"field": "started_at", "direction": "desc"}]),
+        (2, 0, [{"field": "inputs.in_val.prim", "direction": "desc"}]),
+        (2, 0, [{"field": "inputs.in_val.list.0", "direction": "desc"}]),
+        (2, 0, [{"field": "inputs.in_val.dict.inner", "direction": "desc"}]),
+        (2, 0, [{"field": "output.prim", "direction": "desc"}]),
+        (2, 0, [{"field": "output.list.0", "direction": "desc"}]),
+        (2, 0, [{"field": "output.dict.inner", "direction": "desc"}]),
     ]:
         inner_res = get_client_trace_server(client).calls_query(
-            tsi.CallsQueryReq(
-                project_id=get_client_project_id(client),
-                sort_by=sort_by,
-            )
+            {
+                "project_id": get_client_project_id(client),
+                "sort_by": sort_by,
+            }
         )
 
         assert inner_res.calls[0].inputs["in_val"]["prim"] == first
@@ -1154,10 +1138,10 @@ def test_trace_call_sort_with_mixed_types(client):
         ),
     ]:
         inner_res = get_client_trace_server(client).calls_query(
-            tsi.CallsQueryReq(
-                project_id=get_client_project_id(client),
-                sort_by=[SortBy(field="inputs.in_val.prim", direction=direction)],
-            )
+            {
+                "project_id": get_client_project_id(client),
+                "sort_by": [{"field": "inputs.in_val.prim", "direction": direction}],
+            }
         )
 
         for i, call in enumerate(inner_res.calls):
@@ -1526,12 +1510,10 @@ def test_trace_call_filter(client):
     ]:
         print(f"TEST CASE [{count}]", query)
         inner_res = get_client_trace_server(client).calls_query(
-            tsi.CallsQueryReq.model_validate(
-                {
-                    "project_id": get_client_project_id(client),
-                    "query": {"$expr": query},
-                }
-            )
+            {
+                "project_id": get_client_project_id(client),
+                "query": {"$expr": query},
+            }
         )
 
         if len(inner_res.calls) != count:
@@ -1539,12 +1521,10 @@ def test_trace_call_filter(client):
                 f"(ALL) Query {query} expected {count}, but found {len(inner_res.calls)}"
             )
         inner_res = get_client_trace_server(client).calls_query_stats(
-            tsi.CallsQueryStatsReq.model_validate(
-                {
-                    "project_id": get_client_project_id(client),
-                    "query": {"$expr": query},
-                }
-            )
+            {
+                "project_id": get_client_project_id(client),
+                "query": {"$expr": query},
+            }
         )
 
         if inner_res.count != count:
@@ -1571,9 +1551,9 @@ def test_ops_with_default_params(client):
     assert op_with_default(b=5, a=1) == 6
 
     inner_res = client.server.calls_query(
-        tsi.CallsQueryReq(
-            project_id=client.project_id,
-        )
+        {
+            "project_id": client.project_id,
+        }
     )
 
     assert len(inner_res.calls) == 6
@@ -1599,54 +1579,52 @@ def test_trace_call_filter_bool_and_int_literals_no_collision(client):
     call_id = str(uuid.uuid4())
     now = datetime.datetime.now(datetime.timezone.utc)
     client.server.call_start(
-        tsi.CallStartReq(
-            start=tsi.StartedCallSchemaForInsert(
-                project_id=project_id,
-                id=call_id,
-                trace_id=str(uuid.uuid4()),
-                started_at=now,
-                op_name=f"weave:///{project_id}/op/test_op:v1",
-                attributes={},
-                inputs={"enabled": True, "count": 1},
-            )
-        )
+        {
+            "start": {
+                "project_id": project_id,
+                "id": call_id,
+                "trace_id": str(uuid.uuid4()),
+                "started_at": now,
+                "op_name": f"weave:///{project_id}/op/test_op:v1",
+                "attributes": {},
+                "inputs": {"enabled": True, "count": 1},
+            }
+        }
     )
     client.server.call_end(
-        tsi.CallEndReq(
-            end=tsi.EndedCallSchemaForInsert(
-                project_id=project_id,
-                id=call_id,
-                ended_at=now + datetime.timedelta(seconds=1),
-                summary={},
-            )
-        )
+        {
+            "end": {
+                "project_id": project_id,
+                "id": call_id,
+                "ended_at": now + datetime.timedelta(seconds=1),
+                "summary": {},
+            }
+        }
     )
 
     calls = list(
         client.server.calls_query_stream(
-            tsi.CallsQueryReq(
-                project_id=project_id,
-                query=tsi.Query(
-                    **{
-                        "$expr": {
-                            "$and": [
-                                {
-                                    "$eq": [
-                                        {"$getField": "inputs.enabled"},
-                                        {"$literal": True},
-                                    ]
-                                },
-                                {
-                                    "$eq": [
-                                        {"$getField": "inputs.count"},
-                                        {"$literal": 1},
-                                    ]
-                                },
-                            ]
-                        }
+            {
+                "project_id": project_id,
+                "query": {
+                    "$expr": {
+                        "$and": [
+                            {
+                                "$eq": [
+                                    {"$getField": "inputs.enabled"},
+                                    {"$literal": True},
+                                ]
+                            },
+                            {
+                                "$eq": [
+                                    {"$getField": "inputs.count"},
+                                    {"$literal": 1},
+                                ]
+                            },
+                        ]
                     }
-                ),
-            )
+                },
+            }
         )
     )
     assert len(calls) == 1
@@ -1681,20 +1659,20 @@ def test_root_type(client):
     assert c2.c == 3
 
     inner_res = client.server.objs_query(
-        tsi.ObjQueryReq(
-            project_id=client.project_id,
-        )
+        {
+            "project_id": client.project_id,
+        }
     )
 
     assert len(inner_res.objs) == 2
 
     inner_res = client.server.objs_query(
-        tsi.ObjQueryReq(
-            project_id=client.project_id,
-            filter=tsi.ObjectVersionFilter(
-                base_object_classes=["BaseTypeA"],
-            ),
-        )
+        {
+            "project_id": client.project_id,
+            "filter": {
+                "base_object_classes": ["BaseTypeA"],
+            },
+        }
     )
 
     assert len(inner_res.objs) == 1
@@ -1714,10 +1692,10 @@ def test_attributes_on_ops(client):
         op_with_attrs(1, 2)
 
     res = get_client_trace_server(client).calls_query(
-        tsi.CallsQueryReq(
-            project_id=get_client_project_id(client),
-            filter=tsi.CallsFilter(op_names=[ref_str(op_with_attrs)]),
-        )
+        {
+            "project_id": get_client_project_id(client),
+            "filter": {"op_names": [ref_str(op_with_attrs)]},
+        }
     )
 
     assert len(res.calls) == 1
@@ -1772,10 +1750,10 @@ def test_dataclass_support(client):
     assert act == exp
 
     res = get_client_trace_server(client).calls_query(
-        tsi.CallsQueryReq(
-            project_id=get_client_project_id(client),
-            filter=tsi.CallsFilter(op_names=[ref_str(dataclass_maker)]),
-        )
+        {
+            "project_id": get_client_project_id(client),
+            "filter": {"op_names": [ref_str(dataclass_maker)]},
+        }
     )
 
     exp_ref = weave.publish(exp)
@@ -1885,10 +1863,10 @@ def test_table_query_empty_sort_field_validation(client):
 
     # Query the object to get its val
     res = client.server.objs_query(
-        tsi.ObjQueryReq(
-            project_id=get_client_project_id(client),
-            filter={"object_ids": ["test_dataset"]},
-        )
+        {
+            "project_id": get_client_project_id(client),
+            "filter": {"object_ids": ["test_dataset"]},
+        }
     )
     assert len(res.objs) == 1
     queried_obj = res.objs[0]
@@ -1912,11 +1890,11 @@ def test_table_query_empty_sort_field_validation(client):
             # This should fail with a validation error, not a ClickHouse jsonpath error
             list(
                 client.server.table_query_stream(
-                    tsi.TableQueryReq(
-                        project_id=get_client_project_id(client),
-                        digest=table_ref.digest,
-                        sort_by=[SortBy(field=invalid_field, direction="asc")],
-                    )
+                    {
+                        "project_id": get_client_project_id(client),
+                        "digest": table_ref.digest,
+                        "sort_by": [{"field": invalid_field, "direction": "asc"}],
+                    }
                 )
             )
         # The error should be a validation error, not a ClickHouse error
@@ -1937,10 +1915,10 @@ def test_tuple_support(client):
     assert exp_2 == [[1, 2], 3]
 
     res = get_client_trace_server(client).calls_query(
-        tsi.CallsQueryReq(
-            project_id=get_client_project_id(client),
-            filter=tsi.CallsFilter(op_names=[ref_str(tuple_maker)]),
-        )
+        {
+            "project_id": get_client_project_id(client),
+            "filter": {"op_names": [ref_str(tuple_maker)]},
+        }
     )
 
     assert len(res.calls) == 1
@@ -1966,10 +1944,10 @@ def test_namedtuple_support(client):
     assert exp_2 == [{"x": 1, "y": 2}, 3]
 
     res = get_client_trace_server(client).calls_query(
-        tsi.CallsQueryReq(
-            project_id=get_client_project_id(client),
-            filter=tsi.CallsFilter(op_names=[ref_str(tuple_maker)]),
-        )
+        {
+            "project_id": get_client_project_id(client),
+            "filter": {"op_names": [ref_str(tuple_maker)]},
+        }
     )
 
     assert len(res.calls) == 1
@@ -2003,12 +1981,14 @@ async def test_named_reuse(client):
     await evaluation.evaluate(model)
 
     res = get_client_trace_server(client).objs_query(
-        tsi.ObjQueryReq(
-            project_id=get_client_project_id(client),
-            filter=tsi.ObjectVersionFilter(
-                is_op=False, latest_only=True, base_object_classes=["Dataset"]
-            ),
-        )
+        {
+            "project_id": get_client_project_id(client),
+            "filter": {
+                "is_op": False,
+                "latest_only": True,
+                "base_object_classes": ["Dataset"],
+            },
+        }
     )
 
     # There are a lot of additional assertions that could be made here!
@@ -2039,9 +2019,9 @@ def test_unknown_input_and_output_types(client):
     assert res.b_val == 3.14
 
     inner_res = client.server.calls_query(
-        tsi.CallsQueryReq(
-            project_id=client.project_id,
-        )
+        {
+            "project_id": client.project_id,
+        }
     )
 
     assert len(inner_res.calls) == 1
@@ -2138,9 +2118,9 @@ def test_single_primitive_output(client):
     assert d == {"a": 1, "b": True, "c": None}
 
     inner_res = client.server.calls_query(
-        tsi.CallsQueryReq(
-            project_id=client.project_id,
-        )
+        {
+            "project_id": client.project_id,
+        }
     )
 
     assert len(inner_res.calls) == 4
@@ -2261,9 +2241,9 @@ def test_mapped_execution(client, mapper):
         assert events == sequential_expected_order
 
     inner_res = client.server.calls_query(
-        tsi.CallsQueryReq(
-            project_id=client.project_id,
-        )
+        {
+            "project_id": client.project_id,
+        }
     )
 
     assert len(inner_res.calls) == (len(map_vals) * 3) + 1
@@ -2365,9 +2345,9 @@ def test_call_stack_order_implicit_depth_first(client):
     client.finish_call(terminal_root_call)
 
     inner_res = client.server.calls_query(
-        tsi.CallsQueryReq(
-            project_id=client.project_id,
-        )
+        {
+            "project_id": client.project_id,
+        }
     )
 
     assert call_structure(inner_res.calls) == {
@@ -2411,9 +2391,9 @@ def test_call_stack_order_explicit_depth_first(client):
     client.finish_call(terminal_root_call)
 
     inner_res = client.server.calls_query(
-        tsi.CallsQueryReq(
-            project_id=client.project_id,
-        )
+        {
+            "project_id": client.project_id,
+        }
     )
 
     assert call_structure(inner_res.calls) == {
@@ -2460,9 +2440,9 @@ def test_call_stack_order_langchain_batch(client):
     client.finish_call(terminal_root_call)
 
     inner_res = client.server.calls_query(
-        tsi.CallsQueryReq(
-            project_id=client.project_id,
-        )
+        {
+            "project_id": client.project_id,
+        }
     )
 
     assert call_structure(inner_res.calls) == {
@@ -2513,9 +2493,9 @@ def test_call_stack_order_out_of_order_pop(client):
     client.finish_call(terminal_root_call)
 
     inner_res = client.server.calls_query(
-        tsi.CallsQueryReq(
-            project_id=client.project_id,
-        )
+        {
+            "project_id": client.project_id,
+        }
     )
 
     if POP_REORDERS_STACK:
@@ -2580,9 +2560,9 @@ def test_call_stack_order_height_ordering(client):
     client.finish_call(terminal_root_call)
 
     inner_res = client.server.calls_query(
-        tsi.CallsQueryReq(
-            project_id=client.project_id,
-        )
+        {
+            "project_id": client.project_id,
+        }
     )
 
     assert call_structure(inner_res.calls) == {
@@ -2623,9 +2603,9 @@ def test_call_stack_order_mixed(client):
     client.finish_call(terminal_root_call)
 
     inner_res = client.server.calls_query(
-        tsi.CallsQueryReq(
-            project_id=client.project_id,
-        )
+        {
+            "project_id": client.project_id,
+        }
     )
 
     assert call_structure(inner_res.calls) == {
@@ -2646,15 +2626,15 @@ def test_call_query_stream_equality(client):
         calculate(i, i * i)
 
     calls = client.server.calls_query(
-        tsi.CallsQueryReq(
-            project_id=client.project_id,
-        )
+        {
+            "project_id": client.project_id,
+        }
     )
 
     calls_stream = client.server.calls_query_stream(
-        tsi.CallsQueryReq(
-            project_id=client.project_id,
-        )
+        {
+            "project_id": client.project_id,
+        }
     )
 
     i = 0
@@ -2674,10 +2654,10 @@ def test_call_query_stream_columns(client):
         calculate(i, i * i)
 
     calls = client.server.calls_query_stream(
-        tsi.CallsQueryReq(
-            project_id=client.project_id,
-            columns=["id", "inputs"],
-        )
+        {
+            "project_id": client.project_id,
+            "columns": ["id", "inputs"],
+        }
     )
     calls = list(calls)
     assert len(calls) == 2
@@ -2691,10 +2671,10 @@ def test_call_query_stream_columns(client):
 
     # now explicitly get output
     calls = client.server.calls_query_stream(
-        tsi.CallsQueryReq(
-            project_id=client.project_id,
-            columns=["id", "inputs", "output.result"],
-        )
+        {
+            "project_id": client.project_id,
+            "columns": ["id", "inputs", "output.result"],
+        }
     )
     calls = list(calls)
     assert len(calls) == 2
@@ -2704,10 +2684,10 @@ def test_call_query_stream_columns(client):
 
     # now get summary
     calls2 = client.server.calls_query_stream(
-        tsi.CallsQueryReq(
-            project_id=client.project_id,
-            columns=["id", "summary", "started_at", "ended_at", "op_name"],
-        )
+        {
+            "project_id": client.project_id,
+            "columns": ["id", "summary", "started_at", "ended_at", "op_name"],
+        }
     )
     calls2 = list(calls2)
     assert len(calls2) == 2
@@ -2740,11 +2720,11 @@ def test_call_query_stream_columns_with_costs(client):
 
     # Test that costs are returned if we include the summary field
     calls = client.server.calls_query_stream(
-        tsi.CallsQueryReq(
-            project_id=client.project_id,
-            columns=["id", "summary"],
-            include_costs=True,
-        )
+        {
+            "project_id": client.project_id,
+            "columns": ["id", "summary"],
+            "include_costs": True,
+        }
     )
     calls = list(calls)
     assert len(calls) == 2
@@ -2760,11 +2740,11 @@ def test_call_query_stream_columns_with_costs(client):
     )
 
     calls = client.server.calls_query_stream(
-        tsi.CallsQueryReq(
-            project_id=client.project_id,
-            columns=["id", "summary"],
-            include_costs=True,
-        )
+        {
+            "project_id": client.project_id,
+            "columns": ["id", "summary"],
+            "include_costs": True,
+        }
     )
     calls = list(calls)
     assert len(calls) == 2
@@ -2789,40 +2769,39 @@ def test_read_call_start_with_cost(client):
     # --- 1. Insert Prerequisite Data ---
     cost_data = {
         llm_id: {
-            "prompt_token_cost": Decimal("0.00001"),  # Cost per token
-            "completion_token_cost": Decimal("0.00003"),  # Cost per token
+            "prompt_token_cost": 0.00001,  # Cost per token
+            "completion_token_cost": 0.00003,  # Cost per token
             "effective_date": price_effective_date,
         }
     }
     cost_res = client.server.cost_create(
-        tsi.CostCreateReq(
-            project_id=project_id,
-            costs=cost_data,
-        )
+        {
+            "project_id": project_id,
+            "costs": cost_data,
+        }
     )
     price_id = cost_res.ids[0][0]
 
     # Insert a call record with summary_dump=None
-    call_start_data = tsi.StartedCallSchemaForInsert(
-        project_id=project_id,
-        id=call_id,
-        trace_id=trace_id,
-        op_name="test_op_null_summary",
-        display_name="Test Operation Null Summary",
-        started_at=start_time,
-        inputs={"arg1": "no summary"},
-        summary_dump=None,  # Explicitly set to None
-        attributes={},
-    )
-    client.server.call_start(tsi.CallStartReq(start=call_start_data))
+    call_start_data = {
+        "project_id": project_id,
+        "id": call_id,
+        "trace_id": trace_id,
+        "op_name": "test_op_null_summary",
+        "display_name": "Test Operation Null Summary",
+        "started_at": start_time,
+        "inputs": {"arg1": "no summary"},
+        "attributes": {},
+    }
+    client.server.call_start({"start": call_start_data})
 
     # --- 2. Call call_read with include_costs=True ---
     res = client.server.call_read(
-        tsi.CallReadReq(
-            project_id=project_id,
-            id=call_id,
-            include_costs=True,  # Request cost calculation
-        )
+        {
+            "project_id": project_id,
+            "id": call_id,
+            "include_costs": True,  # Request cost calculation
+        }
     )
 
     # --- 3. Assert Results ---
@@ -2846,9 +2825,7 @@ def test_read_call_start_with_cost(client):
         pytest.fail(f"summary_dump was not None or dict: {type(summary)} {summary}")
 
     # --- 4. Cleanup ---
-    client.server.calls_delete(
-        tsi.CallsDeleteReq(project_id=project_id, call_ids=[call_id])
-    )
+    client.server.calls_delete({"project_id": project_id, "call_ids": [call_id]})
     client.purge_costs(price_id)
 
 
@@ -2878,11 +2855,11 @@ def test_call_read_with_unkown_llm(client):
     op_with_usage_no_cost(10)
 
     calls = client.server.calls_query_stream(
-        tsi.CallsQueryReq(
-            project_id=client.project_id,
-            columns=["id", "summary", "output"],
-            include_costs=True,
-        )
+        {
+            "project_id": client.project_id,
+            "columns": ["id", "summary", "output"],
+            "include_costs": True,
+        }
     )
     calls = list(calls)
     assert len(calls) == 1
@@ -2942,16 +2919,16 @@ def test_sort_and_filter_through_refs(client):
     )
 
     for first, _last, sort_by in [
-        (0, 21, [SortBy(field="inputs.val.a.b.c.d", direction="asc")]),
-        (21, 0, [SortBy(field="inputs.val.a.b.c.d", direction="desc")]),
-        (0, 21, [SortBy(field="output.a.b.c.d", direction="asc")]),
-        (21, 0, [SortBy(field="output.a.b.c.d", direction="desc")]),
+        (0, 21, [{"field": "inputs.val.a.b.c.d", "direction": "asc"}]),
+        (21, 0, [{"field": "inputs.val.a.b.c.d", "direction": "desc"}]),
+        (0, 21, [{"field": "output.a.b.c.d", "direction": "asc"}]),
+        (21, 0, [{"field": "output.a.b.c.d", "direction": "desc"}]),
     ]:
         inner_res = get_client_trace_server(client).calls_query(
-            tsi.CallsQueryReq(
-                project_id=get_client_project_id(client),
-                sort_by=sort_by,
-            )
+            {
+                "project_id": get_client_project_id(client),
+                "sort_by": sort_by,
+            }
         )
 
         assert inner_res.calls[0].inputs["label"] == first
@@ -2996,23 +2973,19 @@ def test_sort_and_filter_through_refs(client):
         ),
     ]:
         inner_res = get_client_trace_server(client).calls_query(
-            tsi.CallsQueryReq.model_validate(
-                {
-                    "project_id": get_client_project_id(client),
-                    "sort_by": [SortBy(field="inputs.val.a.b.c.d", direction="asc")],
-                    "query": {"$expr": query},
-                }
-            )
+            {
+                "project_id": get_client_project_id(client),
+                "sort_by": [{"field": "inputs.val.a.b.c.d", "direction": "asc"}],
+                "query": {"$expr": query},
+            }
         )
 
         assert len(inner_res.calls) == count
         inner_res = get_client_trace_server(client).calls_query_stats(
-            tsi.CallsQueryStatsReq.model_validate(
-                {
-                    "project_id": get_client_project_id(client),
-                    "query": {"$expr": query},
-                }
-            )
+            {
+                "project_id": get_client_project_id(client),
+                "query": {"$expr": query},
+            }
         )
 
         assert inner_res.count == count
@@ -3039,12 +3012,10 @@ def test_in_operation(client):
     }
 
     res = get_client_trace_server(client).calls_query_stats(
-        tsi.CallsQueryStatsReq.model_validate(
-            {
-                "project_id": get_client_project_id(client),
-                "query": {"$expr": query},
-            }
-        )
+        {
+            "project_id": get_client_project_id(client),
+            "query": {"$expr": query},
+        }
     )
     assert res.count == 2
 
@@ -3055,12 +3026,10 @@ def test_in_operation(client):
         ]
     }
     res = get_client_trace_server(client).calls_query_stream(
-        tsi.CallsQueryReq.model_validate(
-            {
-                "project_id": get_client_project_id(client),
-                "query": {"$expr": query},
-            }
-        )
+        {
+            "project_id": get_client_project_id(client),
+            "query": {"$expr": query},
+        }
     )
     res = list(res)
     assert len(res) == 4
@@ -3203,12 +3172,14 @@ def test_model_save(client):
     assert model2.predict(1) == {"answer": "42"}
 
     inner_res = get_client_trace_server(client).objs_query(
-        tsi.ObjQueryReq(
-            project_id=get_client_project_id(client),
-            filter=tsi.ObjectVersionFilter(
-                is_op=False, latest_only=True, base_object_classes=["Model"]
-            ),
-        )
+        {
+            "project_id": get_client_project_id(client),
+            "filter": {
+                "is_op": False,
+                "latest_only": True,
+                "base_object_classes": ["Model"],
+            },
+        }
     )
 
     assert len(inner_res.objs) == 1
@@ -3247,9 +3218,9 @@ def test_calls_stream_column_expansion(client):
 
     # output is a ref
     res = client.server.calls_query_stream(
-        tsi.CallsQueryReq(
-            project_id=client.project_id,
-        )
+        {
+            "project_id": client.project_id,
+        }
     )
 
     call_result = next(iter(res))
@@ -3257,11 +3228,11 @@ def test_calls_stream_column_expansion(client):
 
     # output is dereffed
     res = client.server.calls_query_stream(
-        tsi.CallsQueryReq(
-            project_id=client.project_id,
-            columns=["output"],
-            expand_columns=["output"],
-        )
+        {
+            "project_id": client.project_id,
+            "columns": ["output"],
+            "expand_columns": ["output"],
+        }
     )
 
     call_result = next(iter(res))
@@ -3269,44 +3240,44 @@ def test_calls_stream_column_expansion(client):
 
     # expand 2 refs, should be {"b": {"a": ref}}
     res = client.server.calls_query_stream(
-        tsi.CallsQueryReq(
-            project_id=client.project_id,
-            columns=["output.b"],
-            expand_columns=["output", "output.b"],
-        )
+        {
+            "project_id": client.project_id,
+            "columns": ["output.b"],
+            "expand_columns": ["output", "output.b"],
+        }
     )
     call_result = next(iter(res))
     assert call_result.output["b"]["a"] == ref.uri
 
     # expand 3 refs, should be {"b": {"a": {"id": 123}}}
     res = client.server.calls_query_stream(
-        tsi.CallsQueryReq(
-            project_id=client.project_id,
-            columns=["output.b.a"],
-            expand_columns=["output", "output.b", "output.b.a"],
-        )
+        {
+            "project_id": client.project_id,
+            "columns": ["output.b.a"],
+            "expand_columns": ["output", "output.b", "output.b.a"],
+        }
     )
     call_result = next(iter(res))
     assert call_result.output["b"]["a"]["id"] == "123"
 
     # incomplete expansion columns, output should be un expanded
     res = client.server.calls_query_stream(
-        tsi.CallsQueryReq(
-            project_id=client.project_id,
-            columns=["output"],
-            expand_columns=["output.b"],
-        )
+        {
+            "project_id": client.project_id,
+            "columns": ["output"],
+            "expand_columns": ["output.b"],
+        }
     )
     call_result = next(iter(res))
     assert call_result.output == nested_ref.uri
 
     # non-existent column, should be un expanded
     res = client.server.calls_query_stream(
-        tsi.CallsQueryReq(
-            project_id=client.project_id,
-            columns=["output"],
-            expand_columns=["output.b", "output.zzzz"],
-        )
+        {
+            "project_id": client.project_id,
+            "columns": ["output"],
+            "expand_columns": ["output.b", "output.zzzz"],
+        }
     )
     call_result = next(iter(res))
     assert call_result.output == nested_ref.uri
@@ -3325,15 +3296,13 @@ def test_object_with_disallowed_keys(client):
     # we sanitize the name
     assert obj.ref.name == "thing-with-disallowed-keys"
 
-    create_req = tsi.ObjCreateReq.model_validate(
-        {
-            "obj": {
-                "project_id": client.project_id,
-                "object_id": name,
-                "val": {"1": 1},
-            }
+    create_req = {
+        "obj": {
+            "project_id": client.project_id,
+            "object_id": name,
+            "val": {"1": 1},
         }
-    )
+    }
     with pytest.raises(InvalidFieldError):
         client.server.obj_create(create_req)
 
@@ -3353,15 +3322,13 @@ def test_object_with_char_limit(client):
     # Use a distinct name for the raw obj_create path: re-using `name` would
     # collide with the SDK publish above (Custom-typed -> untyped), which the
     # server now rejects (WB-30574).
-    create_req = tsi.ObjCreateReq.model_validate(
-        {
-            "obj": {
-                "project_id": client.project_id,
-                "object_id": "r" * CHAR_LIMIT,
-                "val": {"1": 1},
-            }
+    create_req = {
+        "obj": {
+            "project_id": client.project_id,
+            "object_id": "r" * CHAR_LIMIT,
+            "val": {"1": 1},
         }
-    )
+    }
     client.server.obj_create(create_req)
 
 
@@ -3374,15 +3341,13 @@ def test_object_with_char_over_limit(client):
     # we sanitize the name
     assert obj.ref.name == name[:-1]
 
-    create_req = tsi.ObjCreateReq.model_validate(
-        {
-            "obj": {
-                "project_id": client.project_id,
-                "object_id": "r" * (CHAR_LIMIT + 1),
-                "val": {"1": 1},
-            }
+    create_req = {
+        "obj": {
+            "project_id": client.project_id,
+            "object_id": "r" * (CHAR_LIMIT + 1),
+            "val": {"1": 1},
         }
-    )
+    }
     with pytest.raises(CHValidationError):
         client.server.obj_create(create_req)
 
@@ -3552,10 +3517,10 @@ def test_calls_stream_feedback(client):
 
     # now get calls from the server, with the feedback expanded
     res = client.server.calls_query_stream(
-        tsi.CallsQueryReq(
-            project_id=client.project_id,
-            include_feedback=True,
-        )
+        {
+            "project_id": client.project_id,
+            "include_feedback": True,
+        }
     )
     calls = list(res)
 
@@ -3611,19 +3576,17 @@ def test_feedback_filter_finds_minority_reaction(client):
 
     project_id = get_client_project_id(client)
     res = client.server.calls_query_stream(
-        tsi.CallsQueryReq(
-            project_id=project_id,
-            query=tsi.Query.model_validate(
-                {
-                    "$expr": {
-                        "$eq": [
-                            {"$getField": "feedback.[wandb.reaction.1].payload.emoji"},
-                            {"$literal": "👍"},
-                        ]
-                    }
+        {
+            "project_id": project_id,
+            "query": {
+                "$expr": {
+                    "$eq": [
+                        {"$getField": "feedback.[wandb.reaction.1].payload.emoji"},
+                        {"$literal": "👍"},
+                    ]
                 }
-            ),
-        )
+            },
+        }
     )
     results = list(res)
 
@@ -3644,9 +3607,9 @@ def test_inline_dataclass_generates_no_refs_in_function(client):
     func(a)
 
     res = get_client_trace_server(client).calls_query(
-        tsi.CallsQueryReq(
-            project_id=get_client_project_id(client),
-        )
+        {
+            "project_id": get_client_project_id(client),
+        }
     )
     input_object_version_refs = unique_vals(
         [ref for call in res.calls for ref in extract_refs_from_values(call.inputs)]
@@ -3671,9 +3634,9 @@ def test_inline_dataclass_generates_no_refs_in_object(client):
     ref = weave.publish(wo)
 
     res = get_client_trace_server(client).objs_query(
-        tsi.ObjQueryReq(
-            project_id=get_client_project_id(client),
-        )
+        {
+            "project_id": get_client_project_id(client),
+        }
     )
     assert len(res.objs) == 1  # Just the weave object, and not the dataclass
 
@@ -3690,9 +3653,9 @@ def test_inline_pydantic_basemodel_generates_no_refs_in_function(client):
     func(a)
 
     res = get_client_trace_server(client).calls_query(
-        tsi.CallsQueryReq(
-            project_id=get_client_project_id(client),
-        )
+        {
+            "project_id": get_client_project_id(client),
+        }
     )
     input_object_version_refs = unique_vals(
         [ref for call in res.calls for ref in extract_refs_from_values(call.inputs)]
@@ -3716,9 +3679,9 @@ def test_inline_pydantic_basemodel_generates_no_refs_in_object(client):
     ref = weave.publish(wo)
 
     res = get_client_trace_server(client).objs_query(
-        tsi.ObjQueryReq(
-            project_id=get_client_project_id(client),
-        )
+        {
+            "project_id": get_client_project_id(client),
+        }
     )
     assert len(res.objs) == 1  # Just the weave object, and not the pydantic model
 
@@ -4066,7 +4029,7 @@ def test_calls_query_multiple_dupe_select_columns(client):
 
 
 def test_calls_stream_heavy_condition_aggregation_parts(client):
-    def _make_query(field: str, value: str) -> tsi.CallsQueryRes:
+    def _make_query(field: str, value: str) -> CallsQueryRes:
         query = {
             "$in": [
                 {"$getField": field},
@@ -4074,44 +4037,42 @@ def test_calls_stream_heavy_condition_aggregation_parts(client):
             ]
         }
         res = get_client_trace_server(client).calls_query_stream(
-            tsi.CallsQueryReq.model_validate(
-                {
-                    "project_id": get_client_project_id(client),
-                    "query": {"$expr": query},
-                }
-            )
+            {
+                "project_id": get_client_project_id(client),
+                "query": {"$expr": query},
+            }
         )
         return list(res)
 
     call_id = generate_id()
     trace_id = generate_id()
     parent_id = generate_id()
-    start = tsi.StartedCallSchemaForInsert(
-        project_id=client.project_id,
-        id=call_id,
-        op_name="test_name",
-        trace_id=trace_id,
-        parent_id=parent_id,
-        started_at=datetime.datetime.now(tz=datetime.timezone.utc)
+    start = {
+        "project_id": client.project_id,
+        "id": call_id,
+        "op_name": "test_name",
+        "trace_id": trace_id,
+        "parent_id": parent_id,
+        "started_at": datetime.datetime.now(tz=datetime.timezone.utc)
         - datetime.timedelta(seconds=1),
-        attributes={"a": 5},
-        inputs={"param": {"value1": "hello"}},
-    )
-    client.server.call_start(tsi.CallStartReq(start=start))
+        "attributes": {"a": 5},
+        "inputs": {"param": {"value1": "hello"}},
+    }
+    client.server.call_start({"start": start})
 
     res = _make_query("inputs.param.value1", "hello")
     assert len(res) == 1
     assert res[0].inputs["param"]["value1"] == "hello"
     assert not res[0].output
 
-    end = tsi.EndedCallSchemaForInsert(
-        project_id=client.project_id,
-        id=call_id,
-        ended_at=datetime.datetime.now(tz=datetime.timezone.utc),
-        summary={"c": 5},
-        output={"d": 5},
-    )
-    client.server.call_end(tsi.CallEndReq(end=end))
+    end = {
+        "project_id": client.project_id,
+        "id": call_id,
+        "ended_at": datetime.datetime.now(tz=datetime.timezone.utc),
+        "summary": {"c": 5},
+        "output": {"d": 5},
+    }
+    client.server.call_end({"end": end})
 
     res = _make_query("inputs.param.value1", "hello")
     assert len(res) == 1
@@ -4128,32 +4089,32 @@ def test_call_stream_query_heavy_query_batch(client):
         call_ids.append(call_id)
         trace_id = generate_id()
         parent_id = generate_id()
-        start = tsi.StartedCallSchemaForInsert(
-            project_id=project_id,
-            id=call_id,
-            op_name="test_name",
-            trace_id=trace_id,
-            parent_id=parent_id,
-            started_at=datetime.datetime.now(tz=datetime.timezone.utc)
+        start = {
+            "project_id": project_id,
+            "id": call_id,
+            "op_name": "test_name",
+            "trace_id": trace_id,
+            "parent_id": parent_id,
+            "started_at": datetime.datetime.now(tz=datetime.timezone.utc)
             - datetime.timedelta(seconds=1),
-            attributes={"a": 5, "empty": "", "null": None},
-            inputs={"param": {"value1": "hello"}},
-        )
-        client.server.call_start(tsi.CallStartReq(start=start))
+            "attributes": {"a": 5, "empty": "", "null": None},
+            "inputs": {"param": {"value1": "hello"}},
+        }
+        client.server.call_start({"start": start})
 
     # end 10 calls
     for i in range(10):
         call_id = generate_id()
         trace_id = generate_id()
         parent_id = generate_id()
-        end = tsi.EndedCallSchemaForInsert(
-            project_id=project_id,
-            id=call_ids[i],
-            ended_at=datetime.datetime.now(tz=datetime.timezone.utc),
-            summary={"c": 5},
-            output={"d": 5, "e": "f", "result": {"message": "completed"}},
-        )
-        client.server.call_end(tsi.CallEndReq(end=end))
+        end = {
+            "project_id": project_id,
+            "id": call_ids[i],
+            "ended_at": datetime.datetime.now(tz=datetime.timezone.utc),
+            "summary": {"c": 5},
+            "output": {"d": 5, "e": "f", "result": {"message": "completed"}},
+        }
+        client.server.call_end({"end": end})
 
     # filter by output
     output_query = {
@@ -4167,9 +4128,7 @@ def test_call_stream_query_heavy_query_batch(client):
             }
         },
     }
-    res = client.server.calls_query_stream(
-        tsi.CallsQueryReq.model_validate(output_query)
-    )
+    res = client.server.calls_query_stream(output_query)
     assert len(list(res)) == 10
     for call in res:
         assert call.attributes["a"] == 5
@@ -4198,9 +4157,7 @@ def test_call_stream_query_heavy_query_batch(client):
             }
         },
     }
-    res = client.server.calls_query_stream(
-        tsi.CallsQueryReq.model_validate(input_string_query)
-    )
+    res = client.server.calls_query_stream(input_string_query)
     assert len(list(res)) == 10
     for call in res:
         assert call.inputs["param"]["value1"] == "hello"
@@ -4210,9 +4167,7 @@ def test_call_stream_query_heavy_query_batch(client):
     # Now lets add a light filter, which
     # changes how we filter out calls. Make sure that still works
     input_string_query["filter"] = {"op_names": ["test_name"]}
-    res = client.server.calls_query_stream(
-        tsi.CallsQueryReq.model_validate(input_string_query)
-    )
+    res = client.server.calls_query_stream(input_string_query)
     assert len(list(res)) == 10
     for call in res:
         assert call.inputs["param"]["value1"] == "helslo"
@@ -4225,7 +4180,7 @@ def test_call_stream_query_heavy_query_batch(client):
             "$expr": {"$eq": [{"$getField": "attributes.empty"}, {"$literal": ""}]}
         },
     }
-    res = client.server.calls_query_stream(tsi.CallsQueryReq.model_validate(query))
+    res = client.server.calls_query_stream(query)
     assert len(list(res)) == 10
     for call in res:
         assert call.attributes["empty"] == ""
@@ -4244,9 +4199,7 @@ def test_calls_query_with_storage_size_clickhouse(client):
     # Query with storage size
     calls = list(
         client.server.calls_query_stream(
-            tsi.CallsQueryReq(
-                project_id=get_client_project_id(client), include_storage_size=True
-            )
+            {"project_id": get_client_project_id(client), "include_storage_size": True}
         )
     )
     assert len(calls) == 1
@@ -4275,10 +4228,10 @@ def test_calls_query_with_total_storage_size_clickhouse(client):
     # Query with total storage size
     calls = list(
         client.server.calls_query_stream(
-            tsi.CallsQueryReq(
-                project_id=get_client_project_id(client),
-                include_total_storage_size=True,
-            )
+            {
+                "project_id": get_client_project_id(client),
+                "include_total_storage_size": True,
+            }
         )
     )
     assert len(calls) == 2  # Parent and child calls
@@ -4320,11 +4273,11 @@ def test_calls_query_with_both_storage_sizes_clickhouse(client):
     # Query with total storage size
     calls = list(
         client.server.calls_query_stream(
-            tsi.CallsQueryReq(
-                project_id=get_client_project_id(client),
-                include_storage_size=True,
-                include_total_storage_size=True,
-            )
+            {
+                "project_id": get_client_project_id(client),
+                "include_storage_size": True,
+                "include_total_storage_size": True,
+            }
         )
     )
 
@@ -4363,31 +4316,31 @@ def test_total_storage_size_is_project_scoped(client):
         (other_project_id, other_project_call_id, "x" * 1000),
     ):
         client.server.calls_complete(
-            tsi.CallsUpsertCompleteReq(
-                batch=[
-                    tsi.CompletedCallSchemaForInsert(
-                        project_id=call_project_id,
-                        id=call_id,
-                        trace_id=trace_id,
-                        op_name="storage_test",
-                        started_at=started_at,
-                        ended_at=started_at + datetime.timedelta(seconds=1),
-                        attributes={},
-                        inputs={"payload": payload},
-                        output=None,
-                        summary={},
-                    )
+            {
+                "batch": [
+                    {
+                        "project_id": call_project_id,
+                        "id": call_id,
+                        "trace_id": trace_id,
+                        "op_name": "storage_test",
+                        "started_at": started_at,
+                        "ended_at": started_at + datetime.timedelta(seconds=1),
+                        "attributes": {},
+                        "inputs": {"payload": payload},
+                        "output": None,
+                        "summary": {},
+                    }
                 ]
-            )
+            }
         )
 
     calls = client.server.calls_query(
-        tsi.CallsQueryReq(
-            project_id=project_id,
-            filter=tsi.CallsFilter(call_ids=[project_call_id]),
-            include_storage_size=True,
-            include_total_storage_size=True,
-        )
+        {
+            "project_id": project_id,
+            "filter": {"call_ids": [project_call_id]},
+            "include_storage_size": True,
+            "include_total_storage_size": True,
+        }
     ).calls
 
     assert len(calls) == 1
@@ -4412,16 +4365,16 @@ def test_calls_hydrated(client):
 
     calls = list(
         client.server.calls_query_stream(
-            tsi.CallsQueryReq(
-                project_id=get_client_project_id(client),
-                columns=["inputs", "output", "output.woahhhh"],
-                expand_columns=[
+            {
+                "project_id": get_client_project_id(client),
+                "columns": ["inputs", "output", "output.woahhhh"],
+                "expand_columns": [
                     "inputs",
                     "inputs.input_ref",
                     "output",
                     "output.woahhhh",
                 ],
-            )
+            }
         )
     )
 
@@ -4453,12 +4406,12 @@ def test_call_query_stream_with_costs_and_storage_size(client):
     # Test that "include_costs" and "include_total_storage_size" can be used together
     calls = list(
         client.server.calls_query_stream(
-            tsi.CallsQueryReq(
-                project_id=get_client_project_id(client),
-                columns=["id", "summary", "total_storage_size_bytes"],
-                include_costs=True,
-                include_total_storage_size=True,
-            )
+            {
+                "project_id": get_client_project_id(client),
+                "columns": ["id", "summary", "total_storage_size_bytes"],
+                "include_costs": True,
+                "include_total_storage_size": True,
+            }
         )
     )
 
@@ -4483,19 +4436,17 @@ def test_call_query_stream_with_invalid_filter_field(client):
 
     with pytest.raises(InvalidFieldError):
         res = get_client_trace_server(client).calls_query(
-            tsi.CallsQueryReq.model_validate(
-                {
-                    "project_id": get_client_project_id(client),
-                    "query": {
-                        "$expr": {
-                            "$contains": {
-                                "input": {"$getField": "total_storage_size_bytes"},
-                                "substr": {"$literal": "2025-04-11T05:56:12.957Z"},
-                            }
+            {
+                "project_id": get_client_project_id(client),
+                "query": {
+                    "$expr": {
+                        "$contains": {
+                            "input": {"$getField": "total_storage_size_bytes"},
+                            "substr": {"$literal": "2025-04-11T05:56:12.957Z"},
                         }
-                    },
-                }
-            )
+                    }
+                },
+            }
         )
 
 
@@ -4566,11 +4517,11 @@ def test_dedupe_ref_in_calls_stream(client):
     def call_stream(columns, expand_columns):
         return list(
             client.server.calls_query_stream(
-                tsi.CallsQueryReq(
-                    project_id=client.project_id,
-                    columns=columns,
-                    expand_columns=expand_columns,
-                )
+                {
+                    "project_id": client.project_id,
+                    "columns": columns,
+                    "expand_columns": expand_columns,
+                }
             )
         )
 
@@ -4620,12 +4571,12 @@ def test_dedupe_ref_in_calls_stream(client):
 def test_calls_query_stats_with_limit(client):
     def calls_stats(limit=None, filter=None, include_total_storage_size=False):
         return client.server.calls_query_stats(
-            tsi.CallsQueryStatsReq(
-                project_id=get_client_project_id(client),
-                limit=limit,
-                filter=filter,
-                include_total_storage_size=include_total_storage_size,
-            )
+            {
+                "project_id": get_client_project_id(client),
+                "limit": limit,
+                "filter": filter,
+                "include_total_storage_size": include_total_storage_size,
+            }
         )
 
     @weave.op
@@ -4679,22 +4630,18 @@ def test_calls_query_stats_started_at_window_excludes_deletes(client):
     assert len(all_calls) == 3
 
     def count(literal_seconds: int) -> int:
-        query = tsi.Query(
-            **{
-                "$expr": {
-                    "$gt": [{"$getField": "started_at"}, {"$literal": literal_seconds}]
-                }
+        query = {
+            "$expr": {
+                "$gt": [{"$getField": "started_at"}, {"$literal": literal_seconds}]
             }
-        )
+        }
         return client.server.calls_query_stats(
-            tsi.CallsQueryStatsReq(project_id=project_id, query=query)
+            {"project_id": project_id, "query": query}
         ).count
 
     def unfiltered_count() -> int:
         # No query -> exercises the flat distinct-id fast path (Pattern 3).
-        return client.server.calls_query_stats(
-            tsi.CallsQueryStatsReq(project_id=project_id)
-        ).count
+        return client.server.calls_query_stats({"project_id": project_id}).count
 
     # Lower bound in the distant past counts every (non-deleted) call.
     assert count(1) == 3
@@ -4704,7 +4651,7 @@ def test_calls_query_stats_started_at_window_excludes_deletes(client):
 
     # Deleting a call removes it from both counts (delete exclusion).
     client.server.calls_delete(
-        tsi.CallsDeleteReq(project_id=project_id, call_ids=[all_calls[0].id])
+        {"project_id": project_id, "call_ids": [all_calls[0].id]}
     )
     assert count(1) == 2
     assert unfiltered_count() == 2
@@ -4713,15 +4660,15 @@ def test_calls_query_stats_started_at_window_excludes_deletes(client):
     # has no op_name; the op_name guard must keep it out of both fast-path counts.
     now = datetime.datetime.now(tz=datetime.timezone.utc)
     client.server.call_end(
-        tsi.CallEndReq(
-            end=tsi.EndedCallSchemaForInsert(
-                project_id=project_id,
-                id=generate_id(),
-                started_at=now,
-                ended_at=now,
-                summary={},
-            )
-        )
+        {
+            "end": {
+                "project_id": project_id,
+                "id": generate_id(),
+                "started_at": now,
+                "ended_at": now,
+                "summary": {},
+            }
+        }
     )
     assert count(1) == 2
     assert unfiltered_count() == 2
@@ -4754,32 +4701,28 @@ def test_calls_query_stats_thread_ids_filter_not_minimal(client, thread_ids):
 
     # A query is required to exercise the "Pattern 2" check in _try_optimized_stats_query.
     # Use a query that matches the created calls (wb_run_id not null).
-    wb_run_id_not_null_query = tsi.Query(
-        **{
-            "$expr": {
-                "$not": [{"$eq": [{"$getField": "wb_run_id"}, {"$literal": None}]}]
-            }
-        }
-    )
+    wb_run_id_not_null_query = {
+        "$expr": {"$not": [{"$eq": [{"$getField": "wb_run_id"}, {"$literal": None}]}]}
+    }
     # Confirm that this query returns results, so we can test filtering with the second query below.
     res_with_matching_thread = client.server.calls_query_stats(
-        tsi.CallsQueryStatsReq(
-            project_id=get_client_project_id(client),
-            limit=1,
-            query=wb_run_id_not_null_query,
-            filter=tsi.CallsFilter(thread_ids=["thread_with_calls"]),
-        )
+        {
+            "project_id": get_client_project_id(client),
+            "limit": 1,
+            "query": wb_run_id_not_null_query,
+            "filter": {"thread_ids": ["thread_with_calls"]},
+        }
     )
     assert res_with_matching_thread.count == 1
 
     # Query with thread_ids that match zero calls. Full path -> 0. Incorrectly choosing the optimized path -> 1.
     res = client.server.calls_query_stats(
-        tsi.CallsQueryStatsReq(
-            project_id=get_client_project_id(client),
-            limit=1,
-            query=wb_run_id_not_null_query,
-            filter=tsi.CallsFilter(thread_ids=thread_ids),
-        )
+        {
+            "project_id": get_client_project_id(client),
+            "limit": 1,
+            "query": wb_run_id_not_null_query,
+            "filter": {"thread_ids": thread_ids},
+        }
     )
     assert res.count == 0
 
@@ -4801,20 +4744,16 @@ def test_calls_query_thread_ids_filter_returns_matching_thread(client):
         thread_op()
 
     # Use a query that matches the created calls (wb_run_id not null).
-    wb_run_id_not_null_query = tsi.Query(
-        **{
-            "$expr": {
-                "$not": [{"$eq": [{"$getField": "wb_run_id"}, {"$literal": None}]}]
-            }
-        }
-    )
+    wb_run_id_not_null_query = {
+        "$expr": {"$not": [{"$eq": [{"$getField": "wb_run_id"}, {"$literal": None}]}]}
+    }
     res = client.server.calls_query(
-        tsi.CallsQueryReq(
-            project_id=get_client_project_id(client),
-            limit=1,
-            query=wb_run_id_not_null_query,
-            filter=tsi.CallsFilter(thread_ids=[thread_2]),
-        )
+        {
+            "project_id": get_client_project_id(client),
+            "limit": 1,
+            "query": wb_run_id_not_null_query,
+            "filter": {"thread_ids": [thread_2]},
+        }
     )
     assert len(res.calls) == 1
     assert res.calls[0].thread_id == thread_2
@@ -4836,10 +4775,10 @@ def test_calls_query_stats_total_storage_size_clickhouse(client):
 
     # Query with total storage size
     result = client.server.calls_query_stats(
-        tsi.CallsQueryStatsReq(
-            project_id=get_client_project_id(client),
-            include_total_storage_size=True,
-        )
+        {
+            "project_id": get_client_project_id(client),
+            "include_total_storage_size": True,
+        }
     )
 
     print(result)
@@ -4886,80 +4825,80 @@ def test_calls_query_with_descendant_error(client):
 
     calls = list(
         client.server.calls_query_stream(
-            tsi.CallsQueryReq(
-                project_id=get_client_project_id(client),
-                sort_by=[{"field": "started_at", "direction": "asc"}],
-            )
+            {
+                "project_id": get_client_project_id(client),
+                "sort_by": [{"field": "started_at", "direction": "asc"}],
+            }
         )
     )
 
     assert len(calls) == 5
     assert "parent_op" in calls[0].op_name
     assert calls[0].inputs["val"] == 0
-    assert calls[0].summary["weave"]["status"] == tsi.TraceStatus.DESCENDANT_ERROR
+    assert calls[0].summary["weave"]["status"] == TraceStatus.DESCENDANT_ERROR
 
     assert "child_op" in calls[1].op_name
     assert calls[1].inputs["val"] == 0
-    assert calls[1].summary["weave"]["status"] == tsi.TraceStatus.ERROR
+    assert calls[1].summary["weave"]["status"] == TraceStatus.ERROR
 
     assert "parent_op" in calls[2].op_name
     assert calls[2].inputs["val"] == 1
-    assert calls[2].summary["weave"]["status"] == tsi.TraceStatus.ERROR
+    assert calls[2].summary["weave"]["status"] == TraceStatus.ERROR
 
     assert "parent_op" in calls[3].op_name
     assert calls[3].inputs["val"] == 2
-    assert calls[3].summary["weave"]["status"] == tsi.TraceStatus.SUCCESS
+    assert calls[3].summary["weave"]["status"] == TraceStatus.SUCCESS
 
     assert "child_op" in calls[4].op_name
     assert calls[4].inputs["val"] == 2
-    assert calls[4].summary["weave"]["status"] == tsi.TraceStatus.SUCCESS
+    assert calls[4].summary["weave"]["status"] == TraceStatus.SUCCESS
 
     calls = list(
         client.server.calls_query_stream(
-            tsi.CallsQueryReq(
-                project_id=get_client_project_id(client),
-                sort_by=[{"field": "summary.weave.status", "direction": "asc"}],
-            )
+            {
+                "project_id": get_client_project_id(client),
+                "sort_by": [{"field": "summary.weave.status", "direction": "asc"}],
+            }
         )
     )
 
     assert len(calls) == 5
     assert [c.summary["weave"]["status"] for c in calls] == [
-        tsi.TraceStatus.DESCENDANT_ERROR,
-        tsi.TraceStatus.ERROR,
-        tsi.TraceStatus.ERROR,
-        tsi.TraceStatus.SUCCESS,
-        tsi.TraceStatus.SUCCESS,
+        TraceStatus.DESCENDANT_ERROR,
+        TraceStatus.ERROR,
+        TraceStatus.ERROR,
+        TraceStatus.SUCCESS,
+        TraceStatus.SUCCESS,
     ]
 
     calls = list(
         client.server.calls_query_stream(
-            tsi.CallsQueryReq(
-                project_id=get_client_project_id(client),
-                sort_by=[{"field": "summary.weave.status", "direction": "desc"}],
-            )
+            {
+                "project_id": get_client_project_id(client),
+                "sort_by": [{"field": "summary.weave.status", "direction": "desc"}],
+            }
         )
     )
 
     assert len(calls) == 5
     assert [c.summary["weave"]["status"] for c in calls] == [
-        tsi.TraceStatus.SUCCESS,
-        tsi.TraceStatus.SUCCESS,
-        tsi.TraceStatus.ERROR,
-        tsi.TraceStatus.ERROR,
-        tsi.TraceStatus.DESCENDANT_ERROR,
+        TraceStatus.SUCCESS,
+        TraceStatus.SUCCESS,
+        TraceStatus.ERROR,
+        TraceStatus.ERROR,
+        TraceStatus.DESCENDANT_ERROR,
     ]
 
     for status, count in [
-        (tsi.TraceStatus.DESCENDANT_ERROR, 1),
-        (tsi.TraceStatus.ERROR, 2),
-        (tsi.TraceStatus.SUCCESS, 2),
+        (TraceStatus.DESCENDANT_ERROR, 1),
+        (TraceStatus.ERROR, 2),
+        (TraceStatus.SUCCESS, 2),
     ]:
         calls = list(
             client.server.calls_query_stream(
-                tsi.CallsQueryReq(
-                    project_id=get_client_project_id(client),
-                    query={
+                {
+                    "project_id": get_client_project_id(client),
+                    "query": {
                         "$expr": {
                             "$eq": [
                                 {"$getField": "summary.weave.status"},
@@ -4967,7 +4906,7 @@ def test_calls_query_with_descendant_error(client):
                             ]
                         }
                     },
-                )
+                }
             )
         )
 
@@ -5135,9 +5074,9 @@ def test_thread_id_query_filtering(client):
     if hasattr(client.server, "calls_query"):
         # Test filtering by thread_id
         res1 = client.server.calls_query(
-            tsi.CallsQueryReq(
-                project_id=get_client_project_id(client),
-                query={
+            {
+                "project_id": get_client_project_id(client),
+                "query": {
                     "$expr": {
                         "$eq": [
                             {"$getField": "thread_id"},
@@ -5145,7 +5084,7 @@ def test_thread_id_query_filtering(client):
                         ]
                     }
                 },
-            )
+            }
         )
 
         # Should find the call with filter_thread_1
@@ -5156,9 +5095,9 @@ def test_thread_id_query_filtering(client):
 
         # Query all calls and verify thread_id values
         all_calls_res = client.server.calls_query(
-            tsi.CallsQueryReq(
-                project_id=get_client_project_id(client),
-            )
+            {
+                "project_id": get_client_project_id(client),
+            }
         )
 
         # Find our test calls by op_name pattern
@@ -5200,7 +5139,7 @@ def test_get_calls_filter_by_thread_ids_only(client):
     # Filter using only thread_ids (no op_names, trace_ids, etc.)
     calls_thread_a = list(
         client.get_calls(
-            filter=tsi.CallsFilter(thread_ids=[f"thread_a_{unique}"]),
+            filter={"thread_ids": [f"thread_a_{unique}"]},
             limit=100,
         )
     )
@@ -5259,7 +5198,6 @@ def test_threads_query_endpoint(client):
     import datetime
 
     import weave
-    from weave.trace_server import trace_server_interface as tsi
 
     # Create some test operations
     @weave.op
@@ -5276,7 +5214,7 @@ def test_threads_query_endpoint(client):
     # Test that we start with no threads (if this is a fresh client)
     initial_threads = list(
         client.server.threads_query_stream(
-            tsi.ThreadsQueryReq(project_id=get_client_project_id(client))
+            {"project_id": get_client_project_id(client)}
         )
     )
     initial_count = len(initial_threads)
@@ -5299,7 +5237,7 @@ def test_threads_query_endpoint(client):
     # Test basic threads query
     threads_res = list(
         client.server.threads_query_stream(
-            tsi.ThreadsQueryReq(project_id=get_client_project_id(client))
+            {"project_id": get_client_project_id(client)}
         )
     )
 
@@ -5331,7 +5269,7 @@ def test_threads_query_endpoint(client):
     # Test limit parameter
     limited_res = list(
         client.server.threads_query_stream(
-            tsi.ThreadsQueryReq(project_id=get_client_project_id(client), limit=2)
+            {"project_id": get_client_project_id(client), "limit": 2}
         )
     )
     assert len(limited_res) == 2
@@ -5339,9 +5277,7 @@ def test_threads_query_endpoint(client):
     # Test offset parameter
     offset_res = list(
         client.server.threads_query_stream(
-            tsi.ThreadsQueryReq(
-                project_id=get_client_project_id(client), limit=1, offset=1
-            )
+            {"project_id": get_client_project_id(client), "limit": 1, "offset": 1}
         )
     )
     assert len(offset_res) == 1
@@ -5349,10 +5285,10 @@ def test_threads_query_endpoint(client):
     # Test sorting by thread_id
     sorted_res = list(
         client.server.threads_query_stream(
-            tsi.ThreadsQueryReq(
-                project_id=get_client_project_id(client),
-                sort_by=[SortBy(field="thread_id", direction="asc")],
-            )
+            {
+                "project_id": get_client_project_id(client),
+                "sort_by": [{"field": "thread_id", "direction": "asc"}],
+            }
         )
     )
     thread_ids_sorted = [t.thread_id for t in sorted_res]
@@ -5361,10 +5297,10 @@ def test_threads_query_endpoint(client):
     # Test sorting by turn_count descending
     count_sorted_res = list(
         client.server.threads_query_stream(
-            tsi.ThreadsQueryReq(
-                project_id=get_client_project_id(client),
-                sort_by=[SortBy(field="turn_count", direction="desc")],
-            )
+            {
+                "project_id": get_client_project_id(client),
+                "sort_by": [{"field": "turn_count", "direction": "desc"}],
+            }
         )
     )
     turn_counts = [t.turn_count for t in count_sorted_res]
@@ -5373,10 +5309,10 @@ def test_threads_query_endpoint(client):
     # Test sorting by last_updated descending (most recent first)
     time_sorted_res = list(
         client.server.threads_query_stream(
-            tsi.ThreadsQueryReq(
-                project_id=get_client_project_id(client),
-                sort_by=[SortBy(field="last_updated", direction="desc")],
-            )
+            {
+                "project_id": get_client_project_id(client),
+                "sort_by": [{"field": "last_updated", "direction": "desc"}],
+            }
         )
     )
     last_updated_times = [t.last_updated for t in time_sorted_res]
@@ -5392,10 +5328,10 @@ def test_threads_query_endpoint(client):
 
     after_filter_res = list(
         client.server.threads_query_stream(
-            tsi.ThreadsQueryReq(
-                project_id=get_client_project_id(client),
-                filter=tsi.ThreadsQueryFilter(after_datetime=middle_time),
-            )
+            {
+                "project_id": get_client_project_id(client),
+                "filter": {"after_datetime": middle_time},
+            }
         )
     )
     # Should still include our recent threads
@@ -5408,10 +5344,10 @@ def test_threads_query_endpoint(client):
     ) + datetime.timedelta(minutes=1)
     before_filter_res = list(
         client.server.threads_query_stream(
-            tsi.ThreadsQueryReq(
-                project_id=get_client_project_id(client),
-                filter=tsi.ThreadsQueryFilter(before_datetime=very_recent_time),
-            )
+            {
+                "project_id": get_client_project_id(client),
+                "filter": {"before_datetime": very_recent_time},
+            }
         )
     )
     # Should include our threads since they're before this future time
@@ -5422,10 +5358,10 @@ def test_threads_query_endpoint(client):
     for test_thread_id in thread_ids:
         thread_ids_filter_res = list(
             client.server.threads_query_stream(
-                tsi.ThreadsQueryReq(
-                    project_id=get_client_project_id(client),
-                    filter=tsi.ThreadsQueryFilter(thread_ids=[test_thread_id]),
-                )
+                {
+                    "project_id": get_client_project_id(client),
+                    "filter": {"thread_ids": [test_thread_id]},
+                }
             )
         )
         # Should find exactly one thread with the specified thread_id
@@ -5435,10 +5371,10 @@ def test_threads_query_endpoint(client):
     # Test filtering by multiple thread_ids
     multiple_thread_ids_filter_res = list(
         client.server.threads_query_stream(
-            tsi.ThreadsQueryReq(
-                project_id=get_client_project_id(client),
-                filter=tsi.ThreadsQueryFilter(thread_ids=thread_ids[:2]),
-            )
+            {
+                "project_id": get_client_project_id(client),
+                "filter": {"thread_ids": thread_ids[:2]},
+            }
         )
     )
     # Should find exactly two threads
@@ -5449,10 +5385,10 @@ def test_threads_query_endpoint(client):
     # Test filtering by non-existent thread_ids
     nonexistent_filter_res = list(
         client.server.threads_query_stream(
-            tsi.ThreadsQueryReq(
-                project_id=get_client_project_id(client),
-                filter=tsi.ThreadsQueryFilter(thread_ids=["nonexistent_thread_id"]),
-            )
+            {
+                "project_id": get_client_project_id(client),
+                "filter": {"thread_ids": ["nonexistent_thread_id"]},
+            }
         )
     )
     assert len(nonexistent_filter_res) == 0
@@ -5460,15 +5396,15 @@ def test_threads_query_endpoint(client):
     # Test combining thread_ids filter with other filters
     combo_thread_filter_res = list(
         client.server.threads_query_stream(
-            tsi.ThreadsQueryReq(
-                project_id=get_client_project_id(client),
-                limit=1,
-                sort_by=[SortBy(field="turn_count", direction="desc")],
-                filter=tsi.ThreadsQueryFilter(
-                    thread_ids=["analytics_thread"],
-                    after_datetime=middle_time,
-                ),
-            )
+            {
+                "project_id": get_client_project_id(client),
+                "limit": 1,
+                "sort_by": [{"field": "turn_count", "direction": "desc"}],
+                "filter": {
+                    "thread_ids": ["analytics_thread"],
+                    "after_datetime": middle_time,
+                },
+            }
         )
     )
     # Should find at most 1 thread matching the specific thread_ids and time filter
@@ -5479,13 +5415,13 @@ def test_threads_query_endpoint(client):
     # Test combination of parameters
     combo_res = list(
         client.server.threads_query_stream(
-            tsi.ThreadsQueryReq(
-                project_id=get_client_project_id(client),
-                limit=5,
-                offset=0,
-                sort_by=[SortBy(field="turn_count", direction="desc")],
-                filter=tsi.ThreadsQueryFilter(after_datetime=middle_time),
-            )
+            {
+                "project_id": get_client_project_id(client),
+                "limit": 5,
+                "offset": 0,
+                "sort_by": [{"field": "turn_count", "direction": "desc"}],
+                "filter": {"after_datetime": middle_time},
+            }
         )
     )
     assert len(combo_res) <= 5
@@ -5505,7 +5441,6 @@ def test_threads_query_aggregation_fields(client):
     import time
 
     import weave
-    from weave.trace_server import trace_server_interface as tsi
 
     @weave.op
     def quick_op(value: str) -> str:
@@ -5549,7 +5484,7 @@ def test_threads_query_aggregation_fields(client):
     # Query threads to get the aggregation data
     threads_res = list(
         client.server.threads_query_stream(
-            tsi.ThreadsQueryReq(project_id=get_client_project_id(client))
+            {"project_id": get_client_project_id(client)}
         )
     )
 
@@ -5626,10 +5561,10 @@ def test_threads_query_aggregation_fields(client):
     # Test sorting by p50_turn_duration_ms
     sorted_by_p50 = list(
         client.server.threads_query_stream(
-            tsi.ThreadsQueryReq(
-                project_id=get_client_project_id(client),
-                sort_by=[SortBy(field="p50_turn_duration_ms", direction="desc")],
-            )
+            {
+                "project_id": get_client_project_id(client),
+                "sort_by": [{"field": "p50_turn_duration_ms", "direction": "desc"}],
+            }
         )
     )
     assert len(sorted_by_p50) >= 1
@@ -5637,10 +5572,10 @@ def test_threads_query_aggregation_fields(client):
     # Test sorting by p99_turn_duration_ms
     sorted_by_p99 = list(
         client.server.threads_query_stream(
-            tsi.ThreadsQueryReq(
-                project_id=get_client_project_id(client),
-                sort_by=[SortBy(field="p99_turn_duration_ms", direction="asc")],
-            )
+            {
+                "project_id": get_client_project_id(client),
+                "sort_by": [{"field": "p99_turn_duration_ms", "direction": "asc"}],
+            }
         )
     )
     assert len(sorted_by_p99) >= 1
@@ -6037,18 +5972,16 @@ def test_calls_query_filter_contains_in_message_array(client):
     op1("extra2")
 
     calls = list(
-        client.server.calls_query_stream(
-            tsi.CallsQueryReq(project_id=get_client_project_id(client))
-        )
+        client.server.calls_query_stream({"project_id": get_client_project_id(client)})
     )
     assert len(calls) == 3
 
     # Test $contains with substring search in the JSON-serialized output
     calls = list(
         client.server.calls_query_stream(
-            tsi.CallsQueryReq(
-                project_id=get_client_project_id(client),
-                query={
+            {
+                "project_id": get_client_project_id(client),
+                "query": {
                     "$expr": {
                         "$contains": {
                             "input": {"$getField": "output.messages"},
@@ -6056,16 +5989,16 @@ def test_calls_query_filter_contains_in_message_array(client):
                         }
                     }
                 },
-            )
+            }
         )
     )
     assert len(calls) == 3
 
     calls = list(
         client.server.calls_query_stream(
-            tsi.CallsQueryReq(
-                project_id=get_client_project_id(client),
-                query={
+            {
+                "project_id": get_client_project_id(client),
+                "query": {
                     "$expr": {
                         "$contains": {
                             "input": {"$getField": "output.messages"},
@@ -6073,7 +6006,7 @@ def test_calls_query_filter_contains_in_message_array(client):
                         }
                     }
                 },
-            )
+            }
         )
     )
     assert len(calls) == 1
@@ -6084,9 +6017,9 @@ def test_calls_query_filter_contains_in_message_array(client):
     # optimization, this test should be able to pass!
     # calls = list(
     #     client.server.calls_query_stream(
-    #         tsi.CallsQueryReq(
-    #             project_id=get_client_project_id(client),
-    #             query={
+    #         {
+    #             "project_id": get_client_project_id(client),
+    #             "query": {
     #                 "$expr": {
     #                     "$eq": [
     #                         {"$getField": "output.messages"},
@@ -6094,7 +6027,7 @@ def test_calls_query_filter_contains_in_message_array(client):
     #                     ]
     #                 }
     #             },
-    #         )
+    #         }
     #     )
     # )
     # assert len(calls) == 1
@@ -6187,7 +6120,7 @@ async def test_calls_query_sort_by_feedback_field_with_costs(client):
     _, call2 = op2.call(2)
     await call2.apply_scorer(my_scorer)
 
-    filter = tsi.CallsFilter(op_names=[call1.op_name, call2.op_name])
+    filter = {"op_names": [call1.op_name, call2.op_name]}
 
     # Get call ids in order of creation
     calls = list(client.get_calls(columns=["id"], filter=filter))
@@ -6235,7 +6168,7 @@ def test_calls_query_sort_by_agg_field_with_costs(client):
     _, call_b = my_op.call(2)
     call_b.set_display_name("beta")
 
-    filter = tsi.CallsFilter(call_ids=[call_a.id, call_b.id])
+    filter = {"call_ids": [call_a.id, call_b.id]}
 
     # Sort by display_name ascending with costs - exercises argMaxMerge field
     sort_by = [{"field": "display_name", "direction": "asc"}]
@@ -6285,7 +6218,7 @@ def test_calls_query_sort_by_trace_name_with_costs(client):
     _, call_a = alpha_op.call(1)
     _, call_b = beta_op.call(2)
 
-    filter = tsi.CallsFilter(call_ids=[call_a.id, call_b.id])
+    filter = {"call_ids": [call_a.id, call_b.id]}
 
     # Sort by trace_name ascending with costs
     sort_by = [{"field": "summary.weave.trace_name", "direction": "asc"}]
@@ -6372,7 +6305,7 @@ def test_calls_query_ordering_with_costs_comprehensive(client, no_autoflush):
             sort_by=sort_by,
             columns=["id"],
             include_costs=True,
-            filter=tsi.CallsFilter(call_ids=[call1.id, call2.id, call3.id]),
+            filter={"call_ids": [call1.id, call2.id, call3.id]},
         )
     )
     assert len(calls) == 3
@@ -6389,7 +6322,7 @@ def test_calls_query_ordering_with_costs_comprehensive(client, no_autoflush):
             sort_by=sort_by,
             columns=["id"],
             include_costs=True,
-            filter=tsi.CallsFilter(call_ids=[call4.id, call5.id]),
+            filter={"call_ids": [call4.id, call5.id]},
         )
     )
     assert len(calls) == 2
@@ -6403,7 +6336,7 @@ def test_calls_query_ordering_with_costs_comprehensive(client, no_autoflush):
             sort_by=sort_by,
             columns=["id"],
             include_costs=True,
-            filter=tsi.CallsFilter(call_ids=[call1.id, call2.id, call6.id]),
+            filter={"call_ids": [call1.id, call2.id, call6.id]},
         )
     )
     assert len(calls) == 3
@@ -6433,7 +6366,7 @@ def test_calls_query_ordering_with_costs_comprehensive(client, no_autoflush):
             sort_by=sort_by,
             columns=["id"],
             include_costs=True,
-            filter=tsi.CallsFilter(call_ids=[call1.id, call2.id, call3.id]),
+            filter={"call_ids": [call1.id, call2.id, call3.id]},
         )
     )
     assert len(calls) == 3
@@ -6449,7 +6382,7 @@ def test_calls_query_ordering_with_costs_comprehensive(client, no_autoflush):
             sort_by=sort_by,
             columns=["id"],
             include_costs=True,
-            filter=tsi.CallsFilter(call_ids=[call1.id, call2.id, call3.id]),
+            filter={"call_ids": [call1.id, call2.id, call3.id]},
         )
     )
     assert len(calls) == 3

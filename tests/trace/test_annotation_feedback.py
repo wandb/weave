@@ -4,11 +4,6 @@ from pydantic import BaseModel, Field
 import weave
 from weave import AnnotationSpec
 from weave.trace.errors import InvalidRequest
-from weave.trace_server.trace_server_interface import (
-    FeedbackCreateReq,
-    ObjDeleteReq,
-    ObjQueryReq,
-)
 
 
 def test_human_feedback_basic(client):
@@ -38,12 +33,10 @@ def test_human_feedback_basic(client):
 
     # query it by object type
     objects = client.server.objs_query(
-        ObjQueryReq.model_validate(
-            {
-                "project_id": client.project_id,
-                "filter": {"base_object_classes": ["AnnotationSpec"]},
-            }
-        )
+        {
+            "project_id": client.project_id,
+            "filter": {"base_object_classes": ["AnnotationSpec"]},
+        }
     )
 
     assert len(objects.objs) == 2
@@ -70,28 +63,24 @@ def test_human_feedback_basic(client):
 
     # Attempt to add valid and invalid payloads
     client.server.feedback_create(
-        FeedbackCreateReq.model_validate(
+        {
+            "project_id": client.project_id,
+            "weave_ref": f"weave:///{client.project_id}/call/name:digest",
+            "feedback_type": "wandb.annotation." + ref1.name,
+            "annotation_ref": ref1.uri,
+            "payload": {"value": 0},
+        }
+    )
+
+    with pytest.raises(InvalidRequest):
+        client.server.feedback_create(
             {
                 "project_id": client.project_id,
                 "weave_ref": f"weave:///{client.project_id}/call/name:digest",
                 "feedback_type": "wandb.annotation." + ref1.name,
                 "annotation_ref": ref1.uri,
-                "payload": {"value": 0},
+                "payload": {"value": 42},
             }
-        )
-    )
-
-    with pytest.raises(InvalidRequest):
-        client.server.feedback_create(
-            FeedbackCreateReq.model_validate(
-                {
-                    "project_id": client.project_id,
-                    "weave_ref": f"weave:///{client.project_id}/call/name:digest",
-                    "feedback_type": "wandb.annotation." + ref1.name,
-                    "annotation_ref": ref1.uri,
-                    "payload": {"value": 42},
-                }
-            )
         )
 
 
@@ -107,24 +96,22 @@ def test_feedback_create_on_deleted_annotation_spec(client):
     assert ref
 
     client.server.obj_delete(
-        ObjDeleteReq(
-            project_id=client.project_id,
-            object_id=ref.name,
-            digests=[ref.digest],
-        )
+        {
+            "project_id": client.project_id,
+            "object_id": ref.name,
+            "digests": [ref.digest],
+        }
     )
 
     with pytest.raises(InvalidRequest, match="not found"):
         client.server.feedback_create(
-            FeedbackCreateReq.model_validate(
-                {
-                    "project_id": client.project_id,
-                    "weave_ref": f"weave:///{client.project_id}/call/name:digest",
-                    "feedback_type": "wandb.annotation." + ref.name,
-                    "annotation_ref": ref.uri,
-                    "payload": {"value": 0},
-                }
-            )
+            {
+                "project_id": client.project_id,
+                "weave_ref": f"weave:///{client.project_id}/call/name:digest",
+                "feedback_type": "wandb.annotation." + ref.name,
+                "annotation_ref": ref.uri,
+                "payload": {"value": 0},
+            }
         )
 
 
@@ -145,12 +132,10 @@ def test_field_schema_with_pydantic_model(client):
 
     # Query and verify the converted schema
     objects = client.server.objs_query(
-        ObjQueryReq.model_validate(
-            {
-                "project_id": client.project_id,
-                "filter": {"base_object_classes": ["AnnotationSpec"]},
-            }
-        )
+        {
+            "project_id": client.project_id,
+            "filter": {"base_object_classes": ["AnnotationSpec"]},
+        }
     )
 
     # Find our new spec
@@ -183,7 +168,23 @@ def test_field_schema_with_pydantic_model(client):
 
     # Attempt to add valid and invalid payloads
     client.server.feedback_create(
-        FeedbackCreateReq.model_validate(
+        {
+            "project_id": client.project_id,
+            "weave_ref": f"weave:///{client.project_id}/call/name:digest",
+            "feedback_type": "wandb.annotation." + ref.name,
+            "annotation_ref": ref.uri,
+            "payload": {
+                "value": {
+                    "rating": 1,
+                    "comment": "Good work!",
+                    "category": "good",
+                }
+            },
+        }
+    )
+
+    with pytest.raises(InvalidRequest):
+        client.server.feedback_create(
             {
                 "project_id": client.project_id,
                 "weave_ref": f"weave:///{client.project_id}/call/name:digest",
@@ -191,32 +192,12 @@ def test_field_schema_with_pydantic_model(client):
                 "annotation_ref": ref.uri,
                 "payload": {
                     "value": {
-                        "rating": 1,
+                        "rating": "not a number",
                         "comment": "Good work!",
                         "category": "good",
                     }
                 },
             }
-        )
-    )
-
-    with pytest.raises(InvalidRequest):
-        client.server.feedback_create(
-            FeedbackCreateReq.model_validate(
-                {
-                    "project_id": client.project_id,
-                    "weave_ref": f"weave:///{client.project_id}/call/name:digest",
-                    "feedback_type": "wandb.annotation." + ref.name,
-                    "annotation_ref": ref.uri,
-                    "payload": {
-                        "value": {
-                            "rating": "not a number",
-                            "comment": "Good work!",
-                            "category": "good",
-                        }
-                    },
-                }
-            )
         )
 
 
@@ -262,12 +243,10 @@ def test_field_schema_with_pydantic_field(client):
 
     # Query and verify all specs
     objects = client.server.objs_query(
-        ObjQueryReq.model_validate(
-            {
-                "project_id": client.project_id,
-                "filter": {"base_object_classes": ["AnnotationSpec"]},
-            }
-        )
+        {
+            "project_id": client.project_id,
+            "filter": {"base_object_classes": ["AnnotationSpec"]},
+        }
     )
 
     # Find our specs

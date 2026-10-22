@@ -1,7 +1,6 @@
 import pytest
 
 import weave
-from weave.trace_server import trace_server_interface as tsi
 
 # This file tests the different argument variations that can be passed to an op.
 #
@@ -417,10 +416,10 @@ def test_general_arg_variations(client, fn, arg_variations):
         assert fn_res == wrapped_res
 
         res = client.server.calls_query(
-            tsi.CallsQueryReq(
-                project_id=client.project_id,
-                filter=tsi.CallsFilter(op_names=[wrapped_fn.ref.uri]),
-            )
+            {
+                "project_id": client.project_id,
+                "filter": {"op_names": [wrapped_fn.ref.uri]},
+            }
         )
 
         assert len(res.calls) == ndx + 1
@@ -441,9 +440,9 @@ def test_no_args(client):
     my_op()
 
     res = client.server.calls_query(
-        tsi.CallsQueryReq(
-            project_id=client.project_id,
-        )
+        {
+            "project_id": client.project_id,
+        }
     )
 
     assert res.calls[0].op_name == my_op.ref.uri
@@ -458,9 +457,9 @@ def test_args_concrete(client):
     my_op(1)
 
     res = client.server.calls_query(
-        tsi.CallsQueryReq(
-            project_id=client.project_id,
-        )
+        {
+            "project_id": client.project_id,
+        }
     )
 
     assert res.calls[0].op_name == my_op.ref.uri
@@ -477,9 +476,9 @@ def test_args_concrete_splat(client):
     my_op(1, 2, 3)
 
     res = client.server.calls_query(
-        tsi.CallsQueryReq(
-            project_id=client.project_id,
-        )
+        {
+            "project_id": client.project_id,
+        }
     )
 
     assert res.calls[0].op_name == my_op.ref.uri
@@ -501,9 +500,9 @@ def test_args_concrete_splats(client):
     my_op(1, 2, 3, a=4, b=5)
 
     res = client.server.calls_query(
-        tsi.CallsQueryReq(
-            project_id=client.project_id,
-        )
+        {
+            "project_id": client.project_id,
+        }
     )
 
     assert res.calls[0].op_name == my_op.ref.uri
@@ -530,9 +529,9 @@ def test_args_concrete_splat_concrete(client):
     my_op(1, 2, 3, a=4)
 
     res = client.server.calls_query(
-        tsi.CallsQueryReq(
-            project_id=client.project_id,
-        )
+        {
+            "project_id": client.project_id,
+        }
     )
 
     assert res.calls[0].op_name == my_op.ref.uri
@@ -557,9 +556,9 @@ def test_args_concrete_splat_concrete_splat(client):
     my_op(1, 2, 3, a=4, b=5)
 
     res = client.server.calls_query(
-        tsi.CallsQueryReq(
-            project_id=client.project_id,
-        )
+        {
+            "project_id": client.project_id,
+        }
     )
 
     assert res.calls[0].op_name == my_op.ref.uri

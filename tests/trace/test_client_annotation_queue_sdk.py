@@ -4,21 +4,25 @@ import datetime
 
 import pytest
 
+from weave.trace.builtin_object_classes.query import SortBy
 from weave.trace.call import Call
+from weave.trace.errors import NotFoundError
 from weave.trace.weave_client import WeaveClient
-from weave.trace_server.common_interface import AnnotationQueueItemsFilter, SortBy
-from weave.trace_server.errors import NotFoundError
-from weave.trace_server.trace_server_interface import (
-    AnnotationQueueAddCallsRes,
-    AnnotationQueueCreateRes,
-    AnnotationQueueDeleteRes,
-    AnnotationQueueItemSchema,
-    AnnotationQueueItemsQueryRes,
-    AnnotationQueueReadRes,
+from weave.vendor.weave_server_sdk.types import (
+    AnnotationQueueCreateResponse,
+    AnnotationQueueDeleteResponse,
+    AnnotationQueueReadResponse,
     AnnotationQueueSchema,
-    AnnotationQueuesStatsRes,
-    AnnotationQueueStatsSchema,
-    AnnotationQueueUpdateRes,
+    AnnotationQueueStatsResponse,
+    AnnotationQueueUpdateResponse,
+)
+from weave.vendor.weave_server_sdk.types.annotation_queue_stats_response import Stat
+from weave.vendor.weave_server_sdk.types.annotation_queues import (
+    ItemAddResponse,
+    ItemQueryResponse,
+)
+from weave.vendor.weave_server_sdk.types.annotation_queues.item_query_response import (
+    Item,
 )
 
 
@@ -36,7 +40,7 @@ class FakeAnnotationQueueServer:
             updated_at=now,
             deleted_at=None,
         )
-        self.item = AnnotationQueueItemSchema(
+        self.item = Item(
             id="item-id",
             project_id="entity/project",
             queue_id="queue-id",
@@ -50,7 +54,7 @@ class FakeAnnotationQueueServer:
             created_by="test-user",
             updated_at=now,
         )
-        self.stat = AnnotationQueueStatsSchema(
+        self.stat = Stat(
             queue_id="queue-id",
             total_items=1,
             completed_items=0,
@@ -59,11 +63,11 @@ class FakeAnnotationQueueServer:
 
     def annotation_queue_create(self, req):
         self.requests["create"] = req
-        return AnnotationQueueCreateRes(id="queue-id")
+        return AnnotationQueueCreateResponse(id="queue-id")
 
     def annotation_queue_read(self, req):
         self.requests["read"] = req
-        return AnnotationQueueReadRes(queue=self.queue)
+        return AnnotationQueueReadResponse(queue=self.queue)
 
     def annotation_queues_query_stream(self, req):
         self.requests["query"] = req
@@ -71,23 +75,23 @@ class FakeAnnotationQueueServer:
 
     def annotation_queue_update(self, req):
         self.requests["update"] = req
-        return AnnotationQueueUpdateRes(queue=self.queue)
+        return AnnotationQueueUpdateResponse(queue=self.queue)
 
     def annotation_queue_delete(self, req):
         self.requests["delete"] = req
-        return AnnotationQueueDeleteRes(queue=self.queue)
+        return AnnotationQueueDeleteResponse(queue=self.queue)
 
     def annotation_queue_add_calls(self, req):
         self.requests["add_calls"] = req
-        return AnnotationQueueAddCallsRes(added_count=1, duplicates=0)
+        return ItemAddResponse(added_count=1, duplicates=0)
 
     def annotation_queue_items_query(self, req):
         self.requests["items_query"] = req
-        return AnnotationQueueItemsQueryRes(items=[self.item])
+        return ItemQueryResponse(items=[self.item])
 
     def annotation_queues_stats(self, req):
         self.requests["stats"] = req
-        return AnnotationQueuesStatsRes(stats=[self.stat])
+        return AnnotationQueueStatsResponse(stats=[self.stat])
 
 
 def test_annotation_queue_sdk_methods_build_requests():
@@ -129,7 +133,7 @@ def test_annotation_queue_sdk_methods_build_requests():
         offset=2,
     )
     assert queues == [server.queue]
-    # A weave.shared SortBy goes out as its dump.
+    # A SortBy model goes out as its dump.
     assert server.requests["query"] == {
         "project_id": "entity/project",
         "name": "Test",
@@ -174,7 +178,7 @@ def test_annotation_queue_sdk_methods_build_requests():
         "queue_id": "queue-id",
     }
 
-    item_filter = AnnotationQueueItemsFilter(call_id="call-id")
+    item_filter = {"call_id": "call-id"}
     items = client.list_annotation_queue_items(
         "queue-id",
         filter=item_filter,
@@ -186,7 +190,7 @@ def test_annotation_queue_sdk_methods_build_requests():
     assert items == [server.item]
     assert server.requests["items_query"] == {
         "project_id": "entity/project",
-        "filter": item_filter.model_dump(),
+        "filter": item_filter,
         "sort_by": [{"field": "updated_at", "direction": "desc"}],
         "limit": 5,
         "offset": 1,
@@ -254,7 +258,7 @@ def test_annotation_queue_sdk_lifecycle(client):
 
     items = client.list_annotation_queue_items(
         queue_id,
-        sort_by=[SortBy(field="created_at", direction="asc")],
+        sort_by=[{"field": "created_at", "direction": "asc"}],
         include_position=True,
     )
     assert {item.call_id for item in items} == {call.id for call in calls}
@@ -266,7 +270,7 @@ def test_annotation_queue_sdk_lifecycle(client):
 
     filtered_items = client.list_annotation_queue_items(
         queue_id,
-        filter=AnnotationQueueItemsFilter(call_id=calls[0].id),
+        filter={"call_id": calls[0].id},
     )
     assert len(filtered_items) == 1
     assert filtered_items[0].call_id == calls[0].id

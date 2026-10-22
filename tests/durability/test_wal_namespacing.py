@@ -12,10 +12,11 @@ from __future__ import annotations
 import os
 from unittest.mock import MagicMock
 
+from pydantic_core import to_jsonable_python
+
 from weave.durability.wal_client_id import compute_client_id
 from weave.durability.wal_manager import WALManager
 from weave.durability.wal_sender import create_sender
-from weave.trace_server import trace_server_interface as tsi
 
 
 class TestWALDirectoryNamespacing:
@@ -66,13 +67,13 @@ class TestCrashRecovery:
 
         # --- Process A: write records, then "crash" (close writer only) ---
         mgr_a = WALManager("entity", "project", api_key=api_key)
-        req = tsi.ObjCreateReq(
-            obj=tsi.ObjSchemaForInsert(
-                project_id="entity/project",
-                object_id="orphaned_obj",
-                val={"rescued": True},
-            )
-        )
+        req = {
+            "obj": {
+                "project_id": "entity/project",
+                "object_id": "orphaned_obj",
+                "val": {"rescued": True},
+            }
+        }
         mgr_a.write("obj_create", req)
         mgr_a.flush()
         wal_dir = mgr_a.wal_dir
@@ -100,7 +101,7 @@ class TestCrashRecovery:
         # The sender should have called obj_create on the mock server
         mock_server.obj_create.assert_called_once()
         call_arg = mock_server.obj_create.call_args[0][0]
-        assert call_arg == req.model_dump(mode="json")
+        assert call_arg == to_jsonable_python(req)
         assert call_arg["obj"]["object_id"] == "orphaned_obj"
 
         # The WAL file should be cleaned up after draining
@@ -119,13 +120,13 @@ class TestCrashRecovery:
         mgr_a = WALManager("entity", "project", api_key="wk-key-aaa")
         mgr_a.write(
             "obj_create",
-            tsi.ObjCreateReq(
-                obj=tsi.ObjSchemaForInsert(
-                    project_id="entity/project",
-                    object_id="secret_obj",
-                    val={"owner": "A"},
-                )
-            ),
+            {
+                "obj": {
+                    "project_id": "entity/project",
+                    "object_id": "secret_obj",
+                    "val": {"owner": "A"},
+                }
+            },
         )
         mgr_a.flush()
         mgr_a.close()

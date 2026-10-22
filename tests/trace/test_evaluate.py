@@ -9,7 +9,7 @@ from pydantic import BaseModel
 import weave
 from tests.conftest import LATENCY_TOL
 from weave import Dataset, Evaluation, Model
-from weave.trace_server.constants import MAX_OBJECT_NAME_LENGTH
+from weave.trace.constants import MAX_OBJECT_NAME_LENGTH
 
 dataset_rows = [{"input": "1 + 2", "target": 3}, {"input": "2**4", "target": 15}]
 dataset = Dataset(rows=dataset_rows)

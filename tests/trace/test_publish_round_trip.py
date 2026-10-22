@@ -1,9 +1,8 @@
 from pydantic import BaseModel
 
 import weave
+from weave.trace.builtin_object_classes.query import Query
 from weave.trace.objectify import register_object
-from weave.trace_server.interface.query import Query
-from weave.trace_server.trace_server_interface import RefsReadBatchReq
 
 
 def test_publish_round_trip_query_object(client) -> None:
@@ -17,7 +16,7 @@ def test_publish_round_trip_query_object(client) -> None:
     }
     query = Query(**query_raw)
     ref = weave.publish(query)
-    res = client.server.refs_read_batch(RefsReadBatchReq(refs=[ref.uri]))
+    res = client.server.refs_read_batch({"refs": [ref.uri]})
 
     # remove the extra python class information that round tripping generates
     # specifically: _type, _class_name, _bases

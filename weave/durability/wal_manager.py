@@ -6,7 +6,6 @@ import os
 from collections.abc import Callable, Mapping
 from typing import Any
 
-from pydantic import BaseModel
 from pydantic_core import to_jsonable_python
 
 from weave.durability.wal import WALRecord, WALRecordType, WALWriter
@@ -81,17 +80,12 @@ class WALManager:
         atexit.register(mgr.close)
         return mgr
 
-    def write(
-        self, record_type: WALRecordType, req: BaseModel | Mapping[str, Any]
-    ) -> None:
+    def write(self, record_type: WALRecordType, req: Mapping[str, Any]) -> None:
         """Write a request to the WAL.  Never raises."""
         if self._writer is None:
             return
         try:
-            if isinstance(req, BaseModel):
-                payload = req.model_dump(mode="json")
-            else:
-                payload = to_jsonable_python(req, inf_nan_mode="null")
+            payload = to_jsonable_python(req, inf_nan_mode="null")
             self._writer.write({"type": record_type, "req": payload})
             logger.debug("WAL write: %s -> %s", record_type, self.wal_dir)
         except Exception:

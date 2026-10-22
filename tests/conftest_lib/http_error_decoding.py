@@ -1,10 +1,10 @@
 """Turn the trace server's HTTP error responses back into its exceptions.
 
-The server turns its exceptions into a status code and a JSON body
-(`weave.shared.errors`). The generated client raises `APIStatusError` and
-`RemoteHTTPTraceServer` raises `httpx.HTTPStatusError`. This wrapper is the
-inverse of the server's error registry, so a test can expect the exception the
-server raised.
+The server turns its exceptions into a status code and a JSON body with its
+error registry. The generated client raises `APIStatusError`, and an
+`httpx.HTTPStatusError` is decoded the same way. This wrapper is the inverse of
+the server's error registry, so a test can expect the exception the server
+raised.
 
 Production error bodies do not name the exception class, on purpose: the
 public API should not change for tests. Core's resettable test server adds
@@ -23,11 +23,15 @@ from typing import Any
 import httpx
 from gql.transport.exceptions import TransportQueryError, TransportServerError
 
-from weave.shared import trace_server_interface as tsi
-from weave.shared.validation_util import CHValidationError
 from weave.trace import errors
 from weave.trace.refs_internal import InvalidInternalRef
+from weave.trace_server_bindings.client_interface import TraceServerClientInterface
 from weave.vendor.weave_server_sdk import APIStatusError
+
+
+class CHValidationError(Exception):
+    """The server's error for an invalid id; the client has no class for it."""
+
 
 # Registered error classes that do not live in weave.trace.errors.
 _OTHER_ERRORS: dict[str, type[Exception]] = {
@@ -113,7 +117,7 @@ def _decoding_iterator(it: Iterator[Any]) -> Iterator[Any]:
 class HTTPErrorDecodingTraceServer:
     """Wraps a trace server reached over HTTP; see the module docstring."""
 
-    def __init__(self, server: tsi.TraceServerInterface):
+    def __init__(self, server: TraceServerClientInterface):
         # The name `_next_trace_server` lets tests.trace.server_utils walk
         # through this layer.
         self._next_trace_server = server

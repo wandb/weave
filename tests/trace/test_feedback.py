@@ -7,21 +7,12 @@ import pytest
 import weave
 from weave import AnnotationSpec
 from weave.trace.context import weave_client_context
-from weave.trace.feedback import Feedback, _warned_feedback_fields
-from weave.trace.weave_client import WeaveClient, get_ref
-from weave.trace_server import trace_server_interface as tsi
-from weave.trace_server.common_interface import SortBy
-from weave.trace_server.errors import (
+from weave.trace.errors import (
     InvalidRequest,
     QueryIllegalTypeofArgumentError,
 )
-from weave.trace_server.interface.query import Query
-from weave.trace_server.trace_server_interface import (
-    FeedbackAggregateReq,
-    FeedbackCreateReq,
-    FeedbackQueryReq,
-    FeedbackReplaceReq,
-)
+from weave.trace.feedback import Feedback, _warned_feedback_fields
+from weave.trace.weave_client import WeaveClient, get_ref
 from weave.trace_server_bindings.client_interface import TraceServerClientInterface
 from weave.vendor.weave_server_sdk.types import (
     FeedbackAggregateResponse,
@@ -131,87 +122,87 @@ def test_annotation_feedback(client: WeaveClient, wb_user_id) -> None:
     # Case 1: Errors with no name in type (dangle or char len 0)
     with pytest.raises(InvalidRequest):
         client.server.feedback_create(
-            tsi.FeedbackCreateReq(
-                project_id=project_id,
-                weave_ref=weave_ref,
-                feedback_type="wandb.annotation",  # No name
-                payload=payload,
-                annotation_ref=annotation_ref,
-            )
+            {
+                "project_id": project_id,
+                "weave_ref": weave_ref,
+                "feedback_type": "wandb.annotation",  # No name
+                "payload": payload,
+                "annotation_ref": annotation_ref,
+            }
         )
 
     with pytest.raises(InvalidRequest):
         client.server.feedback_create(
-            tsi.FeedbackCreateReq(
-                project_id=project_id,
-                weave_ref=weave_ref,
-                feedback_type="wandb.annotation.",  # Trailing period
-                payload=payload,
-                annotation_ref=annotation_ref,
-            )
+            {
+                "project_id": project_id,
+                "weave_ref": weave_ref,
+                "feedback_type": "wandb.annotation.",  # Trailing period
+                "payload": payload,
+                "annotation_ref": annotation_ref,
+            }
         )
     # Case 2: Errors with incorrect ref string format
     with pytest.raises(InvalidRequest):
         client.server.feedback_create(
-            tsi.FeedbackCreateReq(
-                project_id=project_id,
-                weave_ref=weave_ref,
-                feedback_type=feedback_type,
-                payload=payload,
-                annotation_ref=f"weave:///{project_id}/object/{column_name}",  # No digest
-            )
+            {
+                "project_id": project_id,
+                "weave_ref": weave_ref,
+                "feedback_type": feedback_type,
+                "payload": payload,
+                "annotation_ref": f"weave:///{project_id}/object/{column_name}",  # No digest
+            }
         )
     # Case 3: Errors with name mismatch
     with pytest.raises(InvalidRequest):
         client.server.feedback_create(
-            tsi.FeedbackCreateReq(
-                project_id=project_id,
-                weave_ref=weave_ref,
-                feedback_type=feedback_type + "_wrong_name",
-                payload=payload,
-                annotation_ref=annotation_ref,
-            )
+            {
+                "project_id": project_id,
+                "weave_ref": weave_ref,
+                "feedback_type": feedback_type + "_wrong_name",
+                "payload": payload,
+                "annotation_ref": annotation_ref,
+            }
         )
     # Case 4: Errors if annotation ref is present but incorrect type
     with pytest.raises(InvalidRequest):
         client.server.feedback_create(
-            tsi.FeedbackCreateReq(
-                project_id=project_id,
-                weave_ref=weave_ref,
-                feedback_type="not.annotation",
-                payload=payload,
-                annotation_ref=f"weave:///{project_id}/op/{column_name}:obj_id_123",
-            )
+            {
+                "project_id": project_id,
+                "weave_ref": weave_ref,
+                "feedback_type": "not.annotation",
+                "payload": payload,
+                "annotation_ref": f"weave:///{project_id}/op/{column_name}:obj_id_123",
+            }
         )
 
     # Case 5: Invalid payload
     with pytest.raises(InvalidRequest):
         client.server.feedback_create(
-            tsi.FeedbackCreateReq(
-                project_id=project_id,
-                weave_ref=weave_ref,
-                feedback_type=feedback_type,
-                payload={"not": "a valid payload"},
-                annotation_ref=annotation_ref,
-            )
+            {
+                "project_id": project_id,
+                "weave_ref": weave_ref,
+                "feedback_type": feedback_type,
+                "payload": {"not": "a valid payload"},
+                "annotation_ref": annotation_ref,
+            }
         )
 
     # Success
     create_res = client.server.feedback_create(
-        tsi.FeedbackCreateReq(
-            project_id=project_id,
-            weave_ref=weave_ref,
-            feedback_type=feedback_type,
-            payload=payload,
-            annotation_ref=annotation_ref,
-        )
+        {
+            "project_id": project_id,
+            "weave_ref": weave_ref,
+            "feedback_type": feedback_type,
+            "payload": payload,
+            "annotation_ref": annotation_ref,
+        }
     )
     assert create_res.id is not None
     # Correct Query Result Payload
     query_res = client.server.feedback_query(
-        tsi.FeedbackQueryReq(
-            project_id=project_id,
-        )
+        {
+            "project_id": project_id,
+        }
     )
     assert len(query_res.result) == 1
     assert query_res.result[0] == {
@@ -255,23 +246,19 @@ def test_annotation_feedback_malformed_spec_is_invalid_request(
     project_id = client.project_id
     column_name = "malformed_spec"
     digest = client.server.obj_create(
-        tsi.ObjCreateReq(
-            obj=tsi.ObjSchemaForInsert(
-                project_id=project_id, object_id=column_name, val=bad_spec
-            )
-        )
+        {"obj": {"project_id": project_id, "object_id": column_name, "val": bad_spec}}
     ).digest
     annotation_ref = f"weave:///{project_id}/object/{column_name}:{digest}"
 
     with pytest.raises(InvalidRequest):
         client.server.feedback_create(
-            tsi.FeedbackCreateReq(
-                project_id=project_id,
-                weave_ref=f"weave:///{project_id}/call/call_id_123",
-                feedback_type=f"wandb.annotation.{column_name}",
-                payload={"value": 1},
-                annotation_ref=annotation_ref,
-            )
+            {
+                "project_id": project_id,
+                "weave_ref": f"weave:///{project_id}/call/call_id_123",
+                "feedback_type": f"wandb.annotation.{column_name}",
+                "payload": {"value": 1},
+                "annotation_ref": annotation_ref,
+            }
         )
 
 
@@ -289,119 +276,119 @@ def test_runnable_feedback(client: WeaveClient, wb_user_id) -> None:
     # Case 1: Errors with no name in type (dangle or char len 0)
     with pytest.raises(InvalidRequest):
         client.server.feedback_create(
-            tsi.FeedbackCreateReq(
-                project_id=project_id,
-                weave_ref=weave_ref,
-                feedback_type="wandb.runnable",  # No name
-                payload=payload,
-                runnable_ref=runnable_ref,
-            )
+            {
+                "project_id": project_id,
+                "weave_ref": weave_ref,
+                "feedback_type": "wandb.runnable",  # No name
+                "payload": payload,
+                "runnable_ref": runnable_ref,
+            }
         )
 
     with pytest.raises(InvalidRequest):
         client.server.feedback_create(
-            tsi.FeedbackCreateReq(
-                project_id=project_id,
-                weave_ref=weave_ref,
-                feedback_type="wandb.runnable.",  # Trailing period
-                payload=payload,
-                runnable_ref=runnable_ref,
-            )
+            {
+                "project_id": project_id,
+                "weave_ref": weave_ref,
+                "feedback_type": "wandb.runnable.",  # Trailing period
+                "payload": payload,
+                "runnable_ref": runnable_ref,
+            }
         )
 
     # Case 2: Errors with incorrect ref string format
     with pytest.raises(InvalidRequest):
         client.server.feedback_create(
-            tsi.FeedbackCreateReq(
-                project_id=project_id,
-                weave_ref=weave_ref,
-                feedback_type=feedback_type,
-                payload=payload,
-                runnable_ref=f"weave:///{project_id}/op/{runnable_name}",  # No digest
-            )
+            {
+                "project_id": project_id,
+                "weave_ref": weave_ref,
+                "feedback_type": feedback_type,
+                "payload": payload,
+                "runnable_ref": f"weave:///{project_id}/op/{runnable_name}",  # No digest
+            }
         )
 
     # Case 3: Errors with name mismatch
     with pytest.raises(InvalidRequest):
         client.server.feedback_create(
-            tsi.FeedbackCreateReq(
-                project_id=project_id,
-                weave_ref=weave_ref,
-                feedback_type=feedback_type + "_wrong_name",
-                payload=payload,
-                runnable_ref=runnable_ref,
-            )
+            {
+                "project_id": project_id,
+                "weave_ref": weave_ref,
+                "feedback_type": feedback_type + "_wrong_name",
+                "payload": payload,
+                "runnable_ref": runnable_ref,
+            }
         )
 
     # Case 4: Errors if runnable ref is present but incorrect type
     with pytest.raises(InvalidRequest):
         client.server.feedback_create(
-            tsi.FeedbackCreateReq(
-                project_id=project_id,
-                weave_ref=weave_ref,
-                feedback_type="not.runnable",  # Wrong type
-                payload=payload,
-                runnable_ref=runnable_ref,  # Wrong type
-            )
+            {
+                "project_id": project_id,
+                "weave_ref": weave_ref,
+                "feedback_type": "not.runnable",  # Wrong type
+                "payload": payload,
+                "runnable_ref": runnable_ref,  # Wrong type
+            }
         )
 
     # Case 5: Errors if call ref is present but incorrect type
     with pytest.raises(InvalidRequest):
         client.server.feedback_create(
-            tsi.FeedbackCreateReq(
-                project_id=project_id,
-                weave_ref=weave_ref,
-                feedback_type="not.runnable",  # Wrong type
-                payload=payload,
-                call_ref=call_ref,
-            )
+            {
+                "project_id": project_id,
+                "weave_ref": weave_ref,
+                "feedback_type": "not.runnable",  # Wrong type
+                "payload": payload,
+                "call_ref": call_ref,
+            }
         )
 
     # Case 6: Errors if trigger ref is present but incorrect type
     with pytest.raises(InvalidRequest):
         client.server.feedback_create(
-            tsi.FeedbackCreateReq(
-                project_id=project_id,
-                weave_ref=weave_ref,
-                feedback_type="not.runnable",
-                payload=payload,
-                trigger_ref=trigger_ref,
-            )
+            {
+                "project_id": project_id,
+                "weave_ref": weave_ref,
+                "feedback_type": "not.runnable",
+                "payload": payload,
+                "trigger_ref": trigger_ref,
+            }
         )
 
     # Case 7: Invalid payload
     with pytest.raises(InvalidRequest):
         client.server.feedback_create(
-            tsi.FeedbackCreateReq(
-                project_id=project_id,
-                weave_ref=weave_ref,
-                feedback_type=feedback_type,
-                payload={"not": "a valid payload"},
-                runnable_ref=runnable_ref,
-                call_ref=call_ref,
-                trigger_ref=trigger_ref,
-            )
+            {
+                "project_id": project_id,
+                "weave_ref": weave_ref,
+                "feedback_type": feedback_type,
+                "payload": {"not": "a valid payload"},
+                "runnable_ref": runnable_ref,
+                "call_ref": call_ref,
+                "trigger_ref": trigger_ref,
+            }
         )
 
     # Success
     create_res = client.server.feedback_create(
-        tsi.FeedbackCreateReq(
-            project_id=project_id,
-            weave_ref=weave_ref,
-            feedback_type=feedback_type,
-            payload=payload,
-            runnable_ref=runnable_ref,
-            call_ref=call_ref,
-            trigger_ref=trigger_ref,
-        )
+        {
+            "project_id": project_id,
+            "weave_ref": weave_ref,
+            "feedback_type": feedback_type,
+            "payload": payload,
+            "runnable_ref": runnable_ref,
+            "call_ref": call_ref,
+            "trigger_ref": trigger_ref,
+        }
     )
     assert create_res.id is not None
 
     # Verify Query Result Payload
     query_res = client.server.feedback_query(
-        tsi.FeedbackQueryReq(
-            project_id=project_id,
-        )
+        {
+            "project_id": project_id,
+        }
     )
     assert len(query_res.result) == 1
     assert query_res.result[0] == {
@@ -436,37 +423,35 @@ def test_runnable_feedback(client: WeaveClient, wb_user_id) -> None:
     # keeping the raw scorer output in payload for backwards compatibility.
     typed_weave_ref = f"weave:///{project_id}/call/call_id_456"
     typed_create_res = client.server.feedback_create(
-        tsi.FeedbackCreateReq(
-            project_id=project_id,
-            weave_ref=typed_weave_ref,
-            feedback_type=feedback_type,
-            payload={"output": {"passed": False}},
-            runnable_ref=runnable_ref,
-            call_ref=call_ref,
-            trigger_ref=trigger_ref,
-            scorer_tags=["unsafe"],
-            scorer_tag_reasons={"unsafe": "contains disallowed content"},
-            scorer_tag_confidences={"unsafe": 0.91},
-            scorer_ratings={"_rating_": 0.2},
-            scorer_rating_reasons={"_rating_": "low quality response"},
-            scorer_rating_confidences={"_rating_": 0.88},
-        )
+        {
+            "project_id": project_id,
+            "weave_ref": typed_weave_ref,
+            "feedback_type": feedback_type,
+            "payload": {"output": {"passed": False}},
+            "runnable_ref": runnable_ref,
+            "call_ref": call_ref,
+            "trigger_ref": trigger_ref,
+            "scorer_tags": ["unsafe"],
+            "scorer_tag_reasons": {"unsafe": "contains disallowed content"},
+            "scorer_tag_confidences": {"unsafe": 0.91},
+            "scorer_ratings": {"_rating_": 0.2},
+            "scorer_rating_reasons": {"_rating_": "low quality response"},
+            "scorer_rating_confidences": {"_rating_": 0.88},
+        }
     )
 
     typed_query_res = client.server.feedback_query(
-        tsi.FeedbackQueryReq(
-            project_id=project_id,
-            query=Query(
-                **{
-                    "$expr": {
-                        "$eq": [
-                            {"$getField": "id"},
-                            {"$literal": typed_create_res.id},
-                        ]
-                    }
+        {
+            "project_id": project_id,
+            "query": {
+                "$expr": {
+                    "$eq": [
+                        {"$getField": "id"},
+                        {"$literal": typed_create_res.id},
+                    ]
                 }
-            ),
-        )
+            },
+        }
     )
     assert len(typed_query_res.result) == 1
     typed_row = typed_query_res.result[0]
@@ -494,79 +479,77 @@ def test_agent_monitor_feedback(client: WeaveClient) -> None:
     # Case 1: runnable_ref is required.
     with pytest.raises(InvalidRequest):
         client.server.feedback_create(
-            tsi.FeedbackCreateReq(
-                project_id=project_id,
-                weave_ref=weave_ref,
-                feedback_type=feedback_type,
-                payload=payload,
-                scorer_tags=["nsfw"],
-            )
+            {
+                "project_id": project_id,
+                "weave_ref": weave_ref,
+                "feedback_type": feedback_type,
+                "payload": payload,
+                "scorer_tags": ["nsfw"],
+            }
         )
 
     # Case 2: call_ref is required.
     with pytest.raises(InvalidRequest):
         client.server.feedback_create(
-            tsi.FeedbackCreateReq(
-                project_id=project_id,
-                weave_ref=weave_ref,
-                feedback_type=feedback_type,
-                payload=payload,
-                runnable_ref=runnable_ref,
-            )
+            {
+                "project_id": project_id,
+                "weave_ref": weave_ref,
+                "feedback_type": feedback_type,
+                "payload": payload,
+                "runnable_ref": runnable_ref,
+            }
         )
 
     # Case 3: trigger_ref is required.
     with pytest.raises(InvalidRequest):
         client.server.feedback_create(
-            tsi.FeedbackCreateReq(
-                project_id=project_id,
-                weave_ref=weave_ref,
-                feedback_type=feedback_type,
-                payload=payload,
-                runnable_ref=runnable_ref,
-                call_ref=call_ref,
-            )
+            {
+                "project_id": project_id,
+                "weave_ref": weave_ref,
+                "feedback_type": feedback_type,
+                "payload": payload,
+                "runnable_ref": runnable_ref,
+                "call_ref": call_ref,
+            }
         )
 
     # Case 4: scorer_* fields rejected on feedback that is neither agent-monitor
     # nor runnable (non-empty value).
     with pytest.raises(InvalidRequest):
         client.server.feedback_create(
-            tsi.FeedbackCreateReq(
-                project_id=project_id,
-                weave_ref=weave_ref,
-                feedback_type="custom",
-                payload={},
-                scorer_tags=["nsfw"],
-            )
+            {
+                "project_id": project_id,
+                "weave_ref": weave_ref,
+                "feedback_type": "custom",
+                "payload": {},
+                "scorer_tags": ["nsfw"],
+            }
         )
 
     # Success: write tags, a rating, and reasons/confidences keyed by name.
     create_res = client.server.feedback_create(
-        tsi.FeedbackCreateReq(
-            project_id=project_id,
-            weave_ref=weave_ref,
-            feedback_type=feedback_type,
-            payload=payload,
-            runnable_ref=runnable_ref,
-            call_ref=call_ref,
-            trigger_ref=trigger_ref,
-            scorer_tags=["nsfw", "high-quality"],
-            scorer_tag_reasons={"nsfw": "explicit language"},
-            scorer_tag_confidences={"nsfw": 0.95},
-            scorer_ratings={"_rating_": 0.87},
-            scorer_rating_reasons={"_rating_": "very confident response"},
-            scorer_rating_confidences={"_rating_": 0.92},
-            span_agent_name="midi-generator",
-            span_agent_version="1.2.0",
-            span_status_code="OK",
-        )
+        {
+            "project_id": project_id,
+            "weave_ref": weave_ref,
+            "feedback_type": feedback_type,
+            "payload": payload,
+            "runnable_ref": runnable_ref,
+            "call_ref": call_ref,
+            "trigger_ref": trigger_ref,
+            "scorer_tags": ["nsfw", "high-quality"],
+            "scorer_tag_reasons": {"nsfw": "explicit language"},
+            "scorer_tag_confidences": {"nsfw": 0.95},
+            "scorer_ratings": {"_rating_": 0.87},
+            "scorer_rating_reasons": {"_rating_": "very confident response"},
+            "scorer_rating_confidences": {"_rating_": 0.92},
+            "span_agent_name": "midi-generator",
+            "span_agent_version": "1.2.0",
+            "span_status_code": "OK",
+        }
     )
     assert create_res.id is not None
 
-    query_res = client.server.feedback_query(
-        tsi.FeedbackQueryReq(project_id=project_id)
-    )
+    query_res = client.server.feedback_query({"project_id": project_id})
     assert len(query_res.result) == 1
     row = query_res.result[0]
     assert row["feedback_type"] == feedback_type
@@ -591,21 +574,19 @@ def test_agent_monitor_feedback_empty_defaults(client: WeaveClient) -> None:
     trigger_ref = f"weave:///{project_id}/object/my_scorer:trigger_id_123"
 
     create_res = client.server.feedback_create(
-        tsi.FeedbackCreateReq(
-            project_id=project_id,
-            weave_ref=weave_ref,
-            feedback_type="wandb.agent_monitor",
-            payload={"value": None},
-            runnable_ref=runnable_ref,
-            call_ref=call_ref,
-            trigger_ref=trigger_ref,
-        )
+        {
+            "project_id": project_id,
+            "weave_ref": weave_ref,
+            "feedback_type": "wandb.agent_monitor",
+            "payload": {"value": None},
+            "runnable_ref": runnable_ref,
+            "call_ref": call_ref,
+            "trigger_ref": trigger_ref,
+        }
     )
     assert create_res.id is not None
 
-    query_res = client.server.feedback_query(
-        tsi.FeedbackQueryReq(project_id=project_id)
-    )
+    query_res = client.server.feedback_query({"project_id": project_id})
     assert query_res.result[0]["scorer_tags"] == []
     assert query_res.result[0]["scorer_tag_reasons"] == {}
     assert query_res.result[0]["scorer_tag_confidences"] == {}
@@ -626,23 +607,21 @@ def test_agent_user_feedback(client: WeaveClient) -> None:
     weave_ref = f"weave:///{project_id}/object/agent_turn:turn_id_123"
 
     create_res = client.server.feedback_create(
-        tsi.FeedbackCreateReq(
-            project_id=project_id,
-            weave_ref=weave_ref,
-            feedback_type=feedback_type,
-            payload={"emoji": "👍", "scorer_tags": ["👍"]},
-            scorer_tags=["👍"],
+        {
+            "project_id": project_id,
+            "weave_ref": weave_ref,
+            "feedback_type": feedback_type,
+            "payload": {"emoji": "👍", "scorer_tags": ["👍"]},
+            "scorer_tags": ["👍"],
             # Denormalized agent metadata the UI attaches for dashboard filtering.
-            span_agent_name="support-bot",
-            span_agent_version="1.2.0",
-            span_status_code="OK",
-        )
+            "span_agent_name": "support-bot",
+            "span_agent_version": "1.2.0",
+            "span_status_code": "OK",
+        }
     )
     assert create_res.id is not None
 
-    query_res = client.server.feedback_query(
-        tsi.FeedbackQueryReq(project_id=project_id)
-    )
+    query_res = client.server.feedback_query({"project_id": project_id})
     assert len(query_res.result) == 1
     row = query_res.result[0]
     assert row["feedback_type"] == feedback_type
@@ -670,16 +649,16 @@ def test_agent_monitor_feedback_filters(client: WeaveClient) -> None:
 
     def _create(weave_ref_suffix: str, **scorer_kwargs):
         client.server.feedback_create(
-            tsi.FeedbackCreateReq(
-                project_id=project_id,
-                weave_ref=f"weave:///{project_id}/call/{weave_ref_suffix}",
-                feedback_type="wandb.agent_monitor",
-                payload={"value": scorer_kwargs.get("scorer_tags", [])},
-                runnable_ref=runnable_ref,
-                call_ref=call_ref,
-                trigger_ref=trigger_ref,
+            {
+                "project_id": project_id,
+                "weave_ref": f"weave:///{project_id}/call/{weave_ref_suffix}",
+                "feedback_type": "wandb.agent_monitor",
+                "payload": {"value": scorer_kwargs.get("scorer_tags", [])},
+                "runnable_ref": runnable_ref,
+                "call_ref": call_ref,
+                "trigger_ref": trigger_ref,
                 **scorer_kwargs,
-            )
+            }
         )
 
     _create("a", scorer_tags=["nsfw"], scorer_ratings={"_rating_": 0.9})
@@ -693,7 +672,7 @@ def test_agent_monitor_feedback_filters(client: WeaveClient) -> None:
 
     def _query(query_dict) -> list[dict]:
         res = client.server.feedback_query(
-            tsi.FeedbackQueryReq(project_id=project_id, query=Query(**query_dict))
+            {"project_id": project_id, "query": {**query_dict}}
         )
         return res.result
 
@@ -818,16 +797,16 @@ def test_feedback_aggregate(client: WeaveClient) -> None:
 
     def _create(suffix: str, runnable_ref: str, **scorer_kwargs):
         client.server.feedback_create(
-            tsi.FeedbackCreateReq(
-                project_id=project_id,
-                weave_ref=f"weave:///{project_id}/call/{suffix}",
-                feedback_type="wandb.agent_monitor",
-                payload={"value": scorer_kwargs.get("scorer_tags", [])},
-                runnable_ref=runnable_ref,
-                call_ref=call_ref,
-                trigger_ref=trigger_ref,
+            {
+                "project_id": project_id,
+                "weave_ref": f"weave:///{project_id}/call/{suffix}",
+                "feedback_type": "wandb.agent_monitor",
+                "payload": {"value": scorer_kwargs.get("scorer_tags", [])},
+                "runnable_ref": runnable_ref,
+                "call_ref": call_ref,
+                "trigger_ref": trigger_ref,
                 **scorer_kwargs,
-            )
+            }
         )
 
     # Scorer A: two rated rows (one also tagged) + one row that scored nothing
@@ -844,12 +823,12 @@ def test_feedback_aggregate(client: WeaveClient) -> None:
     _create("b1", scorer_b, scorer_tags=["nsfw", "slow"], span_status_code="ERROR")
     # A non-agent-monitor row that must be excluded by the feedback_type filter.
     client.server.feedback_create(
-        tsi.FeedbackCreateReq(
-            project_id=project_id,
-            weave_ref=f"weave:///{project_id}/call/note",
-            feedback_type="wandb.note.1",
-            payload={"note": "ignore me"},
-        )
+        {
+            "project_id": project_id,
+            "weave_ref": f"weave:///{project_id}/call/note",
+            "feedback_type": "wandb.note.1",
+            "payload": {"note": "ignore me"},
+        }
     )
 
     # Per-scorer rollups, reused as the expected buckets across the cases below.
@@ -878,14 +857,14 @@ def test_feedback_aggregate(client: WeaveClient) -> None:
     bucket_ms = 3600 * 1000
     expected_bucket_start = (now_ms // bucket_ms) * bucket_ms
     bucketed = client.server.feedback_aggregate(
-        FeedbackAggregateReq(
-            project_id=project_id,
-            after_ms=after_ms,
-            before_ms=before_ms,
-            time_bucket_seconds=3600,
-            feedback_types=["wandb.agent_monitor"],
-            group_by=["scorer_id"],
-        )
+        {
+            "project_id": project_id,
+            "after_ms": after_ms,
+            "before_ms": before_ms,
+            "time_bucket_seconds": 3600,
+            "feedback_types": ["wandb.agent_monitor"],
+            "group_by": ["scorer_id"],
+        }
     )
     # ORDER BY bucket leaves rows in the same bucket unordered; sort by scorer for
     # a stable shape. (A rare run straddling the hour boundary fails loudly here.)
@@ -906,13 +885,13 @@ def test_feedback_aggregate(client: WeaveClient) -> None:
 
     # --- Unbucketed, grouped by scorer (ORDER BY scorer_id is deterministic) ---
     assert client.server.feedback_aggregate(
-        FeedbackAggregateReq(
-            project_id=project_id,
-            after_ms=after_ms,
-            before_ms=before_ms,
-            feedback_types=["wandb.agent_monitor"],
-            group_by=["scorer_id"],
-        )
+        {
+            "project_id": project_id,
+            "after_ms": after_ms,
+            "before_ms": before_ms,
+            "feedback_types": ["wandb.agent_monitor"],
+            "group_by": ["scorer_id"],
+        }
     ) == FeedbackAggregateResponse(
         time_bucket_seconds=None,
         after_ms=after_ms,
@@ -924,13 +903,13 @@ def test_feedback_aggregate(client: WeaveClient) -> None:
     # Enum8 ORDER BY is by numeric value, not name, so sort by status for a
     # stable shape. UNSET (a3) scored nothing -> scored_count 0.
     by_status = client.server.feedback_aggregate(
-        FeedbackAggregateReq(
-            project_id=project_id,
-            after_ms=after_ms,
-            before_ms=before_ms,
-            feedback_types=["wandb.agent_monitor"],
-            group_by=["span_status_code"],
-        )
+        {
+            "project_id": project_id,
+            "after_ms": after_ms,
+            "before_ms": before_ms,
+            "feedback_types": ["wandb.agent_monitor"],
+            "group_by": ["span_status_code"],
+        }
     )
     by_status.buckets.sort(key=lambda b: b.group["span_status_code"])
     assert by_status == FeedbackAggregateResponse(
@@ -970,12 +949,12 @@ def test_feedback_aggregate(client: WeaveClient) -> None:
 
     # --- Unbucketed, no group_by: one global rollup row over all matched rows ---
     assert client.server.feedback_aggregate(
-        FeedbackAggregateReq(
-            project_id=project_id,
-            after_ms=after_ms,
-            before_ms=before_ms,
-            feedback_types=["wandb.agent_monitor"],
-        )
+        {
+            "project_id": project_id,
+            "after_ms": after_ms,
+            "before_ms": before_ms,
+            "feedback_types": ["wandb.agent_monitor"],
+        }
     ) == FeedbackAggregateResponse(
         time_bucket_seconds=None,
         after_ms=after_ms,
@@ -997,13 +976,13 @@ def test_feedback_aggregate(client: WeaveClient) -> None:
     # bucket carrying its timestamp (group stays empty). All rows share one 1h
     # bucket, so a single row comes back. ---
     assert client.server.feedback_aggregate(
-        FeedbackAggregateReq(
-            project_id=project_id,
-            after_ms=after_ms,
-            before_ms=before_ms,
-            time_bucket_seconds=3600,
-            feedback_types=["wandb.agent_monitor"],
-        )
+        {
+            "project_id": project_id,
+            "after_ms": after_ms,
+            "before_ms": before_ms,
+            "time_bucket_seconds": 3600,
+            "feedback_types": ["wandb.agent_monitor"],
+        }
     ) == FeedbackAggregateResponse(
         time_bucket_seconds=3600,
         after_ms=after_ms,
@@ -1026,11 +1005,11 @@ def test_feedback_aggregate(client: WeaveClient) -> None:
     # group_by, no filters), so this rolls up EVERY feedback row in the project --
     # including the non-agent-monitor note (total 5, not 4). ---
     assert client.server.feedback_aggregate(
-        FeedbackAggregateReq(
-            project_id=project_id,
-            after_ms=0,
-            before_ms=before_ms,
-        )
+        {
+            "project_id": project_id,
+            "after_ms": 0,
+            "before_ms": before_ms,
+        }
     ) == FeedbackAggregateResponse(
         time_bucket_seconds=None,
         after_ms=0,
@@ -1053,14 +1032,14 @@ def test_feedback_aggregate(client: WeaveClient) -> None:
     # the same single scorer.
     for scorer_filter in ("scorer_a", "scorer_a*"):
         assert client.server.feedback_aggregate(
-            FeedbackAggregateReq(
-                project_id=project_id,
-                after_ms=after_ms,
-                before_ms=before_ms,
-                feedback_types=["wandb.agent_monitor"],
-                scorer_ids=[scorer_filter],
-                group_by=["scorer_id"],
-            )
+            {
+                "project_id": project_id,
+                "after_ms": after_ms,
+                "before_ms": before_ms,
+                "feedback_types": ["wandb.agent_monitor"],
+                "scorer_ids": [scorer_filter],
+                "group_by": ["scorer_id"],
+            }
         ) == FeedbackAggregateResponse(
             time_bucket_seconds=None,
             after_ms=after_ms,
@@ -1071,14 +1050,14 @@ def test_feedback_aggregate(client: WeaveClient) -> None:
     # --- Filter: tags keeps rows whose scorer_tags include "nsfw" (just b1); the
     # rollup still counts all of that row's tags. ---
     assert client.server.feedback_aggregate(
-        FeedbackAggregateReq(
-            project_id=project_id,
-            after_ms=after_ms,
-            before_ms=before_ms,
-            feedback_types=["wandb.agent_monitor"],
-            tags=["nsfw"],
-            group_by=["scorer_id"],
-        )
+        {
+            "project_id": project_id,
+            "after_ms": after_ms,
+            "before_ms": before_ms,
+            "feedback_types": ["wandb.agent_monitor"],
+            "tags": ["nsfw"],
+            "group_by": ["scorer_id"],
+        }
     ) == FeedbackAggregateResponse(
         time_bucket_seconds=None,
         after_ms=after_ms,
@@ -1089,13 +1068,13 @@ def test_feedback_aggregate(client: WeaveClient) -> None:
     # --- Filter: rating_min keeps rows whose _rating_ >= 0.7 (just a1 at 0.75);
     # a2 (0.5) and the rating-less rows drop out. ---
     assert client.server.feedback_aggregate(
-        FeedbackAggregateReq(
-            project_id=project_id,
-            after_ms=after_ms,
-            before_ms=before_ms,
-            feedback_types=["wandb.agent_monitor"],
-            rating_min=0.7,
-        )
+        {
+            "project_id": project_id,
+            "after_ms": after_ms,
+            "before_ms": before_ms,
+            "feedback_types": ["wandb.agent_monitor"],
+            "rating_min": 0.7,
+        }
     ) == FeedbackAggregateResponse(
         time_bucket_seconds=None,
         after_ms=after_ms,
@@ -1136,24 +1115,24 @@ def test_agent_monitor_feedback_sort_by_map_column(client: WeaveClient) -> None:
     ]
     for suffix, rating, reason in rows:
         client.server.feedback_create(
-            tsi.FeedbackCreateReq(
-                project_id=project_id,
-                weave_ref=f"weave:///{project_id}/call/{suffix}",
-                feedback_type="wandb.agent_monitor",
-                payload={"value": rating},
-                runnable_ref=runnable_ref,
-                call_ref=call_ref,
-                trigger_ref=trigger_ref,
-                scorer_ratings={"_rating_": rating},
-                scorer_rating_reasons={"_rating_": reason},
-            )
+            {
+                "project_id": project_id,
+                "weave_ref": f"weave:///{project_id}/call/{suffix}",
+                "feedback_type": "wandb.agent_monitor",
+                "payload": {"value": rating},
+                "runnable_ref": runnable_ref,
+                "call_ref": call_ref,
+                "trigger_ref": trigger_ref,
+                "scorer_ratings": {"_rating_": rating},
+                "scorer_rating_reasons": {"_rating_": reason},
+            }
         )
 
     asc = client.server.feedback_query(
-        tsi.FeedbackQueryReq(
-            project_id=project_id,
-            sort_by=[SortBy(field="scorer_ratings._rating_", direction="asc")],
-        )
+        {
+            "project_id": project_id,
+            "sort_by": [{"field": "scorer_ratings._rating_", "direction": "asc"}],
+        }
     )
     assert [r["weave_ref"].rsplit("/", 1)[-1] for r in asc.result] == [
         "low",
@@ -1162,10 +1141,10 @@ def test_agent_monitor_feedback_sort_by_map_column(client: WeaveClient) -> None:
     ]
 
     desc = client.server.feedback_query(
-        tsi.FeedbackQueryReq(
-            project_id=project_id,
-            sort_by=[SortBy(field="scorer_ratings._rating_", direction="desc")],
-        )
+        {
+            "project_id": project_id,
+            "sort_by": [{"field": "scorer_ratings._rating_", "direction": "desc"}],
+        }
     )
     assert [r["weave_ref"].rsplit("/", 1)[-1] for r in desc.result] == [
         "high",
@@ -1174,10 +1153,12 @@ def test_agent_monitor_feedback_sort_by_map_column(client: WeaveClient) -> None:
     ]
 
     by_reason = client.server.feedback_query(
-        tsi.FeedbackQueryReq(
-            project_id=project_id,
-            sort_by=[SortBy(field="scorer_rating_reasons._rating_", direction="asc")],
-        )
+        {
+            "project_id": project_id,
+            "sort_by": [
+                {"field": "scorer_rating_reasons._rating_", "direction": "asc"}
+            ],
+        }
     )
     assert [r["weave_ref"].rsplit("/", 1)[-1] for r in by_reason.result] == [
         "low",
@@ -1190,32 +1171,30 @@ def test_feedback_query_total_count_precedes_pagination(client: WeaveClient) -> 
     project_id = client.project_id
     for index, feedback_type in enumerate(["keep", "skip", "keep"]):
         client.server.feedback_create(
-            tsi.FeedbackCreateReq(
-                project_id=project_id,
-                weave_ref=f"weave:///{project_id}/call/{index}",
-                feedback_type=feedback_type,
-                payload={},
-            )
+            {
+                "project_id": project_id,
+                "weave_ref": f"weave:///{project_id}/call/{index}",
+                "feedback_type": feedback_type,
+                "payload": {},
+            }
         )
 
     result = client.server.feedback_query(
-        tsi.FeedbackQueryReq(
-            project_id=project_id,
-            fields=["weave_ref"],
-            query=Query(
-                **{
-                    "$expr": {
-                        "$eq": [
-                            {"$getField": "feedback_type"},
-                            {"$literal": "keep"},
-                        ]
-                    }
+        {
+            "project_id": project_id,
+            "fields": ["weave_ref"],
+            "query": {
+                "$expr": {
+                    "$eq": [
+                        {"$getField": "feedback_type"},
+                        {"$literal": "keep"},
+                    ]
                 }
-            ),
-            sort_by=[SortBy(field="weave_ref", direction="asc")],
-            limit=1,
-            offset=1,
-        )
+            },
+            "sort_by": [{"field": "weave_ref", "direction": "asc"}],
+            "limit": 1,
+            "offset": 1,
+        }
     )
 
     assert result.total_count == 2
@@ -1278,17 +1257,17 @@ async def test_sort_by_feedback(client: WeaveClient, no_autoflush) -> None:
         ),
     ]:
         calls = client.server.calls_query_stream(
-            tsi.CallsQueryReq(
-                project_id=client.project_id,
-                filter=tsi.CallsFilter(op_names=[get_ref(my_model).uri]),
-                sort_by=[
-                    SortBy(
-                        field=field,
-                        direction="asc",
-                    )
+            {
+                "project_id": client.project_id,
+                "filter": {"op_names": [get_ref(my_model).uri]},
+                "sort_by": [
+                    {
+                        "field": field,
+                        "direction": "asc",
+                    }
                     for field in fields
                 ],
-            )
+            }
         )
 
         found_ids = [c.id for c in calls]
@@ -1297,17 +1276,17 @@ async def test_sort_by_feedback(client: WeaveClient, no_autoflush) -> None:
         )
 
         calls = client.server.calls_query_stream(
-            tsi.CallsQueryReq(
-                project_id=client.project_id,
-                filter=tsi.CallsFilter(op_names=[get_ref(my_model).uri]),
-                sort_by=[
-                    SortBy(
-                        field=field,
-                        direction="desc",
-                    )
+            {
+                "project_id": client.project_id,
+                "filter": {"op_names": [get_ref(my_model).uri]},
+                "sort_by": [
+                    {
+                        "field": field,
+                        "direction": "desc",
+                    }
                     for field in fields
                 ],
-            )
+            }
         )
 
         found_ids = [c.id for c in calls]
@@ -1341,10 +1320,10 @@ async def test_filter_by_feedback(client: WeaveClient, no_autoflush) -> None:
         ),
     ]:
         calls = client.server.calls_query_stream(
-            tsi.CallsQueryReq(
-                project_id=client.project_id,
-                filter=tsi.CallsFilter(op_names=[get_ref(my_model).uri]),
-                query={
+            {
+                "project_id": client.project_id,
+                "filter": {"op_names": [get_ref(my_model).uri]},
+                "query": {
                     "$expr": {
                         "$eq": [
                             {"$getField": field},
@@ -1352,7 +1331,7 @@ async def test_filter_by_feedback(client: WeaveClient, no_autoflush) -> None:
                         ]
                     }
                 },
-            )
+            }
         )
 
         found_ids = [c.id for c in calls]
@@ -1361,10 +1340,10 @@ async def test_filter_by_feedback(client: WeaveClient, no_autoflush) -> None:
         )
 
         calls = client.server.calls_query_stream(
-            tsi.CallsQueryReq(
-                project_id=client.project_id,
-                filter=tsi.CallsFilter(op_names=[get_ref(my_model).uri]),
-                query={
+            {
+                "project_id": client.project_id,
+                "filter": {"op_names": [get_ref(my_model).uri]},
+                "query": {
                     "$expr": {
                         "$gt": [
                             {"$getField": field},
@@ -1372,7 +1351,7 @@ async def test_filter_by_feedback(client: WeaveClient, no_autoflush) -> None:
                         ]
                     }
                 },
-            )
+            }
         )
 
         found_ids = [c.id for c in calls]
@@ -1394,10 +1373,10 @@ async def test_filter_by_feedback(client: WeaveClient, no_autoflush) -> None:
     ]:
         operation = "$gt" if isinstance(value, float) else "$eq"
         calls = client.server.calls_query_stream(
-            tsi.CallsQueryReq(
-                project_id=client.project_id,
-                filter=tsi.CallsFilter(op_names=[get_ref(my_model).uri]),
-                query={
+            {
+                "project_id": client.project_id,
+                "filter": {"op_names": [get_ref(my_model).uri]},
+                "query": {
                     "$expr": {
                         operation: [
                             {"$getField": field},
@@ -1405,7 +1384,7 @@ async def test_filter_by_feedback(client: WeaveClient, no_autoflush) -> None:
                         ]
                     }
                 },
-            )
+            }
         )
         found_ids = [c.id for c in calls]
         assert found_ids == expected_ids, (
@@ -1426,10 +1405,10 @@ async def test_filter_by_feedback(client: WeaveClient, no_autoflush) -> None:
         ("x", [ids[1]]),
     ]:
         calls = client.server.calls_query_stream(
-            tsi.CallsQueryReq(
-                project_id=client.project_id,
-                filter=tsi.CallsFilter(op_names=[model_ref]),
-                query={
+            {
+                "project_id": client.project_id,
+                "filter": {"op_names": [model_ref]},
+                "query": {
                     "$expr": {
                         "$contains": {
                             "input": {"$getField": model_output_field},
@@ -1437,7 +1416,7 @@ async def test_filter_by_feedback(client: WeaveClient, no_autoflush) -> None:
                         }
                     }
                 },
-            )
+            }
         )
 
         found_ids = [c.id for c in calls]
@@ -1464,11 +1443,11 @@ async def test_filter_and_sort_by_feedback(client: WeaveClient, no_autoflush) ->
     """Test filtering and sorting by feedback."""
     ids, my_scorer, my_model = await populate_feedback(client)
     calls = client.server.calls_query_stream(
-        tsi.CallsQueryReq(
-            project_id=client.project_id,
-            filter=tsi.CallsFilter(op_names=[get_ref(my_model).uri]),
+        {
+            "project_id": client.project_id,
+            "filter": {"op_names": [get_ref(my_model).uri]},
             # Filter down to just correct matches
-            query={
+            "query": {
                 "$expr": {
                     "$eq": [
                         {
@@ -1479,13 +1458,13 @@ async def test_filter_and_sort_by_feedback(client: WeaveClient, no_autoflush) ->
                 }
             },
             # Sort by the model output desc
-            sort_by=[
+            "sort_by": [
                 {
                     "field": "feedback.[wandb.runnable.my_scorer].payload.output.model_output",
                     "direction": "desc",
                 }
             ],
-        )
+        }
     )
     calls = list(calls)
     assert len(calls) == 2
@@ -1532,10 +1511,10 @@ async def test_filter_by_wildcard_feedback_with_multiple_items(
     # Filter for scorer_b's is_match — should match all 3 calls.
     calls = list(
         client.server.calls_query_stream(
-            tsi.CallsQueryReq(
-                project_id=client.project_id,
-                filter=tsi.CallsFilter(op_names=[model_ref]),
-                query={
+            {
+                "project_id": client.project_id,
+                "filter": {"op_names": [model_ref]},
+                "query": {
                     "$expr": {
                         "$eq": [
                             {
@@ -1545,7 +1524,7 @@ async def test_filter_by_wildcard_feedback_with_multiple_items(
                         ]
                     }
                 },
-            )
+            }
         )
     )
     assert len(calls) == 3, (
@@ -1555,10 +1534,10 @@ async def test_filter_by_wildcard_feedback_with_multiple_items(
     # Also verify scorer_a is findable via its own unique path
     calls = list(
         client.server.calls_query_stream(
-            tsi.CallsQueryReq(
-                project_id=client.project_id,
-                filter=tsi.CallsFilter(op_names=[model_ref]),
-                query={
+            {
+                "project_id": client.project_id,
+                "filter": {"op_names": [model_ref]},
+                "query": {
                     "$expr": {
                         "$eq": [
                             {
@@ -1568,7 +1547,7 @@ async def test_filter_by_wildcard_feedback_with_multiple_items(
                         ]
                     }
                 },
-            )
+            }
         )
     )
     assert len(calls) == 3, (
@@ -1578,10 +1557,10 @@ async def test_filter_by_wildcard_feedback_with_multiple_items(
     # Filter using a specific scorer type (non-wildcard) still works
     calls = list(
         client.server.calls_query_stream(
-            tsi.CallsQueryReq(
-                project_id=client.project_id,
-                filter=tsi.CallsFilter(op_names=[model_ref]),
-                query={
+            {
+                "project_id": client.project_id,
+                "filter": {"op_names": [model_ref]},
+                "query": {
                     "$expr": {
                         "$eq": [
                             {
@@ -1591,7 +1570,7 @@ async def test_filter_by_wildcard_feedback_with_multiple_items(
                         ]
                     }
                 },
-            )
+            }
         )
     )
     assert len(calls) == 3, (
@@ -1601,32 +1580,32 @@ async def test_filter_by_wildcard_feedback_with_multiple_items(
 
 def test_feedback_replace(client) -> None:
     # Create initial feedback
-    create_req = FeedbackCreateReq(
-        project_id=client.project_id,
-        weave_ref=f"weave:///{client.project_id}/obj/123:abc",
-        feedback_type="reaction",
-        payload={"emoji": "👍"},
-    )
+    create_req = {
+        "project_id": client.project_id,
+        "weave_ref": f"weave:///{client.project_id}/obj/123:abc",
+        "feedback_type": "reaction",
+        "payload": {"emoji": "👍"},
+    }
     initial_feedback = client.server.feedback_create(create_req)
 
     # Create another feedback with different type
     note_feedback = client.server.feedback_create(
-        FeedbackCreateReq(
-            project_id=client.project_id,
-            weave_ref=f"weave:///{client.project_id}/obj/456:def",
-            feedback_type="note",
-            payload={"note": "This is a test note"},
-        )
+        {
+            "project_id": client.project_id,
+            "weave_ref": f"weave:///{client.project_id}/obj/456:def",
+            "feedback_type": "note",
+            "payload": {"note": "This is a test note"},
+        }
     )
 
     # Replace the first feedback with new content
-    replace_req = FeedbackReplaceReq(
-        project_id=client.project_id,
-        weave_ref=f"weave:///{client.project_id}/obj/123:abc",
-        feedback_type="note",
-        payload={"note": "Updated feedback"},
-        feedback_id=initial_feedback.id,
-    )
+    replace_req = {
+        "project_id": client.project_id,
+        "weave_ref": f"weave:///{client.project_id}/obj/123:abc",
+        "feedback_type": "note",
+        "payload": {"note": "Updated feedback"},
+        "feedback_id": initial_feedback.id,
+    }
     replaced_feedback = client.server.feedback_replace(replace_req)
 
     # Verify the replacement
@@ -1634,9 +1613,7 @@ def test_feedback_replace(client) -> None:
 
     # Verify the other feedback remains unchanged
     query_res = client.server.feedback_query(
-        FeedbackQueryReq(
-            project_id=client.project_id, fields=["id", "feedback_type", "payload"]
-        )
+        {"project_id": client.project_id, "fields": ["id", "feedback_type", "payload"]}
     )
 
     feedbacks = query_res.result
@@ -1648,22 +1625,20 @@ def test_feedback_replace(client) -> None:
     assert other_feedback["payload"] == {"note": "This is a test note"}
 
     # now replace the replaced feedback with the original content
-    replace_req = FeedbackReplaceReq(
-        project_id=client.project_id,
-        weave_ref=f"weave:///{client.project_id}/obj/123:abc",
-        feedback_type="reaction",
-        payload={"emoji": "👍"},
-        feedback_id=replaced_feedback.id,
-    )
+    replace_req = {
+        "project_id": client.project_id,
+        "weave_ref": f"weave:///{client.project_id}/obj/123:abc",
+        "feedback_type": "reaction",
+        "payload": {"emoji": "👍"},
+        "feedback_id": replaced_feedback.id,
+    }
     replaced_feedback = client.server.feedback_replace(replace_req)
 
     assert replaced_feedback.id != initial_feedback.id
 
     # Verify the latest feedback payload
     query_res = client.server.feedback_query(
-        FeedbackQueryReq(
-            project_id=client.project_id, fields=["id", "feedback_type", "payload"]
-        )
+        {"project_id": client.project_id, "fields": ["id", "feedback_type", "payload"]}
     )
     feedbacks = query_res.result
     assert len(feedbacks) == 2
@@ -1678,12 +1653,12 @@ def test_feedback_replace_validates_before_purge(client) -> None:
     weave_ref = f"weave:///{project_id}/obj/123:abc"
 
     initial = client.server.feedback_create(
-        FeedbackCreateReq(
-            project_id=project_id,
-            weave_ref=weave_ref,
-            feedback_type="reaction",
-            payload={"emoji": "👍"},
-        )
+        {
+            "project_id": project_id,
+            "weave_ref": weave_ref,
+            "feedback_type": "reaction",
+            "payload": {"emoji": "👍"},
+        }
     )
 
     # The replace payload would fail validation (non-empty scorer_tags on a
@@ -1691,19 +1666,19 @@ def test_feedback_replace_validates_before_purge(client) -> None:
     # run first and destroy the original row.
     with pytest.raises(InvalidRequest):
         client.server.feedback_replace(
-            FeedbackReplaceReq(
-                project_id=project_id,
-                weave_ref=weave_ref,
-                feedback_type="reaction",
-                payload={"emoji": "👍"},
-                feedback_id=initial.id,
-                scorer_tags=["nsfw"],
-            )
+            {
+                "project_id": project_id,
+                "weave_ref": weave_ref,
+                "feedback_type": "reaction",
+                "payload": {"emoji": "👍"},
+                "feedback_id": initial.id,
+                "scorer_tags": ["nsfw"],
+            }
         )
 
     # The original row must still be there.
     query_res = client.server.feedback_query(
-        FeedbackQueryReq(project_id=project_id, fields=["id"])
+        {"project_id": project_id, "fields": ["id"]}
     )
     assert [r["id"] for r in query_res.result] == [initial.id]
 
@@ -1717,34 +1692,32 @@ def test_get_feedback_with_dict_query(client) -> None:
     call_ref_uri = f"weave:///{project_id}/call/call_id_123"
 
     # Create feedback with specific feedback_type
-    feedback_req1 = FeedbackCreateReq(
-        project_id=project_id,
-        weave_ref=call_ref_uri,
-        feedback_type="wandb.reaction.1",
-        payload={"emoji": "👍"},
-    )
+    feedback_req1 = {
+        "project_id": project_id,
+        "weave_ref": call_ref_uri,
+        "feedback_type": "wandb.reaction.1",
+        "payload": {"emoji": "👍"},
+    }
     feedback_res1 = client.server.feedback_create(feedback_req1)
 
     # Create feedback with different feedback_type
-    feedback_req2 = FeedbackCreateReq(
-        project_id=project_id,
-        weave_ref=call_ref_uri,
-        feedback_type="custom.score.1",
-        payload={"score": 0.95},
-    )
+    feedback_req2 = {
+        "project_id": project_id,
+        "weave_ref": call_ref_uri,
+        "feedback_type": "custom.score.1",
+        "payload": {"score": 0.95},
+    }
     feedback_res2 = client.server.feedback_create(feedback_req2)
 
     # Test the dict query example from the docstring
-    query = Query(
-        **{
-            "$expr": {
-                "$eq": [
-                    {"$getField": "feedback_type"},
-                    {"$literal": "wandb.reaction.1"},
-                ]
-            }
+    query = {
+        "$expr": {
+            "$eq": [
+                {"$getField": "feedback_type"},
+                {"$literal": "wandb.reaction.1"},
+            ]
         }
-    )
+    }
 
     feedback_results = client.get_feedback(query=query)
 
@@ -1755,16 +1728,14 @@ def test_get_feedback_with_dict_query(client) -> None:
     assert feedback_list[0].payload["emoji"] == "👍"
 
     # Test another dict query for the custom feedback type
-    custom_query = Query(
-        **{
-            "$expr": {
-                "$eq": [
-                    {"$getField": "feedback_type"},
-                    {"$literal": "custom.score.1"},
-                ],
-            }
+    custom_query = {
+        "$expr": {
+            "$eq": [
+                {"$getField": "feedback_type"},
+                {"$literal": "custom.score.1"},
+            ],
         }
-    )
+    }
 
     custom_feedback_results = client.get_feedback(query=custom_query)
     custom_feedback_list = list(custom_feedback_results)
@@ -1773,16 +1744,14 @@ def test_get_feedback_with_dict_query(client) -> None:
     assert custom_feedback_list[0].payload["score"] == 0.95
 
     # Test dict query that should return no results
-    no_results_query = Query(
-        **{
-            "$expr": {
-                "$eq": [
-                    {"$getField": "feedback_type"},
-                    {"$literal": "nonexistent.type"},
-                ],
-            }
+    no_results_query = {
+        "$expr": {
+            "$eq": [
+                {"$getField": "feedback_type"},
+                {"$literal": "nonexistent.type"},
+            ],
         }
-    )
+    }
 
     no_results = client.get_feedback(query=no_results_query)
     assert len(list(no_results)) == 0
@@ -1805,19 +1774,17 @@ def test_feedback_query_bad_json_path(client) -> None:
     # "inputs" is not a valid column or JSON field in the feedback table
     with pytest.raises(ValueError, match="Unknown field: inputs.message_id"):
         client.server.feedback_query(
-            FeedbackQueryReq(
-                project_id=project_id,
-                query=Query(
-                    **{
-                        "$expr": {
-                            "$contains": {
-                                "input": {"$getField": "inputs.message_id"},
-                                "substr": {"$literal": "test-id"},
-                            }
+            {
+                "project_id": project_id,
+                "query": {
+                    "$expr": {
+                        "$contains": {
+                            "input": {"$getField": "inputs.message_id"},
+                            "substr": {"$literal": "test-id"},
                         }
                     }
-                ),
-            )
+                },
+            }
         )
 
 
@@ -1828,12 +1795,12 @@ def test_feedback_query_contains_numeric_literal(client) -> None:
     call_ref_uri = f"weave:///{project_id}/call/call_id_456"
 
     # Create feedback with a payload containing a dataset_id
-    feedback_req = FeedbackCreateReq(
-        project_id=project_id,
-        weave_ref=call_ref_uri,
-        feedback_type="custom.annotation",
-        payload={"dataset_id": 94, "dataset_id_str": "94"},
-    )
+    feedback_req = {
+        "project_id": project_id,
+        "weave_ref": call_ref_uri,
+        "feedback_type": "custom.annotation",
+        "payload": {"dataset_id": 94, "dataset_id_str": "94"},
+    }
     client.server.feedback_create(feedback_req)
 
     # A numeric literal on a JSON field surfaces a guided error pointing at $convert.
@@ -1842,37 +1809,31 @@ def test_feedback_query_contains_numeric_literal(client) -> None:
         match="Illegal type of argument in query",
     ):
         client.server.feedback_query(
-            FeedbackQueryReq(
-                project_id=project_id,
-                query=Query(
-                    **{
-                        "$expr": {
-                            "$contains": {
-                                "input": {"$getField": "payload.dataset_id"},
-                                "substr": {
-                                    "$literal": 94
-                                },  # Numeric literal, not string
-                            }
+            {
+                "project_id": project_id,
+                "query": {
+                    "$expr": {
+                        "$contains": {
+                            "input": {"$getField": "payload.dataset_id"},
+                            "substr": {"$literal": 94},  # Numeric literal, not string
                         }
                     }
-                ),
-            )
+                },
+            }
         )
 
     res = client.server.feedback_query(
-        FeedbackQueryReq(
-            project_id=project_id,
-            query=Query(
-                **{
-                    "$expr": {
-                        "$contains": {
-                            "input": {"$getField": "payload.dataset_id_str"},
-                            "substr": {"$literal": "9"},  # Numeric literal, not string
-                        }
+        {
+            "project_id": project_id,
+            "query": {
+                "$expr": {
+                    "$contains": {
+                        "input": {"$getField": "payload.dataset_id_str"},
+                        "substr": {"$literal": "9"},  # Numeric literal, not string
                     }
                 }
-            ),
-        )
+            },
+        }
     )
     assert len(res.result) == 1
     assert res.result[0]["payload"]["dataset_id_str"] == "94"
@@ -1892,25 +1853,25 @@ def test_feedback_query_typed_payload_filters(client: WeaveClient) -> None:
     call_ref = f"weave:///{project_id}/call/call_id_typed_payload"
 
     client.server.feedback_create(
-        FeedbackCreateReq(
-            project_id=project_id,
-            weave_ref=call_ref,
-            feedback_type="custom.annotation",
-            payload={"is_positive": True, "score": 0.9, "rank": 1},
-        )
+        {
+            "project_id": project_id,
+            "weave_ref": call_ref,
+            "feedback_type": "custom.annotation",
+            "payload": {"is_positive": True, "score": 0.9, "rank": 1},
+        }
     )
     client.server.feedback_create(
-        FeedbackCreateReq(
-            project_id=project_id,
-            weave_ref=call_ref,
-            feedback_type="custom.annotation",
-            payload={"is_positive": False, "score": 0.1, "rank": 2},
-        )
+        {
+            "project_id": project_id,
+            "weave_ref": call_ref,
+            "feedback_type": "custom.annotation",
+            "payload": {"is_positive": False, "score": 0.1, "rank": 2},
+        }
     )
 
     def query(expr: dict) -> list[dict]:
         return client.server.feedback_query(
-            FeedbackQueryReq(project_id=project_id, query=Query(**{"$expr": expr}))
+            {"project_id": project_id, "query": {"$expr": expr}}
         ).result
 
     # Bool literal: this is the exact shape that was 502'ing in production.
@@ -1952,43 +1913,43 @@ def test_feedback_with_queue_id(client: WeaveClient) -> None:
     weave_ref = f"weave:///{project_id}/call/call_id_789"
 
     # Create an annotation queue first
-    queue_create_req = tsi.AnnotationQueueCreateReq(
-        project_id=project_id,
-        name="Test Queue",
-        description="Queue for testing feedback",
-        scorer_refs=[],
-    )
+    queue_create_req = {
+        "project_id": project_id,
+        "name": "Test Queue",
+        "description": "Queue for testing feedback",
+        "scorer_refs": [],
+    }
     queue_res = client.server.annotation_queue_create(queue_create_req)
     queue_id = queue_res.id
 
     # Case 1: Create feedback with valid queue_id
-    feedback_req = FeedbackCreateReq(
-        project_id=project_id,
-        weave_ref=weave_ref,
-        feedback_type="custom.score",
-        payload={"score": 5},
-        queue_id=queue_id,
-    )
+    feedback_req = {
+        "project_id": project_id,
+        "weave_ref": weave_ref,
+        "feedback_type": "custom.score",
+        "payload": {"score": 5},
+        "queue_id": queue_id,
+    }
     create_res = client.server.feedback_create(feedback_req)
     assert create_res.id is not None
 
     # Verify queue_id is in query results
-    query_res = client.server.feedback_query(FeedbackQueryReq(project_id=project_id))
+    query_res = client.server.feedback_query({"project_id": project_id})
     assert len(query_res.result) == 1
     assert query_res.result[0]["queue_id"] == queue_id
 
     # Case 2: Create feedback without queue_id (should still work)
-    feedback_req_no_queue = FeedbackCreateReq(
-        project_id=project_id,
-        weave_ref=weave_ref,
-        feedback_type="custom.score2",
-        payload={"score": 3},
-    )
+    feedback_req_no_queue = {
+        "project_id": project_id,
+        "weave_ref": weave_ref,
+        "feedback_type": "custom.score2",
+        "payload": {"score": 3},
+    }
     create_res_no_queue = client.server.feedback_create(feedback_req_no_queue)
     assert create_res_no_queue.id is not None
 
     # Verify queue_id is None in query results
-    query_res = client.server.feedback_query(FeedbackQueryReq(project_id=project_id))
+    query_res = client.server.feedback_query({"project_id": project_id})
     assert len(query_res.result) == 2
     no_queue_feedback = next(
         f for f in query_res.result if f["id"] == create_res_no_queue.id
@@ -2005,13 +1966,13 @@ def test_feedback_with_invalid_queue_id(client: WeaveClient) -> None:
     # Case 1: Error with non-existent queue_id
     with pytest.raises(InvalidRequest, match="Queue .* not found or has been deleted"):
         client.server.feedback_create(
-            FeedbackCreateReq(
-                project_id=project_id,
-                weave_ref=weave_ref,
-                feedback_type="custom.score",
-                payload={"score": 5},
-                queue_id=invalid_queue_id,
-            )
+            {
+                "project_id": project_id,
+                "weave_ref": weave_ref,
+                "feedback_type": "custom.score",
+                "payload": {"score": 5},
+                "queue_id": invalid_queue_id,
+            }
         )
 
 
@@ -2023,12 +1984,12 @@ def test_feedback_with_queue_id_from_different_project(
     other_project_id = ensure_project("test-project-other")
 
     # Create a queue in the original project
-    queue_create_req = tsi.AnnotationQueueCreateReq(
-        project_id=project_id,
-        name="Original Project Queue",
-        description="Queue in original project",
-        scorer_refs=[],
-    )
+    queue_create_req = {
+        "project_id": project_id,
+        "name": "Original Project Queue",
+        "description": "Queue in original project",
+        "scorer_refs": [],
+    }
     queue_res = client.server.annotation_queue_create(queue_create_req)
     queue_id = queue_res.id
 
@@ -2036,13 +1997,13 @@ def test_feedback_with_queue_id_from_different_project(
     # This should fail because the queue doesn't belong to the target project
     with pytest.raises(InvalidRequest, match="Queue .* not found or has been deleted"):
         client.server.feedback_create(
-            FeedbackCreateReq(
-                project_id=other_project_id,
-                weave_ref=f"weave:///{other_project_id}/call/call_id_123",
-                feedback_type="custom.score",
-                payload={"score": 5},
-                queue_id=queue_id,
-            )
+            {
+                "project_id": other_project_id,
+                "weave_ref": f"weave:///{other_project_id}/call/call_id_123",
+                "feedback_type": "custom.score",
+                "payload": {"score": 5},
+                "queue_id": queue_id,
+            }
         )
 
 
@@ -2052,72 +2013,70 @@ def test_feedback_query_by_queue_id(client: WeaveClient) -> None:
 
     # Create two queues
     queue1_res = client.server.annotation_queue_create(
-        tsi.AnnotationQueueCreateReq(
-            project_id=project_id,
-            name="Queue 1",
-            description="First queue",
-            scorer_refs=[],
-        )
+        {
+            "project_id": project_id,
+            "name": "Queue 1",
+            "description": "First queue",
+            "scorer_refs": [],
+        }
     )
     queue1_id = queue1_res.id
 
     queue2_res = client.server.annotation_queue_create(
-        tsi.AnnotationQueueCreateReq(
-            project_id=project_id,
-            name="Queue 2",
-            description="Second queue",
-            scorer_refs=[],
-        )
+        {
+            "project_id": project_id,
+            "name": "Queue 2",
+            "description": "Second queue",
+            "scorer_refs": [],
+        }
     )
     queue2_id = queue2_res.id
 
     # Create feedback for queue 1
     client.server.feedback_create(
-        FeedbackCreateReq(
-            project_id=project_id,
-            weave_ref=f"weave:///{project_id}/call/call1",
-            feedback_type="custom.score",
-            payload={"score": 1},
-            queue_id=queue1_id,
-        )
+        {
+            "project_id": project_id,
+            "weave_ref": f"weave:///{project_id}/call/call1",
+            "feedback_type": "custom.score",
+            "payload": {"score": 1},
+            "queue_id": queue1_id,
+        }
     )
 
     # Create feedback for queue 2
     client.server.feedback_create(
-        FeedbackCreateReq(
-            project_id=project_id,
-            weave_ref=f"weave:///{project_id}/call/call2",
-            feedback_type="custom.score",
-            payload={"score": 2},
-            queue_id=queue2_id,
-        )
+        {
+            "project_id": project_id,
+            "weave_ref": f"weave:///{project_id}/call/call2",
+            "feedback_type": "custom.score",
+            "payload": {"score": 2},
+            "queue_id": queue2_id,
+        }
     )
 
     # Create feedback without queue
     client.server.feedback_create(
-        FeedbackCreateReq(
-            project_id=project_id,
-            weave_ref=f"weave:///{project_id}/call/call3",
-            feedback_type="custom.score",
-            payload={"score": 3},
-        )
+        {
+            "project_id": project_id,
+            "weave_ref": f"weave:///{project_id}/call/call3",
+            "feedback_type": "custom.score",
+            "payload": {"score": 3},
+        }
     )
 
     # Query feedback for queue 1
     queue1_feedback = client.server.feedback_query(
-        FeedbackQueryReq(
-            project_id=project_id,
-            query=Query(
-                **{
-                    "$expr": {
-                        "$eq": [
-                            {"$getField": "queue_id"},
-                            {"$literal": queue1_id},
-                        ]
-                    }
+        {
+            "project_id": project_id,
+            "query": {
+                "$expr": {
+                    "$eq": [
+                        {"$getField": "queue_id"},
+                        {"$literal": queue1_id},
+                    ]
                 }
-            ),
-        )
+            },
+        }
     )
     assert len(queue1_feedback.result) == 1
     assert queue1_feedback.result[0]["payload"]["score"] == 1
@@ -2125,26 +2084,24 @@ def test_feedback_query_by_queue_id(client: WeaveClient) -> None:
 
     # Query feedback for queue 2
     queue2_feedback = client.server.feedback_query(
-        FeedbackQueryReq(
-            project_id=project_id,
-            query=Query(
-                **{
-                    "$expr": {
-                        "$eq": [
-                            {"$getField": "queue_id"},
-                            {"$literal": queue2_id},
-                        ]
-                    }
+        {
+            "project_id": project_id,
+            "query": {
+                "$expr": {
+                    "$eq": [
+                        {"$getField": "queue_id"},
+                        {"$literal": queue2_id},
+                    ]
                 }
-            ),
-        )
+            },
+        }
     )
     assert len(queue2_feedback.result) == 1
     assert queue2_feedback.result[0]["payload"]["score"] == 2
     assert queue2_feedback.result[0]["queue_id"] == queue2_id
 
     # Query all feedback
-    all_feedback = client.server.feedback_query(FeedbackQueryReq(project_id=project_id))
+    all_feedback = client.server.feedback_query({"project_id": project_id})
     assert len(all_feedback.result) == 3
 
 
@@ -2170,15 +2127,15 @@ def _seed_numeric_feedback(
 
     for score in scores:
         client.server.feedback_create(
-            tsi.FeedbackCreateReq(
-                project_id=project_id,
-                weave_ref=weave_ref,
-                feedback_type=feedback_type,
-                payload={"output": {"score": score}},
-                runnable_ref=runnable_ref,
-                call_ref=call_ref,
-                trigger_ref=trigger_ref,
-            )
+            {
+                "project_id": project_id,
+                "weave_ref": weave_ref,
+                "feedback_type": feedback_type,
+                "payload": {"output": {"score": score}},
+                "runnable_ref": runnable_ref,
+                "call_ref": call_ref,
+                "trigger_ref": trigger_ref,
+            }
         )
 
 
@@ -2196,24 +2153,24 @@ def test_feedback_stats(client: WeaveClient) -> None:
 
     now = datetime.datetime.now(datetime.timezone.utc)
     res = client.server.feedback_stats(
-        tsi.FeedbackStatsReq(
-            project_id=project_id,
-            start=now - datetime.timedelta(hours=1),
-            end=now + datetime.timedelta(minutes=5),
-            feedback_type="wandb.runnable.test-scorer",
-            trigger_ref=trigger,
-            metrics=[
-                tsi.FeedbackMetricSpec(
-                    json_path="output.score",
-                    value_type="numeric",
-                    aggregations=[
-                        tsi.AggregationType.AVG,
-                        tsi.AggregationType.MIN,
-                        tsi.AggregationType.MAX,
+        {
+            "project_id": project_id,
+            "start": now - datetime.timedelta(hours=1),
+            "end": now + datetime.timedelta(minutes=5),
+            "feedback_type": "wandb.runnable.test-scorer",
+            "trigger_ref": trigger,
+            "metrics": [
+                {
+                    "json_path": "output.score",
+                    "value_type": "numeric",
+                    "aggregations": [
+                        "avg",
+                        "min",
+                        "max",
                     ],
-                )
+                }
             ],
-        )
+        }
     )
 
     assert isinstance(res.buckets, list)
@@ -2245,26 +2202,26 @@ def test_feedback_payload_schema(client: WeaveClient) -> None:
         {"output": {"score": 0.5}, "label": "good"},
     ]:
         client.server.feedback_create(
-            tsi.FeedbackCreateReq(
-                project_id=project_id,
-                weave_ref=weave_ref,
-                feedback_type="wandb.runnable.schema-scorer",
-                payload=payload,
-                runnable_ref=runnable_ref,
-                call_ref=call_ref,
-                trigger_ref=trigger,
-            )
+            {
+                "project_id": project_id,
+                "weave_ref": weave_ref,
+                "feedback_type": "wandb.runnable.schema-scorer",
+                "payload": payload,
+                "runnable_ref": runnable_ref,
+                "call_ref": call_ref,
+                "trigger_ref": trigger,
+            }
         )
 
     now = datetime.datetime.now(datetime.timezone.utc)
     res = client.server.feedback_payload_schema(
-        tsi.FeedbackPayloadSchemaReq(
-            project_id=project_id,
-            start=now - datetime.timedelta(hours=1),
-            end=now + datetime.timedelta(minutes=5),
-            feedback_type="wandb.runnable.schema-scorer",
-            trigger_ref=trigger,
-        )
+        {
+            "project_id": project_id,
+            "start": now - datetime.timedelta(hours=1),
+            "end": now + datetime.timedelta(minutes=5),
+            "feedback_type": "wandb.runnable.schema-scorer",
+            "trigger_ref": trigger,
+        }
     )
 
     path_map = {p.json_path: p.value_type for p in res.paths}
@@ -2279,12 +2236,12 @@ def test_feedback_stats_empty_metrics(client: WeaveClient) -> None:
     project_id = client.project_id
     now = datetime.datetime.now(datetime.timezone.utc)
     res = client.server.feedback_stats(
-        tsi.FeedbackStatsReq(
-            project_id=project_id,
-            start=now - datetime.timedelta(hours=1),
-            end=now + datetime.timedelta(minutes=5),
-            metrics=[],
-        )
+        {
+            "project_id": project_id,
+            "start": now - datetime.timedelta(hours=1),
+            "end": now + datetime.timedelta(minutes=5),
+            "metrics": [],
+        }
     )
 
     assert res.buckets == []
@@ -2295,14 +2252,14 @@ def test_feedback_query_returns_tz_aware_created_at(client: WeaveClient) -> None
     """Ensure `feedback_query` returns tz-aware `created_at`."""
     project_id = client.project_id
     client.server.feedback_create(
-        tsi.FeedbackCreateReq(
-            project_id=project_id,
-            weave_ref=f"weave:///{client.project_id}/object/test:digest",
-            feedback_type="custom",
-            payload={"k": "v"},
-        )
+        {
+            "project_id": project_id,
+            "weave_ref": f"weave:///{client.project_id}/object/test:digest",
+            "feedback_type": "custom",
+            "payload": {"k": "v"},
+        }
     )
-    res = client.server.feedback_query(tsi.FeedbackQueryReq(project_id=project_id))
+    res = client.server.feedback_query({"project_id": project_id})
     assert len(res.result) == 1
     created_at = res.result[0]["created_at"]
     # Over HTTP the row is plain JSON, so the timestamp arrives as a string.
@@ -2327,17 +2284,17 @@ def test_feedback_query_by_collection_size(client: WeaveClient) -> None:
         ratings: dict[str, float] | None = None,
     ) -> str:
         result = client.server.feedback_create(
-            tsi.FeedbackCreateReq(
-                project_id=project_id,
-                weave_ref=f"weave:///{project_id}/call/{feedback_id}",
-                feedback_type="wandb.agent_monitor",
-                payload={},
-                runnable_ref=f"weave:///{project_id}/object/scorer:v1",
-                call_ref=f"weave:///{project_id}/call/judge-{feedback_id}",
-                trigger_ref=f"weave:///{project_id}/object/monitor:v1",
-                scorer_tags=tags or [],
-                scorer_ratings=ratings or {},
-            )
+            {
+                "project_id": project_id,
+                "weave_ref": f"weave:///{project_id}/call/{feedback_id}",
+                "feedback_type": "wandb.agent_monitor",
+                "payload": {},
+                "runnable_ref": f"weave:///{project_id}/object/scorer:v1",
+                "call_ref": f"weave:///{project_id}/call/judge-{feedback_id}",
+                "trigger_ref": f"weave:///{project_id}/object/monitor:v1",
+                "scorer_tags": tags or [],
+                "scorer_ratings": ratings or {},
+            }
         )
         return result.id
 
@@ -2346,59 +2303,55 @@ def test_feedback_query_by_collection_size(client: WeaveClient) -> None:
     rated_id = create_feedback("rated", ratings={"_rating_": 0.8})
 
     all_feedback = client.server.feedback_query(
-        tsi.FeedbackQueryReq(project_id=project_id, fields=["id"])
+        {"project_id": project_id, "fields": ["id"]}
     )
     scored_feedback = client.server.feedback_query(
-        tsi.FeedbackQueryReq(
-            project_id=project_id,
-            fields=["id"],
-            query=tsi.Query.model_validate(
-                {
-                    "$expr": {
-                        "$or": [
-                            {
-                                "$gt": [
-                                    {"$size": {"$getField": "scorer_tags"}},
-                                    {"$literal": 0},
-                                ]
-                            },
-                            {
-                                "$gt": [
-                                    {"$size": {"$getField": "scorer_ratings"}},
-                                    {"$literal": 0},
-                                ]
-                            },
-                        ]
-                    }
+        {
+            "project_id": project_id,
+            "fields": ["id"],
+            "query": {
+                "$expr": {
+                    "$or": [
+                        {
+                            "$gt": [
+                                {"$size": {"$getField": "scorer_tags"}},
+                                {"$literal": 0},
+                            ]
+                        },
+                        {
+                            "$gt": [
+                                {"$size": {"$getField": "scorer_ratings"}},
+                                {"$literal": 0},
+                            ]
+                        },
+                    ]
                 }
-            ),
-        )
+            },
+        }
     )
     scored_feedback_above_fractional_threshold = client.server.feedback_query(
-        tsi.FeedbackQueryReq(
-            project_id=project_id,
-            fields=["id"],
-            query=tsi.Query.model_validate(
-                {
-                    "$expr": {
-                        "$or": [
-                            {
-                                "$gt": [
-                                    {"$size": {"$getField": "scorer_tags"}},
-                                    {"$literal": 0.5},
-                                ]
-                            },
-                            {
-                                "$gt": [
-                                    {"$size": {"$getField": "scorer_ratings"}},
-                                    {"$literal": 0.5},
-                                ]
-                            },
-                        ]
-                    }
+        {
+            "project_id": project_id,
+            "fields": ["id"],
+            "query": {
+                "$expr": {
+                    "$or": [
+                        {
+                            "$gt": [
+                                {"$size": {"$getField": "scorer_tags"}},
+                                {"$literal": 0.5},
+                            ]
+                        },
+                        {
+                            "$gt": [
+                                {"$size": {"$getField": "scorer_ratings"}},
+                                {"$literal": 0.5},
+                            ]
+                        },
+                    ]
                 }
-            ),
-        )
+            },
+        }
     )
 
     assert sorted(all_feedback.result, key=lambda row: row["id"]) == sorted(

@@ -217,8 +217,6 @@ markers = [
   "trace_server: alias for `trace_server` fixture used for CI dispatching. Do not use directly in code.",
   "disable_logging_error_check: means that the test expects logging errors (and the default assertion for no logging errors will fail)",
   "timeout: marks tests with a timeout in seconds (via pytest-timeout)",
-  "remote_only: marks tests that only run with --remote-http-trace-server=remote",
-  "stainless_only: marks tests that only run with --remote-http-trace-server=stainless",
 ]
 
 [tool.ruff.lint]
@@ -543,171 +541,19 @@ too-many-positional-arguments = "ignore"
 not-iterable = "ignore"
 
 # ---------------------------------------------------------------------------
-# import-linter: enforce the trace-server / client import boundaries.
+# import-linter: keep the Weave client SDK off the deleted server packages.
 #
-# Goal: the trace server (`weave.trace_server`) and the Weave client SDK
-# (everything else under `weave`) must not import each other. `weave.shared`
-# is the intentional neutral zone that both sides may import, and it imports
-# neither, apart from the modules that moved from it into the client: their
-# aliases, and the modules that stay and use them. `weave.trace_server` now only
-# holds deprecated aliases for
-# `weave.shared` and for those modules. TODO: drop it from these contracts
-# when the last aliases are deleted, which happens together with
-# `weave.shared`.
-#
-# The client does not import the `weave.shared` API type modules at all: it
-# sends plain dicts and reads the generated client's types.
-#
-# The only `ignore_imports` entries are the deprecated aliases for modules that
-# moved from `weave.shared` into the client, each importing its new home, the
-# `weave.shared` modules that stay until the package is deleted, which import
-# what moved, and the frozen legacy HTTP client, which still speaks the
-# `weave.shared` types. Fix any other violation in the code rather than adding
-# an ignore.
-#
-# `allow_indirect_imports = true` keeps each contract focused on *direct*
-# imports, so every violation maps to a concrete `import` statement to fix.
-# The two `weave.shared` contracts set it to `false`: an indirect path into or
-# out of that package couples the sides just the same.
+# The trace server lives in wandb/core. `weave.trace_server` and `weave.shared`,
+# which held the API types the client and the server shared, were deleted: the
+# client sends plain dicts and reads the generated client's types. import-linter
+# checks a forbidden module only while it exists, so this contract fails if
+# either package comes back and the client imports it.
 # ---------------------------------------------------------------------------
 [tool.importlinter]
 root_package = "weave"
-# Imports under `if TYPE_CHECKING:` load nothing at runtime, so no contract counts them.
-exclude_type_checking_imports = true
 
 [[tool.importlinter.contracts]]
-name = "Trace server must not import the Weave client SDK"
-type = "forbidden"
-source_modules = ["weave.trace_server"]
-forbidden_modules = [
-  "weave.agent",
-  "weave.chat",
-  "weave.compat",
-  "weave.conversation",
-  "weave.dataset",
-  "weave.durability",
-  "weave.evaluation",
-  "weave.flow",
-  "weave.initialization",
-  "weave.integrations",
-  "weave.object",
-  "weave.prompt",
-  "weave.scorers",
-  "weave.session",
-  "weave.telemetry",
-  "weave.trace",
-  "weave.trace_server_bindings",
-  "weave.type_handlers",
-  "weave.type_wrappers",
-  "weave.utils",
-  "weave.wandb_interface",
-]
-ignore_imports = [
-  "weave.trace_server.constants -> weave.trace.constants",
-  "weave.trace_server.helpers.url_safety -> weave.utils.url_safety",
-  "weave.trace_server.ids -> weave.utils.ids",
-  "weave.trace_server.interface.builtin_object_classes.* -> weave.trace.builtin_object_classes.*",
-  "weave.trace_server.trace_server_converter -> weave.trace.trace_server_converter",
-  "weave.trace_server.tracing -> weave.trace.server_tracing",
-]
-allow_indirect_imports = true
-# NOTE: bare `from weave import ...` / `import weave` (the root package) is not
-# listed here because the root cannot be a forbidden module without also
-# forbidding trace_server's internal imports.
-
-[[tool.importlinter.contracts]]
-name = "Weave client SDK must not import the trace server"
-type = "forbidden"
-source_modules = [
-  "weave.agent",
-  "weave.chat",
-  "weave.compat",
-  "weave.conversation",
-  "weave.dataset",
-  "weave.durability",
-  "weave.evaluation",
-  "weave.flow",
-  "weave.initialization",
-  "weave.integrations",
-  "weave.object",
-  "weave.prompt",
-  "weave.scorers",
-  "weave.session",
-  "weave.shared",
-  "weave.telemetry",
-  "weave.trace",
-  "weave.trace_server_bindings",
-  "weave.type_handlers",
-  "weave.type_wrappers",
-  "weave.utils",
-  "weave.wandb_interface",
-]
-forbidden_modules = ["weave.trace_server"]
-allow_indirect_imports = true
-
-[[tool.importlinter.contracts]]
-name = "Shared code must not import the Weave client SDK or the trace server"
-type = "forbidden"
-source_modules = ["weave.shared"]
-forbidden_modules = [
-  "weave.agent",
-  "weave.chat",
-  "weave.compat",
-  "weave.conversation",
-  "weave.dataset",
-  "weave.durability",
-  "weave.evaluation",
-  "weave.flow",
-  "weave.initialization",
-  "weave.integrations",
-  "weave.object",
-  "weave.prompt",
-  "weave.scorers",
-  "weave.session",
-  "weave.telemetry",
-  "weave.trace",
-  "weave.trace_server",
-  "weave.trace_server_bindings",
-  "weave.type_handlers",
-  "weave.type_wrappers",
-  "weave.utils",
-  "weave.wandb_interface",
-]
-ignore_imports = [
-  "weave.shared -> weave.trace.serialization.digest",
-  "weave.shared.constants -> weave.trace.constants",
-  "weave.shared.digest -> weave.trace.serialization.digest",
-  "weave.shared.errors -> weave.trace.errors",
-  "weave.shared.helpers.url_safety -> weave.utils.url_safety",
-  "weave.shared.ids -> weave.utils.ids",
-  "weave.shared.interface.builtin_object_classes.* -> weave.trace.builtin_object_classes.*",
-  "weave.shared.object_class_util -> weave.trace.serialization.object_class_util",
-  "weave.shared.otel_context_keys -> weave.trace.otel_context_keys",
-  "weave.shared.otel_span_attrs -> weave.trace.otel_span_attrs",
-  "weave.shared.pydantic_util -> weave.utils.pydantic_util",
-  "weave.shared.refs -> weave.trace.refs_base",
-  "weave.shared.refs_internal -> weave.trace.refs_internal",
-  "weave.shared.serialization_metadata -> weave.trace.serialization.serialization_metadata",
-  "weave.shared.trace_server_converter -> weave.trace.trace_server_converter",
-  "weave.shared.tracing -> weave.trace.server_tracing",
-  # The API type modules stay until weave.shared is deleted, and import what moved.
-  "weave.shared.common_interface -> weave.trace.builtin_object_classes.query",
-  "weave.shared.interface.feedback_types -> weave.trace.feedback_types",
-  "weave.shared.interface.query -> weave.trace.builtin_object_classes.query",
-  "weave.shared.trace_server_interface -> weave.trace.builtin_object_classes.query",
-  "weave.shared.trace_server_interface -> weave.trace.constants",
-  "weave.shared.trace_server_interface -> weave.trace.custom_runtime",
-  "weave.shared.trace_server_interface -> weave.trace.errors",
-  "weave.shared.trace_server_interface_util -> weave.trace.refs_internal",
-  "weave.shared.validation -> weave.trace.constants",
-  "weave.shared.validation -> weave.trace.errors",
-  "weave.shared.validation -> weave.trace.refs_internal",
-  "weave.shared.validation_util -> weave.trace.refs_internal",
-]
-allow_indirect_imports = false
-
-[[tool.importlinter.contracts]]
-name = "Weave client SDK must not import the weave.shared API types"
+name = "Weave client SDK must not import weave.shared or weave.trace_server"
 type = "forbidden"
 source_modules = [
   "weave.agent",
@@ -732,21 +578,5 @@ source_modules = [
   "weave.utils",
   "weave.wandb_interface",
 ]
-forbidden_modules = [
-  "weave.shared.agents",
-  "weave.shared.common_interface",
-  "weave.shared.http_service_interface",
-  "weave.shared.interface.feedback_types",
-  "weave.shared.interface.query",
-  "weave.shared.sensitive_data",
-  "weave.shared.service_interface",
-  "weave.shared.trace_server_interface",
-  "weave.shared.trace_server_interface_util",
-  "weave.shared.validation",
-  "weave.shared.validation_util",
-]
-ignore_imports = [
-  # The frozen legacy client still speaks these types; it goes with weave.shared.
-  "weave.trace_server_bindings.remote_http_trace_server -> weave.shared.**",
-]
+forbidden_modules = ["weave.shared", "weave.trace_server"]
 allow_indirect_imports = false

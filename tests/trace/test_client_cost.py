@@ -4,10 +4,8 @@ from unittest.mock import MagicMock
 
 import pytest
 
+from weave.trace.errors import InvalidRequest
 from weave.trace.weave_client import WeaveClient
-from weave.trace_server import trace_server_interface as tsi
-from weave.trace_server.errors import InvalidRequest
-from weave.trace_server.interface.query import Query
 from weave.trace_server_bindings.client_interface import TraceServerClientInterface
 from weave.vendor.weave_server_sdk.types import CostQueryResponse
 
@@ -38,10 +36,10 @@ def test_cost_apis(client):
     }
     # Create some costs
     res = client.server.cost_create(
-        tsi.CostCreateReq(
-            project_id=project_id,
-            costs=costs,
-        )
+        {
+            "project_id": project_id,
+            "costs": costs,
+        }
     )
 
     cost_ids = res.ids
@@ -50,39 +48,37 @@ def test_cost_apis(client):
     # A matching cost in another project must never be returned.
     other_project_id = f"{project_id}_{uuid.uuid4().hex}"
     res = client.server.cost_create(
-        tsi.CostCreateReq(
-            project_id=other_project_id,
-            costs={
+        {
+            "project_id": other_project_id,
+            "costs": {
                 "foreign_project_model": {
                     "prompt_token_cost": 50,
                     "completion_token_cost": 100,
                 }
             },
-        )
+        }
     )
     assert len(res.ids) == 1
 
     res = client.server.cost_query(
-        tsi.CostQueryReq(
-            project_id=project_id,
-            query=Query(
-                **{
-                    "$expr": {
-                        "$eq": [
-                            {"$getField": "pricing_level_id"},
-                            {"$literal": other_project_id},
-                        ],
-                    }
+        {
+            "project_id": project_id,
+            "query": {
+                "$expr": {
+                    "$eq": [
+                        {"$getField": "pricing_level_id"},
+                        {"$literal": other_project_id},
+                    ],
                 }
-            ),
-        )
+            },
+        }
     )
     assert res.results == []
 
     # query costs by project
-    req = tsi.CostQueryReq(
-        project_id=project_id,
-    )
+    req = {
+        "project_id": project_id,
+    }
     res = client.server.cost_query(req)
     assert len(res.results) == 4
 
@@ -144,16 +140,14 @@ def test_cost_apis(client):
 
     # query with query
     res = client.query_costs(
-        query=Query(
-            **{
-                "$expr": {
-                    "$gt": [
-                        {"$getField": "completion_token_cost"},
-                        {"$literal": 25},
-                    ],
-                }
+        query={
+            "$expr": {
+                "$gt": [
+                    {"$getField": "completion_token_cost"},
+                    {"$literal": 25},
+                ],
             }
-        )
+        }
     )
     assert len(res) == 3
 
@@ -187,10 +181,10 @@ def test_purge_only_ids(client):
     }
     # Create some costs
     res = client.server.cost_create(
-        tsi.CostCreateReq(
-            project_id=project_id,
-            costs=costs,
-        )
+        {
+            "project_id": project_id,
+            "costs": costs,
+        }
     )
 
     cost_ids = res.ids
@@ -198,35 +192,31 @@ def test_purge_only_ids(client):
 
     with pytest.raises(InvalidRequest):
         client.server.cost_purge(
-            tsi.CostPurgeReq(
-                project_id=project_id,
-                query=Query(
-                    **{
-                        "$expr": {
-                            "$eq": [
-                                {"$getField": "llm_id"},
-                                {"$literal": "my_model_to_delete"},
-                            ],
-                        }
+            {
+                "project_id": project_id,
+                "query": {
+                    "$expr": {
+                        "$eq": [
+                            {"$getField": "llm_id"},
+                            {"$literal": "my_model_to_delete"},
+                        ],
                     }
-                ),
-            )
+                },
+            }
         )
 
     client.server.cost_purge(
-        tsi.CostPurgeReq(
-            project_id=project_id,
-            query=Query(
-                **{
-                    "$expr": {
-                        "$eq": [
-                            {"$getField": "id"},
-                            {"$literal": cost_ids[0][0]},
-                        ],
-                    }
+        {
+            "project_id": project_id,
+            "query": {
+                "$expr": {
+                    "$eq": [
+                        {"$getField": "id"},
+                        {"$literal": cost_ids[0][0]},
+                    ],
                 }
-            ),
-        )
+            },
+        }
     )
 
 
@@ -239,9 +229,9 @@ def test_costs_streamed_with_all_fields(client):
 
     # 1. Create cost entry with optional metadata fields populated
     client.server.cost_create(
-        tsi.CostCreateReq(
-            project_id=project_id,
-            costs={
+        {
+            "project_id": project_id,
+            "costs": {
                 "test-llm": {
                     "prompt_token_cost": 0.001,
                     "completion_token_cost": 0.002,
@@ -251,7 +241,7 @@ def test_costs_streamed_with_all_fields(client):
                     ),
                 },
             },
-        )
+        }
     )
 
     # 2. Create a call with matching usage data
@@ -260,25 +250,25 @@ def test_costs_streamed_with_all_fields(client):
     now = datetime.datetime.now(datetime.timezone.utc)
 
     client.server.call_start(
-        tsi.CallStartReq(
-            start=tsi.StartedCallSchemaForInsert(
-                project_id=project_id,
-                id=call_id,
-                trace_id=trace_id,
-                started_at=now,
-                op_name=f"weave:///{project_id}/op/test_op:v1",
-                attributes={},
-                inputs={},
-            )
-        )
+        {
+            "start": {
+                "project_id": project_id,
+                "id": call_id,
+                "trace_id": trace_id,
+                "started_at": now,
+                "op_name": f"weave:///{project_id}/op/test_op:v1",
+                "attributes": {},
+                "inputs": {},
+            }
+        }
     )
     client.server.call_end(
-        tsi.CallEndReq(
-            end=tsi.EndedCallSchemaForInsert(
-                project_id=project_id,
-                id=call_id,
-                ended_at=now + datetime.timedelta(seconds=1),
-                summary={
+        {
+            "end": {
+                "project_id": project_id,
+                "id": call_id,
+                "ended_at": now + datetime.timedelta(seconds=1),
+                "summary": {
                     "usage": {
                         "test-llm": {
                             "prompt_tokens": 100,
@@ -288,8 +278,8 @@ def test_costs_streamed_with_all_fields(client):
                         }
                     }
                 },
-            )
-        )
+            }
+        }
     )
 
     # 3. Stream calls back with include_costs — this is the read path that
@@ -297,10 +287,10 @@ def test_costs_streamed_with_all_fields(client):
     #    required all fields.
     calls = list(
         client.server.calls_query_stream(
-            tsi.CallsQueryReq(
-                project_id=project_id,
-                include_costs=True,
-            )
+            {
+                "project_id": project_id,
+                "include_costs": True,
+            }
         )
     )
     assert len(calls) == 1
@@ -348,45 +338,43 @@ def test_calls_query_bool_filter_with_costs_does_not_collide(client):
     call_id = str(uuid.uuid4())
     now = datetime.datetime.now(datetime.timezone.utc)
     client.server.call_start(
-        tsi.CallStartReq(
-            start=tsi.StartedCallSchemaForInsert(
-                project_id=project_id,
-                id=call_id,
-                trace_id=str(uuid.uuid4()),
-                started_at=now,
-                op_name=f"weave:///{project_id}/op/test_op:v1",
-                attributes={},
-                inputs={"enabled": True},
-            )
-        )
+        {
+            "start": {
+                "project_id": project_id,
+                "id": call_id,
+                "trace_id": str(uuid.uuid4()),
+                "started_at": now,
+                "op_name": f"weave:///{project_id}/op/test_op:v1",
+                "attributes": {},
+                "inputs": {"enabled": True},
+            }
+        }
     )
     client.server.call_end(
-        tsi.CallEndReq(
-            end=tsi.EndedCallSchemaForInsert(
-                project_id=project_id,
-                id=call_id,
-                ended_at=now + datetime.timedelta(seconds=1),
-                summary={},
-            )
-        )
+        {
+            "end": {
+                "project_id": project_id,
+                "id": call_id,
+                "ended_at": now + datetime.timedelta(seconds=1),
+                "summary": {},
+            }
+        }
     )
 
     calls = list(
         client.server.calls_query_stream(
-            tsi.CallsQueryReq(
-                project_id=project_id,
-                query=Query(
-                    **{
-                        "$expr": {
-                            "$eq": [
-                                {"$getField": "inputs.enabled"},
-                                {"$literal": True},
-                            ]
-                        }
+            {
+                "project_id": project_id,
+                "query": {
+                    "$expr": {
+                        "$eq": [
+                            {"$getField": "inputs.enabled"},
+                            {"$literal": True},
+                        ]
                     }
-                ),
-                include_costs=True,
-            )
+                },
+                "include_costs": True,
+            }
         )
     )
     assert len(calls) == 1

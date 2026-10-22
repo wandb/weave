@@ -1,29 +1,29 @@
 import pytest
 
 import weave
+from weave.trace.errors import NotFoundError, ObjectDeletedError
 from weave.trace.weave_client import WeaveClient
-from weave.trace_server import trace_server_interface as tsi
-from weave.trace_server.common_interface import SortBy
+from weave.vendor.weave_server_sdk.types.object_query_response import Obj
 
 
-def _objs_query(client: WeaveClient, object_id: str) -> list[tsi.ObjSchema]:
+def _objs_query(client: WeaveClient, object_id: str) -> list[Obj]:
     objs = client.server.objs_query(
-        tsi.ObjQueryReq(
-            project_id=client.project_id,
-            filter=tsi.ObjectVersionFilter(object_ids=[object_id]),
-            sort_by=[SortBy(field="created_at", direction="asc")],
-        )
+        {
+            "project_id": client.project_id,
+            "filter": {"object_ids": [object_id]},
+            "sort_by": [{"field": "created_at", "direction": "asc"}],
+        }
     )
     return objs.objs
 
 
 def _obj_delete(client: WeaveClient, object_id: str, digests: list[str]) -> int:
     return client.server.obj_delete(
-        tsi.ObjDeleteReq(
-            project_id=client.project_id,
-            object_id=object_id,
-            digests=digests,
-        )
+        {
+            "project_id": client.project_id,
+            "object_id": object_id,
+            "digests": digests,
+        }
     ).num_deleted
 
 
@@ -42,7 +42,7 @@ def test_delete_object_versions(client: WeaveClient):
     assert len(objs) == 2
 
     # test deleting an already deleted digest
-    with pytest.raises(weave.trace_server.errors.NotFoundError):
+    with pytest.raises(NotFoundError):
         _obj_delete(client, "obj_1", [v0.digest])
 
     # test deleting multiple digests
@@ -65,7 +65,7 @@ def test_delete_all_object_versions(client: WeaveClient):
     objs = _objs_query(client, "obj_1")
     assert len(objs) == 0
 
-    with pytest.raises(weave.trace_server.errors.NotFoundError):
+    with pytest.raises(NotFoundError):
         _obj_delete(client, "obj_1", None)
 
 
@@ -122,7 +122,7 @@ def test_delete_object_max_limit(client: WeaveClient):
 
 
 def test_delete_nonexistent_object_id(client: WeaveClient):
-    with pytest.raises(weave.trace_server.errors.NotFoundError):
+    with pytest.raises(NotFoundError):
         _obj_delete(client, "nonexistent_obj", None)
 
 
@@ -132,7 +132,7 @@ def test_delete_mixed_valid_invalid_digests(client: WeaveClient):
 
     invalid_digests = [v0.digest, "invalid-digest", v1.digest]
     with pytest.raises(
-        weave.trace_server.errors.NotFoundError,
+        NotFoundError,
         match="Delete request contains 3 digests, but found 2 objects to delete. Diff digests: {'invalid-digest'}",
     ):
         _obj_delete(client, "obj_1", invalid_digests)
@@ -178,12 +178,12 @@ def test_delete_and_recreate_object(client: WeaveClient):
     assert objs[0].val == {"i": 2}
 
 
-def _latest_objs_query(client: WeaveClient, object_id: str) -> list[tsi.ObjSchema]:
+def _latest_objs_query(client: WeaveClient, object_id: str) -> list[Obj]:
     objs = client.server.objs_query(
-        tsi.ObjQueryReq(
-            project_id=client.project_id,
-            filter=tsi.ObjectVersionFilter(object_ids=[object_id], latest_only=True),
-        )
+        {
+            "project_id": client.project_id,
+            "filter": {"object_ids": [object_id], "latest_only": True},
+        }
     )
     return objs.objs
 
@@ -222,20 +222,20 @@ def test_read_deleted_object(client: WeaveClient):
 
     _obj_delete(client, "obj_1", [obj1_v2.digest])
 
-    with pytest.raises(weave.trace_server.errors.ObjectDeletedError) as e:
+    with pytest.raises(ObjectDeletedError) as e:
         client.server.obj_read(
-            tsi.ObjReadReq(
-                project_id=client.project_id,
-                object_id="obj_1",
-                digest=obj1_v2.digest,
-            )
+            {
+                "project_id": client.project_id,
+                "object_id": "obj_1",
+                "digest": obj1_v2.digest,
+            }
         )
     assert e.value.deleted_at is not None
 
     ref_res = client.server.refs_read_batch(
-        tsi.RefsReadBatchReq(
-            refs=[obj1_v2.uri],
-        )
+        {
+            "refs": [obj1_v2.uri],
+        }
     )
     assert len(ref_res.vals) == 1
     assert ref_res.vals[0] is None
@@ -279,20 +279,20 @@ def test_read_deleted_op(client: WeaveClient):
 
     _obj_delete(client, "my_op", [op_ref.digest])
 
-    with pytest.raises(weave.trace_server.errors.ObjectDeletedError) as e:
+    with pytest.raises(ObjectDeletedError) as e:
         client.server.obj_read(
-            tsi.ObjReadReq(
-                project_id=client.project_id,
-                object_id="my_op",
-                digest=op_ref.digest,
-            )
+            {
+                "project_id": client.project_id,
+                "object_id": "my_op",
+                "digest": op_ref.digest,
+            }
         )
     assert e.value.deleted_at is not None
 
     ref_res = client.server.refs_read_batch(
-        tsi.RefsReadBatchReq(
-            refs=[op_ref.uri],
-        )
+        {
+            "refs": [op_ref.uri],
+        }
     )
     assert len(ref_res.vals) == 1
     assert ref_res.vals[0] is None
@@ -315,7 +315,7 @@ def test_delete_all_object_versions_api(client: WeaveClient):
     assert len(objs) == 0
 
     # Try to delete again when no versions exist
-    with pytest.raises(weave.trace_server.errors.NotFoundError):
+    with pytest.raises(NotFoundError):
         client.delete_all_object_versions("obj_test_all")
 
 
@@ -346,7 +346,7 @@ def test_delete_all_op_versions_api(client: WeaveClient):
     assert len(objs) == 0
 
     # Try to delete again when no versions exist
-    with pytest.raises(weave.trace_server.errors.NotFoundError):
+    with pytest.raises(NotFoundError):
         client.delete_all_op_versions("test_op")
 
 
@@ -392,11 +392,11 @@ def test_delete_reports_deleted_versions(client: WeaveClient):
     v1 = weave.publish({"i": 2}, name="obj_1")
 
     res = client.server.obj_delete(
-        tsi.ObjDeleteReq(
-            project_id=client.project_id,
-            object_id="obj_1",
-            digests=[v0.digest],
-        )
+        {
+            "project_id": client.project_id,
+            "object_id": "obj_1",
+            "digests": [v0.digest],
+        }
     )
     assert res.num_deleted == 1
     assert [dv.model_dump() for dv in res.deleted_versions] == [
@@ -405,11 +405,11 @@ def test_delete_reports_deleted_versions(client: WeaveClient):
 
     # Alias digests are resolved to content digests in the report.
     res = client.server.obj_delete(
-        tsi.ObjDeleteReq(
-            project_id=client.project_id,
-            object_id="obj_1",
-            digests=["latest"],
-        )
+        {
+            "project_id": client.project_id,
+            "object_id": "obj_1",
+            "digests": ["latest"],
+        }
     )
     assert [dv.model_dump() for dv in res.deleted_versions] == [
         {"digest": v1.digest, "base_object_class": None, "leaf_object_class": None}
@@ -421,7 +421,7 @@ def test_delete_all_reports_deleted_versions_with_classes(client: WeaveClient):
     p1 = weave.publish(weave.StringPrompt("world"), name="prompt_1")
 
     res = client.server.obj_delete(
-        tsi.ObjDeleteReq(project_id=client.project_id, object_id="prompt_1")
+        {"project_id": client.project_id, "object_id": "prompt_1"}
     )
     assert res.num_deleted == 2
     assert sorted(dv.digest for dv in res.deleted_versions) == sorted(
@@ -431,14 +431,12 @@ def test_delete_all_reports_deleted_versions_with_classes(client: WeaveClient):
     assert {dv.leaf_object_class for dv in res.deleted_versions} == {"StringPrompt"}
 
 
-def _datasets_query(client: WeaveClient, latest_only: bool) -> list[tsi.ObjSchema]:
+def _datasets_query(client: WeaveClient, latest_only: bool) -> list[Obj]:
     objs = client.server.objs_query(
-        tsi.ObjQueryReq(
-            project_id=client.project_id,
-            filter=tsi.ObjectVersionFilter(
-                base_object_classes=["Dataset"], latest_only=latest_only
-            ),
-        )
+        {
+            "project_id": client.project_id,
+            "filter": {"base_object_classes": ["Dataset"], "latest_only": latest_only},
+        }
     )
     return objs.objs
 

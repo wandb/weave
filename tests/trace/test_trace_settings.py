@@ -16,6 +16,8 @@ from tests.trace.util import (
     flush_and_wait_for_output,
     flush_output,
 )
+from weave.trace import util as weave_util
+from weave.trace import weave_init
 from weave.trace.constants import TRACE_CALL_EMOJI, TRACE_OBJECT_EMOJI
 from weave.trace.display.term import configure_logger
 from weave.trace.settings import (
@@ -33,6 +35,9 @@ from weave.trace.settings import (
     should_redact_pii,
 )
 from weave.trace.weave_client import get_parallelism_settings
+from weave.trace_server_bindings.stainless_remote_http_trace_server import (
+    StainlessRemoteHTTPTraceServer,
+)
 from weave.utils.retry import with_retry
 
 configure_logger()
@@ -642,3 +647,39 @@ class TestUserSettingsValue:
         assert user_settings_hints == overrides_hints, (
             "_SettingsOverrides drift: add/update fields to match UserSettings"
         )
+
+
+@pytest.mark.usefixtures("clean_settings_env")
+@pytest.mark.parametrize("from_env", [False, True])
+def test_use_stainless_server_false_is_ignored_with_one_warning(
+    from_env, caplog, monkeypatch
+) -> None:
+    """The setting is still accepted, but the generated client is always used."""
+    monkeypatch.setattr(weave_util, "logged_messages", [])
+    if from_env:
+        monkeypatch.setenv("WEAVE_USE_STAINLESS_SERVER", "false")
+    else:
+        replace_settings(UserSettings(use_stainless_server=False))
+    caplog.set_level(logging.WARNING, logger="weave.trace.weave_init")
+
+    servers = [weave_init.init_weave_get_server(should_batch=False) for _ in range(2)]
+
+    assert all(isinstance(s, StainlessRemoteHTTPTraceServer) for s in servers)
+    warnings = [
+        r.getMessage()
+        for r in caplog.records
+        if "use_stainless_server" in r.getMessage()
+    ]
+    assert len(warnings) == 1
+    assert warnings[0].startswith("use_stainless_server=False has no effect")
+
+
+@pytest.mark.usefixtures("clean_settings_env")
+def test_use_stainless_server_default_does_not_warn(caplog, monkeypatch) -> None:
+    monkeypatch.setattr(weave_util, "logged_messages", [])
+    caplog.set_level(logging.WARNING, logger="weave.trace.weave_init")
+
+    server = weave_init.init_weave_get_server(should_batch=False)
+
+    assert isinstance(server, StainlessRemoteHTTPTraceServer)
+    assert not [r for r in caplog.records if "use_stainless_server" in r.getMessage()]

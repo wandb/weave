@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 import os
 from collections.abc import Mapping
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, Any
 
 import requests
 
@@ -22,6 +22,7 @@ from weave.trace.settings import (
     use_server_cache,
 )
 from weave.trace.urls import otel_traces_endpoint
+from weave.trace.util import log_once
 from weave.trace.wandb_run_context import (
     check_wandb_run_matches,
     get_global_wb_run_context,
@@ -464,25 +465,20 @@ def init_weave_get_server(
     credentials: WandbCredentials | None = None,
     should_batch: bool = True,
 ) -> TraceServerClientInterface:
-    res: StainlessRemoteHTTPTraceServer | RemoteHTTPTraceServer
-    if should_use_stainless_server():
-        from weave.trace_server_bindings.stainless_remote_http_trace_server import (
-            StainlessRemoteHTTPTraceServer,
-        )
+    from weave.trace_server_bindings.stainless_remote_http_trace_server import (
+        StainlessRemoteHTTPTraceServer,
+    )
 
-        res = StainlessRemoteHTTPTraceServer.from_env(should_batch)
-    else:
-        # Imported here: it loads weave.shared, which `import weave` must not load.
-        from weave.trace_server_bindings.remote_http_trace_server import (
-            RemoteHTTPTraceServer,
+    if not should_use_stainless_server():
+        log_once(
+            logger.warning,
+            "use_stainless_server=False has no effect: the hand-written trace "
+            "server client was removed, and Weave always uses the generated one.",
         )
-
-        res = RemoteHTTPTraceServer.from_env(should_batch)
+    res = StainlessRemoteHTTPTraceServer.from_env(should_batch)
     if credentials is not None:
         res.set_auth(credentials)
-    # The legacy binding is frozen on the weave.shared types and lacks a few
-    # methods, so it is not checked against the protocol.
-    return cast(TraceServerClientInterface, res)
+    return res
 
 
 def finish() -> None:

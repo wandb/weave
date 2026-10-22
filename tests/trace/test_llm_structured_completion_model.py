@@ -20,7 +20,7 @@ from weave.trace.builtin_object_classes.llm_structured_model import (
     parse_response,
 )
 from weave.trace.weave_client import WeaveClient
-from weave.trace_server import trace_server_interface as tsi
+from weave.vendor.weave_server_sdk.types import CompletionCreateResponse
 
 
 def test_llm_structured_completion_model_creation_and_class_assignment(
@@ -30,25 +30,23 @@ def test_llm_structured_completion_model_creation_and_class_assignment(
     # Test 1: Create with minimal parameters via builtin_object_class
     model_minimal = LLMStructuredCompletionModel(llm_model_id="gpt-4")
     minimal_res = client.server.obj_create(
-        tsi.ObjCreateReq.model_validate(
-            {
-                "obj": {
-                    "project_id": client.project_id,
-                    "object_id": "llm_model_minimal",
-                    "val": model_minimal.model_dump(by_alias=True),
-                    "builtin_object_class": "LLMStructuredCompletionModel",
-                }
+        {
+            "obj": {
+                "project_id": client.project_id,
+                "object_id": "llm_model_minimal",
+                "val": model_minimal.model_dump(by_alias=True),
+                "builtin_object_class": "LLMStructuredCompletionModel",
             }
-        )
+        }
     )
 
     # Read back and verify class assignment
     read_minimal_res = client.server.obj_read(
-        tsi.ObjReadReq(
-            project_id=client.project_id,
-            object_id="llm_model_minimal",
-            digest=minimal_res.digest,
-        )
+        {
+            "project_id": client.project_id,
+            "object_id": "llm_model_minimal",
+            "digest": minimal_res.digest,
+        }
     )
 
     assert read_minimal_res.obj.base_object_class == "Model"
@@ -72,25 +70,23 @@ def test_llm_structured_completion_model_creation_and_class_assignment(
     )
 
     full_res = client.server.obj_create(
-        tsi.ObjCreateReq.model_validate(
-            {
-                "obj": {
-                    "project_id": client.project_id,
-                    "object_id": "llm_model_full",
-                    "val": model_full.model_dump(by_alias=True),
-                    "builtin_object_class": "LLMStructuredCompletionModel",
-                }
+        {
+            "obj": {
+                "project_id": client.project_id,
+                "object_id": "llm_model_full",
+                "val": model_full.model_dump(by_alias=True),
+                "builtin_object_class": "LLMStructuredCompletionModel",
             }
-        )
+        }
     )
 
     # Read back and verify
     read_full_res = client.server.obj_read(
-        tsi.ObjReadReq(
-            project_id=client.project_id,
-            object_id="llm_model_full",
-            digest=full_res.digest,
-        )
+        {
+            "project_id": client.project_id,
+            "object_id": "llm_model_full",
+            "digest": full_res.digest,
+        }
     )
 
     assert read_full_res.obj.base_object_class == "Model"
@@ -118,34 +114,32 @@ def test_llm_structured_completion_model_creation_and_class_assignment(
 def test_server_stores_the_sdk_model_payload_and_digest(client: WeaveClient):
     """The server validates against the shared schema but stores the SDK model's shape."""
     res = client.server.obj_create(
-        tsi.ObjCreateReq.model_validate(
-            {
-                "obj": {
-                    "project_id": client.project_id,
-                    "object_id": "llm_model_payload",
-                    "val": {
-                        "_type": "LLMStructuredCompletionModel",
-                        "_class_name": "LLMStructuredCompletionModel",
-                        "llm_model_id": "gpt-4o",
-                        "default_params": {
-                            "messages_template": [
-                                {"role": "system", "content": "Be brief."}
-                            ],
-                            "temperature": 0.2,
-                            "response_format": "text",
-                        },
+        {
+            "obj": {
+                "project_id": client.project_id,
+                "object_id": "llm_model_payload",
+                "val": {
+                    "_type": "LLMStructuredCompletionModel",
+                    "_class_name": "LLMStructuredCompletionModel",
+                    "llm_model_id": "gpt-4o",
+                    "default_params": {
+                        "messages_template": [
+                            {"role": "system", "content": "Be brief."}
+                        ],
+                        "temperature": 0.2,
+                        "response_format": "text",
                     },
-                    "builtin_object_class": "LLMStructuredCompletionModel",
-                }
+                },
+                "builtin_object_class": "LLMStructuredCompletionModel",
             }
-        )
+        }
     )
     read_res = client.server.obj_read(
-        tsi.ObjReadReq(
-            project_id=client.project_id,
-            object_id="llm_model_payload",
-            digest=res.digest,
-        )
+        {
+            "project_id": client.project_id,
+            "object_id": "llm_model_payload",
+            "digest": res.digest,
+        }
     )
 
     assert res.digest == "b9QLkYCtFVomxOagmu9OHL6LemZqHPV9zKOXLuYCUUw"
@@ -195,39 +189,33 @@ def test_llm_structured_completion_model_filtering(client: WeaveClient):
     model2 = LLMStructuredCompletionModel(llm_model_id="claude-3")
 
     client.server.obj_create(
-        tsi.ObjCreateReq.model_validate(
-            {
-                "obj": {
-                    "project_id": client.project_id,
-                    "object_id": "model_1",
-                    "val": model1.model_dump(by_alias=True),
-                    "builtin_object_class": "LLMStructuredCompletionModel",
-                }
+        {
+            "obj": {
+                "project_id": client.project_id,
+                "object_id": "model_1",
+                "val": model1.model_dump(by_alias=True),
+                "builtin_object_class": "LLMStructuredCompletionModel",
             }
-        )
+        }
     )
 
     client.server.obj_create(
-        tsi.ObjCreateReq.model_validate(
-            {
-                "obj": {
-                    "project_id": client.project_id,
-                    "object_id": "model_2",
-                    "val": model2.model_dump(by_alias=True),
-                    "builtin_object_class": "LLMStructuredCompletionModel",
-                }
+        {
+            "obj": {
+                "project_id": client.project_id,
+                "object_id": "model_2",
+                "val": model2.model_dump(by_alias=True),
+                "builtin_object_class": "LLMStructuredCompletionModel",
             }
-        )
+        }
     )
 
     # Test filtering by leaf_object_class
     leaf_filter_res = client.server.objs_query(
-        tsi.ObjQueryReq.model_validate(
-            {
-                "project_id": client.project_id,
-                "filter": {"leaf_object_classes": ["LLMStructuredCompletionModel"]},
-            }
-        )
+        {
+            "project_id": client.project_id,
+            "filter": {"leaf_object_classes": ["LLMStructuredCompletionModel"]},
+        }
     )
 
     assert len(leaf_filter_res.objs) == 2
@@ -239,12 +227,10 @@ def test_llm_structured_completion_model_filtering(client: WeaveClient):
 
     # Test filtering by base_object_class
     base_filter_res = client.server.objs_query(
-        tsi.ObjQueryReq.model_validate(
-            {
-                "project_id": client.project_id,
-                "filter": {"base_object_classes": ["Model"]},
-            }
-        )
+        {
+            "project_id": client.project_id,
+            "filter": {"base_object_classes": ["Model"]},
+        }
     )
 
     assert len(base_filter_res.objs) == 2
@@ -252,15 +238,13 @@ def test_llm_structured_completion_model_filtering(client: WeaveClient):
 
     # Test combined filtering
     combined_filter_res = client.server.objs_query(
-        tsi.ObjQueryReq.model_validate(
-            {
-                "project_id": client.project_id,
-                "filter": {
-                    "base_object_classes": ["Model"],
-                    "leaf_object_classes": ["LLMStructuredCompletionModel"],
-                },
-            }
-        )
+        {
+            "project_id": client.project_id,
+            "filter": {
+                "base_object_classes": ["Model"],
+                "leaf_object_classes": ["LLMStructuredCompletionModel"],
+            },
+        }
     )
 
     assert len(combined_filter_res.objs) == 2
@@ -275,7 +259,7 @@ def test_llm_structured_completion_model_predict_text_response(mock_get_client):
     mock_client.project = "test_project"
 
     # Mock successful API response
-    mock_response = tsi.CompletionsCreateRes(
+    mock_response = CompletionCreateResponse(
         response={
             "choices": [
                 {
@@ -326,7 +310,7 @@ def test_llm_structured_completion_model_predict_json_response(mock_get_client):
 
     # Mock successful API response with JSON content
     json_content = {"result": "success", "data": {"message": "Hello World"}}
-    mock_response = tsi.CompletionsCreateRes(
+    mock_response = CompletionCreateResponse(
         response={
             "choices": [
                 {"message": {"role": "assistant", "content": json.dumps(json_content)}}
@@ -361,7 +345,7 @@ def test_llm_structured_completion_model_predict_with_template(mock_get_client):
     mock_client.entity = "test_entity"
     mock_client.project = "test_project"
 
-    mock_response = tsi.CompletionsCreateRes(
+    mock_response = CompletionCreateResponse(
         response={
             "choices": [
                 {
@@ -418,7 +402,7 @@ def test_llm_structured_completion_model_predict_with_config_override(mock_get_c
     mock_client.entity = "test_entity"
     mock_client.project = "test_project"
 
-    mock_response = tsi.CompletionsCreateRes(
+    mock_response = CompletionCreateResponse(
         response={
             "choices": [
                 {
@@ -469,7 +453,7 @@ def test_llm_structured_completion_model_predict_error_handling(mock_get_client)
     mock_client.project = "test_project"
 
     # Test 1: API error response
-    mock_error_response = tsi.CompletionsCreateRes(
+    mock_error_response = CompletionCreateResponse(
         response={"error": "API rate limit exceeded"}
     )
     mock_client.server.completions_create.return_value = mock_error_response
@@ -493,7 +477,7 @@ def test_llm_structured_completion_model_predict_error_handling(mock_get_client)
 
     # Test 3: Invalid response format
     mock_client.server.completions_create.side_effect = None
-    mock_invalid_response = tsi.CompletionsCreateRes(response={"invalid": "response"})
+    mock_invalid_response = CompletionCreateResponse(response={"invalid": "response"})
     mock_client.server.completions_create.return_value = mock_invalid_response
 
     with pytest.raises(
@@ -742,7 +726,7 @@ def test_llm_structured_completion_model_predict_with_prompt(
     mock_client.entity = client.entity
     mock_client.project = client.project
 
-    mock_response = tsi.CompletionsCreateRes(
+    mock_response = CompletionCreateResponse(
         response={
             "choices": [
                 {
@@ -815,7 +799,7 @@ def test_llm_structured_completion_model_prompt_takes_precedence(
     mock_client.entity = client.entity
     mock_client.project = client.project
 
-    mock_response = tsi.CompletionsCreateRes(
+    mock_response = CompletionCreateResponse(
         response={
             "choices": [{"message": {"role": "assistant", "content": "Response"}}]
         }
@@ -855,35 +839,31 @@ def test_llm_structured_completion_model_schema_validation(client: WeaveClient):
     # Test missing required field
     with pytest.raises(ValueError, match="validation error"):
         client.server.obj_create(
-            tsi.ObjCreateReq.model_validate(
-                {
-                    "obj": {
-                        "project_id": client.project_id,
-                        "object_id": "invalid_model",
-                        "val": {
-                            # Missing required llm_model_id
-                            "default_params": {"temperature": 0.5}
-                        },
-                        "builtin_object_class": "LLMStructuredCompletionModel",
-                    }
-                }
-            )
-        )
-
-    # Test valid minimal model
-    client.server.obj_create(
-        tsi.ObjCreateReq.model_validate(
             {
                 "obj": {
                     "project_id": client.project_id,
-                    "object_id": "valid_minimal_model",
+                    "object_id": "invalid_model",
                     "val": {
-                        "llm_model_id": "gpt-4",
+                        # Missing required llm_model_id
+                        "default_params": {"temperature": 0.5}
                     },
                     "builtin_object_class": "LLMStructuredCompletionModel",
                 }
             }
         )
+
+    # Test valid minimal model
+    client.server.obj_create(
+        {
+            "obj": {
+                "project_id": client.project_id,
+                "object_id": "valid_minimal_model",
+                "val": {
+                    "llm_model_id": "gpt-4",
+                },
+                "builtin_object_class": "LLMStructuredCompletionModel",
+            }
+        }
     )
 
 

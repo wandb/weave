@@ -6,6 +6,9 @@ import logging
 import re
 import time
 from contextlib import contextmanager
+from typing import Any
+
+from weave.trace import refs_internal
 
 
 class AnyStrMatcher:  # noqa: PLW1641
@@ -111,3 +114,33 @@ def flush_and_wait_for_output(
         if time.monotonic() >= deadline:
             return False
         time.sleep(0.01)
+
+
+# The suffix that makes an op or object ref filter match every version.
+WILDCARD_ARTIFACT_VERSION_AND_PATH = ":*"
+
+
+def extract_refs_from_values(vals: Any) -> list[str]:
+    """Return the internal refs found in a call's inputs or output, in order."""
+    seen: dict[str, None] = {}
+    schemes = (refs_internal.ARTIFACT_REF_SCHEME, refs_internal.WEAVE_INTERNAL_SCHEME)
+
+    def _visit(val: Any) -> None:
+        if isinstance(val, dict):
+            for v in val.values():
+                _visit(v)
+        elif isinstance(val, list):
+            for v in val:
+                _visit(v)
+        elif isinstance(val, str) and val.startswith(
+            tuple(scheme + ":///" for scheme in schemes)
+        ):
+            try:
+                parsed = refs_internal.parse_internal_uri(val)
+            except Exception:
+                return
+            if parsed.uri == val:
+                seen[val] = None
+
+    _visit(vals)
+    return list(seen)

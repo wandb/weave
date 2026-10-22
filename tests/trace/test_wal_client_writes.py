@@ -16,6 +16,8 @@ from unittest.mock import MagicMock
 
 import pytest
 from PIL import Image
+from pydantic import TypeAdapter
+from pydantic_core import to_jsonable_python
 
 import weave
 from weave.durability.wal_client_id import compute_client_id
@@ -33,7 +35,6 @@ from weave.durability.wal_writer import JSONLWALWriter
 from weave.trace import weave_client
 from weave.trace.serialization.digest import compute_row_digest
 from weave.trace.settings import UserSettings, override_settings
-from weave.trace_server import trace_server_interface as tsi
 
 
 def _read_all_wal_records(client: weave.WeaveClient) -> list[dict]:
@@ -170,8 +171,6 @@ class TestWALClientWrites:
         assert file_rec["type"] == "file_create"
         assert file_rec["req"]["project_id"] == project_id
         assert file_rec["req"]["name"] == "obj.py"
-        # Earlier SDK versions replay the record through this model.
-        assert tsi.FileCreateReq.model_validate(file_rec["req"]).name == "obj.py"
 
         image_obj = records[2]
         assert image_obj["type"] == "obj_create"
@@ -380,16 +379,14 @@ class TestWALManagerLifecycle:
         dir_mgr = FileWALDirectoryManager(str(tmp_path))
         mgr._writer = JSONLWALWriter(dir_mgr)
 
-        mgr.write(
-            "obj_create",
-            tsi.ObjCreateReq(
-                obj=tsi.ObjSchemaForInsert(
-                    project_id="test-entity/test-project",
-                    object_id="test_obj",
-                    val={"hello": "world"},
-                )
-            ),
-        )
+        req = {
+            "obj": {
+                "project_id": "test-entity/test-project",
+                "object_id": "test_obj",
+                "val": {"hello": "world"},
+            }
+        }
+        mgr.write("obj_create", req)
         mgr.flush()
 
         records: list[dict] = []
@@ -402,19 +399,7 @@ class TestWALManagerLifecycle:
                 consumer.close()
 
         assert len(records) == 1
-        assert records[0] == {
-            "type": "obj_create",
-            "req": {
-                "obj": {
-                    "project_id": "test-entity/test-project",
-                    "object_id": "test_obj",
-                    "val": {"hello": "world"},
-                    "builtin_object_class": None,
-                    "expected_digest": None,
-                    "wb_user_id": None,
-                }
-            },
-        }
+        assert records[0] == {"type": "obj_create", "req": req}
 
         # No sender — file should still be on disk.
         assert len(list(tmp_path.glob("*.jsonl"))) == 1
@@ -449,41 +434,43 @@ class TestTraceServerHandlers:
         mock_server = MagicMock()
         handlers = TraceServerHandlers(mock_server).as_dict()
 
-        req = tsi.ObjCreateReq(
-            obj=tsi.ObjSchemaForInsert(
-                project_id="e/p",
-                object_id="test",
-                val={"x": 1},
-            )
-        )
-        record = {"type": "obj_create", "req": req.model_dump(mode="json")}
+        # What an earlier version's request model dumped, defaults included.
+        req = {
+            "obj": {
+                "project_id": "e/p",
+                "object_id": "test",
+                "val": {"x": 1},
+                "builtin_object_class": None,
+                "expected_digest": None,
+                "wb_user_id": None,
+            }
+        }
+        record = {"type": "obj_create", "req": to_jsonable_python(req)}
         handlers["obj_create"](record)
 
         mock_server.obj_create.assert_called_once()
         call_arg = mock_server.obj_create.call_args[0][0]
         assert call_arg == record["req"]
-        assert tsi.ObjCreateReq.model_validate(call_arg) == req
+        assert call_arg == req
 
     def test_handler_calls_table_create(self):
         """table_create handler should call server.table_create."""
         mock_server = MagicMock()
         handlers = TraceServerHandlers(mock_server).as_dict()
 
-        req = tsi.TableCreateReq(
-            table=tsi.TableSchemaForInsert(
-                project_id="e/p",
-                rows=[{"val": {"x": 1}, "digest": "abc123"}],
-            )
-        )
-        record = {"type": "table_create", "req": req.model_dump(mode="json")}
+        req = {
+            "table": {
+                "project_id": "e/p",
+                "rows": [{"val": {"x": 1}, "digest": "abc123"}],
+                "expected_digest": None,
+            }
+        }
+        record = {"type": "table_create", "req": to_jsonable_python(req)}
         handlers["table_create"](record)
 
         mock_server.table_create.assert_called_once()
 
-    @pytest.mark.parametrize("written_from", ["client", "model"])
-    def test_file_create_roundtrips_bytes_content(
-        self, written_from, tmp_path, monkeypatch
-    ):
+    def test_file_create_roundtrips_bytes_content(self, tmp_path, monkeypatch):
         """file_create handler must preserve bytes content through replay.
 
         Regression guard for the replay path: the WAL's JSON dump writes bytes
@@ -499,19 +486,14 @@ class TestTraceServerHandlers:
         # WAL today (the JSON dump rejects non-utf8 bytes at write time, so
         # non-utf8 content never appears in a replayed record).
         original_content = "small file body — including non-ascii: café 🎉".encode()
-        # An earlier version's request model, or the dict the client writes.
-        req = (
-            tsi.FileCreateReq(
-                project_id="e/p", name="note.txt", content=original_content
-            )
-            if written_from == "model"
-            else {
-                "project_id": "e/p",
-                "name": "note.txt",
-                "content": original_content,
-                "expected_digest": None,
-            }
-        )
+        # The dict the client writes, with the keys an earlier version's
+        # request model dumped.
+        req = {
+            "project_id": "e/p",
+            "name": "note.txt",
+            "content": original_content,
+            "expected_digest": None,
+        }
         # Match the write path exactly: write the record with WALManager.
         monkeypatch.setattr("weave.durability.wal_manager.WAL_ROOT", str(tmp_path))
         mgr = WALManager("e", "p")
@@ -557,10 +539,14 @@ class TestTraceServerHandlers:
             for path in Path(client._wal.wal_dir).glob("*.jsonl")
             for line in path.read_text(encoding="utf-8").splitlines()
         ]
-        # Earlier SDK versions replay the record through this model.
-        expected = tsi.FileCreateReq(project_id="e/p", name="note.txt", content=content)
-        assert record["req"] == expected.model_dump(mode="json")
-        assert tsi.FileCreateReq.model_validate(record["req"]) == expected
+        # Earlier SDK versions replay the record through their request model,
+        # whose JSON dump had these keys.
+        assert record["req"] == {
+            "project_id": "e/p",
+            "name": "note.txt",
+            "content": content.decode(),
+            "expected_digest": None,
+        }
 
     def test_call_start_roundtrips_through_handler(self):
         """call_start handler replays the record's dict as written.
@@ -574,23 +560,38 @@ class TestTraceServerHandlers:
         handlers = TraceServerHandlers(mock_server).as_dict()
 
         started = datetime.datetime.now(datetime.timezone.utc)
-        req = tsi.CallStartReq(
-            start=tsi.StartedCallSchemaForInsert(
-                project_id="e/p",
-                op_name="predict",
-                trace_id="t1",
-                started_at=started,
-                attributes={"k": "v"},
-                inputs={"x": 1},
-            )
-        )
-        record = {"type": "call_start", "req": req.model_dump(mode="json")}
+        # What an earlier version's request model dumped, defaults included.
+        req = {
+            "start": {
+                "project_id": "e/p",
+                "id": None,
+                "op_name": "predict",
+                "display_name": None,
+                "trace_id": "t1",
+                "parent_id": None,
+                "thread_id": None,
+                "turn_id": None,
+                "started_at": started,
+                "attributes": {"k": "v"},
+                "inputs": {"x": 1},
+                "otel_dump": None,
+                "wb_user_id": None,
+                "wb_run_id": None,
+                "wb_run_step": None,
+            }
+        }
+        record = {"type": "call_start", "req": to_jsonable_python(req)}
         handlers["call_start"](record)
 
         mock_server.call_start.assert_called_once()
         call_arg = mock_server.call_start.call_args[0][0]
         assert call_arg == record["req"]
-        assert tsi.CallStartReq.model_validate(call_arg) == req
+        replayed_start = call_arg["start"]
+        assert (
+            TypeAdapter(datetime.datetime).validate_python(replayed_start["started_at"])
+            == started
+        )
+        assert {**replayed_start, "started_at": started} == req["start"]
 
     def test_convenience_function_matches_class(self):
         """build_trace_server_handlers should return the same keys as the class."""

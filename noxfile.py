@@ -57,7 +57,6 @@ SHARDS_WITHOUT_EXTRAS = {
     "trace_no_server",
     "trace_server_bindings",
     "openai_realtime",
-    "stainless",
     "autogen_tests",
     "verifiers_test",
     "pandas_test",
@@ -116,7 +115,6 @@ SHARDS_WITHOUT_EXTRAS = {
         "trace",
         "trace_calls_merged_only",
         "trace_no_server",
-        "stainless",
     ],
 )
 def tests(session: nox.Session, shard: str):
@@ -214,7 +212,6 @@ def tests(session: nox.Session, shard: str):
         "custom": [],
         "flow": ["tests/flow/"],
         "trace_server_bindings": ["tests/trace_server_bindings/"],
-        "stainless": ["tests/trace_server_bindings/"],
         "scorers": ["tests/scorers/"],
         "autogen_tests": ["tests/integrations/autogen/"],
         "verifiers_test": ["tests/integrations/verifiers/"],
@@ -224,7 +221,6 @@ def tests(session: nox.Session, shard: str):
             "tests/utils/",
             "tests/wandb_interface/",
             "tests/conversation/",
-            "tests/shared/",
         ],
         "trace_calls_merged_only": [
             "tests/trace/",
@@ -271,10 +267,6 @@ def tests(session: nox.Session, shard: str):
 
     if shard == "trace_calls_merged_only":
         env["WEAVE_USE_CALLS_COMPLETE"] = "false"
-
-    # Set trace-server flag for stainless shard
-    if shard == "stainless":
-        pytest_args.extend(["--remote-http-trace-server=stainless"])
 
     if shard == "verifiers_test":
         # Pinning to this commit because the latest version of the gsm8k environment is broken.

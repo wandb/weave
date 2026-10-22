@@ -2,7 +2,6 @@ import pytest
 
 import weave
 from weave.trace.ref_util import get_ref
-from weave.trace_server import trace_server_interface as tsi
 
 
 def test_op_return_sync_empty(client):
@@ -13,9 +12,9 @@ def test_op_return_sync_empty(client):
     fn()
 
     res = client.server.calls_query(
-        tsi.CallsQueryReq(
-            project_id=client.project_id,
-        )
+        {
+            "project_id": client.project_id,
+        }
     )
 
     obj_ref = get_ref(fn)
@@ -34,9 +33,9 @@ async def test_op_return_async_empty(client):
     await fn()
 
     res = client.server.calls_query(
-        tsi.CallsQueryReq(
-            project_id=client.project_id,
-        )
+        {
+            "project_id": client.project_id,
+        }
     )
 
     obj_ref = get_ref(fn)
@@ -54,9 +53,9 @@ def test_op_return_sync_obj(client):
     fn()
 
     res = client.server.calls_query(
-        tsi.CallsQueryReq(
-            project_id=client.project_id,
-        )
+        {
+            "project_id": client.project_id,
+        }
     )
 
     obj_ref = get_ref(fn)
@@ -75,9 +74,9 @@ async def test_op_return_async_obj(client):
     await fn()
 
     res = client.server.calls_query(
-        tsi.CallsQueryReq(
-            project_id=client.project_id,
-        )
+        {
+            "project_id": client.project_id,
+        }
     )
 
     obj_ref = get_ref(fn)
@@ -113,9 +112,9 @@ def test_op_return_sync_generator(client):
         pass
 
     res = client.server.calls_query(
-        tsi.CallsQueryReq(
-            project_id=client.project_id,
-        )
+        {
+            "project_id": client.project_id,
+        }
     )
 
     obj_ref = get_ref(fn)
@@ -138,9 +137,9 @@ async def test_op_return_async_generator(client):
         pass
 
     res = client.server.calls_query(
-        tsi.CallsQueryReq(
-            project_id=client.project_id,
-        )
+        {
+            "project_id": client.project_id,
+        }
     )
 
     obj_ref = get_ref(fn)
@@ -171,9 +170,9 @@ def test_op_return_sync_iterator(client):
         pass
 
     res = client.server.calls_query(
-        tsi.CallsQueryReq(
-            project_id=client.project_id,
-        )
+        {
+            "project_id": client.project_id,
+        }
     )
 
     obj_ref = get_ref(fn)
@@ -205,9 +204,9 @@ async def test_op_return_async_iterator(client):
         pass
 
     res = client.server.calls_query(
-        tsi.CallsQueryReq(
-            project_id=client.project_id,
-        )
+        {
+            "project_id": client.project_id,
+        }
     )
 
     obj_ref = get_ref(fn)
@@ -228,9 +227,9 @@ def test_op_return_sync_generator_never_iter(client):
     fn()
 
     res = client.server.calls_query(
-        tsi.CallsQueryReq(
-            project_id=client.project_id,
-        )
+        {
+            "project_id": client.project_id,
+        }
     )
 
     obj_ref = get_ref(fn)
@@ -253,9 +252,9 @@ async def test_op_return_async_generator_never_iter(client):
         return
 
     res = client.server.calls_query(
-        tsi.CallsQueryReq(
-            project_id=client.project_id,
-        )
+        {
+            "project_id": client.project_id,
+        }
     )
 
     obj_ref = get_ref(fn)
@@ -285,9 +284,9 @@ def test_op_return_sync_iterator_never_iter(client):
     fn()
 
     res = client.server.calls_query(
-        tsi.CallsQueryReq(
-            project_id=client.project_id,
-        )
+        {
+            "project_id": client.project_id,
+        }
     )
 
     obj_ref = get_ref(fn)
@@ -318,9 +317,9 @@ async def test_op_return_async_iterator_never_iter(client):
     fn()
 
     res = client.server.calls_query(
-        tsi.CallsQueryReq(
-            project_id=client.project_id,
-        )
+        {
+            "project_id": client.project_id,
+        }
     )
 
     obj_ref = get_ref(fn)
@@ -343,9 +342,9 @@ def test_op_return_sync_generator_partial(client):
             break
 
     res = client.server.calls_query(
-        tsi.CallsQueryReq(
-            project_id=client.project_id,
-        )
+        {
+            "project_id": client.project_id,
+        }
     )
 
     obj_ref = get_ref(fn)
@@ -370,9 +369,9 @@ async def test_op_return_async_generator_partial(client):
         return  # This return is required to raise StopAsyncIteration
 
     res = client.server.calls_query(
-        tsi.CallsQueryReq(
-            project_id=client.project_id,
-        )
+        {
+            "project_id": client.project_id,
+        }
     )
 
     obj_ref = get_ref(fn)
@@ -404,9 +403,9 @@ def test_op_return_sync_iterator_partial(client):
             break
 
     res = client.server.calls_query(
-        tsi.CallsQueryReq(
-            project_id=client.project_id,
-        )
+        {
+            "project_id": client.project_id,
+        }
     )
 
     obj_ref = get_ref(fn)
@@ -439,9 +438,9 @@ async def test_op_return_async_iterator_partial(client):
             break
 
     res = client.server.calls_query(
-        tsi.CallsQueryReq(
-            project_id=client.project_id,
-        )
+        {
+            "project_id": client.project_id,
+        }
     )
 
     obj_ref = get_ref(fn)
@@ -468,9 +467,9 @@ def test_op_return_sync_generator_exception(client):
         pass
 
     res = client.server.calls_query(
-        tsi.CallsQueryReq(
-            project_id=client.project_id,
-        )
+        {
+            "project_id": client.project_id,
+        }
     )
 
     obj_ref = get_ref(fn)
@@ -499,9 +498,9 @@ async def test_op_return_async_generator_exception(client):
         pass
 
     res = client.server.calls_query(
-        tsi.CallsQueryReq(
-            project_id=client.project_id,
-        )
+        {
+            "project_id": client.project_id,
+        }
     )
 
     obj_ref = get_ref(fn)
@@ -538,9 +537,9 @@ def test_op_return_sync_iterator_exception(client):
         pass
 
     res = client.server.calls_query(
-        tsi.CallsQueryReq(
-            project_id=client.project_id,
-        )
+        {
+            "project_id": client.project_id,
+        }
     )
 
     obj_ref = get_ref(fn)
@@ -578,9 +577,9 @@ async def test_op_return_async_iterator_exception(client):
         pass
 
     res = client.server.calls_query(
-        tsi.CallsQueryReq(
-            project_id=client.project_id,
-        )
+        {
+            "project_id": client.project_id,
+        }
     )
 
     obj_ref = get_ref(fn)

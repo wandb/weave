@@ -9,7 +9,6 @@ from weave.object.obj import Object
 from weave.prompt.prompt import EasyPrompt
 from weave.trace.objectify import register_object
 from weave.trace.refs import RefWithExtra
-from weave.trace_server.trace_server_interface import ObjectVersionFilter, ObjQueryReq
 
 T = TypeVar("T")
 
@@ -95,10 +94,10 @@ async def test_gotten_methods(client):
     ]
     # TODO: Replace with client version of this query when available
     res = client.server.objs_query(
-        ObjQueryReq(
-            project_id=client.project_id,
-            filter=ObjectVersionFilter(object_ids=relevant_object_ids),
-        )
+        {
+            "project_id": client.project_id,
+            "filter": {"object_ids": relevant_object_ids},
+        }
     )
     for obj in res.objs:
         assert obj.version_index == 0

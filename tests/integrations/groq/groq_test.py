@@ -9,7 +9,6 @@ from weave.integrations.integration_utilities import (
     flatten_calls,
     flattened_calls_to_names,
 )
-from weave.trace_server.trace_server_interface import CallsFilter
 
 
 @pytest.fixture(autouse=True)
@@ -47,7 +46,7 @@ def test_groq_quickstart(
         chat_completion.choices[0].message.content
         == "The capital of India is New Delhi."
     )
-    calls = list(client.get_calls(filter=CallsFilter(trace_roots_only=True)))
+    calls = list(client.get_calls(filter={"trace_roots_only": True}))
     flattened_calls = flatten_calls(calls)
     assert len(flattened_calls) == 1
 
@@ -104,7 +103,7 @@ async def test_groq_async_chat_completion(
         seed=42,
     )
 
-    calls = list(client.get_calls(filter=CallsFilter(trace_roots_only=True)))
+    calls = list(client.get_calls(filter={"trace_roots_only": True}))
     flattened_calls = flatten_calls(calls)
     assert len(flattened_calls) == 1
 
@@ -165,7 +164,7 @@ def test_groq_streaming_chat_completion(
         if chunk.choices[0].delta.content is not None:
             all_content += chunk.choices[0].delta.content
 
-    calls = list(client.get_calls(filter=CallsFilter(trace_roots_only=True)))
+    calls = list(client.get_calls(filter={"trace_roots_only": True}))
     flattened_calls = flatten_calls(calls)
     assert len(flattened_calls) == 1
 
@@ -246,7 +245,7 @@ async def test_groq_async_streaming_chat_completion(
         if chunk.choices[0].delta.content is not None:
             all_content += chunk.choices[0].delta.content
 
-    calls = list(client.get_calls(filter=CallsFilter(trace_roots_only=True)))
+    calls = list(client.get_calls(filter={"trace_roots_only": True}))
     flattened_calls = flatten_calls(calls)
     assert len(flattened_calls) == 1
 
@@ -418,7 +417,7 @@ def test_groq_tool_call(
 
     response = run_conversation("What was the score of the Warriors game?")
 
-    calls = list(client.get_calls(filter=CallsFilter(trace_roots_only=True)))
+    calls = list(client.get_calls(filter={"trace_roots_only": True}))
     flattened_calls = flatten_calls(calls)
     assert len(flattened_calls) == 4
 

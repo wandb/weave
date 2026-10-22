@@ -14,11 +14,10 @@ from opentelemetry.sdk.trace.sampling import Decision, StaticSampler
 from opentelemetry.trace import NonRecordingSpan, Span, SpanContext, TraceFlags
 
 import weave
+from weave.trace import server_tracing
 from weave.trace.call import Call
+from weave.trace.constants import INVOKING_SPAN_ATTR_KEY
 from weave.trace.otel_context_keys import WEAVE_SERVER_SPAN_KEY
-from weave.trace_server import trace_server_interface as tsi
-from weave.trace_server import tracing as server_tracing
-from weave.trace_server.constants import INVOKING_SPAN_ATTR_KEY
 
 FORGED = {"trace_id": "f" * 32, "span_id": "f" * 16}
 
@@ -374,33 +373,31 @@ def test_survives_the_round_trip_and_is_queryable(client, install_otel_spans):
 
     calls = list(
         client.server.calls_query_stream(
-            tsi.CallsQueryReq(
-                project_id=client.project_id,
-                query=tsi.Query.model_validate(
-                    {
-                        "$expr": {
-                            "$and": [
-                                {
-                                    "$eq": [
-                                        {
-                                            "$getField": f"attributes.weave.{INVOKING_SPAN_ATTR_KEY}.trace_id"
-                                        },
-                                        {"$literal": expected["trace_id"]},
-                                    ]
-                                },
-                                {
-                                    "$eq": [
-                                        {
-                                            "$getField": f"attributes.weave.{INVOKING_SPAN_ATTR_KEY}.span_id"
-                                        },
-                                        {"$literal": expected["span_id"]},
-                                    ]
-                                },
-                            ]
-                        }
+            {
+                "project_id": client.project_id,
+                "query": {
+                    "$expr": {
+                        "$and": [
+                            {
+                                "$eq": [
+                                    {
+                                        "$getField": f"attributes.weave.{INVOKING_SPAN_ATTR_KEY}.trace_id"
+                                    },
+                                    {"$literal": expected["trace_id"]},
+                                ]
+                            },
+                            {
+                                "$eq": [
+                                    {
+                                        "$getField": f"attributes.weave.{INVOKING_SPAN_ATTR_KEY}.span_id"
+                                    },
+                                    {"$literal": expected["span_id"]},
+                                ]
+                            },
+                        ]
                     }
-                ),
-            )
+                },
+            }
         )
     )
 

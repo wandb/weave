@@ -11,10 +11,8 @@ import pytest
 
 import weave
 from tests.trace.server_utils import TEST_ENTITY
-from weave.trace_server import trace_server_interface as tsi
-from weave.trace_server.common_interface import AnnotationQueueItemsFilter, SortBy
-from weave.trace_server.errors import NotFoundError
-from weave.trace_server.ids import generate_id
+from weave.trace.errors import NotFoundError
+from weave.utils.ids import generate_id
 
 
 class CallsFixture(NamedTuple):
@@ -84,12 +82,12 @@ def create_annotation_queue(
     if scorer_refs is None:
         scorer_refs = [f"weave:///{client.project_id}/scorer/test:abc123"]
 
-    create_req = tsi.AnnotationQueueCreateReq(
-        project_id=client.project_id,
-        name=name,
-        description=description,
-        scorer_refs=scorer_refs,
-    )
+    create_req = {
+        "project_id": client.project_id,
+        "name": name,
+        "description": description,
+        "scorer_refs": scorer_refs,
+    }
 
     create_res = client.server.annotation_queue_create(create_req)
     return create_res.id
@@ -122,12 +120,12 @@ def create_queue_with_calls(
     queue_id = create_annotation_queue(client, name=queue_name)
 
     # Add calls to queue
-    add_req = tsi.AnnotationQueueAddCallsReq(
-        project_id=client.project_id,
-        queue_id=queue_id,
-        call_ids=calls_fixture.call_ids,
-        display_fields=display_fields,
-    )
+    add_req = {
+        "project_id": client.project_id,
+        "queue_id": queue_id,
+        "call_ids": calls_fixture.call_ids,
+        "display_fields": display_fields,
+    }
     client.server.annotation_queue_add_calls(add_req)
 
     return QueueWithCallsFixture(
@@ -140,12 +138,12 @@ def create_queue_with_calls(
 def test_annotation_queue_create_and_read(client, wb_user_id):
     """Test creating and reading an annotation queue."""
     # Create a queue
-    create_req = tsi.AnnotationQueueCreateReq(
-        project_id=client.project_id,
-        name="Test Queue",
-        description="A test annotation queue",
-        scorer_refs=[f"weave:///{client.project_id}/scorer/test:abc123"],
-    )
+    create_req = {
+        "project_id": client.project_id,
+        "name": "Test Queue",
+        "description": "A test annotation queue",
+        "scorer_refs": [f"weave:///{client.project_id}/scorer/test:abc123"],
+    }
 
     create_res = client.server.annotation_queue_create(create_req)
 
@@ -154,10 +152,10 @@ def test_annotation_queue_create_and_read(client, wb_user_id):
     assert len(create_res.id) > 0
 
     # Read the queue back
-    read_req = tsi.AnnotationQueueReadReq(
-        project_id=client.project_id,
-        queue_id=create_res.id,
-    )
+    read_req = {
+        "project_id": client.project_id,
+        "queue_id": create_res.id,
+    }
     read_res = client.server.annotation_queue_read(read_req)
 
     # Verify all queue data matches what we created
@@ -173,25 +171,25 @@ def test_annotation_queue_create_and_read(client, wb_user_id):
 
 def test_annotation_queue_multiple_scorer_refs(client):
     """Test creating a queue with multiple scorer refs."""
-    req = tsi.AnnotationQueueCreateReq(
-        project_id=client.project_id,
-        name="Multi Scorer Queue",
-        description="Queue with multiple scorers",
-        scorer_refs=[
+    req = {
+        "project_id": client.project_id,
+        "name": "Multi Scorer Queue",
+        "description": "Queue with multiple scorers",
+        "scorer_refs": [
             f"weave:///{client.project_id}/scorer/accuracy:abc123",
             f"weave:///{client.project_id}/scorer/relevance:def456",
             f"weave:///{client.project_id}/scorer/safety:ghi789",
         ],
-    )
+    }
 
     res = client.server.annotation_queue_create(req)
     assert res.id is not None
 
     # Read it back to verify scorer_refs
-    read_req = tsi.AnnotationQueueReadReq(
-        project_id=client.project_id,
-        queue_id=res.id,
-    )
+    read_req = {
+        "project_id": client.project_id,
+        "queue_id": res.id,
+    }
     read_res = client.server.annotation_queue_read(read_req)
 
     assert len(read_res.queue.scorer_refs) == 3
@@ -212,26 +210,26 @@ def test_annotation_queue_multiple_scorer_refs(client):
 def test_annotation_queue_update_all_fields(client, wb_user_id):
     """Test updating all fields of an annotation queue."""
     # Create a queue
-    create_req = tsi.AnnotationQueueCreateReq(
-        project_id=client.project_id,
-        name="Original Queue",
-        description="Original description",
-        scorer_refs=[f"weave:///{client.project_id}/scorer/original:abc123"],
-    )
+    create_req = {
+        "project_id": client.project_id,
+        "name": "Original Queue",
+        "description": "Original description",
+        "scorer_refs": [f"weave:///{client.project_id}/scorer/original:abc123"],
+    }
     create_res = client.server.annotation_queue_create(create_req)
     original_queue_id = create_res.id
 
     # Update all fields
-    update_req = tsi.AnnotationQueueUpdateReq(
-        project_id=client.project_id,
-        queue_id=original_queue_id,
-        name="Updated Queue",
-        description="Updated description",
-        scorer_refs=[
+    update_req = {
+        "project_id": client.project_id,
+        "queue_id": original_queue_id,
+        "name": "Updated Queue",
+        "description": "Updated description",
+        "scorer_refs": [
             f"weave:///{client.project_id}/scorer/new1:def456",
             f"weave:///{client.project_id}/scorer/new2:ghi789",
         ],
-    )
+    }
     update_res = client.server.annotation_queue_update(update_req)
 
     # Verify update response
@@ -251,10 +249,10 @@ def test_annotation_queue_update_all_fields(client, wb_user_id):
     assert update_res.queue.deleted_at is None
 
     # Read back to verify persistence
-    read_req = tsi.AnnotationQueueReadReq(
-        project_id=client.project_id,
-        queue_id=original_queue_id,
-    )
+    read_req = {
+        "project_id": client.project_id,
+        "queue_id": original_queue_id,
+    }
     read_res = client.server.annotation_queue_read(read_req)
 
     assert read_res.queue.name == "Updated Queue"
@@ -265,23 +263,23 @@ def test_annotation_queue_update_all_fields(client, wb_user_id):
 def test_annotation_queue_update_partial(client):
     """Test updating only some fields (partial update)."""
     # Create a queue
-    create_req = tsi.AnnotationQueueCreateReq(
-        project_id=client.project_id,
-        name="Original Queue",
-        description="Original description",
-        scorer_refs=[f"weave:///{client.project_id}/scorer/test:abc123"],
-    )
+    create_req = {
+        "project_id": client.project_id,
+        "name": "Original Queue",
+        "description": "Original description",
+        "scorer_refs": [f"weave:///{client.project_id}/scorer/test:abc123"],
+    }
     create_res = client.server.annotation_queue_create(create_req)
     original_queue_id = create_res.id
 
     # Update only name
-    update_req = tsi.AnnotationQueueUpdateReq(
-        project_id=client.project_id,
-        queue_id=original_queue_id,
-        name="New Name Only",
-        description=None,  # Not updating
-        scorer_refs=None,  # Not updating
-    )
+    update_req = {
+        "project_id": client.project_id,
+        "queue_id": original_queue_id,
+        "name": "New Name Only",
+        "description": None,  # Not updating
+        "scorer_refs": None,  # Not updating
+    }
     update_res = client.server.annotation_queue_update(update_req)
 
     # Verify only name changed
@@ -295,11 +293,11 @@ def test_annotation_queue_update_partial(client):
 def test_annotation_queue_update_nonexistent(client):
     """Test updating a non-existent queue raises NotFoundError."""
     # Try to update a non-existent queue
-    update_req = tsi.AnnotationQueueUpdateReq(
-        project_id=client.project_id,
-        queue_id=generate_id(),  # Random non-existent ID
-        name="New Name",
-    )
+    update_req = {
+        "project_id": client.project_id,
+        "queue_id": generate_id(),  # Random non-existent ID
+        "name": "New Name",
+    }
 
     with pytest.raises(NotFoundError):
         client.server.annotation_queue_update(update_req)
@@ -308,23 +306,23 @@ def test_annotation_queue_update_nonexistent(client):
 def test_annotation_queue_update_no_fields(client):
     """Test updating with no fields provided returns existing queue."""
     # Create a queue
-    create_req = tsi.AnnotationQueueCreateReq(
-        project_id=client.project_id,
-        name="Test Queue",
-        description="Test description",
-        scorer_refs=[f"weave:///{client.project_id}/scorer/test:abc123"],
-    )
+    create_req = {
+        "project_id": client.project_id,
+        "name": "Test Queue",
+        "description": "Test description",
+        "scorer_refs": [f"weave:///{client.project_id}/scorer/test:abc123"],
+    }
     create_res = client.server.annotation_queue_create(create_req)
     original_queue_id = create_res.id
 
     # Update with no fields
-    update_req = tsi.AnnotationQueueUpdateReq(
-        project_id=client.project_id,
-        queue_id=original_queue_id,
-        name=None,
-        description=None,
-        scorer_refs=None,
-    )
+    update_req = {
+        "project_id": client.project_id,
+        "queue_id": original_queue_id,
+        "name": None,
+        "description": None,
+        "scorer_refs": None,
+    }
     update_res = client.server.annotation_queue_update(update_req)
 
     # Verify nothing changed
@@ -340,18 +338,18 @@ def test_annotation_queues_query_stream_all(client):
     """Test querying all annotation queues for a project."""
     # Create multiple queues
     for i in range(3):
-        req = tsi.AnnotationQueueCreateReq(
-            project_id=client.project_id,
-            name=f"Queue {i}",
-            description=f"Test queue number {i}",
-            scorer_refs=[f"weave:///{client.project_id}/scorer/test{i}:hash{i}"],
-        )
+        req = {
+            "project_id": client.project_id,
+            "name": f"Queue {i}",
+            "description": f"Test queue number {i}",
+            "scorer_refs": [f"weave:///{client.project_id}/scorer/test{i}:hash{i}"],
+        }
         client.server.annotation_queue_create(req)
 
     # Query all queues
-    query_req = tsi.AnnotationQueuesQueryReq(
-        project_id=client.project_id,
-    )
+    query_req = {
+        "project_id": client.project_id,
+    }
 
     queues = list(client.server.annotation_queues_query_stream(query_req))
 
@@ -366,25 +364,25 @@ def test_annotation_queues_query_stream_all(client):
 def test_annotation_queues_query_stream_with_name_filter(client):
     """Test querying queues with name filter."""
     # Create queues with different names
-    req1 = tsi.AnnotationQueueCreateReq(
-        project_id=client.project_id,
-        name="Error Review Queue",
-        scorer_refs=[f"weave:///{client.project_id}/scorer/error:abc"],
-    )
+    req1 = {
+        "project_id": client.project_id,
+        "name": "Error Review Queue",
+        "scorer_refs": [f"weave:///{client.project_id}/scorer/error:abc"],
+    }
     client.server.annotation_queue_create(req1)
 
-    req2 = tsi.AnnotationQueueCreateReq(
-        project_id=client.project_id,
-        name="Quality Check Queue",
-        scorer_refs=[f"weave:///{client.project_id}/scorer/quality:def"],
-    )
+    req2 = {
+        "project_id": client.project_id,
+        "name": "Quality Check Queue",
+        "scorer_refs": [f"weave:///{client.project_id}/scorer/quality:def"],
+    }
     client.server.annotation_queue_create(req2)
 
     # Query with name filter (case-insensitive partial match)
-    query_req = tsi.AnnotationQueuesQueryReq(
-        project_id=client.project_id,
-        name="error",  # Should match "Error Review Queue"
-    )
+    query_req = {
+        "project_id": client.project_id,
+        "name": "error",  # Should match "Error Review Queue"
+    }
 
     queues = list(client.server.annotation_queues_query_stream(query_req))
 
@@ -399,28 +397,28 @@ def test_annotation_queues_query_stream_with_pagination(client):
     """Test querying queues with limit and offset."""
     # Create 5 queues
     for i in range(5):
-        req = tsi.AnnotationQueueCreateReq(
-            project_id=client.project_id,
-            name=f"Pagination Queue {i}",
-            scorer_refs=[f"weave:///{client.project_id}/scorer/test{i}:hash"],
-        )
+        req = {
+            "project_id": client.project_id,
+            "name": f"Pagination Queue {i}",
+            "scorer_refs": [f"weave:///{client.project_id}/scorer/test{i}:hash"],
+        }
         client.server.annotation_queue_create(req)
 
     # Query first page (limit 2)
-    query_req = tsi.AnnotationQueuesQueryReq(
-        project_id=client.project_id,
-        limit=2,
-        offset=0,
-    )
+    query_req = {
+        "project_id": client.project_id,
+        "limit": 2,
+        "offset": 0,
+    }
     page1 = list(client.server.annotation_queues_query_stream(query_req))
     assert len(page1) == 2
 
     # Query second page (offset 2)
-    query_req = tsi.AnnotationQueuesQueryReq(
-        project_id=client.project_id,
-        limit=2,
-        offset=2,
-    )
+    query_req = {
+        "project_id": client.project_id,
+        "limit": 2,
+        "offset": 2,
+    }
     page2 = list(client.server.annotation_queues_query_stream(query_req))
     assert len(page2) == 2
 
@@ -449,20 +447,20 @@ def test_annotation_queue_add_calls(client):
     call_ids = [call.id for call in calls]
 
     # Create a queue
-    create_req = tsi.AnnotationQueueCreateReq(
-        project_id=client.project_id,
-        name="Add Calls Test Queue",
-        scorer_refs=[f"weave:///{client.project_id}/scorer/test:abc"],
-    )
+    create_req = {
+        "project_id": client.project_id,
+        "name": "Add Calls Test Queue",
+        "scorer_refs": [f"weave:///{client.project_id}/scorer/test:abc"],
+    }
     queue_res = client.server.annotation_queue_create(create_req)
 
     # Add calls to queue
-    add_req = tsi.AnnotationQueueAddCallsReq(
-        project_id=client.project_id,
-        queue_id=queue_res.id,
-        call_ids=call_ids,
-        display_fields=["input.x", "output"],
-    )
+    add_req = {
+        "project_id": client.project_id,
+        "queue_id": queue_res.id,
+        "call_ids": call_ids,
+        "display_fields": ["input.x", "output"],
+    }
     add_res = client.server.annotation_queue_add_calls(add_req)
 
     # Verify response
@@ -482,57 +480,57 @@ def test_annotation_queue_add_calls_retries_end_only_calls(client):
 
     # One complete call and one end-only call reproduce the mixed production batch.
     client.server.call_start(
-        tsi.CallStartReq(
-            start=tsi.StartedCallSchemaForInsert(
-                project_id=project_id,
-                id=complete_call_id,
-                trace_id=complete_call_id,
-                started_at=complete_started_at,
-                op_name="complete_call",
-                attributes={},
-                inputs={},
-            )
-        )
+        {
+            "start": {
+                "project_id": project_id,
+                "id": complete_call_id,
+                "trace_id": complete_call_id,
+                "started_at": complete_started_at,
+                "op_name": "complete_call",
+                "attributes": {},
+                "inputs": {},
+            }
+        }
     )
     client.server.call_end(
-        tsi.CallEndReq(
-            end=tsi.EndedCallSchemaForInsert(
-                project_id=project_id,
-                id=complete_call_id,
-                ended_at=complete_ended_at,
-                summary={},
-            )
-        )
+        {
+            "end": {
+                "project_id": project_id,
+                "id": complete_call_id,
+                "ended_at": complete_ended_at,
+                "summary": {},
+            }
+        }
     )
     client.server.call_end(
-        tsi.CallEndReq(
-            end=tsi.EndedCallSchemaForInsert(
-                project_id=project_id,
-                id=end_only_call_id,
-                ended_at=end_only_ended_at,
-                summary={},
-            )
-        )
+        {
+            "end": {
+                "project_id": project_id,
+                "id": end_only_call_id,
+                "ended_at": end_only_ended_at,
+                "summary": {},
+            }
+        }
     )
 
     queue_id = create_annotation_queue(client, name="End-only calls test queue")
     add_res = client.server.annotation_queue_add_calls(
-        tsi.AnnotationQueueAddCallsReq(
-            project_id=project_id,
-            queue_id=queue_id,
-            call_ids=[complete_call_id, end_only_call_id],
-            display_fields=["input", "output"],
-        )
+        {
+            "project_id": project_id,
+            "queue_id": queue_id,
+            "call_ids": [complete_call_id, end_only_call_id],
+            "display_fields": ["input", "output"],
+        }
     )
 
     # The valid call is added with its separately ingested end event intact.
     assert add_res.added_count == 1
     assert add_res.duplicates == 0
     items_res = client.server.annotation_queue_items_query(
-        tsi.AnnotationQueueItemsQueryReq(
-            project_id=project_id,
-            queue_id=queue_id,
-        )
+        {
+            "project_id": project_id,
+            "queue_id": queue_id,
+        }
     )
     assert [item.call_id for item in items_res.items] == [complete_call_id]
     complete_item = items_res.items[0]
@@ -544,34 +542,34 @@ def test_annotation_queue_add_calls_retries_end_only_calls(client):
     # Once the missing start arrives, retrying adds the previously skipped call.
     end_only_started_at = complete_started_at + datetime.timedelta(seconds=2)
     client.server.call_start(
-        tsi.CallStartReq(
-            start=tsi.StartedCallSchemaForInsert(
-                project_id=project_id,
-                id=end_only_call_id,
-                trace_id=end_only_call_id,
-                started_at=end_only_started_at,
-                op_name="end_only_call",
-                attributes={},
-                inputs={},
-            )
-        )
+        {
+            "start": {
+                "project_id": project_id,
+                "id": end_only_call_id,
+                "trace_id": end_only_call_id,
+                "started_at": end_only_started_at,
+                "op_name": "end_only_call",
+                "attributes": {},
+                "inputs": {},
+            }
+        }
     )
     retry_res = client.server.annotation_queue_add_calls(
-        tsi.AnnotationQueueAddCallsReq(
-            project_id=project_id,
-            queue_id=queue_id,
-            call_ids=[end_only_call_id],
-            display_fields=["input", "output"],
-        )
+        {
+            "project_id": project_id,
+            "queue_id": queue_id,
+            "call_ids": [end_only_call_id],
+            "display_fields": ["input", "output"],
+        }
     )
 
     assert retry_res.added_count == 1
     assert retry_res.duplicates == 0
     items_res = client.server.annotation_queue_items_query(
-        tsi.AnnotationQueueItemsQueryReq(
-            project_id=project_id,
-            queue_id=queue_id,
-        )
+        {
+            "project_id": project_id,
+            "queue_id": queue_id,
+        }
     )
     items_by_call_id = {item.call_id: item for item in items_res.items}
     assert set(items_by_call_id) == {complete_call_id, end_only_call_id}
@@ -602,31 +600,31 @@ def test_annotation_queue_add_calls_duplicate_prevention(client):
     call_id = calls[0].id
 
     # Create a queue
-    create_req = tsi.AnnotationQueueCreateReq(
-        project_id=project_id,
-        name="Duplicate Test Queue",
-        scorer_refs=[f"weave:///{client.project_id}/scorer/test:abc"],
-    )
+    create_req = {
+        "project_id": project_id,
+        "name": "Duplicate Test Queue",
+        "scorer_refs": [f"weave:///{client.project_id}/scorer/test:abc"],
+    }
     queue_res = client.server.annotation_queue_create(create_req)
 
     # Add call first time
-    add_req = tsi.AnnotationQueueAddCallsReq(
-        project_id=project_id,
-        queue_id=queue_res.id,
-        call_ids=[call_id],
-        display_fields=["input.x", "output"],
-    )
+    add_req = {
+        "project_id": project_id,
+        "queue_id": queue_res.id,
+        "call_ids": [call_id],
+        "display_fields": ["input.x", "output"],
+    }
     add_res1 = client.server.annotation_queue_add_calls(add_req)
     assert add_res1.added_count == 1
     assert add_res1.duplicates == 0
 
     # Try to add the same call again (create new request to avoid mutation issues)
-    add_req2 = tsi.AnnotationQueueAddCallsReq(
-        project_id=project_id,
-        queue_id=queue_res.id,
-        call_ids=[call_id],
-        display_fields=["input.x", "output"],
-    )
+    add_req2 = {
+        "project_id": project_id,
+        "queue_id": queue_res.id,
+        "call_ids": [call_id],
+        "display_fields": ["input.x", "output"],
+    }
     add_res2 = client.server.annotation_queue_add_calls(add_req2)
     assert add_res2.added_count == 0
     assert add_res2.duplicates == 1
@@ -649,20 +647,20 @@ def test_annotation_queue_add_calls_batch(client):
     call_ids = [call.id for call in calls]
 
     # Create a queue
-    create_req = tsi.AnnotationQueueCreateReq(
-        project_id=client.project_id,
-        name="Batch Test Queue",
-        scorer_refs=[f"weave:///{client.project_id}/scorer/batch:xyz"],
-    )
+    create_req = {
+        "project_id": client.project_id,
+        "name": "Batch Test Queue",
+        "scorer_refs": [f"weave:///{client.project_id}/scorer/batch:xyz"],
+    }
     queue_res = client.server.annotation_queue_create(create_req)
 
     # Add all calls in one batch
-    add_req = tsi.AnnotationQueueAddCallsReq(
-        project_id=client.project_id,
-        queue_id=queue_res.id,
-        call_ids=call_ids,
-        display_fields=["input.x", "output"],
-    )
+    add_req = {
+        "project_id": client.project_id,
+        "queue_id": queue_res.id,
+        "call_ids": call_ids,
+        "display_fields": ["input.x", "output"],
+    }
     add_res = client.server.annotation_queue_add_calls(add_req)
 
     assert add_res.added_count == 20
@@ -685,31 +683,31 @@ def test_annotation_queue_add_calls_partial_duplicates(client):
     call_ids = [call.id for call in calls]
 
     # Create a queue
-    create_req = tsi.AnnotationQueueCreateReq(
-        project_id=client.project_id,
-        name="Partial Duplicate Queue",
-        scorer_refs=[f"weave:///{client.project_id}/scorer/test:abc"],
-    )
+    create_req = {
+        "project_id": client.project_id,
+        "name": "Partial Duplicate Queue",
+        "scorer_refs": [f"weave:///{client.project_id}/scorer/test:abc"],
+    }
     queue_res = client.server.annotation_queue_create(create_req)
 
     # Add first 3 calls
-    add_req1 = tsi.AnnotationQueueAddCallsReq(
-        project_id=client.project_id,
-        queue_id=queue_res.id,
-        call_ids=call_ids[:3],
-        display_fields=["input.x", "output"],
-    )
+    add_req1 = {
+        "project_id": client.project_id,
+        "queue_id": queue_res.id,
+        "call_ids": call_ids[:3],
+        "display_fields": ["input.x", "output"],
+    }
     add_res1 = client.server.annotation_queue_add_calls(add_req1)
     assert add_res1.added_count == 3
     assert add_res1.duplicates == 0
 
     # Add all 5 calls (3 duplicates + 2 new)
-    add_req2 = tsi.AnnotationQueueAddCallsReq(
-        project_id=client.project_id,
-        queue_id=queue_res.id,
-        call_ids=call_ids,
-        display_fields=["input.x", "output"],
-    )
+    add_req2 = {
+        "project_id": client.project_id,
+        "queue_id": queue_res.id,
+        "call_ids": call_ids,
+        "display_fields": ["input.x", "output"],
+    }
     add_res2 = client.server.annotation_queue_add_calls(add_req2)
     assert add_res2.added_count == 2  # Only 2 new calls added
     assert add_res2.duplicates == 3  # 3 were duplicates
@@ -720,19 +718,19 @@ def test_annotation_queues_stats_empty_queues(client):
     # Create two empty queues
     queue_ids = []
     for i in range(2):
-        req = tsi.AnnotationQueueCreateReq(
-            project_id=client.project_id,
-            name=f"Empty Stats Queue {i}",
-            scorer_refs=[f"weave:///{client.project_id}/scorer/empty{i}:abc"],
-        )
+        req = {
+            "project_id": client.project_id,
+            "name": f"Empty Stats Queue {i}",
+            "scorer_refs": [f"weave:///{client.project_id}/scorer/empty{i}:abc"],
+        }
         res = client.server.annotation_queue_create(req)
         queue_ids.append(res.id)
 
     # Get stats for empty queues
-    stats_req = tsi.AnnotationQueuesStatsReq(
-        project_id=client.project_id,
-        queue_ids=queue_ids,
-    )
+    stats_req = {
+        "project_id": client.project_id,
+        "queue_ids": queue_ids,
+    }
     stats_res = client.server.annotation_queues_stats(stats_req)
 
     # Verify we got stats for both queues with zero items
@@ -745,10 +743,10 @@ def test_annotation_queues_stats_empty_queues(client):
 def test_annotation_queues_stats_no_queue_ids(client):
     """Test getting stats with empty queue_ids list."""
     # Request stats with no queue IDs
-    stats_req = tsi.AnnotationQueuesStatsReq(
-        project_id=client.project_id,
-        queue_ids=[],
-    )
+    stats_req = {
+        "project_id": client.project_id,
+        "queue_ids": [],
+    }
     stats_res = client.server.annotation_queues_stats(stats_req)
 
     # Should return empty stats list
@@ -763,10 +761,10 @@ def test_annotation_queue_items_query_basic(client, wb_user_id):
     )
 
     # Query items
-    query_req = tsi.AnnotationQueueItemsQueryReq(
-        project_id=client.project_id,
-        queue_id=fixture.queue_id,
-    )
+    query_req = {
+        "project_id": client.project_id,
+        "queue_id": fixture.queue_id,
+    }
     query_res = client.server.annotation_queue_items_query(query_req)
 
     # Verify we got all 5 items
@@ -790,22 +788,22 @@ def test_annotation_queue_items_query_with_pagination(client):
     )
 
     # Query first page (limit 3)
-    query_req = tsi.AnnotationQueueItemsQueryReq(
-        project_id=client.project_id,
-        queue_id=fixture.queue_id,
-        limit=3,
-        offset=0,
-    )
+    query_req = {
+        "project_id": client.project_id,
+        "queue_id": fixture.queue_id,
+        "limit": 3,
+        "offset": 0,
+    }
     page1_res = client.server.annotation_queue_items_query(query_req)
     assert len(page1_res.items) == 3
 
     # Query second page (offset 3)
-    query_req = tsi.AnnotationQueueItemsQueryReq(
-        project_id=client.project_id,
-        queue_id=fixture.queue_id,
-        limit=3,
-        offset=3,
-    )
+    query_req = {
+        "project_id": client.project_id,
+        "queue_id": fixture.queue_id,
+        "limit": 3,
+        "offset": 3,
+    }
     page2_res = client.server.annotation_queue_items_query(query_req)
     assert len(page2_res.items) == 3
 
@@ -826,10 +824,10 @@ def test_annotation_queue_items_query_with_sorting(client):
     )
 
     # Query with default sort (created_at ASC)
-    query_req = tsi.AnnotationQueueItemsQueryReq(
-        project_id=client.project_id,
-        queue_id=fixture.queue_id,
-    )
+    query_req = {
+        "project_id": client.project_id,
+        "queue_id": fixture.queue_id,
+    }
     query_res = client.server.annotation_queue_items_query(query_req)
 
     # Items should be sorted by created_at ascending
@@ -837,11 +835,11 @@ def test_annotation_queue_items_query_with_sorting(client):
         assert query_res.items[i].created_at <= query_res.items[i + 1].created_at
 
     # Query with call_started_at DESC sort
-    query_req = tsi.AnnotationQueueItemsQueryReq(
-        project_id=client.project_id,
-        queue_id=fixture.queue_id,
-        sort_by=[SortBy(field="call_started_at", direction="desc")],
-    )
+    query_req = {
+        "project_id": client.project_id,
+        "queue_id": fixture.queue_id,
+        "sort_by": [{"field": "call_started_at", "direction": "desc"}],
+    }
     query_res = client.server.annotation_queue_items_query(query_req)
 
     # Items should be sorted by call_started_at descending
@@ -857,10 +855,10 @@ def test_annotation_queue_items_query_empty_queue(client):
     queue_id = create_annotation_queue(client, name="Empty Items Queue")
 
     # Query items from empty queue
-    query_req = tsi.AnnotationQueueItemsQueryReq(
-        project_id=client.project_id,
-        queue_id=queue_id,
-    )
+    query_req = {
+        "project_id": client.project_id,
+        "queue_id": queue_id,
+    }
     query_res = client.server.annotation_queue_items_query(query_req)
 
     # Should return empty list
@@ -875,14 +873,14 @@ def test_annotation_queue_items_query_with_multiple_sort_fields(client):
     )
 
     # Query with multiple sort fields
-    query_req = tsi.AnnotationQueueItemsQueryReq(
-        project_id=client.project_id,
-        queue_id=fixture.queue_id,
-        sort_by=[
-            SortBy(field="call_op_name", direction="asc"),
-            SortBy(field="created_at", direction="desc"),
+    query_req = {
+        "project_id": client.project_id,
+        "queue_id": fixture.queue_id,
+        "sort_by": [
+            {"field": "call_op_name", "direction": "asc"},
+            {"field": "created_at", "direction": "desc"},
         ],
-    )
+    }
     query_res = client.server.annotation_queue_items_query(query_req)
 
     # Should return all items
@@ -900,11 +898,11 @@ def test_annotation_queue_items_query_filter_by_call_id(client):
     target_call_id = fixture.call_ids[2]
 
     # Query with call_id filter
-    query_req = tsi.AnnotationQueueItemsQueryReq(
-        project_id=client.project_id,
-        queue_id=fixture.queue_id,
-        filter=AnnotationQueueItemsFilter(call_id=target_call_id),
-    )
+    query_req = {
+        "project_id": client.project_id,
+        "queue_id": fixture.queue_id,
+        "filter": {"call_id": target_call_id},
+    }
     query_res = client.server.annotation_queue_items_query(query_req)
 
     # Should return only 1 item
@@ -933,11 +931,11 @@ def test_annotation_queue_items_query_filter_by_call_op_name(client):
     assert target_op_name is not None
 
     # Query fixture1's queue filtered by op_name
-    query_req = tsi.AnnotationQueueItemsQueryReq(
-        project_id=client.project_id,
-        queue_id=fixture1.queue_id,
-        filter=AnnotationQueueItemsFilter(call_op_name=target_op_name),
-    )
+    query_req = {
+        "project_id": client.project_id,
+        "queue_id": fixture1.queue_id,
+        "filter": {"call_op_name": target_op_name},
+    }
     query_res = client.server.annotation_queue_items_query(query_req)
 
     # Should return all items from fixture1 (they all have same op_name)
@@ -964,11 +962,11 @@ def test_annotation_queue_items_query_filter_by_call_trace_id(client):
     assert target_trace_id is not None
 
     # Query with trace_id filter
-    query_req = tsi.AnnotationQueueItemsQueryReq(
-        project_id=client.project_id,
-        queue_id=fixture.queue_id,
-        filter=AnnotationQueueItemsFilter(call_trace_id=target_trace_id),
-    )
+    query_req = {
+        "project_id": client.project_id,
+        "queue_id": fixture.queue_id,
+        "filter": {"call_trace_id": target_trace_id},
+    }
     query_res = client.server.annotation_queue_items_query(query_req)
 
     # Should return at least 1 item (might be more if multiple calls share trace)
@@ -985,11 +983,11 @@ def test_annotation_queue_items_query_filter_by_added_by(client, wb_user_id):
     )
 
     # Query with added_by filter
-    query_req = tsi.AnnotationQueueItemsQueryReq(
-        project_id=client.project_id,
-        queue_id=fixture.queue_id,
-        filter=AnnotationQueueItemsFilter(added_by=wb_user_id),
-    )
+    query_req = {
+        "project_id": client.project_id,
+        "queue_id": fixture.queue_id,
+        "filter": {"added_by": wb_user_id},
+    }
     query_res = client.server.annotation_queue_items_query(query_req)
 
     # Should return all 5 items
@@ -998,11 +996,11 @@ def test_annotation_queue_items_query_filter_by_added_by(client, wb_user_id):
         assert item.added_by == wb_user_id
 
     # Query with non-existent added_by
-    query_req = tsi.AnnotationQueueItemsQueryReq(
-        project_id=client.project_id,
-        queue_id=fixture.queue_id,
-        filter=AnnotationQueueItemsFilter(added_by="nonexistent_user"),
-    )
+    query_req = {
+        "project_id": client.project_id,
+        "queue_id": fixture.queue_id,
+        "filter": {"added_by": "nonexistent_user"},
+    }
     query_res = client.server.annotation_queue_items_query(query_req)
 
     # Should return no items
@@ -1022,11 +1020,11 @@ def test_annotation_queue_items_query_filter_by_annotation_states(client):
     )
 
     # Query for unstarted items (all items should be unstarted initially)
-    query_req = tsi.AnnotationQueueItemsQueryReq(
-        project_id=client.project_id,
-        queue_id=fixture.queue_id,
-        filter=AnnotationQueueItemsFilter(annotation_states=["unstarted"]),
-    )
+    query_req = {
+        "project_id": client.project_id,
+        "queue_id": fixture.queue_id,
+        "filter": {"annotation_states": ["unstarted"]},
+    }
     query_res = client.server.annotation_queue_items_query(query_req)
 
     # Should return all 5 items
@@ -1035,11 +1033,11 @@ def test_annotation_queue_items_query_filter_by_annotation_states(client):
         assert item.annotation_state == "unstarted"
 
     # Query for completed items (should be none)
-    query_req = tsi.AnnotationQueueItemsQueryReq(
-        project_id=client.project_id,
-        queue_id=fixture.queue_id,
-        filter=AnnotationQueueItemsFilter(annotation_states=["completed"]),
-    )
+    query_req = {
+        "project_id": client.project_id,
+        "queue_id": fixture.queue_id,
+        "filter": {"annotation_states": ["completed"]},
+    }
     query_res = client.server.annotation_queue_items_query(query_req)
 
     # Should return no items
@@ -1064,15 +1062,15 @@ def test_annotation_queue_items_query_filter_combined(client, wb_user_id):
     assert target_call is not None
 
     # Query with multiple filters: call_id + added_by + annotation_states
-    query_req = tsi.AnnotationQueueItemsQueryReq(
-        project_id=client.project_id,
-        queue_id=fixture.queue_id,
-        filter=AnnotationQueueItemsFilter(
-            call_id=target_call.id,
-            added_by=wb_user_id,
-            annotation_states=["unstarted"],
-        ),
-    )
+    query_req = {
+        "project_id": client.project_id,
+        "queue_id": fixture.queue_id,
+        "filter": {
+            "call_id": target_call.id,
+            "added_by": wb_user_id,
+            "annotation_states": ["unstarted"],
+        },
+    }
     query_res = client.server.annotation_queue_items_query(query_req)
 
     # Should return exactly 1 item matching all criteria
@@ -1082,14 +1080,14 @@ def test_annotation_queue_items_query_filter_combined(client, wb_user_id):
     assert query_res.items[0].annotation_state == "unstarted"
 
     # Query with conflicting filters (specific call_id + wrong annotation state)
-    query_req = tsi.AnnotationQueueItemsQueryReq(
-        project_id=client.project_id,
-        queue_id=fixture.queue_id,
-        filter=AnnotationQueueItemsFilter(
-            call_id=target_call.id,
-            annotation_states=["completed"],  # Item is unstarted, not completed
-        ),
-    )
+    query_req = {
+        "project_id": client.project_id,
+        "queue_id": fixture.queue_id,
+        "filter": {
+            "call_id": target_call.id,
+            "annotation_states": ["completed"],  # Item is unstarted, not completed
+        },
+    }
     query_res = client.server.annotation_queue_items_query(query_req)
 
     # Should return no items
@@ -1104,22 +1102,22 @@ def test_annotation_queue_items_query_filter_empty_results(client):
     )
 
     # Query with non-existent call_id
-    query_req = tsi.AnnotationQueueItemsQueryReq(
-        project_id=client.project_id,
-        queue_id=fixture.queue_id,
-        filter=AnnotationQueueItemsFilter(call_id="nonexistent_call_id"),
-    )
+    query_req = {
+        "project_id": client.project_id,
+        "queue_id": fixture.queue_id,
+        "filter": {"call_id": "nonexistent_call_id"},
+    }
     query_res = client.server.annotation_queue_items_query(query_req)
 
     # Should return no items
     assert len(query_res.items) == 0
 
     # Query with non-existent op_name
-    query_req = tsi.AnnotationQueueItemsQueryReq(
-        project_id=client.project_id,
-        queue_id=fixture.queue_id,
-        filter=AnnotationQueueItemsFilter(call_op_name="NonexistentOp"),
-    )
+    query_req = {
+        "project_id": client.project_id,
+        "queue_id": fixture.queue_id,
+        "filter": {"call_op_name": "NonexistentOp"},
+    }
     query_res = client.server.annotation_queue_items_query(query_req)
 
     # Should return no items
@@ -1134,26 +1132,26 @@ def test_annotation_queue_items_query_filter_with_pagination(client):
     )
 
     # Query for unstarted items with limit
-    query_req = tsi.AnnotationQueueItemsQueryReq(
-        project_id=client.project_id,
-        queue_id=fixture.queue_id,
-        filter=AnnotationQueueItemsFilter(annotation_states=["unstarted"]),
-        limit=3,
-        offset=0,
-    )
+    query_req = {
+        "project_id": client.project_id,
+        "queue_id": fixture.queue_id,
+        "filter": {"annotation_states": ["unstarted"]},
+        "limit": 3,
+        "offset": 0,
+    }
     page1_res = client.server.annotation_queue_items_query(query_req)
 
     # Should return 3 items
     assert len(page1_res.items) == 3
 
     # Query second page
-    query_req = tsi.AnnotationQueueItemsQueryReq(
-        project_id=client.project_id,
-        queue_id=fixture.queue_id,
-        filter=AnnotationQueueItemsFilter(annotation_states=["unstarted"]),
-        limit=3,
-        offset=3,
-    )
+    query_req = {
+        "project_id": client.project_id,
+        "queue_id": fixture.queue_id,
+        "filter": {"annotation_states": ["unstarted"]},
+        "limit": 3,
+        "offset": 3,
+    }
     page2_res = client.server.annotation_queue_items_query(query_req)
 
     # Should return 3 different items
@@ -1171,14 +1169,12 @@ def test_annotation_queue_items_query_filter_with_sorting(client, wb_user_id):
     )
 
     # Query with filter and sort
-    query_req = tsi.AnnotationQueueItemsQueryReq(
-        project_id=client.project_id,
-        queue_id=fixture.queue_id,
-        filter=AnnotationQueueItemsFilter(
-            added_by=wb_user_id, annotation_states=["unstarted"]
-        ),
-        sort_by=[SortBy(field="call_started_at", direction="desc")],
-    )
+    query_req = {
+        "project_id": client.project_id,
+        "queue_id": fixture.queue_id,
+        "filter": {"added_by": wb_user_id, "annotation_states": ["unstarted"]},
+        "sort_by": [{"field": "call_started_at", "direction": "desc"}],
+    }
     query_res = client.server.annotation_queue_items_query(query_req)
 
     # Should return all 5 items sorted by call_started_at descending
@@ -1197,11 +1193,11 @@ def test_annotation_queue_items_query_with_position_basic(client):
     )
 
     # Query items with include_position=True
-    query_req = tsi.AnnotationQueueItemsQueryReq(
-        project_id=client.project_id,
-        queue_id=fixture.queue_id,
-        include_position=True,
-    )
+    query_req = {
+        "project_id": client.project_id,
+        "queue_id": fixture.queue_id,
+        "include_position": True,
+    }
     query_res = client.server.annotation_queue_items_query(query_req)
 
     # Verify we got all 5 items
@@ -1225,10 +1221,10 @@ def test_annotation_queue_items_query_without_position(client):
     )
 
     # Query items without include_position (defaults to False)
-    query_req = tsi.AnnotationQueueItemsQueryReq(
-        project_id=client.project_id,
-        queue_id=fixture.queue_id,
-    )
+    query_req = {
+        "project_id": client.project_id,
+        "queue_id": fixture.queue_id,
+    }
     query_res = client.server.annotation_queue_items_query(query_req)
 
     # Verify position_in_queue is None for all items
@@ -1245,12 +1241,12 @@ def test_annotation_queue_items_query_position_with_sorting(client):
     )
 
     # Query with DESC sort and position
-    query_req = tsi.AnnotationQueueItemsQueryReq(
-        project_id=client.project_id,
-        queue_id=fixture.queue_id,
-        sort_by=[SortBy(field="call_started_at", direction="desc")],
-        include_position=True,
-    )
+    query_req = {
+        "project_id": client.project_id,
+        "queue_id": fixture.queue_id,
+        "sort_by": [{"field": "call_started_at", "direction": "desc"}],
+        "include_position": True,
+    }
     query_res = client.server.annotation_queue_items_query(query_req)
 
     # Verify positions are still sequential 1-5 in the DESC order
@@ -1279,12 +1275,12 @@ def test_annotation_queue_items_query_position_with_filter_unstarted(client):
 
     # All items are initially unstarted
     # Query with filter for unstarted and position
-    query_req = tsi.AnnotationQueueItemsQueryReq(
-        project_id=client.project_id,
-        queue_id=fixture.queue_id,
-        filter=AnnotationQueueItemsFilter(annotation_states=["unstarted"]),
-        include_position=True,
-    )
+    query_req = {
+        "project_id": client.project_id,
+        "queue_id": fixture.queue_id,
+        "filter": {"annotation_states": ["unstarted"]},
+        "include_position": True,
+    }
     query_res = client.server.annotation_queue_items_query(query_req)
 
     # Should return all 5 items with positions 1-5
@@ -1306,10 +1302,10 @@ def test_annotator_queue_items_progress_update_completed(client, wb_user_id):
     )
 
     # Get the queue item
-    query_req = tsi.AnnotationQueueItemsQueryReq(
-        project_id=client.project_id,
-        queue_id=fixture.queue_id,
-    )
+    query_req = {
+        "project_id": client.project_id,
+        "queue_id": fixture.queue_id,
+    }
     query_res = client.server.annotation_queue_items_query(query_req)
     assert len(query_res.items) == 1
     item = query_res.items[0]
@@ -1320,12 +1316,12 @@ def test_annotator_queue_items_progress_update_completed(client, wb_user_id):
     assert item.annotator_user_id == ""
 
     # Update state to completed
-    update_req = tsi.AnnotatorQueueItemsProgressUpdateReq(
-        project_id=client.project_id,
-        queue_id=fixture.queue_id,
-        item_id=item.id,
-        annotation_state="completed",
-    )
+    update_req = {
+        "project_id": client.project_id,
+        "queue_id": fixture.queue_id,
+        "item_id": item.id,
+        "annotation_state": "completed",
+    }
     update_res = client.server.annotator_queue_items_progress_update(update_req)
 
     # Verify response contains updated item with annotator_user_id
@@ -1334,10 +1330,10 @@ def test_annotator_queue_items_progress_update_completed(client, wb_user_id):
     assert update_res.item.annotation_state == "completed"
     assert update_res.item.annotator_user_id == expected_annotator_id
 
-    query_req = tsi.AnnotationQueueItemsQueryReq(
-        project_id=client.project_id,
-        queue_id=fixture.queue_id,
-    )
+    query_req = {
+        "project_id": client.project_id,
+        "queue_id": fixture.queue_id,
+    }
 
     # Query again to verify the state and annotator_user_id persisted
     query_res = client.server.annotation_queue_items_query(query_req)
@@ -1354,21 +1350,21 @@ def test_annotator_queue_items_progress_update_skipped(client, wb_user_id):
     )
 
     # Get the queue item
-    query_req = tsi.AnnotationQueueItemsQueryReq(
-        project_id=client.project_id,
-        queue_id=fixture.queue_id,
-    )
+    query_req = {
+        "project_id": client.project_id,
+        "queue_id": fixture.queue_id,
+    }
     query_res = client.server.annotation_queue_items_query(query_req)
     assert len(query_res.items) == 1
     item = query_res.items[0]
 
     # Update state to skipped
-    update_req = tsi.AnnotatorQueueItemsProgressUpdateReq(
-        project_id=client.project_id,
-        queue_id=fixture.queue_id,
-        item_id=item.id,
-        annotation_state="skipped",
-    )
+    update_req = {
+        "project_id": client.project_id,
+        "queue_id": fixture.queue_id,
+        "item_id": item.id,
+        "annotation_state": "skipped",
+    }
     update_res = client.server.annotator_queue_items_progress_update(update_req)
 
     # Verify response contains updated item
@@ -1384,20 +1380,20 @@ def test_annotator_queue_items_progress_update_invalid_state(client, wb_user_id)
     )
 
     # Get the queue item
-    query_req = tsi.AnnotationQueueItemsQueryReq(
-        project_id=client.project_id,
-        queue_id=fixture.queue_id,
-    )
+    query_req = {
+        "project_id": client.project_id,
+        "queue_id": fixture.queue_id,
+    }
     query_res = client.server.annotation_queue_items_query(query_req)
     item = query_res.items[0]
 
     # Try to update to invalid state
-    update_req = tsi.AnnotatorQueueItemsProgressUpdateReq(
-        project_id=client.project_id,
-        queue_id=fixture.queue_id,
-        item_id=item.id,
-        annotation_state="invalid_state",
-    )
+    update_req = {
+        "project_id": client.project_id,
+        "queue_id": fixture.queue_id,
+        "item_id": item.id,
+        "annotation_state": "invalid_state",
+    }
 
     # Should raise ValueError
     with pytest.raises(ValueError, match="Invalid annotation_state"):
@@ -1410,12 +1406,12 @@ def test_annotator_queue_items_progress_update_nonexistent_item(client, wb_user_
     queue_id = create_annotation_queue(client, name="Nonexistent Item Queue")
 
     # Try to update nonexistent item
-    update_req = tsi.AnnotatorQueueItemsProgressUpdateReq(
-        project_id=client.project_id,
-        queue_id=queue_id,
-        item_id="nonexistent_item_id",
-        annotation_state="completed",
-    )
+    update_req = {
+        "project_id": client.project_id,
+        "queue_id": queue_id,
+        "item_id": "nonexistent_item_id",
+        "annotation_state": "completed",
+    }
 
     # Should raise ValueError
     with pytest.raises(ValueError, match="Queue item .* not found"):
@@ -1432,39 +1428,39 @@ def test_annotator_queue_items_progress_update_transition_from_in_progress(
     )
 
     # Get the queue item
-    query_req = tsi.AnnotationQueueItemsQueryReq(
-        project_id=client.project_id,
-        queue_id=fixture.queue_id,
-    )
+    query_req = {
+        "project_id": client.project_id,
+        "queue_id": fixture.queue_id,
+    }
     query_res = client.server.annotation_queue_items_query(query_req)
     item = query_res.items[0]
 
     # First, mark as in_progress using the API
-    update_req = tsi.AnnotatorQueueItemsProgressUpdateReq(
-        project_id=client.project_id,
-        queue_id=fixture.queue_id,
-        item_id=item.id,
-        annotation_state="in_progress",
-    )
+    update_req = {
+        "project_id": client.project_id,
+        "queue_id": fixture.queue_id,
+        "item_id": item.id,
+        "annotation_state": "in_progress",
+    }
     client.server.annotator_queue_items_progress_update(update_req)
 
     # Verify state is in_progress
     # Create new query_req to avoid mutation issues
-    query_req = tsi.AnnotationQueueItemsQueryReq(
-        project_id=client.project_id,
-        queue_id=fixture.queue_id,
-    )
+    query_req = {
+        "project_id": client.project_id,
+        "queue_id": fixture.queue_id,
+    }
     query_res = client.server.annotation_queue_items_query(query_req)
     assert query_res.items[0].annotation_state == "in_progress"
 
     # Update from in_progress to completed should succeed
     # Create new update_req to avoid mutation issues
-    update_req = tsi.AnnotatorQueueItemsProgressUpdateReq(
-        project_id=client.project_id,
-        queue_id=fixture.queue_id,
-        item_id=item.id,
-        annotation_state="completed",
-    )
+    update_req = {
+        "project_id": client.project_id,
+        "queue_id": fixture.queue_id,
+        "item_id": item.id,
+        "annotation_state": "completed",
+    }
     update_res = client.server.annotator_queue_items_progress_update(update_req)
 
     # Verify state is now completed
@@ -1481,29 +1477,29 @@ def test_annotator_queue_items_progress_update_invalid_transition_from_completed
     )
 
     # Get the queue item
-    query_req = tsi.AnnotationQueueItemsQueryReq(
-        project_id=client.project_id,
-        queue_id=fixture.queue_id,
-    )
+    query_req = {
+        "project_id": client.project_id,
+        "queue_id": fixture.queue_id,
+    }
     query_res = client.server.annotation_queue_items_query(query_req)
     item = query_res.items[0]
 
     # First, mark as completed
-    update_req = tsi.AnnotatorQueueItemsProgressUpdateReq(
-        project_id=client.project_id,
-        queue_id=fixture.queue_id,
-        item_id=item.id,
-        annotation_state="completed",
-    )
+    update_req = {
+        "project_id": client.project_id,
+        "queue_id": fixture.queue_id,
+        "item_id": item.id,
+        "annotation_state": "completed",
+    }
     client.server.annotator_queue_items_progress_update(update_req)
 
     # Try to transition from completed to skipped (should fail)
-    update_req2 = tsi.AnnotatorQueueItemsProgressUpdateReq(
-        project_id=client.project_id,
-        queue_id=fixture.queue_id,
-        item_id=item.id,
-        annotation_state="skipped",
-    )
+    update_req2 = {
+        "project_id": client.project_id,
+        "queue_id": fixture.queue_id,
+        "item_id": item.id,
+        "annotation_state": "skipped",
+    }
 
     # Should raise ValueError about invalid state transition
     with pytest.raises(ValueError, match="Invalid state transition"):
@@ -1524,33 +1520,33 @@ def test_annotator_queue_items_progress_update_idempotent(client, wb_user_id, st
     )
 
     # Get the queue item
-    query_req = tsi.AnnotationQueueItemsQueryReq(
-        project_id=client.project_id,
-        queue_id=fixture.queue_id,
-    )
+    query_req = {
+        "project_id": client.project_id,
+        "queue_id": fixture.queue_id,
+    }
     query_res = client.server.annotation_queue_items_query(query_req)
     assert len(query_res.items) == 1
     item = query_res.items[0]
 
     # First call sets the state
-    update_req1 = tsi.AnnotatorQueueItemsProgressUpdateReq(
-        project_id=client.project_id,
-        queue_id=fixture.queue_id,
-        item_id=item.id,
-        annotation_state=state,
-    )
+    update_req1 = {
+        "project_id": client.project_id,
+        "queue_id": fixture.queue_id,
+        "item_id": item.id,
+        "annotation_state": state,
+    }
     update_res1 = client.server.annotator_queue_items_progress_update(update_req1)
     assert update_res1.item.annotation_state == state
 
     # Second call with same state should succeed (idempotent)
     # Note: Must create a new request object because the adapter mutates
     # req.project_id in place (external -> internal conversion)
-    update_req2 = tsi.AnnotatorQueueItemsProgressUpdateReq(
-        project_id=client.project_id,
-        queue_id=fixture.queue_id,
-        item_id=item.id,
-        annotation_state=state,
-    )
+    update_req2 = {
+        "project_id": client.project_id,
+        "queue_id": fixture.queue_id,
+        "item_id": item.id,
+        "annotation_state": state,
+    }
     update_res2 = client.server.annotator_queue_items_progress_update(update_req2)
     assert update_res2.item.annotation_state == state
 
@@ -1563,47 +1559,47 @@ def test_annotator_queue_items_progress_update_stats_integration(client, wb_user
     )
 
     # Get initial stats (should be 0 completed)
-    stats_req = tsi.AnnotationQueuesStatsReq(
-        project_id=client.project_id,
-        queue_ids=[fixture.queue_id],
-    )
+    stats_req = {
+        "project_id": client.project_id,
+        "queue_ids": [fixture.queue_id],
+    }
     stats_res = client.server.annotation_queues_stats(stats_req)
     assert len(stats_res.stats) == 1
     assert stats_res.stats[0].total_items == 5
     assert stats_res.stats[0].completed_items == 0
 
     # Get queue items
-    query_req = tsi.AnnotationQueueItemsQueryReq(
-        project_id=client.project_id,
-        queue_id=fixture.queue_id,
-    )
+    query_req = {
+        "project_id": client.project_id,
+        "queue_id": fixture.queue_id,
+    }
     query_res = client.server.annotation_queue_items_query(query_req)
 
     # Mark 2 items as completed
     for i in range(2):
-        update_req = tsi.AnnotatorQueueItemsProgressUpdateReq(
-            project_id=client.project_id,
-            queue_id=fixture.queue_id,
-            item_id=query_res.items[i].id,
-            annotation_state="completed",
-        )
+        update_req = {
+            "project_id": client.project_id,
+            "queue_id": fixture.queue_id,
+            "item_id": query_res.items[i].id,
+            "annotation_state": "completed",
+        }
         client.server.annotator_queue_items_progress_update(update_req)
 
     # Mark 1 item as skipped
-    update_req = tsi.AnnotatorQueueItemsProgressUpdateReq(
-        project_id=client.project_id,
-        queue_id=fixture.queue_id,
-        item_id=query_res.items[2].id,
-        annotation_state="skipped",
-    )
+    update_req = {
+        "project_id": client.project_id,
+        "queue_id": fixture.queue_id,
+        "item_id": query_res.items[2].id,
+        "annotation_state": "skipped",
+    }
     client.server.annotator_queue_items_progress_update(update_req)
 
     # Get updated stats (should be 3 completed: 2 completed + 1 skipped)
     # Create new stats_req to avoid mutation issues
-    stats_req = tsi.AnnotationQueuesStatsReq(
-        project_id=client.project_id,
-        queue_ids=[fixture.queue_id],
-    )
+    stats_req = {
+        "project_id": client.project_id,
+        "queue_ids": [fixture.queue_id],
+    }
     stats_res = client.server.annotation_queues_stats(stats_req)
     assert len(stats_res.stats) == 1
     assert stats_res.stats[0].total_items == 5
@@ -1618,10 +1614,10 @@ def test_annotator_queue_items_progress_update_in_progress_new(client, wb_user_i
     )
 
     # Get the queue item
-    query_req = tsi.AnnotationQueueItemsQueryReq(
-        project_id=client.project_id,
-        queue_id=fixture.queue_id,
-    )
+    query_req = {
+        "project_id": client.project_id,
+        "queue_id": fixture.queue_id,
+    }
     query_res = client.server.annotation_queue_items_query(query_req)
     assert len(query_res.items) == 1
     item = query_res.items[0]
@@ -1630,12 +1626,12 @@ def test_annotator_queue_items_progress_update_in_progress_new(client, wb_user_i
     assert item.annotation_state == "unstarted"
 
     # Update state to in_progress (should succeed for new record)
-    update_req = tsi.AnnotatorQueueItemsProgressUpdateReq(
-        project_id=client.project_id,
-        queue_id=fixture.queue_id,
-        item_id=item.id,
-        annotation_state="in_progress",
-    )
+    update_req = {
+        "project_id": client.project_id,
+        "queue_id": fixture.queue_id,
+        "item_id": item.id,
+        "annotation_state": "in_progress",
+    }
     update_res = client.server.annotator_queue_items_progress_update(update_req)
 
     # Verify response contains updated item
@@ -1644,10 +1640,10 @@ def test_annotator_queue_items_progress_update_in_progress_new(client, wb_user_i
 
     # Query again to verify the state persisted
     # Create new query_req to avoid mutation issues
-    query_req = tsi.AnnotationQueueItemsQueryReq(
-        project_id=client.project_id,
-        queue_id=fixture.queue_id,
-    )
+    query_req = {
+        "project_id": client.project_id,
+        "queue_id": fixture.queue_id,
+    }
     query_res = client.server.annotation_queue_items_query(query_req)
     assert len(query_res.items) == 1
     assert query_res.items[0].annotation_state == "in_progress"
@@ -1661,33 +1657,33 @@ def test_annotator_queue_items_progress_update_in_progress_existing(client, wb_u
     )
 
     # Get the queue item
-    query_req = tsi.AnnotationQueueItemsQueryReq(
-        project_id=client.project_id,
-        queue_id=fixture.queue_id,
-    )
+    query_req = {
+        "project_id": client.project_id,
+        "queue_id": fixture.queue_id,
+    }
     query_res = client.server.annotation_queue_items_query(query_req)
     assert len(query_res.items) == 1
     item = query_res.items[0]
 
     # First, mark it as in_progress
-    update_req1 = tsi.AnnotatorQueueItemsProgressUpdateReq(
-        project_id=client.project_id,
-        queue_id=fixture.queue_id,
-        item_id=item.id,
-        annotation_state="in_progress",
-    )
+    update_req1 = {
+        "project_id": client.project_id,
+        "queue_id": fixture.queue_id,
+        "item_id": item.id,
+        "annotation_state": "in_progress",
+    }
     update_res = client.server.annotator_queue_items_progress_update(update_req1)
     assert update_res.item.annotation_state == "in_progress"
 
     # Update to in_progress again - should be idempotent (succeed as no-op)
     # Note: Must create a new request object because the adapter mutates
     # req.project_id in place (external -> internal conversion)
-    update_req2 = tsi.AnnotatorQueueItemsProgressUpdateReq(
-        project_id=client.project_id,
-        queue_id=fixture.queue_id,
-        item_id=item.id,
-        annotation_state="in_progress",
-    )
+    update_req2 = {
+        "project_id": client.project_id,
+        "queue_id": fixture.queue_id,
+        "item_id": item.id,
+        "annotation_state": "in_progress",
+    }
     update_res2 = client.server.annotator_queue_items_progress_update(update_req2)
     assert update_res2.item.annotation_state == "in_progress"
 
@@ -1702,31 +1698,31 @@ def test_annotator_queue_items_progress_update_in_progress_from_completed(
     )
 
     # Get the queue item
-    query_req = tsi.AnnotationQueueItemsQueryReq(
-        project_id=client.project_id,
-        queue_id=fixture.queue_id,
-    )
+    query_req = {
+        "project_id": client.project_id,
+        "queue_id": fixture.queue_id,
+    }
     query_res = client.server.annotation_queue_items_query(query_req)
     assert len(query_res.items) == 1
     item = query_res.items[0]
 
     # First, mark it as completed
-    update_req = tsi.AnnotatorQueueItemsProgressUpdateReq(
-        project_id=client.project_id,
-        queue_id=fixture.queue_id,
-        item_id=item.id,
-        annotation_state="completed",
-    )
+    update_req = {
+        "project_id": client.project_id,
+        "queue_id": fixture.queue_id,
+        "item_id": item.id,
+        "annotation_state": "completed",
+    }
     update_res = client.server.annotator_queue_items_progress_update(update_req)
     assert update_res.item.annotation_state == "completed"
 
     # Try to transition from completed to in_progress (should fail)
-    update_req2 = tsi.AnnotatorQueueItemsProgressUpdateReq(
-        project_id=client.project_id,
-        queue_id=fixture.queue_id,
-        item_id=item.id,
-        annotation_state="in_progress",
-    )
+    update_req2 = {
+        "project_id": client.project_id,
+        "queue_id": fixture.queue_id,
+        "item_id": item.id,
+        "annotation_state": "in_progress",
+    }
     with pytest.raises(
         Exception,
         match="Cannot transition to 'in_progress' when a record already exists",
@@ -1742,41 +1738,41 @@ def test_annotator_queue_items_progress_in_progress_to_completed(client, wb_user
     )
 
     # Get the queue item
-    query_req = tsi.AnnotationQueueItemsQueryReq(
-        project_id=client.project_id,
-        queue_id=fixture.queue_id,
-    )
+    query_req = {
+        "project_id": client.project_id,
+        "queue_id": fixture.queue_id,
+    }
     query_res = client.server.annotation_queue_items_query(query_req)
     assert len(query_res.items) == 1
     item = query_res.items[0]
 
     # First, mark it as in_progress
-    update_req = tsi.AnnotatorQueueItemsProgressUpdateReq(
-        project_id=client.project_id,
-        queue_id=fixture.queue_id,
-        item_id=item.id,
-        annotation_state="in_progress",
-    )
+    update_req = {
+        "project_id": client.project_id,
+        "queue_id": fixture.queue_id,
+        "item_id": item.id,
+        "annotation_state": "in_progress",
+    }
     update_res = client.server.annotator_queue_items_progress_update(update_req)
     assert update_res.item.annotation_state == "in_progress"
 
     # Now update to completed (should succeed)
     # Create new update_req to avoid mutation issues
-    update_req = tsi.AnnotatorQueueItemsProgressUpdateReq(
-        project_id=client.project_id,
-        queue_id=fixture.queue_id,
-        item_id=item.id,
-        annotation_state="completed",
-    )
+    update_req = {
+        "project_id": client.project_id,
+        "queue_id": fixture.queue_id,
+        "item_id": item.id,
+        "annotation_state": "completed",
+    }
     update_res = client.server.annotator_queue_items_progress_update(update_req)
     assert update_res.item.annotation_state == "completed"
 
     # Query again to verify
     # Create new query_req to avoid mutation issues
-    query_req = tsi.AnnotationQueueItemsQueryReq(
-        project_id=client.project_id,
-        queue_id=fixture.queue_id,
-    )
+    query_req = {
+        "project_id": client.project_id,
+        "queue_id": fixture.queue_id,
+    }
     query_res = client.server.annotation_queue_items_query(query_req)
     assert len(query_res.items) == 1
     assert query_res.items[0].annotation_state == "completed"
@@ -1790,69 +1786,69 @@ def test_annotator_queue_items_progress_in_progress_workflow(client, wb_user_id)
     )
 
     # Get queue items
-    query_req = tsi.AnnotationQueueItemsQueryReq(
-        project_id=client.project_id,
-        queue_id=fixture.queue_id,
-    )
+    query_req = {
+        "project_id": client.project_id,
+        "queue_id": fixture.queue_id,
+    }
     query_res = client.server.annotation_queue_items_query(query_req)
     assert len(query_res.items) == 3
 
     # Workflow for item 1: mark in_progress, then complete
     item1_id = query_res.items[0].id
-    update_req = tsi.AnnotatorQueueItemsProgressUpdateReq(
-        project_id=client.project_id,
-        queue_id=fixture.queue_id,
-        item_id=item1_id,
-        annotation_state="in_progress",
-    )
+    update_req = {
+        "project_id": client.project_id,
+        "queue_id": fixture.queue_id,
+        "item_id": item1_id,
+        "annotation_state": "in_progress",
+    }
     client.server.annotator_queue_items_progress_update(update_req)
 
     # Complete item 1
     # Create new update_req to avoid mutation issues
-    update_req = tsi.AnnotatorQueueItemsProgressUpdateReq(
-        project_id=client.project_id,
-        queue_id=fixture.queue_id,
-        item_id=item1_id,
-        annotation_state="completed",
-    )
+    update_req = {
+        "project_id": client.project_id,
+        "queue_id": fixture.queue_id,
+        "item_id": item1_id,
+        "annotation_state": "completed",
+    }
     client.server.annotator_queue_items_progress_update(update_req)
 
     # Workflow for item 2: mark in_progress, then skip
     item2_id = query_res.items[1].id
-    update_req = tsi.AnnotatorQueueItemsProgressUpdateReq(
-        project_id=client.project_id,
-        queue_id=fixture.queue_id,
-        item_id=item2_id,
-        annotation_state="in_progress",
-    )
+    update_req = {
+        "project_id": client.project_id,
+        "queue_id": fixture.queue_id,
+        "item_id": item2_id,
+        "annotation_state": "in_progress",
+    }
     client.server.annotator_queue_items_progress_update(update_req)
 
     # Skip item 2
     # Create new update_req to avoid mutation issues
-    update_req = tsi.AnnotatorQueueItemsProgressUpdateReq(
-        project_id=client.project_id,
-        queue_id=fixture.queue_id,
-        item_id=item2_id,
-        annotation_state="skipped",
-    )
+    update_req = {
+        "project_id": client.project_id,
+        "queue_id": fixture.queue_id,
+        "item_id": item2_id,
+        "annotation_state": "skipped",
+    }
     client.server.annotator_queue_items_progress_update(update_req)
 
     # Item 3: leave as in_progress
     item3_id = query_res.items[2].id
-    update_req = tsi.AnnotatorQueueItemsProgressUpdateReq(
-        project_id=client.project_id,
-        queue_id=fixture.queue_id,
-        item_id=item3_id,
-        annotation_state="in_progress",
-    )
+    update_req = {
+        "project_id": client.project_id,
+        "queue_id": fixture.queue_id,
+        "item_id": item3_id,
+        "annotation_state": "in_progress",
+    }
     client.server.annotator_queue_items_progress_update(update_req)
 
     # Query all items and verify states
     # Create new query_req to avoid mutation issues
-    query_req = tsi.AnnotationQueueItemsQueryReq(
-        project_id=client.project_id,
-        queue_id=fixture.queue_id,
-    )
+    query_req = {
+        "project_id": client.project_id,
+        "queue_id": fixture.queue_id,
+    }
     query_res = client.server.annotation_queue_items_query(query_req)
     assert len(query_res.items) == 3
 
@@ -1868,10 +1864,10 @@ def test_annotator_queue_items_progress_in_progress_workflow(client, wb_user_id)
     assert items_by_id[item3_id].annotator_user_id == expected_annotator_id
 
     # Verify stats (completed count includes skipped)
-    stats_req = tsi.AnnotationQueuesStatsReq(
-        project_id=client.project_id,
-        queue_ids=[fixture.queue_id],
-    )
+    stats_req = {
+        "project_id": client.project_id,
+        "queue_ids": [fixture.queue_id],
+    }
     stats_res = client.server.annotation_queues_stats(stats_req)
     assert len(stats_res.stats) == 1
     assert stats_res.stats[0].total_items == 3
@@ -1887,10 +1883,10 @@ def test_annotator_queue_items_progress_update_returns_correct_item(client, wb_u
     )
 
     # Get all queue items
-    query_req = tsi.AnnotationQueueItemsQueryReq(
-        project_id=client.project_id,
-        queue_id=fixture.queue_id,
-    )
+    query_req = {
+        "project_id": client.project_id,
+        "queue_id": fixture.queue_id,
+    }
     query_res = client.server.annotation_queue_items_query(query_req)
     assert len(query_res.items) == 3
 
@@ -1901,12 +1897,12 @@ def test_annotator_queue_items_progress_update_returns_correct_item(client, wb_u
     assert target_item.id != first_item.id, "Test requires items to have different IDs"
 
     # Update the last item to completed
-    update_req = tsi.AnnotatorQueueItemsProgressUpdateReq(
-        project_id=client.project_id,
-        queue_id=fixture.queue_id,
-        item_id=target_item.id,
-        annotation_state="completed",
-    )
+    update_req = {
+        "project_id": client.project_id,
+        "queue_id": fixture.queue_id,
+        "item_id": target_item.id,
+        "annotation_state": "completed",
+    }
     update_res = client.server.annotator_queue_items_progress_update(update_req)
 
     # Verify the returned item is the one we updated
@@ -1939,49 +1935,47 @@ def test_annotation_queue_add_calls_with_calls_complete_table(trace_server):
     for i in range(5):
         call_id = generate_id()
         seed_calls.append(
-            tsi.CompletedCallSchemaForInsert(
-                project_id=project_id,
-                id=call_id,
-                trace_id=generate_id(),
-                op_name="test_calls_complete_add_to_queue",
-                started_at=started_at,
-                ended_at=started_at + datetime.timedelta(seconds=1),
-                attributes={},
-                inputs={"x": i, "name": f"call_{i}"},
-                output={"result": i * 2},
-                summary={"usage": {}, "status_counts": {}},
-            )
+            {
+                "project_id": project_id,
+                "id": call_id,
+                "trace_id": generate_id(),
+                "op_name": "test_calls_complete_add_to_queue",
+                "started_at": started_at,
+                "ended_at": started_at + datetime.timedelta(seconds=1),
+                "attributes": {},
+                "inputs": {"x": i, "name": f"call_{i}"},
+                "output": {"result": i * 2},
+                "summary": {"usage": {}, "status_counts": {}},
+            }
         )
 
-    call_ids = [call.id for call in seed_calls]
-    trace_server.calls_complete(tsi.CallsUpsertCompleteReq(batch=seed_calls))
+    call_ids = [call["id"] for call in seed_calls]
+    trace_server.calls_complete({"batch": seed_calls})
 
     # Step 2: Verify calls are queryable
-    all_calls = list(
-        trace_server.calls_query_stream(tsi.CallsQueryReq(project_id=project_id))
-    )
+    all_calls = list(trace_server.calls_query_stream({"project_id": project_id}))
     assert len(all_calls) == 5, f"Expected 5 calls, got {len(all_calls)}"
 
     # Step 3: Create annotation queue
     queue_res = trace_server.annotation_queue_create(
-        tsi.AnnotationQueueCreateReq(
-            project_id=project_id,
-            name="calls_complete_test_queue",
-            description="Test queue for calls_complete table",
-            scorer_refs=[f"weave:///{project_id}/scorer/test:xyz"],
-        )
+        {
+            "project_id": project_id,
+            "name": "calls_complete_test_queue",
+            "description": "Test queue for calls_complete table",
+            "scorer_refs": [f"weave:///{project_id}/scorer/test:xyz"],
+        }
     )
     queue_id = queue_res.id
 
     # Step 4: Add 3 of the 5 calls to the queue with display_fields
     queue_call_ids = call_ids[:3]
     add_res = trace_server.annotation_queue_add_calls(
-        tsi.AnnotationQueueAddCallsReq(
-            project_id=project_id,
-            queue_id=queue_id,
-            call_ids=queue_call_ids,
-            display_fields=["input.x", "input.name", "output.result"],
-        )
+        {
+            "project_id": project_id,
+            "queue_id": queue_id,
+            "call_ids": queue_call_ids,
+            "display_fields": ["input.x", "input.name", "output.result"],
+        }
     )
 
     # Step 5: Verify add operation succeeded
@@ -1992,10 +1986,10 @@ def test_annotation_queue_add_calls_with_calls_complete_table(trace_server):
 
     # Step 6: Query queue items to verify they were added correctly
     items_res = trace_server.annotation_queue_items_query(
-        tsi.AnnotationQueueItemsQueryReq(
-            project_id=project_id,
-            queue_id=queue_id,
-        )
+        {
+            "project_id": project_id,
+            "queue_id": queue_id,
+        }
     )
 
     assert len(items_res.items) == 3, (
@@ -2031,10 +2025,10 @@ def test_annotation_queue_add_calls_with_calls_complete_table(trace_server):
 
     # Step 8: Verify stats reflect the added calls
     stats_res = trace_server.annotation_queues_stats(
-        tsi.AnnotationQueuesStatsReq(
-            project_id=project_id,
-            queue_ids=[queue_id],
-        )
+        {
+            "project_id": project_id,
+            "queue_ids": [queue_id],
+        }
     )
 
     assert len(stats_res.stats) == 1
@@ -2059,10 +2053,10 @@ def test_annotation_queue_read_nonexistent(client):
     # Attempt to read a queue that doesn't exist
     with pytest.raises(NotFoundError, match=f"Queue {nonexistent_queue_id} not found"):
         client.server.annotation_queue_read(
-            tsi.AnnotationQueueReadReq(
-                project_id=project_id,
-                queue_id=nonexistent_queue_id,
-            )
+            {
+                "project_id": project_id,
+                "queue_id": nonexistent_queue_id,
+            }
         )
 
 
@@ -2079,20 +2073,20 @@ def test_annotation_queue_delete_basic(client):
     )
 
     # Read the queue to verify it exists and capture original timestamps
-    read_req = tsi.AnnotationQueueReadReq(
-        project_id=client.project_id,
-        queue_id=queue_id,
-    )
+    read_req = {
+        "project_id": client.project_id,
+        "queue_id": queue_id,
+    }
     read_res = client.server.annotation_queue_read(read_req)
     assert read_res.queue.id == queue_id
     assert read_res.queue.deleted_at is None
     original_created_at = read_res.queue.created_at
 
     # Delete the queue
-    delete_req = tsi.AnnotationQueueDeleteReq(
-        project_id=client.project_id,
-        queue_id=queue_id,
-    )
+    delete_req = {
+        "project_id": client.project_id,
+        "queue_id": queue_id,
+    }
     delete_res = client.server.annotation_queue_delete(delete_req)
 
     # Verify response contains the deleted queue with deleted_at set
@@ -2110,18 +2104,18 @@ def test_annotation_queue_delete_basic(client):
     assert delete_res.queue.created_at == original_created_at
 
     # Verify deleted queue cannot be read
-    read_req = tsi.AnnotationQueueReadReq(
-        project_id=client.project_id,
-        queue_id=queue_id,
-    )
+    read_req = {
+        "project_id": client.project_id,
+        "queue_id": queue_id,
+    }
     with pytest.raises(NotFoundError, match=f"Queue {queue_id} not found"):
         client.server.annotation_queue_read(read_req)
 
     # Verify already-deleted queue cannot be deleted again (idempotency)
-    delete_req = tsi.AnnotationQueueDeleteReq(
-        project_id=client.project_id,
-        queue_id=queue_id,
-    )
+    delete_req = {
+        "project_id": client.project_id,
+        "queue_id": queue_id,
+    }
     with pytest.raises(
         NotFoundError, match=f"Queue {queue_id} not found or already deleted"
     ):
@@ -2135,25 +2129,25 @@ def test_annotation_queue_delete_not_in_query(client):
     queue2_id = create_annotation_queue(client, name="Queue 2")
 
     # Query all queues - should see both
-    query_req = tsi.AnnotationQueuesQueryReq(
-        project_id=client.project_id,
-    )
+    query_req = {
+        "project_id": client.project_id,
+    }
     queues = list(client.server.annotation_queues_query_stream(query_req))
     queue_ids = {q.id for q in queues}
     assert queue1_id in queue_ids
     assert queue2_id in queue_ids
 
     # Delete queue1
-    delete_req = tsi.AnnotationQueueDeleteReq(
-        project_id=client.project_id,
-        queue_id=queue1_id,
-    )
+    delete_req = {
+        "project_id": client.project_id,
+        "queue_id": queue1_id,
+    }
     client.server.annotation_queue_delete(delete_req)
 
     # Query again - should only see queue2
-    query_req = tsi.AnnotationQueuesQueryReq(
-        project_id=client.project_id,
-    )
+    query_req = {
+        "project_id": client.project_id,
+    }
     queues = list(client.server.annotation_queues_query_stream(query_req))
     queue_ids = {q.id for q in queues}
     assert queue1_id not in queue_ids
@@ -2165,10 +2159,10 @@ def test_annotation_queue_delete_nonexistent(client):
     nonexistent_queue_id = "00000000-0000-0000-0000-000000000000"
 
     # Try to delete non-existent queue
-    delete_req = tsi.AnnotationQueueDeleteReq(
-        project_id=client.project_id,
-        queue_id=nonexistent_queue_id,
-    )
+    delete_req = {
+        "project_id": client.project_id,
+        "queue_id": nonexistent_queue_id,
+    }
 
     with pytest.raises(
         NotFoundError,

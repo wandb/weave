@@ -6,12 +6,16 @@ shipped SDK distribution**. The published `weave` wheel does not include
 this code; consumers who don't need the mock don't pay for its
 dependencies.
 
-The mock imports request/response models directly from
-`weave.trace_server.trace_server_interface` (declared as a normal `weave`
-dependency, sourced via `[tool.uv.sources]` from the sibling `..` path
-during local development). When production renames or restructures a model,
-the mock's import breaks loudly or Pydantic validation rejects the request —
-drift detection is the central reason for this dependency.
+The mock validates requests against the generated client's request types in
+`weave.vendor.weave_server_sdk` (declared as a normal `weave` dependency,
+sourced via `[tool.uv.sources]` from the sibling `..` path during local
+development). They are generated from the trace server's OpenAPI spec, so
+when the API renames or retypes a required field, Pydantic validation rejects
+what the SDK still sends — drift detection is the central reason for this
+dependency. Unknown keys are ignored, as the server ignores them. Call
+timestamps must parse as datetimes, and a calls query is checked with the
+client's own query model, because the generated query type does not describe
+the wire form (`{"$expr": ...}`).
 
 ## Running
 
@@ -33,7 +37,7 @@ Test drivers spawn this as a subprocess and parse the banner.
 ## Endpoints
 
 **Production-shaped (real Weave API):**
-- `POST /call/upsert_batch` — batch start/end recording. Validated against `weave.trace_server.trace_server_interface` types.
+- `POST /call/upsert_batch` — batch start/end recording. Validated against the generated client's request types.
 - `POST /calls/stream_query` — NDJSON stream of captured calls for a project.
 - Several stub endpoints (`/obj/*`, `/table/*`, `/file/*`, `/feedback/*`, `/call/update`) return canned success without action. Implement on demand as future tests need them.
 
