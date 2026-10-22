@@ -3,7 +3,9 @@ import inspect
 import json
 from collections import defaultdict
 from collections.abc import Callable
+from types import SimpleNamespace
 from typing import TypedDict
+from unittest.mock import Mock
 
 import pytest
 
@@ -571,11 +573,22 @@ def test_evaluation_no_auto_summarize_with_custom_dict(client):
     calls = client.get_calls()
     # assert len(calls) == 1
     summarize_call = calls[4]
-    assert summarize_call.output == {
-        "something": 1,
-        "else": 2,
-        "output": {"something": 1, "else": 2},
-    }
+    assert summarize_call.output == {"something": 1, "else": 2}
+
+
+def test_evaluation_no_auto_summarize_does_not_duplicate_custom_summary():
+    ev = object.__new__(EvaluationLogger)
+    ev._is_finalized = False
+    ev._accumulated_predictions = []
+    ev._evaluate_call = object()
+    ev._eval_meta = {}
+    ev._pseudo_evaluation = SimpleNamespace(summarize=Mock())
+    ev._finalize_evaluation = Mock()
+
+    summary = {"correctness": {"mean": 1.0}}
+    ev.log_summary(summary=summary, auto_summarize=False)
+
+    ev._finalize_evaluation.assert_called_once_with(output=summary)
 
 
 def test_evaluation_logger_model_inference_method_handling(weave_active):
