@@ -31,8 +31,8 @@ from weave.trace.weave_client import (
     NoInternalProjectIDError,
     WeaveClient,
 )
-from weave.trace_server_bindings.stainless_remote_http_trace_server import (
-    StainlessRemoteHTTPTraceServer,
+from weave.trace_server_bindings.remote_http_trace_server import (
+    RemoteHTTPTraceServer,
 )
 from weave.vendor.weave_server_sdk.types import (
     FileCreateResponse,
@@ -416,7 +416,7 @@ class TestConvertRefsToInternal:
         """
         # Spy on obj_create to capture expected_digest values
         captured: list[str | None] = []
-        adapter = find_server_layer(client.server, StainlessRemoteHTTPTraceServer)
+        adapter = find_server_layer(client.server, RemoteHTTPTraceServer)
         original = type(adapter).obj_create
 
         def spy(self, req):
@@ -455,7 +455,7 @@ class TestDigestMismatchAutoDisable:
         """First obj_create with expected_digest fails; client retries without
         it and disables fast path for subsequent saves.
         """
-        adapter = find_server_layer(client.server, StainlessRemoteHTTPTraceServer)
+        adapter = find_server_layer(client.server, RemoteHTTPTraceServer)
         original = adapter.obj_create
         seen_digests: list[str | None] = []
         injected = False
@@ -490,7 +490,7 @@ class TestDigestMismatchAutoDisable:
         self, client: WeaveClient, fast_path: None, monkeypatch
     ) -> None:
         """Table digest mismatch retries and disables fast path."""
-        adapter = find_server_layer(client.server, StainlessRemoteHTTPTraceServer)
+        adapter = find_server_layer(client.server, RemoteHTTPTraceServer)
         original = adapter.table_create
         injected = False
 
@@ -519,7 +519,7 @@ class TestDigestMismatchAutoDisable:
         self, client: WeaveClient, fast_path: None, monkeypatch
     ) -> None:
         """File digest mismatch retries and disables fast path."""
-        adapter = find_server_layer(client.server, StainlessRemoteHTTPTraceServer)
+        adapter = find_server_layer(client.server, RemoteHTTPTraceServer)
         original = adapter.file_create
         injected = False
 

@@ -35,8 +35,8 @@ from weave.trace.settings import (
     should_redact_pii,
 )
 from weave.trace.weave_client import get_parallelism_settings
-from weave.trace_server_bindings.stainless_remote_http_trace_server import (
-    StainlessRemoteHTTPTraceServer,
+from weave.trace_server_bindings.remote_http_trace_server import (
+    RemoteHTTPTraceServer,
 )
 from weave.utils.retry import with_retry
 
@@ -664,7 +664,7 @@ def test_use_stainless_server_false_is_ignored_with_one_warning(
 
     servers = [weave_init.init_weave_get_server(should_batch=False) for _ in range(2)]
 
-    assert all(isinstance(s, StainlessRemoteHTTPTraceServer) for s in servers)
+    assert all(isinstance(s, RemoteHTTPTraceServer) for s in servers)
     warnings = [
         r.getMessage()
         for r in caplog.records
@@ -681,5 +681,5 @@ def test_use_stainless_server_default_does_not_warn(caplog, monkeypatch) -> None
 
     server = weave_init.init_weave_get_server(should_batch=False)
 
-    assert isinstance(server, StainlessRemoteHTTPTraceServer)
+    assert isinstance(server, RemoteHTTPTraceServer)
     assert not [r for r in caplog.records if "use_stainless_server" in r.getMessage()]

@@ -8,8 +8,8 @@ import pydantic
 import pytest
 import tenacity
 
-from weave.trace_server_bindings.stainless_remote_http_trace_server import (
-    StainlessRemoteHTTPTraceServer,
+from weave.trace_server_bindings.remote_http_trace_server import (
+    RemoteHTTPTraceServer,
 )
 from weave.utils.ids import generate_id
 from weave.vendor.weave_server_sdk.types import (
@@ -89,8 +89,8 @@ def success_response():
 
 @pytest.fixture
 def server(request):
-    """A batching StainlessRemoteHTTPTraceServer, set up by `request.param`."""
-    server_ = StainlessRemoteHTTPTraceServer("http://example.com", should_batch=True)
+    """A batching RemoteHTTPTraceServer, set up by `request.param`."""
+    server_ = RemoteHTTPTraceServer("http://example.com", should_batch=True)
 
     if request.param == "normal":
         server_._send_batch_to_server = MagicMock()

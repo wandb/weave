@@ -9,8 +9,8 @@ import pytest
 
 from tests.conftest_lib.http_error_decoding import HTTPErrorDecodingTraceServer
 from tests.trace.server_utils import TEST_ENTITY
-from weave.trace_server_bindings.stainless_remote_http_trace_server import (
-    StainlessRemoteHTTPTraceServer,
+from weave.trace_server_bindings.remote_http_trace_server import (
+    RemoteHTTPTraceServer,
 )
 from weave.utils.ids import generate_id
 from weave.wandb_interface import project_creator
@@ -69,7 +69,7 @@ def pytest_collection_modifyitems(config, items):
 _http_user_ids: dict[str, str] = {}
 
 
-def _probe_http_user_id(server: StainlessRemoteHTTPTraceServer) -> str:
+def _probe_http_user_id(server: RemoteHTTPTraceServer) -> str:
     """Write one call and read back the user id the server stamped on it."""
     project_id = f"{TEST_ENTITY}/test-project"
     call_id = generate_id()
@@ -102,7 +102,7 @@ def trace_server() -> HTTPErrorDecodingTraceServer:
     """
     url = os.environ["WF_TRACE_SERVER_URL"]
     # The client users get by default (`use_stainless_server`).
-    server = StainlessRemoteHTTPTraceServer(url, password=os.environ["WANDB_API_KEY"])
+    server = RemoteHTTPTraceServer(url, password=os.environ["WANDB_API_KEY"])
     if url not in _http_user_ids:
         httpx.post(f"{url}/testonly/reset").raise_for_status()
         _http_user_ids[url] = _probe_http_user_id(server)
