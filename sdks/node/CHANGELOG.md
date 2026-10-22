@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [0.16.10] - 2026-10-22
 
+### Added
+
+- Trace `systemOne` calls from `@typesafe-ai/sdk` (0.6.0 and later) as `chat <model>` spans with provider `typesafe`, recording the response model, input and output token counts, and the `x-typesafe-request-id` header as `gen_ai.response.id`. The SDK is patched on import; `wrapTypeSafe(client, {captureContent})` wraps one client and controls whether state, questions, and answers are kept. ([#7987](https://github.com/wandb/weave/pull/7987))
+
 ### Changed
 
 - Identify the SDK on every emitted span with the resource attributes `wandb.sdk.name` (`weave`), `wandb.sdk.version`, and `wandb.sdk.language`. The old `weave.sdk.version` and `weave.sdk.language` attributes are no longer set. ([#7953](https://github.com/wandb/weave/pull/7953))
