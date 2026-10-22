@@ -386,6 +386,28 @@ def patch_autogen(settings: IntegrationSettings | None = None) -> None:
     )
 
 
+def patch_typesafe(
+    settings: IntegrationSettings | None = None, *, capture_content: bool | None = None
+) -> None:
+    """Record each TypeSafe ``system_one`` call as one chat span, not a Weave Call.
+
+    ``capture_content`` sets the process default for state, questions, and
+    answers. When omitted, ``OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT``
+    applies (``false`` turns content off). A conversation with
+    ``include_content=False`` still drops content.
+    """
+    if capture_content is not None:
+        from weave.integrations.typesafe.typesafe_sdk import set_capture_content
+
+        set_capture_content(capture_content)
+    _patch_integration(
+        module_path="weave.integrations.typesafe.typesafe_sdk",
+        patcher_func_getter_name="get_typesafe_patcher",
+        triggering_symbols=["typesafe_sdk"],
+        settings=settings,
+    )
+
+
 def patch_claude_agent_sdk(settings: IntegrationSettings | None = None) -> None:
     """Enable Weave tracing for Claude Agent SDK (calls-based)."""
     _patch_integration(
@@ -498,6 +520,7 @@ INTEGRATION_MODULE_MAPPING: dict[str, Callable[[], None]] = {
     "mcp": patch_fastmcp,
     "langchain_nvidia_ai_endpoints": patch_nvidia,
     "smolagents": patch_smolagents,
+    "typesafe_sdk": patch_typesafe,
     "claude_agent_sdk": _dispatch_claude_agent_sdk,
     "verdict": patch_verdict,
     "verifiers": patch_verifiers,

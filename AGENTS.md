@@ -243,6 +243,11 @@ without a marker filter, so both kinds of test run.
 Calls-based tests must include the integration's intentional text and thinking
 child calls in exact operation-set assertions.
 
+TypeSafe `system_one` tests live in `tests/integrations/typesafe/` and mock
+the SDK's HTTP transport. They do not use the trace server. PR CI runs
+`tests-3.13(shard='typesafe')` once, without `-m trace_server`. Node tests are
+`sdks/node/src/__tests__/integrations/typesafe.test.ts`.
+
 Every other shard, `flow` included, is run by CI with `-m "trace_server"`, and
 that filter comes from the workflow and `.github/scripts/run_nox_shards.py`
 rather than from `noxfile.py`. A test that uses no server fixture therefore

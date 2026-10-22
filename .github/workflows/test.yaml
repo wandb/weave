@@ -116,14 +116,15 @@ jobs:
         group: ["trace", "trace_calls_merged_only", "integrations"]
         # Shards that don't support certain Python versions. The Claude Agent
         # SDK has both server-backed calls tests and no-server OTel tests, so
-        # it runs once, on 3.10, without the marker filter.
+        # it runs once, on 3.10, without the marker filter. TypeSafe tests mock
+        # HTTP and run once, on 3.13, the same way.
         include:
           - python-version-minor: "10"
             group: "integrations"
-            skip-shards: "notdiamond verifiers_test"
+            skip-shards: "notdiamond verifiers_test typesafe"
           - python-version-minor: "11"
             group: "integrations"
-            skip-shards: "claude_agent_sdk"
+            skip-shards: "claude_agent_sdk typesafe"
           - python-version-minor: "13"
             group: "integrations"
             skip-shards: "claude_agent_sdk cohere notdiamond verifiers_test"
@@ -138,8 +139,8 @@ jobs:
         llamaindex langchain autogen_tests stainless trace_server_bindings flow
         scorers crewai openai dspy anthropic verifiers_test vertexai litellm
         openai_agents mistral instructor smolagents google_genai pandas_test
-        claude_agent_sdk bedrock fastmcp cohere cerebras groq google_adk
-        notdiamond
+        claude_agent_sdk typesafe bedrock fastmcp cohere cerebras groq
+        google_adk notdiamond
     steps:
       - name: Checkout
         uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
@@ -206,8 +207,9 @@ jobs:
             for shard in ${INTEGRATION_SHARDS}; do
               [[ " ${SKIP_SHARDS} " == *" ${shard} "* ]] || shards+=("${shard}")
             done
+            # One argument, because the script splits it and a second word is rejected.
             python .github/scripts/run_nox_shards.py "${PYTHON_VERSION}" "${shards[@]}" \
-              --unfiltered claude_agent_sdk --log-dir "${RUNNER_TEMP}/nox"
+              --unfiltered "claude_agent_sdk typesafe" --log-dir "${RUNNER_TEMP}/nox"
           else
             # Nothing reads the coverage files.
             nox -e "tests-${PYTHON_VERSION}(shard='${{ matrix.group }}')" -- \
