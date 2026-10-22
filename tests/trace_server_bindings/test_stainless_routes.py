@@ -9,6 +9,7 @@ the default one.
 from __future__ import annotations
 
 import collections.abc
+import copy
 import dataclasses
 import datetime
 import inspect
@@ -1341,7 +1342,7 @@ COMPLETION_INPUTS = {
             "completions_create",
             {
                 "project_id": PROJECT,
-                "inputs": COMPLETION_INPUTS,
+                "inputs": copy.deepcopy(COMPLETION_INPUTS),
                 "inference_route": {
                     "connection_type": "dedicated",
                     "connection": "dedicated_cwc38d",
