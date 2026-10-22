@@ -1,6 +1,15 @@
+import warnings
 from typing import Any
 
-from weave.shared import refs_internal
+from weave.trace import refs_internal
+
+# TODO: delete this module together with weave.shared.
+warnings.warn(
+    "weave.shared.trace_server_interface_util is deprecated and will be removed in "
+    "a future release.",
+    FutureWarning,
+    stacklevel=2,
+)
 
 TRACE_REF_SCHEME = "weave"
 ARTIFACT_REF_SCHEME = "wandb-artifact"

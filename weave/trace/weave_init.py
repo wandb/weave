@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 import os
 from collections.abc import Mapping
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 import requests
 
@@ -30,7 +30,6 @@ from weave.trace_server_bindings.caching_middleware_trace_server import (
     CachingMiddlewareTraceServer,
 )
 from weave.trace_server_bindings.client_interface import TraceServerClientInterface
-from weave.trace_server_bindings.remote_http_trace_server import RemoteHTTPTraceServer
 from weave.trace_server_version import MIN_TRACE_SERVER_VERSION
 from weave.version import VERSION
 from weave.wandb_interface.auth import (
@@ -45,8 +44,8 @@ if TYPE_CHECKING:
     )
     from opentelemetry.sdk.trace import TracerProvider
 
-    from weave.shared.service_interface import ServerInfoRes
     from weave.trace.op import PostprocessInputsFunc, PostprocessOutputFunc
+    from weave.vendor.weave_server_sdk.types import ServerInfoRes
 
 logger = logging.getLogger(__name__)
 
@@ -465,7 +464,7 @@ def init_weave_get_server(
     credentials: WandbCredentials | None = None,
     should_batch: bool = True,
 ) -> TraceServerClientInterface:
-    res: TraceServerClientInterface
+    res: StainlessRemoteHTTPTraceServer | RemoteHTTPTraceServer
     if should_use_stainless_server():
         from weave.trace_server_bindings.stainless_remote_http_trace_server import (
             StainlessRemoteHTTPTraceServer,
@@ -473,10 +472,17 @@ def init_weave_get_server(
 
         res = StainlessRemoteHTTPTraceServer.from_env(should_batch)
     else:
+        # Imported here: it loads weave.shared, which `import weave` must not load.
+        from weave.trace_server_bindings.remote_http_trace_server import (
+            RemoteHTTPTraceServer,
+        )
+
         res = RemoteHTTPTraceServer.from_env(should_batch)
     if credentials is not None:
         res.set_auth(credentials)
-    return res
+    # The legacy binding is frozen on the weave.shared types and lacks a few
+    # methods, so it is not checked against the protocol.
+    return cast(TraceServerClientInterface, res)
 
 
 def finish() -> None:

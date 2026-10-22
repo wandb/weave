@@ -1,4 +1,5 @@
 import datetime
+import inspect
 import json
 import platform
 import re
@@ -6,6 +7,7 @@ import sys
 import threading
 import time
 import uuid
+from typing import Any
 
 import httpx
 import pydantic
@@ -15,6 +17,10 @@ from pydantic import ValidationError
 import weave
 import weave.trace.call
 import weave.trace_server.trace_server_interface as tsi
+
+# The generated client imports its resource modules lazily; two executor threads
+# doing that at once from a fresh process trip the import lock's deadlock check.
+import weave.vendor.weave_server_sdk.resources  # noqa: F401
 from tests.conftest import TestOnlyFlushingWeaveClient
 from tests.trace.server_utils import TEST_ENTITY
 from tests.trace.testutil import ObjectRefStrMatcher
@@ -23,16 +29,16 @@ from weave import Evaluation
 from weave.flow.llm_structured_model import LLMStructuredCompletionModel
 from weave.integrations.integration_utilities import op_name_from_call
 from weave.prompt.prompt import MessagesPrompt
-from weave.shared.errors import NotFoundError
-from weave.shared.interface.builtin_object_classes.llm_structured_model import (
-    LLMStructuredCompletionModelDefaultParams,
-)
 from weave.shared.trace_server_interface_util import (
     WILDCARD_ARTIFACT_VERSION_AND_PATH,
 )
 from weave.trace import refs, settings, table_upload_chunking, weave_client
-from weave.trace.context import call_context
+from weave.trace.builtin_object_classes.llm_structured_model import (
+    LLMStructuredCompletionModelDefaultParams,
+)
+from weave.trace.context import call_context, weave_client_context
 from weave.trace.context.call_context import tracing_disabled
+from weave.trace.errors import NotFoundError
 from weave.trace.isinstance import weave_isinstance
 from weave.trace.op import is_op
 from weave.trace.refs import (
@@ -69,6 +75,7 @@ from weave.trace_server_bindings.http_utils import (
 from weave.trace_server_bindings.stainless_remote_http_trace_server import (
     StainlessRemoteHTTPTraceServer,
 )
+from weave.vendor.weave_server_sdk import APIStatusError, UnprocessableEntityError
 
 
 @pytest.mark.flaky(reruns=3, reruns_delay=0.2)
@@ -302,9 +309,9 @@ def test_filter_sort_by_query_validation(client):
     client.get_calls(filter={"trace_ids": ["some_trace_id"]})
 
     # now order_by
-    with pytest.raises(ValidationError):
+    with pytest.raises(TypeError):
         client.get_calls(sort_by="not a sort_by")
-    with pytest.raises(ValidationError):
+    with pytest.raises(TypeError):
         client.get_calls(sort_by=1)
     with pytest.raises(TypeError):
         client.get_calls(sort_by=["not a sort_by"])
@@ -320,11 +327,11 @@ def test_filter_sort_by_query_validation(client):
     with pytest.raises(TypeError):
         client.get_calls(query=["not a query"])
 
-    with pytest.raises(
-        ValidationError,
-        match=r"\d+ validation errors for WeaveClient.get_calls",
-    ):
-        client.get_calls(query={"$expr": {"$invalid_field": "invalid_value"}})
+    # A malformed query is rejected by whoever parses the request (the
+    # hand-written client or the server), when the calls are read.
+    calls = client.get_calls(query={"$expr": {"$invalid_field": "invalid_value"}})
+    with pytest.raises((ValidationError, APIStatusError)):
+        list(calls)
 
     # test valid
     client.get_calls(
@@ -348,6 +355,187 @@ def test_get_calls_forwards_include_usernames(client, monkeypatch):
 
     assert captured_kwargs["project_id"] == client.project_id
     assert captured_kwargs["include_usernames"] is True
+
+
+def test_call_readers_parse_the_summary():
+    """get_call and get_calls give a summary's statuses and feedback times parsed."""
+    stamp = "2026-10-20T12:34:56.123456Z"
+    row = {
+        "id": "call-id",
+        "project_id": "entity/project",
+        "op_name": "op",
+        "trace_id": "trace-id",
+        "started_at": stamp,
+        "attributes": {},
+        "inputs": {},
+        "summary": {
+            "status_counts": {"success": 1, "error": 0},
+            "weave": {
+                "status": "success",
+                "feedback": [
+                    {
+                        "id": "fb",
+                        "feedback_type": "custom",
+                        "payload": {},
+                        "created_at": stamp,
+                    }
+                ],
+            },
+        },
+    }
+
+    def handle(request: httpx.Request) -> httpx.Response:
+        if request.url.path == "/calls/query_stats":
+            return httpx.Response(200, json={"count": 1}, request=request)
+        return httpx.Response(200, content=json.dumps(row) + "\n", request=request)
+
+    server = StainlessRemoteHTTPTraceServer("http://example.com")
+    server._stainless_client = server._stainless_client.copy(
+        http_client=httpx.Client(transport=httpx.MockTransport(handle))
+    )
+    client = weave_client.WeaveClient(
+        "entity", "project", server, ensure_project_exists=False
+    )
+
+    expected = tsi.CallSchema.model_validate(row).summary
+    for call in (client.get_call("call-id"), next(iter(client.get_calls()))):
+        summary = call.summary
+        assert summary == expected
+        assert type(summary["weave"]["status"]) is tsi.TraceStatus
+        assert {type(status) for status in summary["status_counts"]} == {
+            tsi.TraceStatus
+        }
+        created_at = summary["weave"]["feedback"][0]["created_at"]
+        assert created_at.isoformat() == "2026-10-20T12:34:56.123456+00:00"
+
+
+def test_get_calls_sends_column_iterables_as_lists():
+    """get_calls and get_call send columns given as a set or tuple as lists."""
+    bodies: dict[str, dict] = {}
+
+    def handle(request: httpx.Request) -> httpx.Response:
+        bodies[request.url.path] = json.loads(request.content)
+        if request.url.path == "/calls/query_stats":
+            return httpx.Response(200, json={"count": 0}, request=request)
+        return httpx.Response(200, content=b"", request=request)
+
+    server = StainlessRemoteHTTPTraceServer("http://example.com")
+    server._stainless_client = server._stainless_client.copy(
+        http_client=httpx.Client(transport=httpx.MockTransport(handle))
+    )
+    client = weave_client.WeaveClient(
+        "entity", "project", server, ensure_project_exists=False
+    )
+
+    list(client.get_calls(columns={"inputs"}, expand_columns=("inputs.model",)))
+
+    assert bodies["/calls/stream_query"]["columns"] == ["inputs"]
+    assert bodies["/calls/stream_query"]["expand_columns"] == ["inputs.model"]
+    assert bodies["/calls/query_stats"]["expand_columns"] == ["inputs.model"]
+
+    bodies.clear()
+    with pytest.raises(ValueError, match="Call not found"):
+        client.get_call("call-id", columns={"inputs"})
+    assert bodies["/calls/stream_query"]["columns"] == ["inputs"]
+
+
+def test_get_calls_sends_every_keyword():
+    """Every get_calls keyword reaches the requests that read and count the calls."""
+    requests: list[httpx.Request] = []
+
+    def handle(request: httpx.Request) -> httpx.Response:
+        requests.append(request)
+        if request.url.path == "/calls/query_stats":
+            return httpx.Response(200, json={"count": 0}, request=request)
+        return httpx.Response(200, content=b"", request=request)
+
+    server = StainlessRemoteHTTPTraceServer("http://example.com")
+    server._stainless_client = server._stainless_client.copy(
+        http_client=httpx.Client(transport=httpx.MockTransport(handle))
+    )
+    client = weave_client.WeaveClient(
+        "entity", "project", server, ensure_project_exists=False
+    )
+    user_expr = {"$eq": [{"$getField": "op_name"}, {"$literal": "op"}]}
+    kwargs = {
+        "filter": {"op_names": ["op"]},
+        "limit": 5,
+        "offset": 2,
+        "sort_by": [{"field": "started_at", "direction": "desc"}],
+        "query": {"$expr": user_expr},
+        "include_costs": True,
+        "include_feedback": True,
+        "include_storage_size": True,
+        "include_total_storage_size": True,
+        "include_usernames": True,
+        "columns": ["inputs"],
+        "expand_columns": ["inputs.model"],
+        "return_expanded_column_values": False,
+        "scored_by": "my_scorer",
+        "page_size": 3,
+    }
+    # A new keyword has to be added here, so the test checks it reaches the request.
+    assert set(kwargs) == set(inspect.signature(client.get_calls).parameters)
+
+    list(client.get_calls(**kwargs))
+
+    sent: dict[str, list] = {}
+    for r in requests:
+        sent.setdefault(r.url.path, []).append(json.loads(r.content))
+    calls_filter = {
+        "op_names": ["op"],
+        "input_refs": None,
+        "output_refs": None,
+        "parent_ids": None,
+        "trace_ids": None,
+        "call_ids": None,
+        "thread_ids": None,
+        "turn_ids": None,
+        "trace_roots_only": None,
+        "wb_user_ids": None,
+        "wb_run_ids": None,
+    }
+    scored_expr = {
+        "$not": [
+            {
+                "$eq": [
+                    {"$getField": "feedback.[wandb.runnable.my_scorer].payload.output"},
+                    {"$literal": ""},
+                ]
+            }
+        ]
+    }
+    query = {"$expr": {"$and": [user_expr, scored_expr]}}
+    assert sorted(sent) == ["/calls/query_stats", "/calls/stream_query"]
+    assert sent["/calls/stream_query"] == [
+        {
+            "project_id": "entity/project",
+            "filter": calls_filter,
+            "limit": 3,
+            "offset": 2,
+            "latest_only": False,
+            "sort_by": [{"field": "started_at", "direction": "desc"}],
+            "query": query,
+            "include_costs": True,
+            "include_feedback": True,
+            "include_storage_size": True,
+            "include_total_storage_size": True,
+            "include_usernames": True,
+            "columns": ["inputs"],
+            "expand_columns": ["inputs.model"],
+            "return_expanded_column_values": False,
+        }
+    ]
+    assert sent["/calls/query_stats"] == [
+        {
+            "project_id": "entity/project",
+            "filter": calls_filter,
+            "query": query,
+            "limit": None,
+            "include_total_storage_size": False,
+            "expand_columns": ["inputs.model"],
+        }
+    ]
 
 
 def test_call_create(client, wb_user_id):
@@ -769,7 +957,8 @@ def test_delete_calls(client):
     assert len(calls) == 1
     assert calls[0].id == call_2_id
 
-    with pytest.raises(ValueError, match="validation error"):
+    # The server rejects a call id that is not a string.
+    with pytest.raises(UnprocessableEntityError):
         client.delete_calls([1111111111111111])
 
     client.delete_calls([call_2_id])
@@ -830,7 +1019,7 @@ def test_set_display_name_does_not_block_caller(client, no_autoflush):
     executor drains.
     """
     gate = threading.Event()
-    seen: list[tsi.CallUpdateReq] = []
+    seen: list[dict] = []
 
     class GatedServer:
         def __init__(self, inner):
@@ -869,11 +1058,230 @@ def test_set_display_name_does_not_block_caller(client, no_autoflush):
         gate.set()
         client.flush()
         assert len(seen) == 1
-        assert seen[0].call_id == call.id
-        assert seen[0].display_name == "new_name"
+        assert seen[0]["call_id"] == call.id
+        assert seen[0]["display_name"] == "new_name"
     finally:
         gate.set()
         client.server = real_server
+
+
+def _client_storing_objects(
+    sent: list[tuple[str, dict]],
+) -> weave_client.WeaveClient:
+    """A client on the unbatched default binding whose server stores objects."""
+    objs: dict[str, dict] = {}
+
+    def handle(request: httpx.Request) -> httpx.Response:
+        if request.url.path == "/file/create":
+            return httpx.Response(200, json={"digest": "f0"}, request=request)
+        body = json.loads(request.content)
+        sent.append((request.url.path, body))
+        if request.url.path == "/obj/create":
+            digest = f"d{len(objs)}"
+            objs[digest] = body["obj"]
+            return httpx.Response(200, json={"digest": digest}, request=request)
+        if request.url.path == "/obj/read":
+            obj = objs[body["digest"]]
+            read = {
+                "project_id": obj["project_id"],
+                "object_id": obj["object_id"],
+                "created_at": "2026-01-01T00:00:00Z",
+                "digest": body["digest"],
+                "version_index": 0,
+                "is_latest": 1,
+                "kind": "object",
+                "base_object_class": None,
+                "leaf_object_class": None,
+                "val": obj["val"],
+            }
+            return httpx.Response(200, json={"obj": read}, request=request)
+        if request.url.path == "/call/start":
+            start = body["start"]
+            res = {"id": start["id"], "trace_id": start["trace_id"]}
+            return httpx.Response(200, json=res, request=request)
+        return httpx.Response(200, json={}, request=request)
+
+    server = StainlessRemoteHTTPTraceServer("http://example.com", should_batch=False)
+    server._stainless_client = server._stainless_client.copy(
+        http_client=httpx.Client(transport=httpx.MockTransport(handle))
+    )
+    return weave_client.WeaveClient(
+        "entity", "project", server, ensure_project_exists=False
+    )
+
+
+class _EditedThing(weave.Object):
+    a: str
+
+
+def test_edited_object_reaches_call_start_and_end():
+    """A fetched object edited and passed to a call is sent as call input and output.
+
+    Its serialized `_type` holds the object's ref, which has to go out as JSON.
+    """
+    sent: list[tuple[str, dict]] = []
+    client = _client_storing_objects(sent)
+    ref = client._save_object(_EditedThing(a="hello"), "thing")
+    thing = client.get(ref)
+    thing.a = "newer"
+
+    weave_client_context.set_weave_client_global(client)
+    try:
+        call = client.create_call("op", {"x": thing})
+        client.finish_call(call, output=thing)
+        client._flush()
+    finally:
+        weave_client_context.set_weave_client_global(None)
+
+    bodies = dict(sent)
+    sent_input = bodies["/call/start"]["start"]["inputs"]["x"]
+    sent_output = bodies["/call/end"]["end"]["output"]
+    for value in (sent_input, sent_output):
+        assert value["a"] == "newer"
+        assert value["_type"]["name"] == "thing"
+
+
+def test_edited_object_publishes_again():
+    """A fetched object edited and saved again is sent as a new object version.
+
+    Its serialized `_type` holds the object's ref, which has to go out as JSON.
+    """
+    sent: list[tuple[str, dict]] = []
+    client = _client_storing_objects(sent)
+    ref = client._save_object(_EditedThing(a="hello"), "thing")
+    thing = client.get(ref)
+    thing.a = "newer"
+
+    client._save_object(thing, "thing")
+    client._flush()
+
+    creates = [body["obj"] for path, body in sent if path == "/obj/create"]
+    assert len(creates) == 2
+    assert creates[1]["val"]["a"] == "newer"
+    assert creates[1]["val"]["_type"]["name"] == "thing"
+
+
+def test_saved_object_sends_dict_keys_the_way_the_digest_reads_them():
+    """A dict key that is not a str goes out as json.dumps writes it."""
+    sent: list[tuple[str, dict]] = []
+    client = _client_storing_objects(sent)
+
+    client._save_object({None: "first", "None": "second"}, "keys")
+    client._flush()
+
+    creates = [body["obj"] for path, body in sent if path == "/obj/create"]
+    assert [obj["val"] for obj in creates] == [{"null": "first", "None": "second"}]
+
+
+class _Config(pydantic.BaseModel):
+    retries: int = 3
+
+
+def test_attributes_and_summary_models_keep_defaults_at_call_start_and_end():
+    """Default fields of models nested in attributes and summary reach the server.
+
+    The generated client dumps nested models with exclude_unset, so they have
+    to be turned into plain JSON before they go into the request.
+    """
+    sent: list[tuple[str, dict]] = []
+    client = _client_storing_objects(sent)
+
+    weave_client_context.set_weave_client_global(client)
+    try:
+        call = client.create_call("op", {"x": 1}, attributes={"config": _Config()})
+        call.summary = {"config": _Config()}
+        client.finish_call(call, output=None)
+        client._flush()
+    finally:
+        weave_client_context.set_weave_client_global(None)
+
+    bodies = dict(sent)
+    assert bodies["/call/start"]["start"]["attributes"]["config"] == {"retries": 3}
+    assert bodies["/call/end"]["end"]["summary"]["config"] == {"retries": 3}
+
+
+@pytest.mark.disable_logging_error_check
+def test_a_call_with_a_bad_field_does_not_take_its_batch_down(monkeypatch):
+    """A call that fails request validation is dropped where it is created.
+
+    The server rejects a whole batch for one bad call, and a batch whose halves
+    are both rejected is dropped, so a bad call must never join a batch.
+    """
+    # The bad calls' ends never pair with a start; do not wait for them.
+    monkeypatch.setattr(
+        "weave.trace_server_bindings.call_batch_processor.FLUSH_TIMEOUT_SECONDS", 0.5
+    )
+    sent_ids: list[str] = []
+
+    def handle(request: httpx.Request) -> httpx.Response:
+        if request.url.path.endswith("/calls/complete"):
+            batch = json.loads(request.content)["batch"]
+            if any(
+                not isinstance(c.get("display_name"), (str, type(None))) for c in batch
+            ):
+                return httpx.Response(422, json={"detail": "invalid"}, request=request)
+            sent_ids.extend(c["id"] for c in batch)
+        if request.url.path in {"/obj/create", "/file/create"}:
+            return httpx.Response(200, json={"digest": "d"}, request=request)
+        return httpx.Response(200, json={}, request=request)
+
+    server = StainlessRemoteHTTPTraceServer("http://example.com", should_batch=True)
+    server._stainless_client = server._stainless_client.copy(
+        http_client=httpx.Client(transport=httpx.MockTransport(handle))
+    )
+    client = weave_client.WeaveClient(
+        "entity", "project", server, ensure_project_exists=False
+    )
+
+    weave_client_context.set_weave_client_global(client)
+    try:
+        bad_name: Any = 5
+        calls = []
+        for i in range(8):
+            display_name = bad_name if i in {0, 4} else f"call-{i}"
+            call = client.create_call("op", {"i": i}, display_name=display_name)
+            client.finish_call(call, output=i)
+            calls.append(call)
+        client.flush()
+    finally:
+        weave_client_context.set_weave_client_global(None)
+        if server.call_processor:
+            server.call_processor.stop_accepting_new_work_and_flush_queue()
+
+    good = [call.id for i, call in enumerate(calls) if i not in {0, 4}]
+    assert sorted(sent_ids) == sorted(good)
+
+
+def test_summary_written_after_finish_does_not_change_the_end_request():
+    """The end request carries a copy of the summary, not the call's live dict."""
+    sent: list[tuple[str, dict]] = []
+    client = _client_storing_objects(sent)
+    built = threading.Event()
+    gate = threading.Event()
+    real_send = client.server.call_end
+
+    def gated_call_end(req):
+        built.set()
+        gate.wait(timeout=5)
+        return real_send(req)
+
+    client.server.call_end = gated_call_end
+
+    weave_client_context.set_weave_client_global(client)
+    try:
+        call = client.create_call("op", {"x": 1})
+        call.summary = {"result": "before"}
+        client.finish_call(call, output=None)
+        assert built.wait(timeout=5)
+        call.summary["result"] = "after"
+        gate.set()
+        client._flush()
+    finally:
+        gate.set()
+        weave_client_context.set_weave_client_global(None)
+
+    end_summary = dict(sent)["/call/end"]["end"]["summary"]
+    assert end_summary["result"] == "before"
 
 
 def test_dataset_calls(client):
@@ -1659,6 +2067,66 @@ def test_table_partitioning(network_proxy_client, use_parallel_table_upload):
             f"Expected 2 obj_create/obj_read calls, got {len(obj_records)}"
         )
         assert len(records) == 6, f"Expected 6 total records, got {len(records)}"
+
+
+@pytest.mark.timeout(60)
+@pytest.mark.flaky(reruns=3, reruns_delay=2)
+@pytest.mark.parametrize("use_parallel_table_upload", [False, True])
+def test_table_partitioning_on_the_generated_client(
+    client, stainless_recording_server, use_parallel_table_upload
+):
+    """test_table_partitioning, for the client users get by default.
+
+    The server must compute the same digests from what the generated client
+    sends, through the same requests.
+    """
+    remote_client, paths = stainless_recording_server
+    settings.replace_settings(
+        settings.UserSettings(use_parallel_table_upload=use_parallel_table_upload)
+    )
+
+    rows = list(row_gen(16, 1024))
+    exp_digest = "15696550bde28f9231173a085ce107c823e7eab6744a97adaa7da55bc9c93347"
+    # A buffer large enough for a single request.
+    remote_client.remote_request_bytes_limit = 100 * 1024
+    res = remote_client.table_create(
+        tsi.TableCreateReq(
+            table=tsi.TableSchemaForInsert(project_id=client.project_id, rows=rows)
+        )
+    )
+    assert res.digest == exp_digest
+    assert paths == ["/table/create"]
+
+    # Small enough to turn on chunking.
+    remote_client.remote_request_bytes_limit = 4 * 1024
+    paths.clear()
+    remote_weave_client = TestOnlyFlushingWeaveClient(
+        entity=client.entity,
+        project=client.project,
+        server=remote_client,
+        ensure_project_exists=False,
+    )
+    remote_weave_client.set_autoflush(False)
+    # The probe is made only once per process; clear it so the paths are the same
+    # whatever ran before.
+    _ENDPOINT_CACHE.discard("table_create_from_digests")
+
+    saved_table = remote_weave_client.save(weave_client.Table(rows), "table")
+    remote_weave_client.flush()
+
+    assert saved_table.table_ref._digest == exp_digest
+    # Chunks are cut at TARGET_CHUNK_BYTES, so this table is one chunk either way.
+    if use_parallel_table_upload:
+        # The chunk, the endpoint probe, the merge of the chunks, then the object.
+        assert sorted(paths) == [
+            "/obj/create",
+            "/obj/read",
+            "/table/create",
+            "/table/create_from_digests",
+            "/table/create_from_digests",
+        ]
+    else:
+        assert sorted(paths) == ["/obj/create", "/obj/read", "/table/create"]
 
 
 def test_parallel_chunk_probe_works_for_the_generated_client(client, monkeypatch):
@@ -4270,6 +4738,57 @@ def test_feedback_batching(network_proxy_client):
         assert feedback.payload["note"] == f"Test feedback {i}"
 
 
+def test_feedback_batching_on_the_generated_client(client, stainless_recording_server):
+    """test_feedback_batching, for the client users get by default."""
+    remote_client, paths = stainless_recording_server
+    remote_weave_client = TestOnlyFlushingWeaveClient(
+        entity=client.entity,
+        project=client.project,
+        server=remote_client,
+        ensure_project_exists=False,
+    )
+    remote_weave_client.set_autoflush(False)
+
+    @weave.op
+    def test_op(x: int) -> int:
+        return x * 2
+
+    test_op(5)
+    client.flush()
+    test_call = remote_weave_client.get_calls()[0]
+    paths.clear()
+
+    # Feedback goes through the global client, so make the recording one global.
+    # The setter only replaces an unset client, hence the None first.
+    weave_client_context.set_weave_client_global(None)
+    weave_client_context.set_weave_client_global(remote_weave_client)
+    try:
+        feedback_ids = [
+            test_call.feedback.add(
+                feedback_type=f"test_feedback_{i}",
+                payload={"score": i, "note": f"Test feedback {i}"},
+            )
+            for i in range(10)
+        ]
+        remote_weave_client.flush()
+    finally:
+        weave_client_context.set_weave_client_global(None)
+        weave_client_context.set_weave_client_global(client)
+
+    assert remote_client.get_feedback_processor() is not None
+    assert "/feedback/create" not in paths
+    assert "/feedback/batch/create" in paths
+    created_feedback = sorted(
+        (f for f in test_call.feedback if f.feedback_type.startswith("test_feedback_")),
+        key=lambda f: f.feedback_type,
+    )
+    assert sorted(f.id for f in created_feedback) == sorted(feedback_ids)
+    assert [(f.feedback_type, f.payload) for f in created_feedback] == [
+        (f"test_feedback_{i}", {"score": i, "note": f"Test feedback {i}"})
+        for i in range(10)
+    ]
+
+
 @pytest.mark.disable_logging_error_check
 @pytest.mark.parametrize("use_parallel_table_upload", [False, True])
 def test_parallel_table_uploads_digest_consistency(
@@ -4833,21 +5352,21 @@ def test_evaluate_with_llm_completion_model_and_prompt_template_vars(client):
     )
 
     # Verify the request has prompt reference and template_vars
-    assert req.inputs.prompt == prompt_ref.uri, (
+    assert req["inputs"]["prompt"] == prompt_ref.uri, (
         "Request should include prompt reference"
     )
-    assert req.inputs.template_vars == {
+    assert req["inputs"]["template_vars"] == {
         "assistant_name": "MathBot",
         "topic": "mathematics",
         "question": "What is 2+2?",
     }, "Request should include template_vars"
 
     # Verify messages are empty (prompt resolution happens in completions endpoint)
-    assert req.inputs.messages == [], "Messages should be empty when using prompt"
+    assert req["inputs"]["messages"] == [], "Messages should be empty when using prompt"
 
     # Verify other params are set
-    assert req.inputs.temperature == 0.7
-    assert req.inputs.max_tokens == 50
+    assert req["inputs"]["temperature"] == 0.7
+    assert req["inputs"]["max_tokens"] == 50
 
     # Test with additional user_input messages
     req_with_input = model.prepare_completion_request(
@@ -4860,14 +5379,14 @@ def test_evaluate_with_llm_completion_model_and_prompt_template_vars(client):
     )
 
     # Should still have prompt and template_vars
-    assert req_with_input.inputs.prompt == prompt_ref.uri
-    assert req_with_input.inputs.template_vars == {
+    assert req_with_input["inputs"]["prompt"] == prompt_ref.uri
+    assert req_with_input["inputs"]["template_vars"] == {
         "assistant_name": "MathBot",
         "topic": "mathematics",
         "question": "What is 2+2?",
     }
 
     # Should have user_input messages
-    assert req_with_input.inputs.messages == [
+    assert req_with_input["inputs"]["messages"] == [
         {"role": "user", "content": "Additional context"}
     ]

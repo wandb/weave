@@ -1,9 +1,21 @@
 import re
+import warnings
 from typing import Any, Literal
 
-from weave.shared import refs_internal, validation_util
-from weave.shared.constants import MAX_DISPLAY_NAME_LENGTH, MAX_OP_NAME_LENGTH
-from weave.shared.errors import InvalidFieldError, InvalidRequest
+# Sibling modules warn too; one warning, this module's, is enough.
+with warnings.catch_warnings():
+    warnings.simplefilter("ignore", FutureWarning)
+    from weave.shared import validation_util
+from weave.trace import refs_internal
+from weave.trace.constants import MAX_DISPLAY_NAME_LENGTH, MAX_OP_NAME_LENGTH
+from weave.trace.errors import InvalidFieldError, InvalidRequest
+
+# TODO: delete this module together with weave.shared.
+warnings.warn(
+    "weave.shared.validation is deprecated and will be removed in a future release.",
+    FutureWarning,
+    stacklevel=2,
+)
 
 
 def project_id_validator(s: str) -> str:

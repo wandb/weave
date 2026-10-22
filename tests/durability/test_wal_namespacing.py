@@ -66,16 +66,14 @@ class TestCrashRecovery:
 
         # --- Process A: write records, then "crash" (close writer only) ---
         mgr_a = WALManager("entity", "project", api_key=api_key)
-        mgr_a.write(
-            "obj_create",
-            tsi.ObjCreateReq(
-                obj=tsi.ObjSchemaForInsert(
-                    project_id="entity/project",
-                    object_id="orphaned_obj",
-                    val={"rescued": True},
-                )
-            ),
+        req = tsi.ObjCreateReq(
+            obj=tsi.ObjSchemaForInsert(
+                project_id="entity/project",
+                object_id="orphaned_obj",
+                val={"rescued": True},
+            )
         )
+        mgr_a.write("obj_create", req)
         mgr_a.flush()
         wal_dir = mgr_a.wal_dir
         # Close writer (releases lock file) but don't drain — simulates crash
@@ -102,8 +100,8 @@ class TestCrashRecovery:
         # The sender should have called obj_create on the mock server
         mock_server.obj_create.assert_called_once()
         call_arg = mock_server.obj_create.call_args[0][0]
-        assert isinstance(call_arg, tsi.ObjCreateReq)
-        assert call_arg.obj.object_id == "orphaned_obj"
+        assert call_arg == req.model_dump(mode="json")
+        assert call_arg["obj"]["object_id"] == "orphaned_obj"
 
         # The WAL file should be cleaned up after draining
         remaining = [f for f in os.listdir(wal_dir) if f.endswith(".jsonl")]

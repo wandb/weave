@@ -8,17 +8,10 @@ from typing import Any, Literal, SupportsIndex, cast
 
 from pydantic import BaseModel
 
-from weave.shared.errors import ObjectDeletedError
-from weave.shared.trace_server_interface import (
-    ObjReadReq,
-    TableQueryReq,
-    TableQueryStatsReq,
-    TableRowFilter,
-    TraceServerInterface,
-)
 from weave.trace import box
 from weave.trace.context.tests_context import get_raise_on_captured_errors
 from weave.trace.context.weave_client_context import get_weave_client
+from weave.trace.errors import ObjectDeletedError
 from weave.trace.object_record import ObjectRecord
 from weave.trace.op import is_op, maybe_bind_method
 from weave.trace.refs import (
@@ -33,9 +26,11 @@ from weave.trace.refs import (
 )
 from weave.trace.serialization.serialize import from_json
 from weave.trace.table import Table
+from weave.trace_server_bindings.client_interface import TraceServerClientInterface
 from weave.trace_server_bindings.http_utils import retry_on_not_found
 from weave.utils.iterators import ThreadSafeLazyList
 from weave.utils.project_id import to_project_id
+from weave.vendor.weave_server_sdk.types import table_query_params
 
 logger = logging.getLogger(__name__)
 
@@ -116,7 +111,7 @@ class Traceable:
     mutations: list[Mutation] | None = None
     root: "Traceable"
     parent: "Traceable | None" = None
-    server: TraceServerInterface
+    server: TraceServerClientInterface
     _is_dirty: bool = False
 
     def _mark_dirty(self) -> None:
@@ -186,7 +181,7 @@ def attribute_access_result(
     val_attr_val: Any,
     attr_name: str,
     *,
-    server: TraceServerInterface | None,
+    server: TraceServerClientInterface | None,
 ) -> Any:
     # Not ideal, what about properties?
     if callable(val_attr_val):
@@ -222,7 +217,7 @@ class WeaveObject(Traceable):  # noqa: PLW1641
         self,
         val: Any,
         ref: RefWithExtra | None,
-        server: TraceServerInterface,
+        server: TraceServerClientInterface,
         root: Traceable | None,
         parent: Traceable | None = None,
     ) -> None:
@@ -292,7 +287,7 @@ class WeaveObject(Traceable):  # noqa: PLW1641
 
 
 class WeaveTable(Traceable):  # noqa: PLW1641
-    filter: TableRowFilter | None = None
+    filter: table_query_params.Filter | None = None
     _known_length: int | None = None
     _rows: Sequence[dict] | None = None
     # _prefetched_rows is a local cache of rows that can be used to
@@ -301,10 +296,10 @@ class WeaveTable(Traceable):  # noqa: PLW1641
 
     def __init__(
         self,
-        server: TraceServerInterface,
+        server: TraceServerClientInterface,
         table_ref: TableRef | None = None,
         ref: RefWithExtra | None = None,
-        filter: TableRowFilter | None = None,
+        filter: table_query_params.Filter | None = None,
         root: Traceable | None = None,
         parent: Traceable | None = None,
     ) -> None:
@@ -400,9 +395,7 @@ class WeaveTable(Traceable):  # noqa: PLW1641
             raise ValueError("Cannot fetch remote length of table without table ref")
 
         response = self.server.table_query_stats(
-            TableQueryStatsReq(
-                project_id=self.table_ref.project_id, digest=self.table_ref.digest
-            )
+            {"project_id": self.table_ref.project_id, "digest": self.table_ref.digest}
         )
         return response.count
 
@@ -493,13 +486,14 @@ class WeaveTable(Traceable):  # noqa: PLW1641
         page_size = REMOTE_ITER_PAGE_SIZE
         while True:
             response = self.server.table_query(
-                TableQueryReq(
-                    project_id=self.table_ref.project_id,
-                    digest=self.table_ref.digest,
-                    offset=page_index * page_size,
-                    limit=page_size,
-                    filter=self.filter,
-                )
+                {
+                    "project_id": self.table_ref.project_id,
+                    "digest": self.table_ref.digest,
+                    "filter": self.filter,
+                    "limit": page_size,
+                    "offset": page_index * page_size,
+                    "sort_by": None,
+                }
             )
 
             # When paginating through large datasets, we need special handling for prefetched rows
@@ -616,7 +610,7 @@ class WeaveList(Traceable, list):  # noqa: PLW1641
     def __init__(
         self,
         *args: Any,
-        server: TraceServerInterface,
+        server: TraceServerClientInterface,
         ref: RefWithExtra | None = None,
         root: Traceable | None = None,
         parent: Traceable | None = None,
@@ -695,7 +689,7 @@ class WeaveDict(Traceable, dict):  # noqa: PLW1641
     def __init__(
         self,
         *args: Any,
-        server: TraceServerInterface,
+        server: TraceServerClientInterface,
         ref: RefWithExtra | None = None,
         root: Traceable | None = None,
         parent: Traceable | None = None,
@@ -779,7 +773,7 @@ class WeaveDict(Traceable, dict):  # noqa: PLW1641
 def make_trace_obj(
     val: Any,
     new_ref: RefWithExtra | None,  # Can this actually be None?
-    server: TraceServerInterface,
+    server: TraceServerClientInterface,
     root: Traceable | None,
     parent: Any = None,
 ) -> Any:
@@ -806,11 +800,13 @@ def make_trace_obj(
             # publish races against server-side eventual consistency, same as
             # the top-level reads in WeaveClient.get.
             read_res = retry_on_not_found(server.obj_read)(
-                ObjReadReq(
-                    project_id=project_id,
-                    object_id=val.name,
-                    digest=val.digest,
-                )
+                {
+                    "project_id": project_id,
+                    "object_id": val.name,
+                    "digest": val.digest,
+                    "metadata_only": False,
+                    "include_tags_and_aliases": False,
+                }
             )
             val = from_json(read_res.obj.val, project_id, server)
         except ObjectDeletedError as e:
@@ -832,7 +828,7 @@ def make_trace_obj(
             table_ref=val_ref,
             ref=new_ref,
             server=server,
-            filter=TableRowFilter(),
+            filter={"row_digests": None},
             root=root,
             parent=parent,
         )
@@ -847,7 +843,7 @@ def make_trace_obj(
             table_ref=val,
             ref=new_ref,
             server=server,
-            filter=TableRowFilter(),
+            filter={"row_digests": None},
             root=root,
             parent=parent,
         )
@@ -869,14 +865,14 @@ def make_trace_obj(
 
             # need to deref if we encounter these
             if isinstance(val, TableRef):
-                table_row_filter = TableRowFilter()
+                table_row_filter: table_query_params.Filter = {"row_digests": None}
                 if (
                     len(extra) == 4
                     and extra[0] == OBJECT_ATTR_EDGE_NAME
                     and extra[1] == "rows"
                     and extra[2] == TABLE_ROW_ID_EDGE_NAME
                 ):
-                    table_row_filter.row_digests = [extra[3]]
+                    table_row_filter["row_digests"] = [extra[3]]
 
                 val = WeaveTable(
                     table_ref=val,

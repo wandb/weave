@@ -6,17 +6,21 @@ from typing import Any, Literal, TypedDict
 from pydantic import BaseModel
 from typing_extensions import Self
 
-from weave.shared import trace_server_interface as tsi
-from weave.shared.common_interface import SortBy
-from weave.shared.interface import query as tsi_query
-from weave.shared.interface.builtin_object_classes.saved_view import Column, Pin
-from weave.shared.interface.builtin_object_classes.saved_view import (
-    SavedView as SavedViewBase,
-)
 from weave.trace import urls
 from weave.trace.api import publish as weave_publish
 from weave.trace.api import ref as weave_ref
+from weave.trace.builtin_object_classes import query as query_models
+from weave.trace.builtin_object_classes.saved_view import (
+    CallsFilter,
+    Column,
+    Pin,
+    SortBy,
+)
+from weave.trace.builtin_object_classes.saved_view import (
+    SavedView as SavedViewBase,
+)
 from weave.trace.call import CallsIter
+from weave.trace.constants import TraceStatus
 from weave.trace.context import weave_client_context
 from weave.trace.display import display
 from weave.trace.display.grid import Grid
@@ -159,11 +163,11 @@ VALUELESS_OPERATORS = {"(any): isEmpty", "(any): isNotEmpty"}
 FIELDS_NO_FLOAT_CONVERT = {"summary.weave.latency_ms", "started_at"}
 
 
-def py_to_api_filter(filter: tsi.CallsFilter | None) -> tsi.CallsFilter | None:
+def py_to_api_filter(filter: CallsFilter | None) -> CallsFilter | None:
     """Convert Saved View Filter to API Filter."""
     if filter is None:
         return None
-    return tsi.CallsFilter(
+    return CallsFilter(
         **filter.model_dump(exclude_none=True),
     )
 
@@ -279,26 +283,26 @@ def filter_to_clause(item: Filter) -> dict[str, Any]:
         raise ValueError(f"Unsupported operator: {item.operator}")
 
 
-def filters_to_query(filters: Filters | None) -> tsi.Query | None:
+def filters_to_query(filters: Filters | None) -> query_models.Query | None:
     """Convert in-memory only Filters to API Query."""
     if not filters:
         return None
 
     filter_clauses = [filter_to_clause(f) for f in filters]
     expr = {"$and": filter_clauses}
-    return tsi.Query(**{"$expr": expr})
+    return query_models.Query(**{"$expr": expr})
 
 
-def operand_to_filter_eq(operand: tsi_query.EqOperation) -> Filter:
+def operand_to_filter_eq(operand: query_models.EqOperation) -> Filter:
     first = operand.eq_[0]
     second = operand.eq_[1]
-    if isinstance(first, tsi_query.ConvertOperation) and first.convert_.to in {
+    if isinstance(first, query_models.ConvertOperation) and first.convert_.to in {
         "double",
         "int",
     }:
         first = first.convert_.input
-    if isinstance(first, tsi_query.GetFieldOperator) and isinstance(
-        second, tsi_query.LiteralOperation
+    if isinstance(first, query_models.GetFieldOperator) and isinstance(
+        second, query_models.LiteralOperation
     ):
         value = second.literal_
         if isinstance(value, str):
@@ -316,13 +320,13 @@ def operand_to_filter_eq(operand: tsi_query.EqOperation) -> Filter:
     raise QueryTranslationException(f"Could not parse {operand}")
 
 
-def operand_to_filter_contains(operand: tsi_query.ContainsOperation) -> Filter:
+def operand_to_filter_contains(operand: query_models.ContainsOperation) -> Filter:
     input = operand.contains_.input
     substr = operand.contains_.substr
     case_insensitive = operand.contains_.case_insensitive
     # TODO: Handle case_insensitive correctly
-    if isinstance(input, tsi_query.GetFieldOperator) and isinstance(
-        substr, tsi_query.LiteralOperation
+    if isinstance(input, query_models.GetFieldOperator) and isinstance(
+        substr, query_models.LiteralOperation
     ):
         value = substr.literal_
         if isinstance(value, str):
@@ -334,16 +338,16 @@ def operand_to_filter_contains(operand: tsi_query.ContainsOperation) -> Filter:
     raise QueryTranslationException(f"Could not parse {operand}")
 
 
-def operand_to_filter_gt(operand: tsi_query.GtOperation) -> Filter:
+def operand_to_filter_gt(operand: query_models.GtOperation) -> Filter:
     first = operand.gt_[0]
     second = operand.gt_[1]
-    if isinstance(first, tsi_query.ConvertOperation) and first.convert_.to in {
+    if isinstance(first, query_models.ConvertOperation) and first.convert_.to in {
         "double",
         "int",
     }:
         first = first.convert_.input
-    if isinstance(first, tsi_query.GetFieldOperator) and isinstance(
-        second, tsi_query.LiteralOperation
+    if isinstance(first, query_models.GetFieldOperator) and isinstance(
+        second, query_models.LiteralOperation
     ):
         value = second.literal_
         if isinstance(value, (int, float)):
@@ -358,16 +362,16 @@ def operand_to_filter_gt(operand: tsi_query.GtOperation) -> Filter:
     raise QueryTranslationException(f"Could not parse {operand}")
 
 
-def operand_to_filter_gte(operand: tsi_query.GteOperation) -> Filter:
+def operand_to_filter_gte(operand: query_models.GteOperation) -> Filter:
     first = operand.gte_[0]
     second = operand.gte_[1]
-    if isinstance(first, tsi_query.ConvertOperation) and first.convert_.to in {
+    if isinstance(first, query_models.ConvertOperation) and first.convert_.to in {
         "double",
         "int",
     }:
         first = first.convert_.input
-    if isinstance(first, tsi_query.GetFieldOperator) and isinstance(
-        second, tsi_query.LiteralOperation
+    if isinstance(first, query_models.GetFieldOperator) and isinstance(
+        second, query_models.LiteralOperation
     ):
         value = second.literal_
         if isinstance(value, (int, float)):
@@ -379,16 +383,16 @@ def operand_to_filter_gte(operand: tsi_query.GteOperation) -> Filter:
     raise QueryTranslationException(f"Could not parse {operand}")
 
 
-def operand_to_filter(operand: tsi_query.Operand) -> Filter:
-    if isinstance(operand, tsi_query.EqOperation):
+def operand_to_filter(operand: query_models.Operand) -> Filter:
+    if isinstance(operand, query_models.EqOperation):
         return operand_to_filter_eq(operand)
-    if isinstance(operand, tsi_query.ContainsOperation):
+    if isinstance(operand, query_models.ContainsOperation):
         return operand_to_filter_contains(operand)
-    if isinstance(operand, tsi_query.GtOperation):
+    if isinstance(operand, query_models.GtOperation):
         return operand_to_filter_gt(operand)
-    if isinstance(operand, tsi_query.GteOperation):
+    if isinstance(operand, query_models.GteOperation):
         return operand_to_filter_gte(operand)
-    if isinstance(operand, tsi_query.NotOperation):
+    if isinstance(operand, query_models.NotOperation):
         filter = operand_to_filter(operand.not_[0])
         if filter.operator == "(number): >=":
             filter.operator = "(number): <"
@@ -415,7 +419,7 @@ def operand_to_filter(operand: tsi_query.Operand) -> Filter:
         else:
             raise QueryTranslationException(f"Could not parse {filter}")
         return filter
-    if isinstance(operand, tsi_query.OrOperation) and len(operand.or_) > 0:
+    if isinstance(operand, query_models.OrOperation) and len(operand.or_) > 0:
         operands = [operand_to_filter(o) for o in operand.or_]
         if all(o.field == operands[0].field for o in operands) and all(
             o.operator == "(string): equals" for o in operands
@@ -426,12 +430,12 @@ def operand_to_filter(operand: tsi_query.Operand) -> Filter:
     raise QueryTranslationException(f"Could not parse {operand}")
 
 
-def query_to_filters(query: tsi.Query | None) -> Filters | None:
+def query_to_filters(query: query_models.Query | None) -> Filters | None:
     """Convert Saved View Query to Filters representation."""
     if query is None:
         return None
 
-    if isinstance(query.expr_, tsi_query.AndOperation):
+    if isinstance(query.expr_, query_models.AndOperation):
         operands = query.expr_.and_
         if not operands:
             return None
@@ -440,11 +444,11 @@ def query_to_filters(query: tsi.Query | None) -> Filters | None:
     if isinstance(
         query.expr_,
         (
-            tsi_query.EqOperation,
-            tsi_query.GtOperation,
-            tsi_query.GteOperation,
-            tsi_query.NotOperation,
-            tsi_query.ContainsOperation,
+            query_models.EqOperation,
+            query_models.GtOperation,
+            query_models.GteOperation,
+            query_models.NotOperation,
+            query_models.ContainsOperation,
         ),
     ):
         return [operand_to_filter(query.expr_)]
@@ -473,11 +477,11 @@ def get_object_path(obj: WeaveObject, path: str | ObjectPath) -> Any:
 
 
 def render_status(value: Any) -> str:
-    if value == tsi.TraceStatus.SUCCESS:
+    if value == TraceStatus.SUCCESS:
         return "✅"
-    elif value == tsi.TraceStatus.ERROR:
+    elif value == TraceStatus.ERROR:
         return "❌"
-    elif value == tsi.TraceStatus.RUNNING:
+    elif value == TraceStatus.RUNNING:
         return "⏳"
     return value
 
@@ -592,7 +596,7 @@ class SavedView:
                 if ":" not in op_name:
                     op_uri += ":*"
             if not self.base.definition.filter:
-                self.base.definition.filter = tsi.CallsFilter()
+                self.base.definition.filter = CallsFilter()
             self.base.definition.filter.op_names = [op_uri]
         return self
 
@@ -871,7 +875,7 @@ class SavedView:
             # For evaluations, inject a frozen filter.
             filter = self.base.definition.filter
             if self.view_type == "evaluations":
-                filter = filter.model_copy() if filter else tsi.CallsFilter()
+                filter = filter.model_copy() if filter else CallsFilter()
                 filter.op_names = [make_eval_op_name(client.entity, client.project)]
 
             query = self.base.definition.query

@@ -106,16 +106,20 @@ def test_annotation_queue_sdk_methods_build_requests():
         scorer_refs=scorer_refs,
     )
     assert queue_id == "queue-id"
-    create_req = server.requests["create"]
-    assert create_req.project_id == "entity/project"
-    assert create_req.name == "Test Queue"
-    assert create_req.description == "Queue description"
-    assert create_req.scorer_refs == scorer_refs
+    assert server.requests["create"] == {
+        "project_id": "entity/project",
+        "name": "Test Queue",
+        "description": "Queue description",
+        "scorer_refs": scorer_refs,
+        "wb_user_id": None,
+    }
 
     queue = client.get_annotation_queue("queue-id")
     assert queue is server.queue
-    assert server.requests["read"].project_id == "entity/project"
-    assert server.requests["read"].queue_id == "queue-id"
+    assert server.requests["read"] == {
+        "project_id": "entity/project",
+        "queue_id": "queue-id",
+    }
 
     sort_by = [SortBy(field="updated_at", direction="desc")]
     queues = client.list_annotation_queues(
@@ -125,12 +129,14 @@ def test_annotation_queue_sdk_methods_build_requests():
         offset=2,
     )
     assert queues == [server.queue]
-    query_req = server.requests["query"]
-    assert query_req.project_id == "entity/project"
-    assert query_req.name == "Test"
-    assert query_req.sort_by == sort_by
-    assert query_req.limit == 10
-    assert query_req.offset == 2
+    # A weave.shared SortBy goes out as its dump.
+    assert server.requests["query"] == {
+        "project_id": "entity/project",
+        "name": "Test",
+        "sort_by": [{"field": "updated_at", "direction": "desc"}],
+        "limit": 10,
+        "offset": 2,
+    }
 
     updated_queue = client.update_annotation_queue(
         "queue-id",
@@ -139,17 +145,20 @@ def test_annotation_queue_sdk_methods_build_requests():
         scorer_refs=scorer_refs,
     )
     assert updated_queue is server.queue
-    update_req = server.requests["update"]
-    assert update_req.project_id == "entity/project"
-    assert update_req.queue_id == "queue-id"
-    assert update_req.name == "Updated Queue"
-    assert update_req.description == "Updated description"
-    assert update_req.scorer_refs == scorer_refs
+    assert server.requests["update"] == {
+        "project_id": "entity/project",
+        "queue_id": "queue-id",
+        "name": "Updated Queue",
+        "description": "Updated description",
+        "scorer_refs": scorer_refs,
+    }
 
     deleted_queue = client.delete_annotation_queue("queue-id")
     assert deleted_queue is server.queue
-    assert server.requests["delete"].project_id == "entity/project"
-    assert server.requests["delete"].queue_id == "queue-id"
+    assert server.requests["delete"] == {
+        "project_id": "entity/project",
+        "queue_id": "queue-id",
+    }
 
     add_res = client.add_calls_to_annotation_queue(
         "queue-id",
@@ -158,11 +167,12 @@ def test_annotation_queue_sdk_methods_build_requests():
     )
     assert add_res.added_count == 1
     assert add_res.duplicates == 0
-    add_req = server.requests["add_calls"]
-    assert add_req.project_id == "entity/project"
-    assert add_req.queue_id == "queue-id"
-    assert add_req.call_ids == ["call-id"]
-    assert add_req.display_fields == ["inputs.prompt", "output.text"]
+    assert server.requests["add_calls"] == {
+        "project_id": "entity/project",
+        "call_ids": ["call-id"],
+        "display_fields": ["inputs.prompt", "output.text"],
+        "queue_id": "queue-id",
+    }
 
     item_filter = AnnotationQueueItemsFilter(call_id="call-id")
     items = client.list_annotation_queue_items(
@@ -174,20 +184,22 @@ def test_annotation_queue_sdk_methods_build_requests():
         include_position=True,
     )
     assert items == [server.item]
-    items_req = server.requests["items_query"]
-    assert items_req.project_id == "entity/project"
-    assert items_req.queue_id == "queue-id"
-    assert items_req.filter == item_filter
-    assert items_req.sort_by == sort_by
-    assert items_req.limit == 5
-    assert items_req.offset == 1
-    assert items_req.include_position is True
+    assert server.requests["items_query"] == {
+        "project_id": "entity/project",
+        "filter": item_filter.model_dump(),
+        "sort_by": [{"field": "updated_at", "direction": "desc"}],
+        "limit": 5,
+        "offset": 1,
+        "include_position": True,
+        "queue_id": "queue-id",
+    }
 
     stats = client.get_annotation_queue_stats(["queue-id"])
     assert stats == [server.stat]
-    stats_req = server.requests["stats"]
-    assert stats_req.project_id == "entity/project"
-    assert stats_req.queue_ids == ["queue-id"]
+    assert server.requests["stats"] == {
+        "project_id": "entity/project",
+        "queue_ids": ["queue-id"],
+    }
 
 
 def _create_finished_calls(client, count: int) -> list[Call]:

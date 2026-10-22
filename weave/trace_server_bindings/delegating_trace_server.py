@@ -2,18 +2,12 @@ from __future__ import annotations
 
 from typing import Any
 
-from weave.shared import trace_server_interface as tsi
-from weave.shared.service_interface import ServiceInterface
+from weave.trace_server_bindings.client_interface import TraceServerClientInterface
 
 _TRACE_SERVER_METHOD_NAMES = frozenset(
     {
         name
-        for interface in (
-            tsi.TraceServerInterface,
-            tsi.ObjectInterface,
-            ServiceInterface,
-        )
-        for name, value in vars(interface).items()
+        for name, value in vars(TraceServerClientInterface).items()
         if callable(value) and not name.startswith("_")
     }
 )

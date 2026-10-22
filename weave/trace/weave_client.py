@@ -13,91 +13,14 @@ from functools import cached_property
 from typing import TYPE_CHECKING, Any, TypedDict, TypeVar, cast
 
 import pydantic
-from httpx import HTTPStatusError as HTTPError
+from pydantic_core import to_jsonable_python
 
 from weave.chat.chat import Chat
 from weave.chat.inference_models import InferenceModels
 from weave.durability.wal_manager import WALManager
-from weave.shared.common_interface import AnnotationQueueItemsFilter, SortBy
-from weave.shared.constants import (
-    INVOKING_SPAN_ATTR_KEY,
-    MAX_OBJECT_NAME_LENGTH,
-)
-from weave.shared.digest import (
-    compute_file_digest,
-    compute_object_digest,
-    compute_row_digest,
-    compute_table_digest,
-)
-from weave.shared.errors import DigestMismatchError, InvalidExternalRef
-from weave.shared.ids import generate_id
-from weave.shared.interface.feedback_types import (
-    RUNNABLE_FEEDBACK_TYPE_PREFIX,
-    runnable_feedback_output_selector,
-    runnable_feedback_runnable_ref_selector,
-)
-from weave.shared.trace_server_converter import universal_ext_to_int_ref_converter
-from weave.shared.trace_server_interface import (
-    AliasesListReq,
-    AnnotationQueueAddCallsReq,
-    AnnotationQueueAddCallsRes,
-    AnnotationQueueCreateReq,
-    AnnotationQueueDeleteReq,
-    AnnotationQueueItemSchema,
-    AnnotationQueueItemsQueryReq,
-    AnnotationQueueReadReq,
-    AnnotationQueueSchema,
-    AnnotationQueuesQueryReq,
-    AnnotationQueuesStatsReq,
-    AnnotationQueueStatsSchema,
-    AnnotationQueueUpdateReq,
-    CallEndReq,
-    CallsDeleteReq,
-    CallsFilter,
-    CallsQueryReq,
-    CallStartReq,
-    CallUpdateReq,
-    CostCreateInput,
-    CostCreateReq,
-    CostCreateRes,
-    CostPurgeReq,
-    CostQueryOutput,
-    CostQueryReq,
-    CustomRuntimeApplyReq,
-    CustomRuntimeApplyRes,
-    CustomRuntimeID,
-    EndedCallSchemaForInsertWithStartedAt,
-    FeedbackCreateReq,
-    FileCreateReq,
-    FileCreateRes,
-    ObjAddTagsReq,
-    ObjCreateReq,
-    ObjCreateRes,
-    ObjDeleteReq,
-    ObjectVersionFilter,
-    ObjQueryReq,
-    ObjReadReq,
-    ObjRemoveAliasesReq,
-    ObjRemoveTagsReq,
-    ObjSchema,
-    ObjSchemaForInsert,
-    ObjSetAliasesReq,
-    Query,
-    RefsReadBatchReq,
-    StartedCallSchemaForInsert,
-    TableAppendSpec,
-    TableAppendSpecPayload,
-    TableCreateFromDigestsReq,
-    TableCreateReq,
-    TableCreateRes,
-    TableSchemaForInsert,
-    TableUpdateReq,
-    TagsListReq,
-    TraceStatus,
-    agent_types,
-)
 from weave.telemetry import trace_sentry
 from weave.trace import settings
+from weave.trace.builtin_object_classes.query import Query
 from weave.trace.call import (
     DEFAULT_CALLS_PAGE_SIZE,
     Call,
@@ -107,12 +30,45 @@ from weave.trace.call import (
     is_eval_call,
     make_client_call,
 )
-from weave.trace.casting import CallsFilterLike, QueryLike, SortByLike
+from weave.trace.call_request_validation import validate_call_end, validate_call_start
+from weave.trace.casting import (
+    CallsFilterLike,
+    QueryLike,
+    SortByLike,
+    cast_to_calls_filter,
+    cast_to_query,
+    cast_to_sort_by,
+)
 from weave.trace.concurrent.futures import FutureExecutor
-from weave.trace.constants import TRACE_CALL_EMOJI
+from weave.trace.constants import (
+    DEFAULT_AGENT_CUSTOM_ATTR_SCHEMA_LIMIT,
+    DEFAULT_AGENT_QUERY_LIMIT,
+    DEFAULT_AGENT_STATS_GROUP_LIMIT,
+    DEFAULT_CUSTOM_RUNTIME_MAX_TOKENS,
+    DEFAULT_SEARCH_LIMIT,
+    INVOKING_SPAN_ATTR_KEY,
+    MAX_CONVERSATION_CHAT_TURNS,
+    MAX_OBJECT_NAME_LENGTH,
+    TRACE_CALL_EMOJI,
+    TraceStatus,
+)
 from weave.trace.context import call_context
-from weave.trace.errors import format_http_error
-from weave.trace.feedback import FeedbackQuery, RefFeedbackQuery
+from weave.trace.custom_runtime import CustomRuntimeID
+from weave.trace.errors import (
+    DigestMismatchError,
+    InvalidExternalRef,
+    format_http_error,
+)
+from weave.trace.feedback import (
+    FeedbackQuery,
+    RefFeedbackQuery,
+    feedback_create_params,
+)
+from weave.trace.feedback_types import (
+    RUNNABLE_FEEDBACK_TYPE_PREFIX,
+    runnable_feedback_output_selector,
+    runnable_feedback_runnable_ref_selector,
+)
 from weave.trace.interface_query_builder import (
     exists_expr,
     get_field_expr,
@@ -159,6 +115,13 @@ from weave.trace.registry_links import (
     parse_registry_target_path,
     resolve_prompt_ref,
 )
+from weave.trace.serialization.digest import (
+    compute_file_digest,
+    compute_object_digest,
+    compute_row_digest,
+    compute_table_digest,
+)
+from weave.trace.serialization.json_dict_keys import to_jsonable_with_json_keys
 from weave.trace.serialization.serialize import (
     from_json,
     isinstance_namedtuple,
@@ -173,6 +136,7 @@ from weave.trace.settings import (
 )
 from weave.trace.table import Table
 from weave.trace.table_upload_chunking import ChunkingConfig, TableChunkManager
+from weave.trace.trace_server_converter import universal_ext_to_int_ref_converter
 from weave.trace.urls import redirect_call
 from weave.trace.util import log_once
 from weave.trace.vals import WeaveObject, WeaveTable, make_trace_obj
@@ -188,6 +152,7 @@ from weave.trace_server_bindings.client_interface import TraceServerClientInterf
 from weave.trace_server_bindings.http_utils import (
     REMOTE_REQUEST_BYTES_LIMIT,
     ROW_COUNT_CHUNKING_THRESHOLD,
+    as_params,
     check_endpoint_exists,
     retry_on_not_found,
 )
@@ -202,9 +167,58 @@ from weave.utils.attributes_dict import AttributesDict
 from weave.utils.capture_info import get_capture_info
 from weave.utils.dict_utils import sum_dict_leaves, zip_dicts
 from weave.utils.exception import exception_to_json_str
+from weave.utils.ids import generate_id
 from weave.utils.paginated_iterator import PaginatedIterator
 from weave.utils.project_id import from_project_id, to_project_id
+from weave.utils.retry import _http_response
 from weave.utils.sanitize import REDACTED_VALUE, redact_dataclass_fields, should_redact
+from weave.vendor.weave_server_sdk.types import (
+    AgentSearchResponse,
+    AgentTraceChatRes,
+    AnnotationQueueSchema,
+    CallEndParams,
+    CallStartParams,
+    CallUpdateParams,
+    CostCreateResponse,
+    FileCreateParams,
+    FileCreateResponse,
+    ObjectCreateParams,
+    ObjectCreateResponse,
+    TableCreateFromDigestsParams,
+    TableCreateParams,
+    TableCreateResponse,
+    TableUpdateParams,
+    V2RuntimeApplyResponse,
+    agent_query_params,
+    agent_query_response,
+    annotation_queue_query_params,
+    annotation_queue_stats_response,
+    cost_create_params,
+    cost_purge_params,
+    cost_query_params,
+    cost_query_response,
+    object_query_params,
+    object_query_response,
+)
+from weave.vendor.weave_server_sdk.types.agents import (
+    ConversationChatParams,
+    ConversationChatResponse,
+    SpanCustomAttrsSchemaResponse,
+    SpanStatsResponse,
+    TraceChatParams,
+    agent_version_query_params,
+    agent_version_query_response,
+    span_custom_attrs_schema_params,
+    span_query_params,
+    span_query_response,
+    span_stats_params,
+)
+from weave.vendor.weave_server_sdk.types.annotation_queues import (
+    ItemAddResponse,
+    item_query_params,
+    item_query_response,
+)
+from weave.vendor.weave_server_sdk.types.call_end_params import EndSummary
 
 # OTel imports — kept top-level under a try/except guard so the module
 # loads cleanly when opentelemetry is not installed. When unavailable,
@@ -213,7 +227,7 @@ try:
     from opentelemetry import context as otel_context
     from opentelemetry import trace as otel_trace
 
-    from weave.shared.otel_context_keys import WEAVE_SERVER_SPAN_KEY
+    from weave.trace.otel_context_keys import WEAVE_SERVER_SPAN_KEY
 
     _OTEL_AVAILABLE = True
 except ImportError:
@@ -221,6 +235,8 @@ except ImportError:
 
 if TYPE_CHECKING:
     from weave.evaluation.eval import Evaluation
+    from weave.shared.agents import types as agent_types
+    from weave.shared.trace_server_interface import ObjectVersionFilter
 
 # Controls if objects can have refs to projects not the WeaveClient project.
 # If False, object refs with with mismatching projects will be recreated.
@@ -289,8 +305,8 @@ def _invoking_span_attr() -> dict[str, str] | None:
 
 
 def _add_scored_by_to_calls_query(
-    scored_by: list[str] | str | None, query: Query | None
-) -> Query | None:
+    scored_by: list[str] | str | None, query: Mapping[str, Any] | None
+) -> Mapping[str, Any] | None:
     # This logic might be pushed down to the server soon, but for now it lives here:
     if not scored_by:
         return query
@@ -319,23 +335,35 @@ def _add_scored_by_to_calls_query(
             exprs.append(
                 exists_expr(get_field_expr(runnable_feedback_output_selector(name)))
             )
-    return Query.model_validate({"$expr": {"$and": exprs}})
+    return {"$expr": {"$and": exprs}}
+
+
+def _request_values(values: Sequence[Any]) -> list[Any]:
+    """Return request values with each model dumped the way the bindings dump one."""
+    return [as_params(value) for value in values]
 
 
 def _build_agent_spans_query(
-    agent_name: str | None, query: Query | None
-) -> Query | None:
+    agent_name: str | None, query: Query | Mapping[str, Any] | None
+) -> Any:
     """Build the ``get_agent_spans`` query from the ``agent_name`` shortcut.
 
     Mirrors the TS SDK: ``agent_name`` becomes an ``$eq`` on the ``agent_name``
     field, AND-combined with any user-supplied ``query`` when both are present.
     """
+    wire_query = None if query is None else cast_to_query(query)
     if agent_name is None:
-        return query
+        return wire_query
     agent_expr = {"$eq": [{"$getField": "agent_name"}, {"$literal": agent_name}]}
-    if query is None:
-        return Query.model_validate({"$expr": agent_expr})
-    return Query.model_validate({"$expr": {"$and": [agent_expr, query.expr_]}})
+    if wire_query is None:
+        return {"$expr": agent_expr}
+    if "$expr" not in wire_query:
+        # A Query dumped without aliases carries `expr_`; validate it and
+        # dump it back with aliases (or reject it when no expression exists).
+        wire_query = Query.model_validate(wire_query).model_dump(by_alias=True)
+    # Keep any other top-level keys so the server sees (and rejects) them,
+    # exactly as it does when no `agent_name` is given.
+    return {**wire_query, "$expr": {"$and": [agent_expr, wire_query["$expr"]]}}
 
 
 _AgentListItemT = TypeVar("_AgentListItemT")
@@ -380,13 +408,11 @@ def _make_agent_iterator(
 
 
 # Iterator return types for the paginated agent list methods (mirrors ``CallsIter``).
-AgentsIter = PaginatedIterator[agent_types.AgentSchema, agent_types.AgentSchema]
+AgentsIter = PaginatedIterator[agent_query_response.Agent, agent_query_response.Agent]
 AgentVersionsIter = PaginatedIterator[
-    agent_types.AgentVersionSchema, agent_types.AgentVersionSchema
+    agent_version_query_response.Version, agent_version_query_response.Version
 ]
-AgentSpansIter = PaginatedIterator[
-    agent_types.AgentSpanSchema, agent_types.AgentSpanSchema
-]
+AgentSpansIter = PaginatedIterator[span_query_response.Span, span_query_response.Span]
 
 
 def get_obj_name(val: Any) -> str:
@@ -531,9 +557,9 @@ class WeaveClient:
         # Whether this client may reconstruct code-bearing custom objects (ops, or any
         # type that decodes by running a stored `.py`) on `client.get`. Defaults True:
         # for normal users this only ever runs code from their own traces, so it is
-        # safe. Server-side workers flip it off via `require_secure_weave_client`, and
-        # anyone can disable it globally with `WEAVE_ALLOW_UNSAFE_CUSTOM_OBJ_DECODE=false`
-        # (data-only objects like images/audio still decode). Enforced in custom_objs.py.
+        # safe. Anyone can disable it globally with
+        # `WEAVE_ALLOW_UNSAFE_CUSTOM_OBJ_DECODE=false` (data-only objects like
+        # images/audio still decode). Enforced in custom_objs.py.
         self._allow_unsafe_custom_obj_decode = True
 
         if ensure_project_exists:
@@ -600,7 +626,7 @@ class WeaveClient:
         runtime_ids: Iterable[str | CustomRuntimeID],
         api_key_secret: str | None = None,
         headers: Mapping[str, str] | None = None,
-    ) -> CustomRuntimeApplyRes:
+    ) -> V2RuntimeApplyResponse:
         """Register a custom runtime, replacing its configuration if it exists.
 
         Runtime IDs omitted from this call are removed. String IDs use the
@@ -609,20 +635,20 @@ class WeaveClient:
         update.
         """
         normalized_runtime_ids = [
-            CustomRuntimeID(id=runtime_id)
+            {"id": runtime_id, "max_tokens": DEFAULT_CUSTOM_RUNTIME_MAX_TOKENS}
             if isinstance(runtime_id, str)
-            else runtime_id
+            else as_params(runtime_id)
             for runtime_id in runtime_ids
         ]
         return self.server.custom_runtime_apply(
-            CustomRuntimeApplyReq(
-                project_id=self.project_id,
-                runtime_name=name,
-                base_url=base_url,
-                api_key_secret=api_key_secret,
-                headers=headers or {},
-                runtime_ids=normalized_runtime_ids,
-            )
+            {
+                "project_id": self.project_id,
+                "runtime_name": name,
+                "base_url": base_url,
+                "api_key_secret": api_key_secret,
+                "headers": dict(headers or {}),
+                "runtime_ids": normalized_runtime_ids,
+            }
         )
 
     @trace_sentry.global_trace_sentry.watch()
@@ -662,17 +688,21 @@ class WeaveClient:
         # missing ref is not user-visible.
         try:
             read_res = retry_on_not_found(self.server.obj_read)(
-                ObjReadReq(
-                    project_id=project_id,
-                    object_id=ref.name,
-                    digest=ref.digest,
-                )
+                {
+                    "project_id": project_id,
+                    "object_id": ref.name,
+                    "digest": ref.digest,
+                    "metadata_only": False,
+                    "include_tags_and_aliases": False,
+                }
             )
-        except HTTPError as e:
-            if e.response is not None:
+        except Exception as e:
+            # The Stainless client's APIStatusError is not an httpx.HTTPStatusError.
+            response = _http_response(e)
+            if response is not None:
                 raise ValueError(
                     format_http_error(
-                        e.response,
+                        response,
                         f"Unable to read object for ref uri: {ref.uri}",
                     )
                 ) from None
@@ -692,11 +722,10 @@ class WeaveClient:
         # let the server resolve it.
         if ref.extra:
             try:
-                ref_read_res = self.server.refs_read_batch(
-                    RefsReadBatchReq(refs=[ref.uri])
-                )
-            except HTTPError as e:
-                if e.response is not None and e.response.status_code == 404:
+                ref_read_res = self.server.refs_read_batch({"refs": [ref.uri]})
+            except Exception as e:
+                response = _http_response(e)
+                if response is not None and response.status_code == 404:
                     raise ValueError(
                         f"Unable to find object for ref uri: {ref.uri}"
                     ) from None
@@ -766,9 +795,7 @@ class WeaveClient:
                 print(f"Evaluation: {eval.name}")
             ```
         """
-        eval_objs = self._objects(
-            filter=ObjectVersionFilter(base_object_classes=["Evaluation"]),
-        )
+        eval_objs = self._objects(filter={"base_object_classes": ["Evaluation"]})
 
         lst = []
         for obj in eval_objs:
@@ -778,7 +805,7 @@ class WeaveClient:
             ref = ObjectRef(
                 entity=entity,
                 project=project,
-                name=obj.val["name"],
+                name=cast("dict[str, Any]", obj.val)["name"],
                 _digest=obj.digest,
             )
             try:
@@ -790,7 +817,6 @@ class WeaveClient:
         return lst
 
     @trace_sentry.global_trace_sentry.watch()
-    @pydantic.validate_call
     def get_calls(
         self,
         *,
@@ -840,7 +866,7 @@ class WeaveClient:
         Example:
             ```python
             calls = client.get_calls(
-                filter=CallsFilter(op_names=["my_op"]),
+                filter={"op_names": ["my_op"]},
                 columns=["inputs", "output", "summary"],
                 limit=100,
             )
@@ -849,17 +875,24 @@ class WeaveClient:
             ```
         """
         if filter is None:
-            filter = CallsFilter()
+            filter = {}
+        # The request is JSON, so a set or other iterable of names goes as a list.
+        if columns is not None and not isinstance(columns, (list, str)):
+            columns = list(columns)
+        if expand_columns is not None and not isinstance(expand_columns, (list, str)):
+            expand_columns = list(expand_columns)
 
-        query = _add_scored_by_to_calls_query(scored_by, query)
+        query = _add_scored_by_to_calls_query(
+            scored_by, None if query is None else cast_to_query(query)
+        )
 
         return _make_calls_iterator(
             self.server,
             self.project_id,
-            filter=filter,
+            filter=cast_to_calls_filter(filter),
             limit_override=limit,
             offset_override=offset,
-            sort_by=sort_by,
+            sort_by=None if sort_by is None else [cast_to_sort_by(s) for s in sort_by],
             query=query,
             include_costs=include_costs,
             include_feedback=include_feedback,
@@ -893,15 +926,28 @@ class WeaveClient:
         Returns:
             A call object.
         """
+        # The request is JSON, so a set or other iterable of names goes as a list.
+        if columns is not None and not isinstance(columns, (list, str)):
+            columns = list(columns)
         calls = list(
             self.server.calls_query_stream(
-                CallsQueryReq(
-                    project_id=self.project_id,
-                    filter=CallsFilter(call_ids=[call_id]),
-                    include_costs=include_costs,
-                    include_feedback=include_feedback,
-                    columns=columns,
-                )
+                {
+                    "project_id": self.project_id,
+                    "filter": cast_to_calls_filter({"call_ids": [call_id]}),
+                    "limit": None,
+                    "offset": None,
+                    "latest_only": False,
+                    "sort_by": None,
+                    "query": None,
+                    "include_costs": include_costs,
+                    "include_feedback": include_feedback,
+                    "include_storage_size": False,
+                    "include_total_storage_size": False,
+                    "include_usernames": False,
+                    "columns": columns,
+                    "expand_columns": None,
+                    "return_expanded_column_values": True,
+                }
             )
         )
         if not calls:
@@ -910,7 +956,6 @@ class WeaveClient:
         return make_client_call(self.entity, self.project, response_call, self.server)
 
     @trace_sentry.global_trace_sentry.watch()
-    @pydantic.validate_call
     def get_agents(
         self,
         *,
@@ -918,7 +963,7 @@ class WeaveClient:
         sort_by: list[agent_types.AgentSortBy] | None = None,
         limit: int | None = None,
         offset: int | None = None,
-        page_size: int = agent_types.DEFAULT_AGENT_QUERY_LIMIT,
+        page_size: int = DEFAULT_AGENT_QUERY_LIMIT,
     ) -> AgentsIter:
         """List agents in this project with aggregated stats.
 
@@ -934,7 +979,7 @@ class WeaveClient:
             page_size: Number of agents fetched per request.
 
         Returns:
-            A `PaginatedIterator` over `AgentSchema`.
+            A `PaginatedIterator` over `Agent`.
 
         Example:
             ```python
@@ -943,23 +988,25 @@ class WeaveClient:
                 print(agent.agent_name, agent.total_input_tokens)
             ```
         """
-        filters = (
-            agent_types.AgentsQueryFilters(agent_name=agent_name)
-            if agent_name is not None
-            else None
+        sort_by_values = cast(
+            "list[agent_query_params.SortBy] | None",
+            None if sort_by is None else [cast_to_sort_by(s) for s in sort_by],
         )
 
         def fetch_page(
             offset: int, page_limit: int
-        ) -> tuple[list[agent_types.AgentSchema], int]:
+        ) -> tuple[list[agent_query_response.Agent], int]:
             res = self.server.agent_agents_query(
-                agent_types.AgentsQueryReq(
-                    project_id=self.project_id,
-                    filters=filters,
-                    sort_by=sort_by,
-                    limit=page_limit,
-                    offset=offset,
-                )
+                {
+                    "project_id": self.project_id,
+                    "filters": (
+                        {"agent_name": agent_name} if agent_name is not None else None
+                    ),
+                    "sort_by": sort_by_values,
+                    "limit": page_limit,
+                    "offset": offset,
+                    "include_costs": False,
+                }
             )
             return res.agents, res.total_count
 
@@ -971,7 +1018,6 @@ class WeaveClient:
         )
 
     @trace_sentry.global_trace_sentry.watch()
-    @pydantic.validate_call
     def get_agent_versions(
         self,
         *,
@@ -979,7 +1025,7 @@ class WeaveClient:
         sort_by: list[agent_types.AgentSortBy] | None = None,
         limit: int | None = None,
         offset: int | None = None,
-        page_size: int = agent_types.DEFAULT_AGENT_QUERY_LIMIT,
+        page_size: int = DEFAULT_AGENT_QUERY_LIMIT,
     ) -> AgentVersionsIter:
         """List versions for a single agent, with aggregated stats.
 
@@ -994,7 +1040,7 @@ class WeaveClient:
             page_size: Number of versions fetched per request.
 
         Returns:
-            A `PaginatedIterator` over `AgentVersionSchema`.
+            A `PaginatedIterator` over `Version`.
 
         Example:
             ```python
@@ -1003,18 +1049,23 @@ class WeaveClient:
                 print(version.agent_version, version.total_input_tokens)
             ```
         """
+        sort_by_values = cast(
+            "list[agent_version_query_params.SortBy] | None",
+            None if sort_by is None else [cast_to_sort_by(s) for s in sort_by],
+        )
 
         def fetch_page(
             offset: int, page_limit: int
-        ) -> tuple[list[agent_types.AgentVersionSchema], int]:
+        ) -> tuple[list[agent_version_query_response.Version], int]:
             res = self.server.agent_versions_query(
-                agent_types.AgentVersionsQueryReq(
-                    project_id=self.project_id,
-                    agent_name=agent_name,
-                    sort_by=sort_by,
-                    limit=page_limit,
-                    offset=offset,
-                )
+                {
+                    "project_id": self.project_id,
+                    "agent_name": agent_name,
+                    "sort_by": sort_by_values,
+                    "limit": page_limit,
+                    "offset": offset,
+                    "include_costs": False,
+                }
             )
             return res.versions, res.total_count
 
@@ -1026,7 +1077,6 @@ class WeaveClient:
         )
 
     @trace_sentry.global_trace_sentry.watch()
-    @pydantic.validate_call
     def get_agent_spans(
         self,
         *,
@@ -1035,7 +1085,7 @@ class WeaveClient:
         sort_by: list[agent_types.AgentSortBy] | None = None,
         limit: int | None = None,
         offset: int | None = None,
-        page_size: int = agent_types.DEFAULT_AGENT_QUERY_LIMIT,
+        page_size: int = DEFAULT_AGENT_QUERY_LIMIT,
     ) -> AgentSpansIter:
         """Query agent spans for this project, optionally filtered.
 
@@ -1053,7 +1103,7 @@ class WeaveClient:
             page_size: Number of spans fetched per request.
 
         Returns:
-            A `PaginatedIterator` over `AgentSpanSchema`.
+            A `PaginatedIterator` over `Span`.
 
         Example:
             ```python
@@ -1062,18 +1112,34 @@ class WeaveClient:
                 print(span.span_id, span.span_name, span.input_tokens)
             ```
         """
+        spans_query = _build_agent_spans_query(agent_name, query)
+        sort_by_values = cast(
+            "list[span_query_params.SortBy] | None",
+            None if sort_by is None else [cast_to_sort_by(s) for s in sort_by],
+        )
 
         def fetch_page(
             offset: int, page_limit: int
-        ) -> tuple[list[agent_types.AgentSpanSchema], int]:
+        ) -> tuple[list[span_query_response.Span], int]:
             res = self.server.agent_spans_query(
-                agent_types.AgentSpansQueryReq(
-                    project_id=self.project_id,
-                    query=_build_agent_spans_query(agent_name, query),
-                    sort_by=sort_by,
-                    limit=page_limit,
-                    offset=offset,
-                )
+                {
+                    "project_id": self.project_id,
+                    "query": spans_query,
+                    "group_by": None,
+                    "measures": [],
+                    "group_filters": [],
+                    "group_distributions": [],
+                    "custom_attr_columns": [],
+                    "include_details": False,
+                    "include_costs": False,
+                    "sort_by": sort_by_values,
+                    "limit": page_limit,
+                    "offset": offset,
+                    "started_after": None,
+                    "started_before": None,
+                    "signal_filters": None,
+                    "insight_filters": [],
+                }
             )
             return res.spans, res.total_count
 
@@ -1091,7 +1157,7 @@ class WeaveClient:
         *,
         trace_id: str,
         include_feedback: bool = False,
-    ) -> agent_types.AgentTraceChatRes:
+    ) -> AgentTraceChatRes:
         """Get the structured chat view (messages) for a single turn.
 
         A turn corresponds to one trace.
@@ -1112,10 +1178,15 @@ class WeaveClient:
             ```
         """
         return self.server.agent_traces_chat(
-            agent_types.AgentTraceChatReq(
-                project_id=self.project_id,
-                trace_id=trace_id,
-                include_feedback=include_feedback,
+            # The vendored SDK is generated from core and may lag this server's API.
+            cast(
+                TraceChatParams,
+                {
+                    "project_id": self.project_id,
+                    "trace_id": trace_id,
+                    "include_feedback": include_feedback,
+                    "include_model_tool_calls": False,
+                },
             )
         )
 
@@ -1125,10 +1196,10 @@ class WeaveClient:
         self,
         *,
         conversation_id: str,
-        limit: int = agent_types.MAX_CONVERSATION_CHAT_TURNS,
+        limit: int = MAX_CONVERSATION_CHAT_TURNS,
         offset: int = 0,
         include_feedback: bool = False,
-    ) -> agent_types.AgentConversationChatRes:
+    ) -> ConversationChatResponse:
         """Get the multi-turn chat view for a conversation.
 
         Each turn corresponds to one trace.
@@ -1140,7 +1211,7 @@ class WeaveClient:
             include_feedback: If true, include feedback on the messages.
 
         Returns:
-            An `AgentConversationChatRes` with the ordered `turns`.
+            A `ConversationChatResponse` with the ordered `turns`.
 
         Example:
             ```python
@@ -1152,17 +1223,21 @@ class WeaveClient:
             ```
         """
         return self.server.agent_conversation_chat(
-            agent_types.AgentConversationChatReq(
-                project_id=self.project_id,
-                conversation_id=conversation_id,
-                limit=limit,
-                offset=offset,
-                include_feedback=include_feedback,
+            # The vendored SDK is generated from core and may lag this server's API.
+            cast(
+                ConversationChatParams,
+                {
+                    "project_id": self.project_id,
+                    "conversation_id": conversation_id,
+                    "limit": limit,
+                    "offset": offset,
+                    "include_feedback": include_feedback,
+                    "include_model_tool_calls": False,
+                },
             )
         )
 
     @trace_sentry.global_trace_sentry.watch()
-    @pydantic.validate_call
     def get_agent_span_stats(
         self,
         *,
@@ -1173,7 +1248,7 @@ class WeaveClient:
         group_by: list[agent_types.AgentGroupByRef] | None = None,
         granularity: int | None = None,
         timezone: str = "UTC",
-    ) -> agent_types.AgentSpanStatsRes:
+    ) -> SpanStatsResponse:
         """Compute chart-ready aggregations over agent spans.
 
         Covers the common time-series / grouped-metric case. For numeric-bucket
@@ -1190,7 +1265,7 @@ class WeaveClient:
             timezone: IANA timezone used to align time buckets.
 
         Returns:
-            An ``AgentSpanStatsRes`` with `columns` and `rows`.
+            A ``SpanStatsResponse`` with `columns` and `rows`.
 
         Example:
             ```python
@@ -1201,29 +1276,36 @@ class WeaveClient:
             ```
         """
         return self.server.agent_spans_stats(
-            agent_types.AgentSpanStatsReq(
-                project_id=self.project_id,
-                start=start,
-                end=end,
-                metrics=metrics,
-                query=query,
-                group_by=group_by or [],
-                granularity=granularity,
-                timezone=timezone,
-            )
+            {
+                "project_id": self.project_id,
+                "query": cast(
+                    "span_stats_params.Query | None",
+                    None if query is None else cast_to_query(query),
+                ),
+                "start": start,
+                "end": end,
+                "granularity": granularity,
+                "timezone": timezone,
+                "group_by": _request_values(group_by or []),
+                "metrics": _request_values(metrics),
+                "group_limit": DEFAULT_AGENT_STATS_GROUP_LIMIT,
+                "bucket_by": None,
+                "group_filters": [],
+                "signal_filters": None,
+                "insight_filters": [],
+            }
         )
 
     @trace_sentry.global_trace_sentry.watch()
-    @pydantic.validate_call
     def get_agent_custom_attributes(
         self,
         *,
         query: Query | None = None,
         started_after: datetime.datetime | None = None,
         started_before: datetime.datetime | None = None,
-        limit: int = agent_types.DEFAULT_AGENT_CUSTOM_ATTR_SCHEMA_LIMIT,
+        limit: int = DEFAULT_AGENT_CUSTOM_ATTR_SCHEMA_LIMIT,
         offset: int = 0,
-    ) -> agent_types.AgentCustomAttrsSchemaRes:
+    ) -> SpanCustomAttrsSchemaResponse:
         """Discover typed custom-attribute keys on matching agent spans.
 
         Useful for populating filter/column pickers: returns the custom
@@ -1237,7 +1319,7 @@ class WeaveClient:
             offset: Number of keys to skip (for pagination).
 
         Returns:
-            An ``AgentCustomAttrsSchemaRes`` with `attributes` and `has_more`.
+            A ``SpanCustomAttrsSchemaResponse`` with `attributes` and `has_more`.
 
         Example:
             ```python
@@ -1248,14 +1330,17 @@ class WeaveClient:
             ```
         """
         return self.server.agent_custom_attrs_schema(
-            agent_types.AgentCustomAttrsSchemaReq(
-                project_id=self.project_id,
-                query=query,
-                started_after=started_after,
-                started_before=started_before,
-                limit=limit,
-                offset=offset,
-            )
+            {
+                "project_id": self.project_id,
+                "query": cast(
+                    "span_custom_attrs_schema_params.Query | None",
+                    None if query is None else cast_to_query(query),
+                ),
+                "started_after": started_after,
+                "started_before": started_before,
+                "limit": limit,
+                "offset": offset,
+            }
         )
 
     @trace_sentry.global_trace_sentry.watch()
@@ -1267,9 +1352,9 @@ class WeaveClient:
         agent_name: str | None = None,
         conversation_id: str | None = None,
         trace_id: str | None = None,
-        limit: int = agent_types.DEFAULT_SEARCH_LIMIT,
+        limit: int = DEFAULT_SEARCH_LIMIT,
         offset: int = 0,
-    ) -> agent_types.AgentSearchRes:
+    ) -> AgentSearchResponse:
         """Search agent messages by content, grouped by conversation.
 
         Searches message content (and/or the structured filters below) and
@@ -1285,7 +1370,7 @@ class WeaveClient:
             offset: Number of matches to skip (for pagination).
 
         Returns:
-            An ``AgentSearchRes`` with `results` (matched conversations).
+            An ``AgentSearchResponse`` with `results` (matched conversations).
 
         Example:
             ```python
@@ -1296,15 +1381,21 @@ class WeaveClient:
             ```
         """
         return self.server.agent_search(
-            agent_types.AgentSearchReq(
-                project_id=self.project_id,
-                query=query,
-                agent_name=agent_name,
-                conversation_id=conversation_id,
-                trace_id=trace_id,
-                limit=limit,
-                offset=offset,
-            )
+            {
+                "project_id": self.project_id,
+                "query": query,
+                "trace_id": trace_id,
+                "roles": None,
+                "conversation_id": conversation_id,
+                "agent_name": agent_name,
+                "provider_name": None,
+                "request_model": None,
+                "truncate_content": True,
+                "started_after": None,
+                "started_before": None,
+                "limit": limit,
+                "offset": offset,
+            }
         )
 
     @trace_sentry.global_trace_sentry.watch()
@@ -1326,12 +1417,13 @@ class WeaveClient:
             The ID of the created annotation queue.
         """
         res = self.server.annotation_queue_create(
-            AnnotationQueueCreateReq(
-                project_id=self.project_id,
-                name=name,
-                description=description,
-                scorer_refs=scorer_refs,
-            )
+            {
+                "project_id": self.project_id,
+                "name": name,
+                "description": description,
+                "scorer_refs": scorer_refs,
+                "wb_user_id": None,
+            }
         )
         return res.id
 
@@ -1339,7 +1431,7 @@ class WeaveClient:
     def get_annotation_queue(self, queue_id: str) -> AnnotationQueueSchema:
         """Read a single annotation queue by ID."""
         res = self.server.annotation_queue_read(
-            AnnotationQueueReadReq(project_id=self.project_id, queue_id=queue_id)
+            {"project_id": self.project_id, "queue_id": queue_id}
         )
         return res.queue
 
@@ -1348,20 +1440,22 @@ class WeaveClient:
         self,
         *,
         name: str | None = None,
-        sort_by: list[SortBy] | None = None,
+        sort_by: list[annotation_queue_query_params.SortBy] | None = None,
         limit: int | None = None,
         offset: int | None = None,
     ) -> list[AnnotationQueueSchema]:
         """List annotation queues for this project."""
         return list(
             self.server.annotation_queues_query_stream(
-                AnnotationQueuesQueryReq(
-                    project_id=self.project_id,
-                    name=name,
-                    sort_by=sort_by,
-                    limit=limit,
-                    offset=offset,
-                )
+                {
+                    "project_id": self.project_id,
+                    "name": name,
+                    "sort_by": None
+                    if sort_by is None
+                    else [cast_to_sort_by(s) for s in sort_by],
+                    "limit": limit,
+                    "offset": offset,
+                }
             )
         )
 
@@ -1376,13 +1470,13 @@ class WeaveClient:
     ) -> AnnotationQueueSchema:
         """Update annotation queue metadata."""
         res = self.server.annotation_queue_update(
-            AnnotationQueueUpdateReq(
-                project_id=self.project_id,
-                queue_id=queue_id,
-                name=name,
-                description=description,
-                scorer_refs=scorer_refs,
-            )
+            {
+                "project_id": self.project_id,
+                "queue_id": queue_id,
+                "name": name,
+                "description": description,
+                "scorer_refs": scorer_refs,
+            }
         )
         return res.queue
 
@@ -1390,7 +1484,7 @@ class WeaveClient:
     def delete_annotation_queue(self, queue_id: str) -> AnnotationQueueSchema:
         """Soft-delete an annotation queue."""
         res = self.server.annotation_queue_delete(
-            AnnotationQueueDeleteReq(project_id=self.project_id, queue_id=queue_id)
+            {"project_id": self.project_id, "queue_id": queue_id}
         )
         return res.queue
 
@@ -1401,7 +1495,7 @@ class WeaveClient:
         *,
         call_ids: list[str],
         display_fields: list[str],
-    ) -> AnnotationQueueAddCallsRes:
+    ) -> ItemAddResponse:
         """Add calls to an annotation queue.
 
         Args:
@@ -1413,12 +1507,12 @@ class WeaveClient:
         # Ensure newly created calls are persisted before queue membership is created.
         self._flush()
         return self.server.annotation_queue_add_calls(
-            AnnotationQueueAddCallsReq(
-                project_id=self.project_id,
-                queue_id=queue_id,
-                call_ids=call_ids,
-                display_fields=display_fields,
-            )
+            {
+                "project_id": self.project_id,
+                "call_ids": call_ids,
+                "display_fields": display_fields,
+                "queue_id": queue_id,
+            }
         )
 
     @trace_sentry.global_trace_sentry.watch()
@@ -1426,33 +1520,37 @@ class WeaveClient:
         self,
         queue_id: str,
         *,
-        filter: AnnotationQueueItemsFilter | None = None,
-        sort_by: list[SortBy] | None = None,
+        filter: item_query_params.Filter | None = None,
+        sort_by: list[item_query_params.SortBy] | None = None,
         limit: int | None = None,
         offset: int | None = None,
         include_position: bool = False,
-    ) -> list[AnnotationQueueItemSchema]:
+    ) -> list[item_query_response.Item]:
         """List calls assigned to an annotation queue."""
         res = self.server.annotation_queue_items_query(
-            AnnotationQueueItemsQueryReq(
-                project_id=self.project_id,
-                queue_id=queue_id,
-                filter=filter,
-                sort_by=sort_by,
-                limit=limit,
-                offset=offset,
-                include_position=include_position,
-            )
+            {
+                "project_id": self.project_id,
+                "filter": None
+                if filter is None
+                else cast(item_query_params.Filter, as_params(filter)),
+                "sort_by": None
+                if sort_by is None
+                else [cast_to_sort_by(s) for s in sort_by],
+                "limit": limit,
+                "offset": offset,
+                "include_position": include_position,
+                "queue_id": queue_id,
+            }
         )
         return res.items
 
     @trace_sentry.global_trace_sentry.watch()
     def get_annotation_queue_stats(
         self, queue_ids: list[str]
-    ) -> list[AnnotationQueueStatsSchema]:
+    ) -> list[annotation_queue_stats_response.Stat]:
         """Get item completion stats for annotation queues."""
         res = self.server.annotation_queues_stats(
-            AnnotationQueuesStatsReq(project_id=self.project_id, queue_ids=queue_ids)
+            {"project_id": self.project_id, "queue_ids": queue_ids}
         )
         return res.stats
 
@@ -1625,23 +1723,27 @@ class WeaveClient:
             inputs_json = to_json(
                 maybe_redacted_inputs_with_refs, project_id, self, use_dictify=False
             )
-            call_start_req = CallStartReq(
-                start=StartedCallSchemaForInsert(
-                    project_id=project_id,
-                    id=call_id,
-                    op_name=op_def_ref.uri,
-                    display_name=call.display_name,
-                    trace_id=trace_id,
-                    started_at=started_at,
-                    parent_id=parent_id,
-                    inputs=inputs_json,
-                    attributes=attributes_dict.unwrap(),
-                    wb_run_id=current_wb_run_id,
-                    wb_run_step=current_wb_run_step,
-                    thread_id=thread_id,
-                    turn_id=turn_id,
-                )
-            )
+            call_start_req: CallStartParams = {
+                "start": {
+                    "project_id": project_id,
+                    "id": call_id,
+                    "op_name": op_def_ref.uri,
+                    "display_name": cast("str | None", call.display_name),
+                    "trace_id": trace_id,
+                    "parent_id": parent_id,
+                    "thread_id": thread_id,
+                    "turn_id": turn_id,
+                    "started_at": started_at,
+                    "attributes": to_jsonable_python(attributes_dict.unwrap()),
+                    "inputs": to_jsonable_python(inputs_json),
+                    "otel_dump": None,
+                    "wb_user_id": None,
+                    "wb_run_id": current_wb_run_id,
+                    "wb_run_step": current_wb_run_step,
+                }
+            }
+
+            validate_call_start(call_start_req)
 
             # WAL path: persist to disk; the sender replays to the server.
             if self._wal is not None:
@@ -1812,20 +1914,22 @@ class WeaveClient:
                 wb_run_context_end.step if wb_run_context_end else None
             )
 
-            call_end_req = CallEndReq(
-                end=EndedCallSchemaForInsertWithStartedAt(
-                    project_id=project_id,
-                    id=call.id,
-                    trace_id=call.trace_id,
-                    is_eval=is_eval_call(call),
-                    started_at=call.started_at,
-                    ended_at=ended_at,
-                    output=output_json,
-                    summary=merged_summary,
-                    exception=exception_str,
-                    wb_run_step_end=current_wb_run_step_end,
-                )
-            )
+            call_end_req: CallEndParams = {
+                "end": {
+                    "project_id": project_id,
+                    "id": cast(str, call.id),
+                    "trace_id": call.trace_id,
+                    "is_eval": is_eval_call(call),
+                    "ended_at": ended_at,
+                    "started_at": call.started_at,
+                    "exception": exception_str,
+                    "output": to_jsonable_python(output_json),
+                    "summary": cast(EndSummary, to_jsonable_python(merged_summary)),
+                    "wb_run_step_end": current_wb_run_step_end,
+                }
+            }
+            validate_call_end(call_end_req)
+
             # WAL path: persist to disk; the sender replays to the server.
             if self._wal is not None:
                 self._wal.write("call_end", call_end_req)
@@ -1934,10 +2038,11 @@ class WeaveClient:
     @trace_sentry.global_trace_sentry.watch()
     def delete_call(self, call: Call) -> None:
         self.server.calls_delete(
-            CallsDeleteReq(
-                project_id=self.project_id,
-                call_ids=[call.id],
-            )
+            {
+                "project_id": self.project_id,
+                "call_ids": [cast(str, call.id)],
+                "wb_user_id": None,
+            }
         )
 
     @trace_sentry.global_trace_sentry.watch()
@@ -1950,20 +2055,17 @@ class WeaveClient:
             call_ids: A list of call IDs to delete. Ex: ["2F0193e107-8fcf-7630-b576-977cc3062e2e"]
         """
         self.server.calls_delete(
-            CallsDeleteReq(
-                project_id=self.project_id,
-                call_ids=call_ids,
-            )
+            {"project_id": self.project_id, "call_ids": call_ids, "wb_user_id": None}
         )
 
     @trace_sentry.global_trace_sentry.watch()
     def delete_object_version(self, object: ObjectRef) -> None:
         self.server.obj_delete(
-            ObjDeleteReq(
-                project_id=self.project_id,
-                object_id=object.name,
-                digests=[object.digest],
-            )
+            {
+                "project_id": self.project_id,
+                "object_id": object.name,
+                "digests": [object.digest],
+            }
         )
 
     @trace_sentry.global_trace_sentry.watch()
@@ -1977,11 +2079,7 @@ class WeaveClient:
             The number of versions deleted.
         """
         result = self.server.obj_delete(
-            ObjDeleteReq(
-                project_id=self.project_id,
-                object_id=object_name,
-                digests=None,
-            )
+            {"project_id": self.project_id, "object_id": object_name, "digests": None}
         )
         return result.num_deleted
 
@@ -1997,11 +2095,11 @@ class WeaveClient:
             The number of versions deleted.
         """
         result = self.server.obj_delete(
-            ObjDeleteReq(
-                project_id=self.project_id,
-                object_id=object_name,
-                digests=digests,
-            )
+            {
+                "project_id": self.project_id,
+                "object_id": object_name,
+                "digests": digests,
+            }
         )
         return result.num_deleted
 
@@ -2059,12 +2157,12 @@ class WeaveClient:
         """
         obj_ref = self._resolve_obj_ref(obj_ref)
         self.server.obj_add_tags(
-            ObjAddTagsReq(
-                project_id=self.project_id,
-                object_id=obj_ref.name,
-                digest=obj_ref.digest,
-                tags=tags,
-            )
+            {
+                "project_id": self.project_id,
+                "object_id": obj_ref.name,
+                "digest": obj_ref.digest,
+                "tags": tags,
+            }
         )
 
     @trace_sentry.global_trace_sentry.watch()
@@ -2078,12 +2176,12 @@ class WeaveClient:
         """
         obj_ref = self._resolve_obj_ref(obj_ref)
         self.server.obj_remove_tags(
-            ObjRemoveTagsReq(
-                project_id=self.project_id,
-                object_id=obj_ref.name,
-                digest=obj_ref.digest,
-                tags=tags,
-            )
+            {
+                "project_id": self.project_id,
+                "object_id": obj_ref.name,
+                "digest": obj_ref.digest,
+                "tags": tags,
+            }
         )
 
     @trace_sentry.global_trace_sentry.watch()
@@ -2100,12 +2198,13 @@ class WeaveClient:
         """
         obj_ref = self._resolve_obj_ref(obj_ref)
         res = retry_on_not_found(self.server.obj_read)(
-            ObjReadReq(
-                project_id=self.project_id,
-                object_id=obj_ref.name,
-                digest=obj_ref.digest,
-                include_tags_and_aliases=True,
-            )
+            {
+                "project_id": self.project_id,
+                "object_id": obj_ref.name,
+                "digest": obj_ref.digest,
+                "metadata_only": False,
+                "include_tags_and_aliases": True,
+            }
         )
         return res.obj.tags or []
 
@@ -2125,12 +2224,13 @@ class WeaveClient:
         """
         obj_ref = self._resolve_obj_ref(obj_ref)
         res = retry_on_not_found(self.server.obj_read)(
-            ObjReadReq(
-                project_id=self.project_id,
-                object_id=obj_ref.name,
-                digest=obj_ref.digest,
-                include_tags_and_aliases=True,
-            )
+            {
+                "project_id": self.project_id,
+                "object_id": obj_ref.name,
+                "digest": obj_ref.digest,
+                "metadata_only": False,
+                "include_tags_and_aliases": True,
+            }
         )
         return (res.obj.tags or [], res.obj.aliases or [])
 
@@ -2148,12 +2248,12 @@ class WeaveClient:
         if not aliases:
             return
         self.server.obj_set_aliases(
-            ObjSetAliasesReq(
-                project_id=self.project_id,
-                object_id=obj_ref.name,
-                digest=obj_ref.digest,
-                aliases=aliases,
-            )
+            {
+                "project_id": self.project_id,
+                "object_id": obj_ref.name,
+                "digest": obj_ref.digest,
+                "aliases": aliases,
+            }
         )
 
     @trace_sentry.global_trace_sentry.watch()
@@ -2170,11 +2270,11 @@ class WeaveClient:
         if not aliases:
             return
         self.server.obj_remove_aliases(
-            ObjRemoveAliasesReq(
-                project_id=self.project_id,
-                object_id=obj_ref.name,
-                aliases=aliases,
-            )
+            {
+                "project_id": self.project_id,
+                "object_id": obj_ref.name,
+                "aliases": aliases,
+            }
         )
 
     @trace_sentry.global_trace_sentry.watch()
@@ -2191,12 +2291,13 @@ class WeaveClient:
         """
         obj_ref = self._resolve_obj_ref(obj_ref)
         res = retry_on_not_found(self.server.obj_read)(
-            ObjReadReq(
-                project_id=self.project_id,
-                object_id=obj_ref.name,
-                digest=obj_ref.digest,
-                include_tags_and_aliases=True,
-            )
+            {
+                "project_id": self.project_id,
+                "object_id": obj_ref.name,
+                "digest": obj_ref.digest,
+                "metadata_only": False,
+                "include_tags_and_aliases": True,
+            }
         )
         return res.obj.aliases or []
 
@@ -2207,7 +2308,7 @@ class WeaveClient:
         Returns:
             List of all tag strings in the project.
         """
-        res = self.server.tags_list(TagsListReq(project_id=self.project_id))
+        res = self.server.tags_list({"project_id": self.project_id})
         return res.tags
 
     @trace_sentry.global_trace_sentry.watch()
@@ -2217,17 +2318,17 @@ class WeaveClient:
         Returns:
             List of all alias strings in the project.
         """
-        res = self.server.aliases_list(AliasesListReq(project_id=self.project_id))
+        res = self.server.aliases_list({"project_id": self.project_id})
         return res.aliases
 
     @trace_sentry.global_trace_sentry.watch()
     def delete_op_version(self, op: OpRef) -> None:
         self.server.obj_delete(
-            ObjDeleteReq(
-                project_id=self.project_id,
-                object_id=op.name,
-                digests=[op.digest],
-            )
+            {
+                "project_id": self.project_id,
+                "object_id": op.name,
+                "digests": [op.digest],
+            }
         )
 
     @trace_sentry.global_trace_sentry.watch()
@@ -2241,17 +2342,13 @@ class WeaveClient:
             The number of versions deleted.
         """
         result = self.server.obj_delete(
-            ObjDeleteReq(
-                project_id=self.project_id,
-                object_id=op_name,
-                digests=None,
-            )
+            {"project_id": self.project_id, "object_id": op_name, "digests": None}
         )
         return result.num_deleted
 
     def get_feedback(
         self,
-        query: Query | str | None = None,
+        query: Mapping[str, Any] | str | None = None,
         *,
         reaction: str | None = None,
         offset: int = 0,
@@ -2271,18 +2368,14 @@ class WeaveClient:
 
             # Find all feedback objects with a specific feedback type with
             # mongo-style query.
-            from weave.shared.interface.query import Query
-
-            query = Query(
-                **{
-                    "$expr": {
-                        "$eq": [
-                            {"$getField": "feedback_type"},
-                            {"$literal": "wandb.reaction.1"},
-                        ],
-                    }
+            query = {
+                "$expr": {
+                    "$eq": [
+                        {"$getField": "feedback_type"},
+                        {"$literal": "wandb.reaction.1"},
+                    ],
                 }
-            )
+            }
             client.get_feedback(query=query)
             ```
 
@@ -2308,8 +2401,8 @@ class WeaveClient:
                     {"$literal": query},
                 ],
             }
-        elif isinstance(query, Query):
-            expr = query.expr_
+        elif query is not None:
+            expr = cast_to_query(query)["$expr"]
 
         if reaction:
             expr = {
@@ -2329,7 +2422,7 @@ class WeaveClient:
                     },
                 ]
             }
-        rewritten_query = Query(**{"$expr": expr})
+        rewritten_query = {"$expr": expr}
 
         return FeedbackQuery(
             entity=self.entity,
@@ -2390,7 +2483,7 @@ class WeaveClient:
         provider_id: str | None = "default",
         cache_read_input_token_cost: float = 0,
         cache_creation_input_token_cost: float = 0,
-    ) -> CostCreateRes:
+    ) -> CostCreateResponse:
         """Add a cost to the current project.
 
         Examples:
@@ -2411,24 +2504,24 @@ class WeaveClient:
             cache_creation_input_token_cost: The cost per cache-creation input token. Defaults to 0.
 
         Returns:
-            A CostCreateRes object.
-            Which has one field called a list of tuples called ids.
-            Each tuple contains the llm_id and the id of the created cost object.
+            A CostCreateResponse object.
+            Which has one field called ids, a list of two-item lists.
+            Each list holds the llm_id and the id of the created cost object.
         """
         if effective_date is None:
             effective_date = datetime.datetime.now(datetime.timezone.utc)
-        cost = CostCreateInput(
-            prompt_token_cost=prompt_token_cost,
-            completion_token_cost=completion_token_cost,
-            cache_read_input_token_cost=cache_read_input_token_cost,
-            cache_creation_input_token_cost=cache_creation_input_token_cost,
-            effective_date=effective_date,
-            prompt_token_cost_unit=prompt_token_cost_unit,
-            completion_token_cost_unit=completion_token_cost_unit,
-            provider_id=provider_id,
-        )
+        cost: cost_create_params.Costs = {
+            "prompt_token_cost": float(prompt_token_cost),
+            "completion_token_cost": float(completion_token_cost),
+            "cache_read_input_token_cost": float(cache_read_input_token_cost),
+            "cache_creation_input_token_cost": float(cache_creation_input_token_cost),
+            "prompt_token_cost_unit": prompt_token_cost_unit,
+            "completion_token_cost_unit": completion_token_cost_unit,
+            "effective_date": effective_date,
+            "provider_id": provider_id,
+        }
         return self.server.cost_create(
-            CostCreateReq(project_id=self.project_id, costs={llm_id: cost})
+            {"project_id": self.project_id, "costs": {llm_id: cost}, "wb_user_id": None}
         )
 
     def purge_costs(self, ids: list[str] | str) -> None:
@@ -2452,16 +2545,19 @@ class WeaveClient:
             ]
         }
         self.server.cost_purge(
-            CostPurgeReq(project_id=self.project_id, query=Query(**{"$expr": expr}))
+            {
+                "project_id": self.project_id,
+                "query": cast(cost_purge_params.Query, {"$expr": expr}),
+            }
         )
 
     def query_costs(
         self,
-        query: Query | str | None = None,
+        query: Mapping[str, Any] | str | None = None,
         llm_ids: list[str] | None = None,
         offset: int = 0,
         limit: int = 100,
-    ) -> list[CostQueryOutput]:
+    ) -> list[cost_query_response.Result]:
         """Query project for costs.
 
         Examples:
@@ -2497,8 +2593,8 @@ class WeaveClient:
                     {"$literal": query},
                 ],
             }
-        elif isinstance(query, Query):
-            expr = query.expr_
+        elif query is not None:
+            expr = cast_to_query(query)["$expr"]
 
         if llm_ids:
             expr = {
@@ -2512,15 +2608,15 @@ class WeaveClient:
                     },
                 ]
             }
-        rewritten_query = Query(**{"$expr": expr})
-
         res = self.server.cost_query(
-            CostQueryReq(
-                project_id=self.project_id,
-                query=rewritten_query,
-                offset=offset,
-                limit=limit,
-            )
+            {
+                "project_id": self.project_id,
+                "fields": None,
+                "query": cast(cost_query_params.Query, {"$expr": expr}),
+                "sort_by": None,
+                "limit": limit,
+                "offset": offset,
+            }
         )
         return res.results
 
@@ -2593,7 +2689,7 @@ class WeaveClient:
             "output": results_json,
         }
 
-        freq = FeedbackCreateReq(
+        freq = feedback_create_params(
             project_id=self.project_id,
             weave_ref=weave_ref_uri,
             feedback_type=RUNNABLE_FEEDBACK_TYPE_PREFIX + "." + runnable_ref.name,
@@ -2761,23 +2857,17 @@ class WeaveClient:
         """
         self.project_id_resolver.get_internal_project_id(self.project_id)
 
-    def _handle_digest_mismatch(
-        self, e: DigestMismatchError | HTTPError, label: str
-    ) -> None:
+    def _handle_digest_mismatch(self, e: Exception, label: str) -> None:
         """If *e* is a digest-mismatch error, disable client-side digests.
 
         Raises the original exception if it is NOT a digest mismatch
-        (e.g. an HTTPError with a non-409 status code).
+        (e.g. an HTTP error with a non-409 status code).
         """
         # DigestMismatchError: raised directly by in-process servers (ClickHouse).
         is_local_mismatch = isinstance(e, DigestMismatchError)
-        # HTTPError 409: raised by RemoteHTTPTraceServer when the remote
-        # server returns HTTP 409 Conflict for a digest mismatch.
-        is_remote_mismatch = (
-            isinstance(e, HTTPError)
-            and e.response is not None
-            and e.response.status_code == 409
-        )
+        # HTTP 409 from either remote client: the server rejected expected_digest.
+        response = _http_response(e)
+        is_remote_mismatch = response is not None and response.status_code == 409
         is_mismatch = is_local_mismatch or is_remote_mismatch
         if is_mismatch:
             self.project_id_resolver.disable_after_validation_error(e, label)
@@ -2868,7 +2958,7 @@ class WeaveClient:
 
         compute_digests = self._should_compute_client_digests()
 
-        def send_obj_create() -> ObjCreateRes:
+        def send_obj_create() -> ObjectCreateResponse:
             # `to_json` is mostly fast, except for CustomWeaveTypes
             # which incur network costs to serialize the payload
             json_val = to_json(val, self.project_id, self)
@@ -2904,38 +2994,48 @@ class WeaveClient:
                         InvalidExternalRef,
                     ):
                         local_digest = compute_object_digest(json_val)
-                req = ObjCreateReq(
-                    obj=ObjSchemaForInsert(
-                        project_id=self.entity + "/" + self.project,
-                        object_id=name,
-                        val=json_val,
-                    )
-                )
+                req: ObjectCreateParams = {
+                    "obj": {
+                        "project_id": self.entity + "/" + self.project,
+                        "object_id": name,
+                        "val": to_jsonable_with_json_keys(json_val),
+                        "builtin_object_class": None,
+                        "expected_digest": None,
+                        "wb_user_id": None,
+                    }
+                }
                 self._wal.write("obj_create", req)
-                return ObjCreateRes(digest=local_digest)
+                return ObjectCreateResponse(digest=local_digest)
 
             # Standard path: send directly to the trace server and get
             # back a server-computed digest.
-            req = ObjCreateReq(
-                obj=ObjSchemaForInsert(
-                    project_id=self.entity + "/" + self.project,
-                    object_id=name,
-                    val=json_val,
-                    expected_digest=expected_digest,
-                )
-            )
+            req = {
+                "obj": {
+                    "project_id": self.entity + "/" + self.project,
+                    "object_id": name,
+                    "val": to_jsonable_with_json_keys(json_val),
+                    "builtin_object_class": None,
+                    "expected_digest": expected_digest,
+                    "wb_user_id": None,
+                }
+            }
             try:
                 return self.server.obj_create(req)
-            except (DigestMismatchError, HTTPError) as e:
-                if expected_digest is None:
+            except Exception as e:
+                if (
+                    expected_digest is None
+                    or not ProjectIdResolver.is_digest_validation_error(e)
+                ):
                     raise
                 self._handle_digest_mismatch(
                     e, f"weave:///{self.entity}/{self.project}/object/{name}"
                 )
-                req.obj.expected_digest = None
+                req["obj"]["expected_digest"] = None
                 return self.server.obj_create(req)
 
-        res_future: Future[ObjCreateRes] = self.future_executor.defer(send_obj_create)
+        res_future: Future[ObjectCreateResponse] = self.future_executor.defer(
+            send_obj_create
+        )
         digest_future: Future[str] = self.future_executor.then(
             [res_future], lambda res: res[0].digest
         )
@@ -2966,7 +3066,7 @@ class WeaveClient:
 
         return self._save_object_basic(op, name)
 
-    def _send_table_create(self, rows: list[Any]) -> TableCreateRes:
+    def _send_table_create(self, rows: list[Any]) -> TableCreateResponse:
         compute_digests = self._should_compute_client_digests()
         json_rows = to_json(rows, self.project_id, self)
 
@@ -2987,30 +3087,34 @@ class WeaveClient:
         if self._wal is not None:
             row_digests = [compute_row_digest(row) for row in json_rows]
             local_digest = expected_digest or compute_table_digest(row_digests)
-            req = TableCreateReq(
-                table=TableSchemaForInsert(
-                    project_id=self.project_id,
-                    rows=json_rows,
-                )
-            )
+            req: TableCreateParams = {
+                "table": {
+                    "project_id": self.project_id,
+                    "rows": to_jsonable_with_json_keys(json_rows),
+                    "expected_digest": None,
+                }
+            }
             self._wal.write("table_create", req)
-            return TableCreateRes(digest=local_digest, row_digests=row_digests)
+            return TableCreateResponse(digest=local_digest, row_digests=row_digests)
 
         # Standard path: send directly to the trace server.
-        req = TableCreateReq(
-            table=TableSchemaForInsert(
-                project_id=self.project_id,
-                rows=json_rows,
-                expected_digest=expected_digest,
-            )
-        )
+        req = {
+            "table": {
+                "project_id": self.project_id,
+                "rows": json_rows,
+                "expected_digest": expected_digest,
+            }
+        }
         try:
             return self.server.table_create(req)
-        except (DigestMismatchError, HTTPError) as e:
-            if expected_digest is None:
+        except Exception as e:
+            if (
+                expected_digest is None
+                or not ProjectIdResolver.is_digest_validation_error(e)
+            ):
                 raise
             self._handle_digest_mismatch(e, f"table in {self.project_id}")
-            req.table.expected_digest = None
+            req["table"]["expected_digest"] = None
             return self.server.table_create(req)
 
     @trace_sentry.global_trace_sentry.watch()
@@ -3028,7 +3132,7 @@ class WeaveClient:
         chunking_config = self._should_use_chunking(table)
         if not chunking_config.use_chunking:
             # Simple case: defer the entire serialization and upload
-            res_future: Future[TableCreateRes] = self.future_executor.defer(
+            res_future: Future[TableCreateResponse] = self.future_executor.defer(
                 lambda: self._send_table_create(list(table.rows))
             )
         elif chunking_config.use_parallel_chunks:
@@ -3042,7 +3146,7 @@ class WeaveClient:
             [res_future], lambda res: res[0].digest
         )
         row_digests_future: Future[list[str]] = self.future_executor.then(
-            [res_future], lambda res: res[0].row_digests
+            [res_future], lambda res: res[0].row_digests or []
         )
 
         table_ref = TableRef(
@@ -3087,9 +3191,11 @@ class WeaveClient:
         # Determine parallel vs incremental chunking
         use_parallel_chunks = False
         if use_chunking and should_use_parallel_table_upload():
-            test_req = TableCreateFromDigestsReq(
-                project_id=self.project_id, row_digests=[]
-            )
+            test_req: TableCreateFromDigestsParams = {
+                "project_id": self.project_id,
+                "row_digests": [],
+                "expected_digest": None,
+            }
 
             use_parallel_chunks = check_endpoint_exists(
                 self.server.table_create_from_digests,
@@ -3103,7 +3209,7 @@ class WeaveClient:
 
     def _create_table_with_parallel_chunks(
         self, table: Table | WeaveTable
-    ) -> Future[TableCreateRes]:
+    ) -> Future[TableCreateResponse]:
         """Execute the actual parallel chunk upload."""
         # Create chunks from raw table data (not serialized yet)
         chunk_manager = TableChunkManager()
@@ -3113,8 +3219,8 @@ class WeaveClient:
         chunk_futures = []
         for raw_chunk in raw_chunks:
 
-            def make_chunk_task(chunk: list[Any]) -> Callable[[], TableCreateRes]:
-                def chunk_task() -> TableCreateRes:
+            def make_chunk_task(chunk: list[Any]) -> Callable[[], TableCreateResponse]:
+                def chunk_task() -> TableCreateResponse:
                     return self._send_table_create(chunk)
 
                 return chunk_task
@@ -3124,31 +3230,34 @@ class WeaveClient:
 
         # Chain the operations using future_executor.then
         def combine_chunks_and_create_table(
-            chunk_results: list[TableCreateRes],
-        ) -> TableCreateRes:
+            chunk_results: list[TableCreateResponse],
+        ) -> TableCreateResponse:
             all_row_digests = []
             for chunk_result in chunk_results:
-                all_row_digests.extend(chunk_result.row_digests)
+                all_row_digests.extend(chunk_result.row_digests or [])
 
             # Create final table from digests
             expected_digest = None
             if self._should_compute_client_digests():
                 expected_digest = compute_table_digest(all_row_digests)
-            create_req = TableCreateFromDigestsReq(
-                project_id=self.project_id,
-                row_digests=all_row_digests,
-                expected_digest=expected_digest,
-            )
+            create_req: TableCreateFromDigestsParams = {
+                "project_id": self.project_id,
+                "row_digests": all_row_digests,
+                "expected_digest": expected_digest,
+            }
             try:
                 create_res = self.server.table_create_from_digests(create_req)
-            except (DigestMismatchError, HTTPError) as e:
-                if expected_digest is None:
+            except Exception as e:
+                if (
+                    expected_digest is None
+                    or not ProjectIdResolver.is_digest_validation_error(e)
+                ):
                     raise
                 self._handle_digest_mismatch(e, "table_create_from_digests")
-                create_req.expected_digest = None
+                create_req["expected_digest"] = None
                 create_res = self.server.table_create_from_digests(create_req)
 
-            return TableCreateRes(
+            return TableCreateResponse(
                 digest=create_res.digest,
                 row_digests=all_row_digests,
             )
@@ -3158,7 +3267,7 @@ class WeaveClient:
 
     def _create_table_with_incremental_updates(
         self, table: Table | WeaveTable
-    ) -> Future[TableCreateRes]:
+    ) -> Future[TableCreateResponse]:
         """Create table using incremental table_update pattern (fallback)."""
         # Create chunks from raw table data (not serialized yet)
         chunk_manager = TableChunkManager()
@@ -3169,7 +3278,7 @@ class WeaveClient:
         # Create first chunk as the base table - defer serialization
         first_raw_chunk = raw_chunks[0]
 
-        def create_first_chunk() -> TableCreateRes:
+        def create_first_chunk() -> TableCreateResponse:
             serialized_rows = to_json(first_raw_chunk, self.project_id, self)
             return self._send_table_create(serialized_rows)
 
@@ -3177,27 +3286,26 @@ class WeaveClient:
 
         # Chain the incremental updates sequentially
         def process_remaining_chunks(
-            base_results: list[TableCreateRes],
-        ) -> TableCreateRes:
+            base_results: list[TableCreateResponse],
+        ) -> TableCreateResponse:
             base_result = base_results[0]
             current_digest = base_result.digest
-            all_row_digests = list(base_result.row_digests)
+            all_row_digests = list(base_result.row_digests or [])
 
             # Process remaining chunks sequentially (each depends on previous)
             for raw_chunk in raw_chunks[1:]:
                 # Serialize each chunk separately to avoid recursion
                 serialized_chunk = to_json(raw_chunk, self.project_id, self)
-                payloads = [TableAppendSpecPayload(row=row) for row in serialized_chunk]
-                update_req = TableUpdateReq(
-                    project_id=self.project_id,
-                    base_digest=current_digest,
-                    updates=[TableAppendSpec(append=payload) for payload in payloads],
-                )
+                update_req: TableUpdateParams = {
+                    "project_id": self.project_id,
+                    "base_digest": current_digest,
+                    "updates": [{"append": {"row": row}} for row in serialized_chunk],
+                }
                 update_result = self.server.table_update(update_req)
                 current_digest = update_result.digest
-                all_row_digests.extend(update_result.updated_row_digests)
+                all_row_digests.extend(update_result.updated_row_digests or [])
 
-            return TableCreateRes(
+            return TableCreateResponse(
                 digest=current_digest,
                 row_digests=all_row_digests,
             )
@@ -3206,12 +3314,11 @@ class WeaveClient:
         return self.future_executor.then([base_future], process_remaining_chunks)
 
     def _append_to_table(self, table_digest: str, rows: list[dict]) -> WeaveTable:
-        payloads = [TableAppendSpecPayload(row=row) for row in rows]
-        table_update_req = TableUpdateReq(
-            project_id=self.project_id,
-            base_digest=table_digest,
-            updates=[TableAppendSpec(append=payload) for payload in payloads],
-        )
+        table_update_req: TableUpdateParams = {
+            "project_id": self.project_id,
+            "base_digest": table_digest,
+            "updates": [{"append": {"row": row}} for row in rows],
+        }
         res = self.server.table_update(table_update_req)
         return WeaveTable(
             table_ref=TableRef(
@@ -3236,22 +3343,38 @@ class WeaveClient:
         op_ref = get_ref(op)
         if op_ref is None:
             raise ValueError(f"Can't get runs for unpublished op: {op}")
-        return self.get_calls(filter=CallsFilter(op_names=[op_ref.uri]))
+        return self.get_calls(filter={"op_names": [op_ref.uri]})
 
     @trace_sentry.global_trace_sentry.watch()
-    def _objects(self, filter: ObjectVersionFilter | None = None) -> list[ObjSchema]:
-        if not filter:
-            filter = ObjectVersionFilter()
-        else:
-            filter = filter.model_copy()
-        filter = cast(ObjectVersionFilter, filter)
-        filter.is_op = False
+    def _objects(
+        self, filter: object_query_params.Filter | ObjectVersionFilter | None = None
+    ) -> list[object_query_response.Obj]:
+        # Every filter key, null when unset.
+        query_filter: object_query_params.Filter = {
+            "base_object_classes": None,
+            "exclude_base_object_classes": None,
+            "leaf_object_classes": None,
+            "object_ids": None,
+            "is_op": None,
+            "latest_only": None,
+            "tags": None,
+            "aliases": None,
+        }
+        if filter:
+            query_filter.update(cast(object_query_params.Filter, as_params(filter)))
+        query_filter["is_op"] = False
 
         response = self.server.objs_query(
-            ObjQueryReq(
-                project_id=self.project_id,
-                filter=filter,
-            )
+            {
+                "project_id": self.project_id,
+                "filter": query_filter,
+                "limit": None,
+                "offset": None,
+                "sort_by": None,
+                "metadata_only": False,
+                "include_storage_size": False,
+                "include_tags_and_aliases": False,
+            }
         )
         return response.objs
 
@@ -3262,11 +3385,12 @@ class WeaveClient:
         # Removing call display name, use "" for db representation
         if display_name is None:
             display_name = ""
-        req = CallUpdateReq(
-            project_id=self.project_id,
-            call_id=call.id,
-            display_name=elide_display_name(display_name),
-        )
+        req: CallUpdateParams = {
+            "project_id": self.project_id,
+            "call_id": cast(str, call.id),
+            "display_name": elide_display_name(display_name),
+            "wb_user_id": None,
+        }
 
         def send_call_update() -> None:
             self.server.call_update(req)
@@ -3285,29 +3409,39 @@ class WeaveClient:
     def _ref_uri(self, name: str, version: str, path: str) -> str:
         return ObjectRef(self.entity, self.project, name, version).uri
 
-    def _send_file_create(self, req: FileCreateReq) -> Future[FileCreateRes]:
+    def _send_file_create(self, req: FileCreateParams) -> Future[FileCreateResponse]:
         cached_res = self.send_file_cache.get(req)
         if cached_res:
             return cached_res
 
+        name, content = cast("tuple[str, bytes]", req["file"])
         # WAL path: persist to disk; return a resolved future immediately.
         if self._wal is not None:
-            digest = req.expected_digest or compute_file_digest(req.content)
-            self._wal.write("file_create", req)
-            f: Future[FileCreateRes] = Future()
-            f.set_result(FileCreateRes(digest=digest))
+            digest = req.get("expected_digest") or compute_file_digest(content)
+            # The record keeps the name and content keys every SDK version replays.
+            record = {
+                "project_id": req["project_id"],
+                "name": name,
+                "content": content,
+                "expected_digest": req.get("expected_digest"),
+            }
+            self._wal.write("file_create", record)
+            f: Future[FileCreateResponse] = Future()
+            f.set_result(FileCreateResponse(digest=digest))
             self.send_file_cache.put(req, f)
             return f
 
         # Standard path: send directly to the trace server.
-        def file_create_with_fallback() -> FileCreateRes:
+        def file_create_with_fallback() -> FileCreateResponse:
             try:
                 return self.server.file_create(req)
-            except (DigestMismatchError, HTTPError) as e:
-                if req.expected_digest is None:
+            except Exception as e:
+                if req.get(
+                    "expected_digest"
+                ) is None or not ProjectIdResolver.is_digest_validation_error(e):
                     raise
-                self._handle_digest_mismatch(e, f"file://{req.name}")
-                req.expected_digest = None
+                self._handle_digest_mismatch(e, f"file://{name}")
+                req["expected_digest"] = None
                 return self.server.file_create(req)
 
         if self.future_executor_fastlane:
@@ -3317,7 +3451,7 @@ class WeaveClient:
 
         self.send_file_cache.put(req, res)
 
-        def _evict_on_failure(fut: Future[FileCreateRes]) -> None:
+        def _evict_on_failure(fut: Future[FileCreateResponse]) -> None:
             if fut.exception() is not None:
                 self.send_file_cache.delete_if(req, fut)
 

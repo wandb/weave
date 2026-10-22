@@ -80,11 +80,11 @@ While many Weave Objects are free-form and user-defined, there is often a need f
 
 Here's how to define and use a validated base object:
 
-1. **Define your schema** (in `weave/shared/interface/builtin_object_classes/your_schema.py` for the Python SDK, and in the trace server's copy in wandb/core, `services/weave-trace/src/trace_server_backend/contract/interface/builtin_object_classes/your_schema.py`):
+1. **Define your schema** (in `weave/trace/builtin_object_classes/your_schema.py` for the Python SDK, and in the trace server's copy in wandb/core, `services/weave-trace/src/trace_server_backend/contract/interface/builtin_object_classes/your_schema.py`):
 
 ```python
 from pydantic import BaseModel
-from weave.shared.interface.builtin_object_classes import base_object_def
+from weave.trace.builtin_object_classes import base_object_def
 
 class NestedConfig(BaseModel):
     setting_a: int
@@ -160,7 +160,7 @@ The frontend TypeScript types are generated in wandb/core from the trace server'
 
 ### Architecture Flow
 
-1. Define your schema in a python file in the `weave/shared/interface/builtin_object_classes/` directory for the Python SDK, and in `services/weave-trace/src/trace_server_backend/contract/interface/builtin_object_classes/` in wandb/core for the trace server and the frontend. See `test_only_example.py` in either directory as an example.
+1. Define your schema in a python file in the `weave/trace/builtin_object_classes/` directory for the Python SDK, and in `services/weave-trace/src/trace_server_backend/contract/interface/builtin_object_classes/` in wandb/core for the trace server and the frontend. See `test_only_example.py` in either directory as an example.
 2. Make sure to register your schemas in `builtin_object_registry.py` in both directories by calling `register_base_object`.
 3. Generate the frontend types in wandb/core.
    - `make export-builtin-object-schemas` in `services/weave-trace` runs `src/export_builtin_object_schemas.py` to write the JSON schema to `services/weave-trace/src/trace_server_backend/contract/interface/builtin_object_classes/generated/generated_builtin_object_class_schemas.json`.

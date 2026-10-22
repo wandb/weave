@@ -1,7 +1,7 @@
 import weave
 from weave.flow.llm_structured_model import LLMStructuredCompletionModel
 from weave.scorers import LLMAsAJudgeScorer
-from weave.shared.interface.builtin_object_classes.llm_structured_model import (
+from weave.trace.builtin_object_classes.llm_structured_model import (
     LLMStructuredCompletionModelDefaultParams,
 )
 

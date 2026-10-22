@@ -7,20 +7,16 @@ import pytest
 import weave.trace_server
 from weave.shared import (
     common_interface,
-    errors,
     http_service_interface,
     service_interface,
-    trace_server_converter,
     trace_server_interface,
-    tracing,
     validation,
 )
 from weave.shared.agents import constants, semconv
 from weave.shared.agents import types as agent_types
-from weave.shared.helpers import url_safety
-from weave.shared.ids import generate_id
 from weave.shared.interface import feedback_types
 from weave.shared.sensitive_data import policy
+from weave.trace import errors, server_tracing, trace_server_converter
 from weave.trace_server import common_interface as common_interface_legacy
 from weave.trace_server import errors as errors_legacy
 from weave.trace_server import http_service_interface as http_service_interface_legacy
@@ -36,6 +32,8 @@ from weave.trace_server.helpers import url_safety as url_safety_legacy
 from weave.trace_server.ids import generate_id as generate_id_legacy
 from weave.trace_server.interface import feedback_types as feedback_types_legacy
 from weave.trace_server.sensitive_data import policy as policy_legacy
+from weave.utils import url_safety
+from weave.utils.ids import generate_id
 
 pytestmark = pytest.mark.trace_server
 
@@ -53,8 +51,8 @@ def test_trace_server_paths_are_the_shared_modules() -> None:
     assert feedback_types is feedback_types_legacy
     assert policy is policy_legacy
     assert url_safety is url_safety_legacy
-    assert errors is errors_legacy
-    assert tracing is tracing_legacy
+    assert errors.NotFoundError is errors_legacy.NotFoundError
+    assert server_tracing is tracing_legacy
     assert generate_id is generate_id_legacy
 
 
@@ -82,14 +80,67 @@ _SERVER_TYPE_MODULES = {
     "weave.trace_server.agents.constants",
     "weave.trace_server.sensitive_data.policy",
     "weave.trace_server.validation",
+    "weave.trace_server.validation_util",
+}
+
+
+# Modules that already left weave.shared for the client.
+_MOVED_MODULES = {
+    "weave.trace_server.constants": "weave.trace.constants",
+    "weave.trace_server.helpers.url_safety": "weave.utils.url_safety",
+    "weave.trace_server.ids": "weave.utils.ids",
+    "weave.trace_server.interface.builtin_object_classes.agent_dashboard": (
+        "weave.trace.builtin_object_classes.agent_dashboard"
+    ),
+    "weave.trace_server.interface.builtin_object_classes.alert_spec": (
+        "weave.trace.builtin_object_classes.alert_spec"
+    ),
+    "weave.trace_server.interface.builtin_object_classes.annotation_spec": (
+        "weave.trace.builtin_object_classes.annotation_spec"
+    ),
+    "weave.trace_server.interface.builtin_object_classes.base_object_def": (
+        "weave.trace.builtin_object_classes.base_object_def"
+    ),
+    "weave.trace_server.interface.builtin_object_classes.builtin_object_registry": (
+        "weave.trace.builtin_object_classes.builtin_object_registry"
+    ),
+    "weave.trace_server.interface.builtin_object_classes.comparison_view": (
+        "weave.trace.builtin_object_classes.comparison_view"
+    ),
+    "weave.trace_server.interface.builtin_object_classes.leaderboard": (
+        "weave.trace.builtin_object_classes.leaderboard"
+    ),
+    "weave.trace_server.interface.builtin_object_classes.provider": (
+        "weave.trace.builtin_object_classes.provider"
+    ),
+    "weave.trace_server.interface.builtin_object_classes.saved_view": (
+        "weave.trace.builtin_object_classes.saved_view"
+    ),
+    "weave.trace_server.interface.builtin_object_classes.test_only_example": (
+        "weave.trace.builtin_object_classes.test_only_example"
+    ),
+    "weave.trace_server.trace_server_converter": "weave.trace.trace_server_converter",
+    "weave.trace_server.tracing": "weave.trace.server_tracing",
 }
 
 
 def _expected_warning(name: str) -> str:
+    if name == "weave.trace_server.errors":
+        # It stays weave.shared.errors, whose server error registry has no new home.
+        return (
+            f"{name} is deprecated since weave 0.53.13 and will be removed in a "
+            "future release; import the error classes from weave.trace.errors "
+            "instead."
+        )
     if name in _SERVER_TYPE_MODULES:
         return (
             f"{name} is deprecated since weave 0.53.13 and will be removed in a "
             "future release."
+        )
+    if name in _MOVED_MODULES:
+        return (
+            f"{name} is deprecated since weave 0.53.13 and will be removed in a "
+            f"future release; import {_MOVED_MODULES[name]} instead."
         )
     new_name = name.replace("weave.trace_server", "weave.shared", 1)
     return (
@@ -105,4 +156,6 @@ def test_trace_server_paths_warn_with_the_new_path(
     monkeypatch.delitem(sys.modules, name, raising=False)
     with pytest.warns(FutureWarning) as record:
         importlib.import_module(name)
-    assert [str(w.message) for w in record] == [_expected_warning(name)]
+    # Garbage collection can add unrelated warnings to the record.
+    messages = [str(w.message) for w in record if issubclass(w.category, FutureWarning)]
+    assert messages == [_expected_warning(name)]

@@ -1,7 +1,16 @@
 import base64
 import uuid
+import warnings
 
-from weave.shared import refs_internal
+from weave.trace import refs_internal
+
+# TODO: delete this module together with weave.shared.
+warnings.warn(
+    "weave.shared.validation_util is deprecated and will be removed in a future "
+    "release.",
+    FutureWarning,
+    stacklevel=2,
+)
 
 # OTel trace ID: 16 bytes encoded as 32 hex characters
 OTEL_TRACE_ID_HEX_LENGTH = 32

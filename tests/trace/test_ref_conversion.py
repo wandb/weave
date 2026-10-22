@@ -12,7 +12,13 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from weave.shared.refs_internal import (
+from weave.trace.ref_conversion import (
+    CrossProjectRefError,
+    ProjectNotFoundError,
+    convert_cross_project_ref,
+    convert_same_project_ref,
+)
+from weave.trace.refs_internal import (
     InternalAgentConversationRef,
     InternalAgentSpanRef,
     InternalAgentTurnRef,
@@ -20,12 +26,6 @@ from weave.shared.refs_internal import (
     InternalObjectRef,
     InternalOpRef,
     InternalTableRef,
-)
-from weave.trace.ref_conversion import (
-    CrossProjectRefError,
-    ProjectNotFoundError,
-    convert_cross_project_ref,
-    convert_same_project_ref,
 )
 
 # ---------------------------------------------------------------------------

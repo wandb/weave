@@ -1273,14 +1273,14 @@ def test_get_scores(client, make_evals):
 
 
 @contextlib.contextmanager
-def _capture_call_ends(client) -> Iterator[dict[str, tsi.EndedCallSchemaForInsert]]:
+def _capture_call_ends(client) -> Iterator[dict[str, dict[str, Any]]]:
     """Record outgoing call-ends by id, delegating every call to the real server."""
     inner = client.server
-    ends: dict[str, tsi.EndedCallSchemaForInsert] = {}
+    ends: dict[str, dict[str, Any]] = {}
 
     class _Recorder:
-        def call_end(self, req: tsi.CallEndReq) -> tsi.CallEndRes:
-            ends[req.end.id] = req.end
+        def call_end(self, req: dict[str, Any]) -> object:
+            ends[req["end"]["id"]] = req["end"]
             return inner.call_end(req)
 
         def __getattr__(self, name: str) -> Any:
@@ -1323,7 +1323,7 @@ async def test_declarative_eval_sets_is_eval_on_call_ends(client):
 
     is_eval_by_op: dict[str, list] = defaultdict(list)
     for call_id, end in ends.items():
-        is_eval_by_op[op_by_id[call_id]].append(end.is_eval)
+        is_eval_by_op[op_by_id[call_id]].append(end["is_eval"])
 
     # Root is matched by op_name (it carries no _weave_eval_meta) — the case a
     # naive attrs-only formula would miss. Children are matched by attributes.
@@ -1355,5 +1355,5 @@ def test_imperative_eval_sets_is_eval_on_call_ends(client):
 
     # Every imperative call carries _weave_eval_meta, so every end is is_eval,
     # including the root.
-    assert ends[root_id].is_eval is True
-    assert all(end.is_eval is True for end in ends.values())
+    assert ends[root_id]["is_eval"] is True
+    assert all(end["is_eval"] is True for end in ends.values())

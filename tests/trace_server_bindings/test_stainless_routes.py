@@ -8,21 +8,216 @@ the default one.
 
 from __future__ import annotations
 
+import collections.abc
+import dataclasses
 import datetime
+import inspect
 import json
+import operator
+import types
+import typing
+from collections.abc import Iterator
 from dataclasses import dataclass
+from typing import Any
 
 import httpx
 import pytest
+import typing_extensions
 from pydantic import BaseModel
 
 from tests.trace_server_bindings.conftest import generate_call_start_end_pair
+from weave.durability.wal_sender import build_trace_server_handlers
+from weave.trace.serialization.digest import compute_object_digest, compute_row_digest
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.agents import types as agent_types
+from weave.trace_server_bindings import (
+    stainless_remote_http_trace_server as stainless_binding,
+)
+from weave.trace_server_bindings.client_interface import (
+    ObjAddTagsParams,
+    ObjRemoveAliasesParams,
+    ObjRemoveTagsParams,
+    ObjSetAliasesParams,
+)
+from weave.trace_server_bindings.models import DatasetSourcesLinkDeleteRes
 from weave.trace_server_bindings.stainless_remote_http_trace_server import (
     StainlessRemoteHTTPTraceServer,
 )
 from weave.vendor.weave_server_sdk import Client as StainlessClient
+from weave.vendor.weave_server_sdk.types import (
+    AgentQueryParams,
+    AgentQueryResponse,
+    AgentSearchParams,
+    AgentSearchResponse,
+    AgentTraceChatRes,
+    AnnotationQueueCreateParams,
+    AnnotationQueueCreateResponse,
+    AnnotationQueueDeleteParams,
+    AnnotationQueueQueryParams,
+    AnnotationQueueReadParams,
+    AnnotationQueueReadResponse,
+    AnnotationQueueSchema,
+    AnnotationQueueStatsParams,
+    AnnotationQueueStatsResponse,
+    AnnotationQueueUpdateParams,
+    CallDeleteParams,
+    CallEndParams,
+    CallQueryStatsParams,
+    CallReadParams,
+    CallScoreParams,
+    CallStartParams,
+    CallStatsParams,
+    CallStatsResponse,
+    CallStreamQueryParams,
+    CallUpdateParams,
+    CallUpsertBatchParams,
+    CallUpsertBatchResponse,
+    CallUsageParams,
+    CompletionCreateParams,
+    CompletionCreateResponse,
+    CompletionCreateStreamParams,
+    CostCreateParams,
+    CostPurgeParams,
+    CostQueryParams,
+    DatasetSourceLinkParams,
+    DatasetSourceLinkResponse,
+    DatasetSourceQueryParams,
+    DatasetSourceQueryResponse,
+    DatasetSourceSourceDatasetsQueryParams,
+    DatasetSourceSourceDatasetsQueryResponse,
+    EvaluationEvaluateModelParams,
+    EvaluationEvaluateModelResponse,
+    EvaluationRescoreParams,
+    EvaluationRescoreResponse,
+    EvaluationStatusParams,
+    EvaluationStatusResponse,
+    FeedbackAggregateParams,
+    FeedbackAggregateResponse,
+    FeedbackBatchCreateParams,
+    FeedbackCreateParams,
+    FeedbackPayloadSchemaParams,
+    FeedbackPayloadSchemaResponse,
+    FeedbackPurgeParams,
+    FeedbackQueryParams,
+    FeedbackReplaceParams,
+    FeedbackStatsParams,
+    FeedbackStatsResponse,
+    FileContentParams,
+    FileCreateResponse,
+    FileStatsParams,
+    ImageCreateParams,
+    ImageCreateResponse,
+    ObjectCreateParams,
+    ObjectDeleteParams,
+    ObjectQueryParams,
+    ObjectReadParams,
+    ProjectStatsParams,
+    ProjectStatsResponse,
+    RefReadBatchParams,
+    ServiceProjectsInfoParams,
+    TableCreateFromDigestsParams,
+    TableCreateParams,
+    TableQueryParams,
+    TableQueryStatsBatchParams,
+    TableQueryStatsParams,
+    TableUpdateParams,
+    ThreadStreamQueryParams,
+    ThreadStreamQueryResponse,
+    TraceUsageParams,
+    V2DatasetCreateParams,
+    V2DatasetCreateResponse,
+    V2DatasetDeleteParams,
+    V2DatasetListParams,
+    V2DatasetListResponse,
+    V2DatasetReadResponse,
+    V2EvalResultQueryParams,
+    V2EvalResultQueryResponse,
+    V2EvaluationCreateParams,
+    V2EvaluationCreateResponse,
+    V2EvaluationDeleteParams,
+    V2EvaluationListParams,
+    V2EvaluationListResponse,
+    V2EvaluationReadResponse,
+    V2EvaluationRunCreateParams,
+    V2EvaluationRunCreateResponse,
+    V2EvaluationRunDeleteParams,
+    V2EvaluationRunDeleteResponse,
+    V2EvaluationRunFinishParams,
+    V2EvaluationRunFinishResponse,
+    V2EvaluationRunListParams,
+    V2EvaluationRunListResponse,
+    V2EvaluationRunReadResponse,
+    V2ModelCreateParams,
+    V2ModelCreateResponse,
+    V2ModelDeleteParams,
+    V2ModelListParams,
+    V2ModelListResponse,
+    V2ModelReadResponse,
+    V2OpCreateParams,
+    V2OpCreateResponse,
+    V2OpDeleteParams,
+    V2OpListParams,
+    V2OpListResponse,
+    V2OpReadResponse,
+    V2PredictionCreateParams,
+    V2PredictionCreateResponse,
+    V2PredictionDeleteParams,
+    V2PredictionDeleteResponse,
+    V2PredictionFinishResponse,
+    V2PredictionListParams,
+    V2PredictionListResponse,
+    V2PredictionReadResponse,
+    V2RuntimeApplyParams,
+    V2RuntimeApplyResponse,
+    V2ScoreCreateParams,
+    V2ScoreCreateResponse,
+    V2ScoreDeleteParams,
+    V2ScoreDeleteResponse,
+    V2ScoreListParams,
+    V2ScoreListResponse,
+    V2ScorerCreateParams,
+    V2ScorerCreateResponse,
+    V2ScorerDeleteParams,
+    V2ScoreReadResponse,
+    V2ScorerListParams,
+    V2ScorerListResponse,
+    V2ScorerReadResponse,
+)
+from weave.vendor.weave_server_sdk.types.agents import (
+    AgentVersionQueryParams,
+    AgentVersionQueryResponse,
+    ConversationChatParams,
+    ConversationChatResponse,
+    ConversationSpansParams,
+    ConversationSpansResponse,
+    SpanCustomAttrsSchemaParams,
+    SpanCustomAttrsSchemaResponse,
+    SpanQueryParams,
+    SpanQueryResponse,
+    SpanStatsParams,
+    SpanStatsResponse,
+    TraceChatParams,
+)
+from weave.vendor.weave_server_sdk.types.annotation_queues import (
+    ItemAddParams,
+    ItemQueryParams,
+    ItemQueryResponse,
+    ItemUpdateProgressParams,
+)
+from weave.vendor.weave_server_sdk.types.call_read_response import Call
+from weave.vendor.weave_server_sdk.types.call_upsert_batch_response import (
+    ReCallStartRes,
+)
+from weave.vendor.weave_server_sdk.types.objects import (
+    AliasListParams,
+    TagListParams,
+)
+from weave.vendor.weave_server_sdk.types.projects import (
+    TtlSettingReadParams,
+    TtlSettingReadResponse,
+    TtlSettingUpdateParams,
+    TtlSettingUpdateResponse,
+)
 
 BASE_URL = "http://example.com"
 PROJECT = "entity/project"
@@ -189,7 +384,7 @@ def _mock_server(
             ),
             "POST",
             f"{V2}/ops",
-            tsi.OpCreateRes,
+            V2OpCreateResponse,
             id="op_create",
         ),
         pytest.param(
@@ -197,7 +392,7 @@ def _mock_server(
             tsi.OpReadReq(project_id=PROJECT, object_id="my-object", digest="abc123"),
             "GET",
             f"{V2}/ops/my-object/versions/abc123",
-            tsi.OpReadRes,
+            V2OpReadResponse,
             id="op_read",
         ),
         pytest.param(
@@ -205,7 +400,7 @@ def _mock_server(
             tsi.DatasetCreateReq(project_id=PROJECT, name="my-object", rows=[]),
             "POST",
             f"{V2}/datasets",
-            tsi.DatasetCreateRes,
+            V2DatasetCreateResponse,
             id="dataset_create",
         ),
         pytest.param(
@@ -215,7 +410,7 @@ def _mock_server(
             ),
             "GET",
             f"{V2}/datasets/my-object/versions/abc123",
-            tsi.DatasetReadRes,
+            V2DatasetReadResponse,
             id="dataset_read",
         ),
         pytest.param(
@@ -225,7 +420,7 @@ def _mock_server(
             ),
             "POST",
             f"{V2}/scorers",
-            tsi.ScorerCreateRes,
+            V2ScorerCreateResponse,
             id="scorer_create",
         ),
         pytest.param(
@@ -235,7 +430,7 @@ def _mock_server(
             ),
             "GET",
             f"{V2}/scorers/my-object/versions/abc123",
-            tsi.ScorerReadRes,
+            V2ScorerReadResponse,
             id="scorer_read",
         ),
         pytest.param(
@@ -245,7 +440,7 @@ def _mock_server(
             ),
             "POST",
             f"{V2}/evaluations",
-            tsi.EvaluationCreateRes,
+            V2EvaluationCreateResponse,
             id="evaluation_create",
         ),
         pytest.param(
@@ -255,7 +450,7 @@ def _mock_server(
             ),
             "GET",
             f"{V2}/evaluations/my-object/versions/abc123",
-            tsi.EvaluationReadRes,
+            V2EvaluationReadResponse,
             id="evaluation_read",
         ),
         pytest.param(
@@ -265,7 +460,7 @@ def _mock_server(
             ),
             "POST",
             f"{V2}/models",
-            tsi.ModelCreateRes,
+            V2ModelCreateResponse,
             id="model_create",
         ),
         pytest.param(
@@ -275,7 +470,7 @@ def _mock_server(
             ),
             "GET",
             f"{V2}/models/my-object/versions/abc123",
-            tsi.ModelReadRes,
+            V2ModelReadResponse,
             id="model_read",
         ),
         pytest.param(
@@ -285,7 +480,7 @@ def _mock_server(
             ),
             "POST",
             f"{V2}/evaluation_runs",
-            tsi.EvaluationRunCreateRes,
+            V2EvaluationRunCreateResponse,
             id="evaluation_run_create",
         ),
         pytest.param(
@@ -293,7 +488,7 @@ def _mock_server(
             tsi.EvaluationRunReadReq(project_id=PROJECT, evaluation_run_id="run-id"),
             "GET",
             f"{V2}/evaluation_runs/run-id",
-            tsi.EvaluationRunReadRes,
+            V2EvaluationRunReadResponse,
             id="evaluation_run_read",
         ),
         pytest.param(
@@ -303,7 +498,7 @@ def _mock_server(
             ),
             "DELETE",
             f"{V2}/evaluation_runs",
-            tsi.EvaluationRunDeleteRes,
+            V2EvaluationRunDeleteResponse,
             id="evaluation_run_delete",
         ),
         pytest.param(
@@ -311,7 +506,7 @@ def _mock_server(
             tsi.EvaluationRunFinishReq(project_id=PROJECT, evaluation_run_id="run-id"),
             "POST",
             f"{V2}/evaluation_runs/run-id/finish",
-            tsi.EvaluationRunFinishRes,
+            V2EvaluationRunFinishResponse,
             id="evaluation_run_finish",
         ),
         pytest.param(
@@ -321,7 +516,7 @@ def _mock_server(
             ),
             "POST",
             f"{V2}/predictions",
-            tsi.PredictionCreateRes,
+            V2PredictionCreateResponse,
             id="prediction_create",
         ),
         pytest.param(
@@ -329,7 +524,7 @@ def _mock_server(
             tsi.PredictionReadReq(project_id=PROJECT, prediction_id="prediction-id"),
             "GET",
             f"{V2}/predictions/prediction-id",
-            tsi.PredictionReadRes,
+            V2PredictionReadResponse,
             id="prediction_read",
         ),
         pytest.param(
@@ -339,7 +534,7 @@ def _mock_server(
             ),
             "DELETE",
             f"{V2}/predictions",
-            tsi.PredictionDeleteRes,
+            V2PredictionDeleteResponse,
             id="prediction_delete",
         ),
         pytest.param(
@@ -347,7 +542,7 @@ def _mock_server(
             tsi.PredictionFinishReq(project_id=PROJECT, prediction_id="prediction-id"),
             "POST",
             f"{V2}/predictions/prediction-id/finish",
-            tsi.PredictionFinishRes,
+            V2PredictionFinishResponse,
             id="prediction_finish",
         ),
         pytest.param(
@@ -360,7 +555,7 @@ def _mock_server(
             ),
             "POST",
             f"{V2}/scores",
-            tsi.ScoreCreateRes,
+            V2ScoreCreateResponse,
             id="score_create",
         ),
         pytest.param(
@@ -368,7 +563,7 @@ def _mock_server(
             tsi.ScoreReadReq(project_id=PROJECT, score_id="score-id"),
             "GET",
             f"{V2}/scores/score-id",
-            tsi.ScoreReadRes,
+            V2ScoreReadResponse,
             id="score_read",
         ),
         pytest.param(
@@ -376,7 +571,7 @@ def _mock_server(
             tsi.ScoreDeleteReq(project_id=PROJECT, score_ids=["score-id"]),
             "DELETE",
             f"{V2}/scores",
-            tsi.ScoreDeleteRes,
+            V2ScoreDeleteResponse,
             id="score_delete",
         ),
     ],
@@ -407,7 +602,7 @@ def test_v2_method_reaches_its_flat_route(
             agent_types.AgentSpansQueryReq(project_id=PROJECT),
             "POST",
             "/agents/spans/query",
-            agent_types.AgentSpansQueryRes,
+            SpanQueryResponse,
             id="agent_spans_query",
         ),
         pytest.param(
@@ -415,7 +610,7 @@ def test_v2_method_reaches_its_flat_route(
             agent_types.AgentTraceChatReq(project_id=PROJECT, trace_id="t1"),
             "POST",
             "/agents/traces/chat",
-            agent_types.AgentTraceChatRes,
+            AgentTraceChatRes,
             id="agent_traces_chat",
         ),
         pytest.param(
@@ -425,7 +620,7 @@ def test_v2_method_reaches_its_flat_route(
             ),
             "POST",
             "/agents/conversations/chat",
-            agent_types.AgentConversationChatRes,
+            ConversationChatResponse,
             id="agent_conversation_chat",
         ),
         pytest.param(
@@ -433,7 +628,7 @@ def test_v2_method_reaches_its_flat_route(
             agent_types.AgentConversationSpansReq(project_id=PROJECT),
             "POST",
             "/agents/conversations/spans",
-            agent_types.AgentConversationSpansRes,
+            ConversationSpansResponse,
             id="agent_conversation_spans",
         ),
         pytest.param(
@@ -441,7 +636,7 @@ def test_v2_method_reaches_its_flat_route(
             agent_types.AgentsQueryReq(project_id=PROJECT),
             "POST",
             "/agents/query",
-            agent_types.AgentsQueryRes,
+            AgentQueryResponse,
             id="agent_agents_query",
         ),
         pytest.param(
@@ -451,7 +646,7 @@ def test_v2_method_reaches_its_flat_route(
             ),
             "POST",
             "/agents/agent-versions/query",
-            agent_types.AgentVersionsQueryRes,
+            AgentVersionQueryResponse,
             id="agent_versions_query",
         ),
         pytest.param(
@@ -483,7 +678,7 @@ def test_v2_method_reaches_its_flat_route(
             ),
             "POST",
             "/agents/spans/stats",
-            agent_types.AgentSpanStatsRes,
+            SpanStatsResponse,
             id="agent_spans_stats",
         ),
         pytest.param(
@@ -491,7 +686,7 @@ def test_v2_method_reaches_its_flat_route(
             agent_types.AgentCustomAttrsSchemaReq(project_id=PROJECT),
             "POST",
             "/agents/spans/custom-attrs/schema",
-            agent_types.AgentCustomAttrsSchemaRes,
+            SpanCustomAttrsSchemaResponse,
             id="agent_custom_attrs_schema",
         ),
         pytest.param(
@@ -499,7 +694,7 @@ def test_v2_method_reaches_its_flat_route(
             agent_types.AgentSearchReq(project_id=PROJECT),
             "POST",
             "/agents/search",
-            agent_types.AgentSearchRes,
+            AgentSearchResponse,
             id="agent_search",
         ),
         pytest.param(
@@ -507,7 +702,7 @@ def test_v2_method_reaches_its_flat_route(
             tsi.CallStatsReq(project_id=PROJECT, start=START, end=END),
             "POST",
             "/calls/stats",
-            tsi.CallStatsRes,
+            CallStatsResponse,
             id="call_stats",
         ),
         pytest.param(
@@ -515,7 +710,7 @@ def test_v2_method_reaches_its_flat_route(
             tsi.FeedbackStatsReq(project_id=PROJECT, start=START, end=END),
             "POST",
             "/feedback/stats",
-            tsi.FeedbackStatsRes,
+            FeedbackStatsResponse,
             id="feedback_stats",
         ),
         pytest.param(
@@ -523,7 +718,7 @@ def test_v2_method_reaches_its_flat_route(
             tsi.FeedbackAggregateReq(project_id=PROJECT, after_ms=0, before_ms=1),
             "POST",
             "/feedback/aggregate",
-            tsi.FeedbackAggregateRes,
+            FeedbackAggregateResponse,
             id="feedback_aggregate",
         ),
         pytest.param(
@@ -531,7 +726,7 @@ def test_v2_method_reaches_its_flat_route(
             tsi.FeedbackPayloadSchemaReq(project_id=PROJECT, start=START, end=END),
             "POST",
             "/feedback/payload_schema",
-            tsi.FeedbackPayloadSchemaRes,
+            FeedbackPayloadSchemaResponse,
             id="feedback_payload_schema",
         ),
         pytest.param(
@@ -539,7 +734,7 @@ def test_v2_method_reaches_its_flat_route(
             tsi.CompletionsCreateReq(project_id=PROJECT, inputs={"model": "gpt-4o"}),
             "POST",
             "/completions/create",
-            tsi.CompletionsCreateRes,
+            CompletionCreateResponse,
             id="completions_create",
         ),
         pytest.param(
@@ -549,7 +744,7 @@ def test_v2_method_reaches_its_flat_route(
             ),
             "POST",
             "/image/create",
-            tsi.ImageGenerationCreateRes,
+            ImageCreateResponse,
             id="image_create",
         ),
         pytest.param(
@@ -557,7 +752,7 @@ def test_v2_method_reaches_its_flat_route(
             tsi.ProjectStatsReq(project_id=PROJECT),
             "POST",
             "/project/stats",
-            tsi.ProjectStatsRes,
+            ProjectStatsResponse,
             id="project_stats",
         ),
         pytest.param(
@@ -565,7 +760,7 @@ def test_v2_method_reaches_its_flat_route(
             tsi.ProjectTTLSettingsReadReq(project_id=PROJECT),
             "POST",
             "/project/ttl_settings/read",
-            tsi.ProjectTTLSettingsReadRes,
+            TtlSettingReadResponse,
             id="project_ttl_settings_read",
         ),
         pytest.param(
@@ -573,7 +768,7 @@ def test_v2_method_reaches_its_flat_route(
             tsi.ProjectTTLSettingsUpdateReq(project_id=PROJECT, retention_days=30),
             "POST",
             "/project/ttl_settings/update",
-            tsi.ProjectTTLSettingsUpdateRes,
+            TtlSettingUpdateResponse,
             id="project_ttl_settings_update",
         ),
         pytest.param(
@@ -597,15 +792,23 @@ def test_v2_method_reaches_its_flat_route(
             ),
             "POST",
             "/dataset_sources/link",
-            tsi.DatasetSourcesLinkRes,
+            DatasetSourceLinkResponse,
             id="dataset_sources_link",
+        ),
+        pytest.param(
+            "dataset_sources_link_delete",
+            tsi.DatasetSourcesLinkDeleteReq(project_id=PROJECT, link_ids=["l1"]),
+            "POST",
+            "/dataset_sources/link_delete",
+            DatasetSourcesLinkDeleteRes,
+            id="dataset_sources_link_delete",
         ),
         pytest.param(
             "dataset_sources_query",
             tsi.DatasetSourcesQueryReq(project_id=PROJECT, dataset_object_id="ds"),
             "POST",
             "/dataset_sources/query",
-            tsi.DatasetSourcesQueryRes,
+            DatasetSourceQueryResponse,
             id="dataset_sources_query",
         ),
         pytest.param(
@@ -622,7 +825,7 @@ def test_v2_method_reaches_its_flat_route(
             ),
             "POST",
             "/dataset_sources/source_datasets_query",
-            tsi.SourceDatasetsQueryRes,
+            DatasetSourceSourceDatasetsQueryResponse,
             id="source_datasets_query",
         ),
         pytest.param(
@@ -634,7 +837,7 @@ def test_v2_method_reaches_its_flat_route(
             ),
             "POST",
             "/evaluations/evaluate_model",
-            tsi.EvaluateModelRes,
+            EvaluationEvaluateModelResponse,
             id="evaluate_model",
         ),
         pytest.param(
@@ -642,7 +845,7 @@ def test_v2_method_reaches_its_flat_route(
             tsi.EvaluationStatusReq(project_id=PROJECT, call_id="c1"),
             "POST",
             "/evaluations/status",
-            tsi.EvaluationStatusRes,
+            EvaluationStatusResponse,
             id="evaluation_status",
         ),
         pytest.param(
@@ -654,7 +857,7 @@ def test_v2_method_reaches_its_flat_route(
             ),
             "POST",
             "/evaluations/rescore",
-            tsi.RescoreRes,
+            EvaluationRescoreResponse,
             id="rescore",
         ),
         pytest.param(
@@ -666,7 +869,7 @@ def test_v2_method_reaches_its_flat_route(
             ),
             "POST",
             "/calls/score",
-            tsi.CallsScoreRes,
+            dict,
             id="calls_score",
         ),
         pytest.param(
@@ -676,7 +879,7 @@ def test_v2_method_reaches_its_flat_route(
             ),
             "POST",
             "/annotation_queues",
-            tsi.AnnotationQueueCreateRes,
+            AnnotationQueueCreateResponse,
             id="annotation_queue_create",
         ),
         pytest.param(
@@ -684,7 +887,7 @@ def test_v2_method_reaches_its_flat_route(
             tsi.AnnotationQueueReadReq(project_id=PROJECT, queue_id="q1"),
             "GET",
             "/annotation_queues/q1",
-            tsi.AnnotationQueueReadRes,
+            AnnotationQueueReadResponse,
             id="annotation_queue_read",
         ),
         pytest.param(
@@ -692,7 +895,7 @@ def test_v2_method_reaches_its_flat_route(
             tsi.AnnotationQueueItemsQueryReq(project_id=PROJECT, queue_id="q1"),
             "POST",
             "/annotation_queues/q1/items/query",
-            tsi.AnnotationQueueItemsQueryRes,
+            ItemQueryResponse,
             id="annotation_queue_items_query",
         ),
         pytest.param(
@@ -700,7 +903,7 @@ def test_v2_method_reaches_its_flat_route(
             tsi.AnnotationQueuesStatsReq(project_id=PROJECT, queue_ids=["q1"]),
             "POST",
             "/annotation_queues/stats",
-            tsi.AnnotationQueuesStatsRes,
+            AnnotationQueueStatsResponse,
             id="annotation_queues_stats",
         ),
         pytest.param(
@@ -713,7 +916,7 @@ def test_v2_method_reaches_its_flat_route(
             ),
             "PUT",
             f"{V2}/runtimes/my-runtime",
-            tsi.CustomRuntimeApplyRes,
+            V2RuntimeApplyResponse,
             id="custom_runtime_apply",
         ),
         pytest.param(
@@ -721,7 +924,7 @@ def test_v2_method_reaches_its_flat_route(
             tsi.EvalResultsQueryReq(project_id=PROJECT, evaluation_call_ids=["c1"]),
             "POST",
             f"{V2}/eval_results/query",
-            tsi.EvalResultsQueryRes,
+            V2EvalResultQueryResponse,
             id="eval_results_query",
         ),
     ],
@@ -731,7 +934,7 @@ def test_route_reaches_its_path(
     req: BaseModel,
     expected_method: str,
     expected_path: str,
-    res_type: type[BaseModel],
+    res_type: type,
 ):
     """Test that a bound method reaches its route and parses the response back."""
     mock_server = _mock_server(httpx.Response(200, json=V1_RESPONSE))
@@ -804,17 +1007,19 @@ def test_route_reaches_its_path(
         ),
     ],
 )
+@pytest.mark.parametrize("as_dict", [False, True], ids=["model", "dict"])
 def test_tag_and_alias_method_omits_wb_user_id(
     method_name: str,
     req: BaseModel,
     expected_method: str,
     expected_path: str,
     expected_body: dict,
+    as_dict: bool,
 ):
     """Test that the server-populated wb_user_id stays out of the request."""
     mock_server = _mock_server(httpx.Response(200, json={}))
 
-    getattr(mock_server.server, method_name)(req)
+    getattr(mock_server.server, method_name)(req.model_dump() if as_dict else req)
 
     assert len(mock_server.requests) == 1
     assert (mock_server.requests[0].method, mock_server.requests[0].url.path) == (
@@ -822,6 +1027,18 @@ def test_tag_and_alias_method_omits_wb_user_id(
         expected_path,
     )
     assert json.loads(mock_server.requests[0].content) == expected_body
+
+
+def test_objs_query_drops_a_query_key():
+    """A dict with a `query` key, which the route lacks, sends the model's body."""
+    mock_server = _mock_server(httpx.Response(200, json={"objs": []}))
+    req = tsi.ObjQueryReq(project_id=PROJECT)
+
+    mock_server.server.objs_query(req)
+    mock_server.server.objs_query({**req.model_dump(), "query": {"$expr": {}}})
+
+    first, second = (json.loads(r.content) for r in mock_server.requests)
+    assert first == second
 
 
 @pytest.mark.parametrize(
@@ -905,17 +1122,19 @@ def test_tag_and_alias_list_omits_wb_user_id(
         ),
     ],
 )
+@pytest.mark.parametrize("as_dict", [False, True], ids=["model", "dict"])
 def test_annotation_queue_method_omits_wb_user_id(
     method_name: str,
     req: BaseModel,
     expected_method: str,
     expected_path: str,
     expected_body: dict,
+    as_dict: bool,
 ):
     """Test that the server-populated wb_user_id stays out of the request."""
     mock_server = _mock_server(httpx.Response(200, json=V1_RESPONSE))
 
-    getattr(mock_server.server, method_name)(req)
+    getattr(mock_server.server, method_name)(req.model_dump() if as_dict else req)
 
     assert len(mock_server.requests) == 1
     assert (mock_server.requests[0].method, mock_server.requests[0].url.path) == (
@@ -1245,6 +1464,18 @@ def test_create_sends_every_supported_field(
             id="dataset_sources_link",
         ),
         pytest.param(
+            "dataset_sources_link_delete",
+            tsi.DatasetSourcesLinkDeleteReq(
+                project_id=PROJECT, link_ids=["l1", "l2"], wb_user_id="user-id"
+            ),
+            {
+                "project_id": PROJECT,
+                "link_ids": ["l1", "l2"],
+                "wb_user_id": "user-id",
+            },
+            id="dataset_sources_link_delete",
+        ),
+        pytest.param(
             "dataset_sources_query",
             tsi.DatasetSourcesQueryReq(
                 project_id=PROJECT,
@@ -1479,9 +1710,10 @@ def test_route_sends_every_supported_field(
     assert json.loads(mock_server.requests[0].content) == expected_body
 
 
+@pytest.mark.parametrize("as_dict", [False, True])
 @pytest.mark.parametrize("include_model_tool_calls", [None, False, True])
 def test_chat_tool_call_option_reaches_http(
-    include_model_tool_calls: bool | None,
+    include_model_tool_calls: bool | None, as_dict: bool
 ) -> None:
     mock_server = _mock_server(httpx.Response(200, json=V1_RESPONSE))
     trace_req = agent_types.AgentTraceChatReq(project_id=PROJECT, trace_id="t1")
@@ -1492,11 +1724,15 @@ def test_chat_tool_call_option_reaches_http(
         trace_req.include_model_tool_calls = include_model_tool_calls
         conversation_req.include_model_tool_calls = include_model_tool_calls
 
-    trace = mock_server.server.agent_traces_chat(trace_req)
-    conversation = mock_server.server.agent_conversation_chat(conversation_req)
+    trace = mock_server.server.agent_traces_chat(
+        trace_req.model_dump() if as_dict else trace_req
+    )
+    conversation = mock_server.server.agent_conversation_chat(
+        conversation_req.model_dump() if as_dict else conversation_req
+    )
 
-    assert isinstance(trace, agent_types.AgentTraceChatRes)
-    assert isinstance(conversation, agent_types.AgentConversationChatRes)
+    assert isinstance(trace, AgentTraceChatRes)
+    assert isinstance(conversation, ConversationChatResponse)
     assert [request.url.path for request in mock_server.requests] == [
         "/agents/traces/chat",
         "/agents/conversations/chat",
@@ -1601,7 +1837,37 @@ def test_call_end_reads_an_empty_response_body():
 
     assert len(mock_server.requests) == 1
     assert mock_server.requests[0].url.path == "/call/end"
-    assert res == tsi.CallEndRes()
+    assert res == {}
+
+
+@pytest.mark.parametrize("as_dict", [False, True], ids=["model", "dict"])
+def test_calls_complete_sends_the_batch_to_the_v2_route(as_dict):
+    """Test that calls_complete posts the whole batch to the project's v2 route."""
+    mock_server = _mock_server(httpx.Response(200, json={}))
+    req = tsi.CallsUpsertCompleteReq(
+        batch=[
+            tsi.CompletedCallSchemaForInsert(
+                project_id=PROJECT,
+                id="call-id",
+                trace_id="trace-id",
+                op_name="my-op",
+                started_at=START,
+                ended_at=END,
+                attributes={},
+                inputs={"x": 1},
+                output={"y": 2},
+                summary={},
+            )
+        ]
+    )
+
+    res = mock_server.server.calls_complete(req.model_dump() if as_dict else req)
+
+    assert [(r.method, r.url.path) for r in mock_server.requests] == [
+        ("POST", f"{V2}/calls/complete")
+    ]
+    assert json.loads(mock_server.requests[0].content) == req.model_dump(mode="json")
+    assert res == {}
 
 
 def test_call_start_batch_reads_the_response_list():
@@ -1624,10 +1890,679 @@ def test_call_start_batch_reads_the_response_list():
 
     assert len(mock_server.requests) == 1
     assert mock_server.requests[0].url.path == "/call/upsert_batch"
-    assert res.res == [
-        tsi.CallStartRes(id="call-id", trace_id="trace-id"),
-        tsi.CallEndRes(),
+    assert isinstance(res, CallUpsertBatchResponse)
+    assert res.res == [ReCallStartRes(id="call-id", trace_id="trace-id"), {}]
+
+
+def _strip(hint: Any) -> tuple[Any, list[Any]]:
+    """Drop `Required`, `NotRequired` and `Annotated`; return the type and metadata."""
+    metadata: list[Any] = []
+    while typing_extensions.get_origin(hint) in {
+        typing_extensions.Required,
+        typing_extensions.NotRequired,
+        typing_extensions.Annotated,
+    }:
+        if typing_extensions.get_origin(hint) is typing_extensions.Annotated:
+            metadata.extend(hint.__metadata__)
+        hint = typing_extensions.get_args(hint)[0]
+    return hint, metadata
+
+
+def _typed_dicts(hint: Any) -> list[type]:
+    """The TypedDicts a value of type `hint` can be, in declaration order."""
+    hint, _ = _strip(hint)
+    if typing_extensions.get_origin(hint) in {typing.Union, types.UnionType}:
+        return [
+            t for arg in typing_extensions.get_args(hint) for t in _typed_dicts(arg)
+        ]
+    return [hint] if typing_extensions.is_typeddict(hint) else []
+
+
+def _sentinel_params(typed_dict: type, here: str = "") -> dict[str, Any]:
+    """A value for every key of `typed_dict`, each naming its own place on the wire.
+
+    Nested TypedDicts, and lists of them, are filled the same way; every other
+    value is the string `<path>`, which the generated client sends unchanged.
+    """
+    params: dict[str, Any] = {}
+    hints = typing_extensions.get_type_hints(typed_dict, include_extras=True)
+    for key, hint in hints.items():
+        stripped, metadata = _strip(hint)
+        wire_key = next((m.alias for m in metadata if getattr(m, "alias", None)), key)
+        path = f"{here}.{wire_key}" if here else wire_key
+        origin = typing_extensions.get_origin(stripped)
+        if origin in {list, collections.abc.Iterable, collections.abc.Sequence}:
+            members = _typed_dicts(typing_extensions.get_args(stripped)[0])
+            params[key] = (
+                [_sentinel_params(t, f"{path}[{i}]") for i, t in enumerate(members)]
+                if members
+                else f"<{path}>"
+            )
+        elif members := _typed_dicts(stripped):
+            params[key] = _sentinel_params(members[0], path)
+        else:
+            params[key] = f"<{path}>"
+    return params
+
+
+def _leaves(value: Any, here: str = "") -> Iterator[tuple[str, Any]]:
+    if isinstance(value, dict):
+        for key, item in value.items():
+            yield from _leaves(item, f"{here}.{key}" if here else key)
+    elif isinstance(value, list):
+        for i, item in enumerate(value):
+            yield from _leaves(item, f"{here}[{i}]")
+    else:
+        yield here, value
+
+
+@pytest.mark.parametrize(
+    ("method_name", "params_type", "expected_method", "expected_path"),
+    [
+        pytest.param("call_start", CallStartParams, "POST", "/call/start"),
+        pytest.param("call_end", CallEndParams, "POST", "/call/end"),
+        pytest.param(
+            "call_start_batch", CallUpsertBatchParams, "POST", "/call/upsert_batch"
+        ),
+        pytest.param("call_update", CallUpdateParams, "POST", "/call/update"),
+        pytest.param("calls_delete", CallDeleteParams, "POST", "/calls/delete"),
+        pytest.param("call_read", CallReadParams, "POST", "/call/read"),
+        pytest.param(
+            "calls_query", CallStreamQueryParams, "POST", "/calls/stream_query"
+        ),
+        pytest.param(
+            "calls_query_stream",
+            CallStreamQueryParams,
+            "POST",
+            "/calls/stream_query",
+        ),
+        pytest.param(
+            "calls_query_stats", CallQueryStatsParams, "POST", "/calls/query_stats"
+        ),
+        pytest.param("call_stats", CallStatsParams, "POST", "/calls/stats"),
+        pytest.param("trace_usage", TraceUsageParams, "POST", "/trace/usage"),
+        pytest.param("calls_usage", CallUsageParams, "POST", "/calls/usage"),
+        pytest.param(
+            "threads_query_stream",
+            ThreadStreamQueryParams,
+            "POST",
+            "/threads/stream_query",
+        ),
+        pytest.param("feedback_query", FeedbackQueryParams, "POST", "/feedback/query"),
+        pytest.param("feedback_purge", FeedbackPurgeParams, "POST", "/feedback/purge"),
+        pytest.param(
+            "feedback_replace", FeedbackReplaceParams, "POST", "/feedback/replace"
+        ),
+        pytest.param("feedback_stats", FeedbackStatsParams, "POST", "/feedback/stats"),
+        pytest.param(
+            "feedback_aggregate", FeedbackAggregateParams, "POST", "/feedback/aggregate"
+        ),
+        pytest.param(
+            "feedback_payload_schema",
+            FeedbackPayloadSchemaParams,
+            "POST",
+            "/feedback/payload_schema",
+        ),
+        pytest.param("cost_query", CostQueryParams, "POST", "/cost/query"),
+        pytest.param("cost_create", CostCreateParams, "POST", "/cost/create"),
+        pytest.param("cost_purge", CostPurgeParams, "POST", "/cost/purge"),
+        pytest.param(
+            "completions_create", CompletionCreateParams, "POST", "/completions/create"
+        ),
+        pytest.param("image_create", ImageCreateParams, "POST", "/image/create"),
+        pytest.param("project_stats", ProjectStatsParams, "POST", "/project/stats"),
+        pytest.param(
+            "project_ttl_settings_read",
+            TtlSettingReadParams,
+            "POST",
+            "/project/ttl_settings/read",
+        ),
+        pytest.param(
+            "project_ttl_settings_update",
+            TtlSettingUpdateParams,
+            "POST",
+            "/project/ttl_settings/update",
+        ),
+        pytest.param(
+            "dataset_sources_link",
+            DatasetSourceLinkParams,
+            "POST",
+            "/dataset_sources/link",
+        ),
+        pytest.param(
+            "dataset_sources_query",
+            DatasetSourceQueryParams,
+            "POST",
+            "/dataset_sources/query",
+        ),
+        pytest.param(
+            "source_datasets_query",
+            DatasetSourceSourceDatasetsQueryParams,
+            "POST",
+            "/dataset_sources/source_datasets_query",
+        ),
+        pytest.param(
+            "annotation_queue_create",
+            AnnotationQueueCreateParams,
+            "POST",
+            "/annotation_queues",
+        ),
+        pytest.param(
+            "annotation_queues_stats",
+            AnnotationQueueStatsParams,
+            "POST",
+            "/annotation_queues/stats",
+        ),
+        pytest.param(
+            "evaluate_model",
+            EvaluationEvaluateModelParams,
+            "POST",
+            "/evaluations/evaluate_model",
+        ),
+        pytest.param(
+            "evaluation_status", EvaluationStatusParams, "POST", "/evaluations/status"
+        ),
+        pytest.param(
+            "rescore", EvaluationRescoreParams, "POST", "/evaluations/rescore"
+        ),
+        pytest.param("calls_score", CallScoreParams, "POST", "/calls/score"),
+        pytest.param(
+            "projects_info",
+            ServiceProjectsInfoParams,
+            "POST",
+            "/service/projects_info",
+        ),
+        pytest.param(
+            "agent_spans_query", SpanQueryParams, "POST", "/agents/spans/query"
+        ),
+        pytest.param(
+            "agent_traces_chat", TraceChatParams, "POST", "/agents/traces/chat"
+        ),
+        pytest.param(
+            "agent_conversation_chat",
+            ConversationChatParams,
+            "POST",
+            "/agents/conversations/chat",
+        ),
+        pytest.param(
+            "agent_conversation_spans",
+            ConversationSpansParams,
+            "POST",
+            "/agents/conversations/spans",
+        ),
+        pytest.param("agent_agents_query", AgentQueryParams, "POST", "/agents/query"),
+        pytest.param(
+            "agent_versions_query",
+            AgentVersionQueryParams,
+            "POST",
+            "/agents/agent-versions/query",
+        ),
+        pytest.param(
+            "agent_spans_stats", SpanStatsParams, "POST", "/agents/spans/stats"
+        ),
+        pytest.param(
+            "agent_custom_attrs_schema",
+            SpanCustomAttrsSchemaParams,
+            "POST",
+            "/agents/spans/custom-attrs/schema",
+        ),
+        pytest.param("agent_search", AgentSearchParams, "POST", "/agents/search"),
+        pytest.param("obj_create", ObjectCreateParams, "POST", "/obj/create"),
+        pytest.param("obj_read", ObjectReadParams, "POST", "/obj/read"),
+        pytest.param("objs_query", ObjectQueryParams, "POST", "/objs/query"),
+        pytest.param("obj_delete", ObjectDeleteParams, "POST", "/obj/delete"),
+        pytest.param(
+            "obj_add_tags",
+            ObjAddTagsParams,
+            "PUT",
+            "/objs/<object_id>/versions/<digest>/tags",
+        ),
+        pytest.param(
+            "obj_remove_tags",
+            ObjRemoveTagsParams,
+            "POST",
+            "/objs/<object_id>/versions/<digest>/tags/remove",
+        ),
+        pytest.param(
+            "obj_set_aliases", ObjSetAliasesParams, "PUT", "/objs/<object_id>/aliases"
+        ),
+        pytest.param(
+            "obj_remove_aliases",
+            ObjRemoveAliasesParams,
+            "POST",
+            "/objs/<object_id>/aliases/remove",
+        ),
+        pytest.param("tags_list", TagListParams, "GET", "/tags"),
+        pytest.param("aliases_list", AliasListParams, "GET", "/aliases"),
+        pytest.param("table_create", TableCreateParams, "POST", "/table/create"),
+        pytest.param("table_update", TableUpdateParams, "POST", "/table/update"),
+        pytest.param("table_query", TableQueryParams, "POST", "/table/query"),
+        pytest.param(
+            "table_query_stats", TableQueryStatsParams, "POST", "/table/query_stats"
+        ),
+        pytest.param(
+            "table_query_stats_batch",
+            TableQueryStatsBatchParams,
+            "POST",
+            "/table/query_stats_batch",
+        ),
+        pytest.param(
+            "table_create_from_digests",
+            TableCreateFromDigestsParams,
+            "POST",
+            "/table/create_from_digests",
+        ),
+        pytest.param("refs_read_batch", RefReadBatchParams, "POST", "/refs/read_batch"),
+        pytest.param("file_content_read", FileContentParams, "POST", "/file/content"),
+        pytest.param("files_stats", FileStatsParams, "POST", "/files/query_stats"),
+    ],
+)
+def test_every_params_key_reaches_the_request(
+    method_name: str,
+    params_type: type,
+    expected_method: str,
+    expected_path: str,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    """A binding method given the generated client's params must lose no key."""
+    # The sentinel values are strings in every field, so skip request validation.
+    for name in ("validate_call_start", "validate_call_end"):
+        monkeypatch.setattr(stainless_binding, name, lambda req: None)
+    mock_server = _mock_server(
+        httpx.Response(
+            200, json={"id": "c1", "trace_id": "t1", "num_deleted": 0, "res": []}
+        )
+    )
+    params = _sentinel_params(params_type)
+
+    res = getattr(mock_server.server, method_name)(params)
+    if isinstance(res, Iterator):
+        list(res)
+
+    assert len(mock_server.requests) == 1
+    request = mock_server.requests[0]
+    assert (request.method, request.url.path) == (expected_method, expected_path)
+    body = dict(_leaves(json.loads(request.content) if request.content else {}))
+    # A header parameter (the stream's `accept`) joins the generated default.
+    headers = [v for h in request.headers.values() for v in h.split(", ")]
+    sent = sorted(
+        [
+            *body.values(),
+            *request.url.params.values(),
+            *request.url.path.split("/"),
+            *headers,
+        ]
+    )
+    assert [s for s in sent if s.startswith("<")] == sorted(
+        value for _, value in _leaves(params)
+    )
+    # Each value sits under the key path it names.
+    assert all(value == f"<{path}>" for path, value in body.items())
+
+
+@pytest.mark.parametrize(
+    ("method_name", "params", "expected_method", "expected_path"),
+    [
+        pytest.param(
+            "annotation_queue_read",
+            {**_sentinel_params(AnnotationQueueReadParams), "queue_id": "<queue_id>"},
+            "GET",
+            "/annotation_queues/<queue_id>",
+            id="annotation_queue_read",
+        ),
+        pytest.param(
+            "annotation_queue_delete",
+            {**_sentinel_params(AnnotationQueueDeleteParams), "queue_id": "<queue_id>"},
+            "DELETE",
+            "/annotation_queues/<queue_id>",
+            id="annotation_queue_delete",
+        ),
+        pytest.param(
+            "annotation_queue_update",
+            {**_sentinel_params(AnnotationQueueUpdateParams), "queue_id": "<queue_id>"},
+            "PUT",
+            "/annotation_queues/<queue_id>",
+            id="annotation_queue_update",
+        ),
+        pytest.param(
+            "annotation_queue_add_calls",
+            {**_sentinel_params(ItemAddParams), "queue_id": "<queue_id>"},
+            "POST",
+            "/annotation_queues/<queue_id>/items",
+            id="annotation_queue_add_calls",
+        ),
+        pytest.param(
+            "annotation_queue_items_query",
+            {**_sentinel_params(ItemQueryParams), "queue_id": "<queue_id>"},
+            "POST",
+            "/annotation_queues/<queue_id>/items/query",
+            id="annotation_queue_items_query",
+        ),
+        pytest.param(
+            "annotator_queue_items_progress_update",
+            {**_sentinel_params(ItemUpdateProgressParams), "item_id": "<item_id>"},
+            "POST",
+            "/annotation_queues/<queue_id>/items/<item_id>/progress",
+            id="annotator_queue_items_progress_update",
+        ),
+        pytest.param(
+            "annotation_queues_query_stream",
+            _sentinel_params(AnnotationQueueQueryParams),
+            "POST",
+            "/annotation_queues/query",
+            id="annotation_queues_query_stream",
+        ),
+        pytest.param(
+            "completions_create_stream",
+            _sentinel_params(CompletionCreateStreamParams),
+            "POST",
+            "/completions/create_stream",
+            id="completions_create_stream",
+        ),
+    ],
+)
+def test_every_key_of_a_path_or_stream_request_reaches_it(
+    method_name: str, params: dict[str, Any], expected_method: str, expected_path: str
+):
+    """Path parameters, which the params TypedDict leaves out, and streams lose no key."""
+    mock_server = _mock_server(httpx.Response(200, json=V1_RESPONSE))
+
+    res = getattr(mock_server.server, method_name)(params)
+    if inspect.isgenerator(res):
+        list(res)
+
+    assert len(mock_server.requests) == 1
+    request = mock_server.requests[0]
+    assert (request.method, request.url.path) == (expected_method, expected_path)
+    body = dict(_leaves(json.loads(request.content))) if request.content else {}
+    sent = sorted(
+        [*body.values(), *request.url.params.values(), *request.url.path.split("/")]
+    )
+    assert [s for s in sent if s.startswith("<")] == sorted(
+        value for _, value in _leaves(params)
+    )
+    assert all(value == f"<{path}>" for path, value in body.items())
+
+
+def test_custom_runtime_apply_sends_every_key():
+    """The project id and runtime name make the path; every other key is the body."""
+    mock_server = _mock_server(httpx.Response(200, json=V1_RESPONSE))
+    body = _sentinel_params(V2RuntimeApplyParams)
+    entity, project = body.pop("entity"), body.pop("project")
+
+    mock_server.server.custom_runtime_apply(
+        {"project_id": f"{entity}/{project}", "runtime_name": "<runtime_name>", **body}
+    )
+
+    assert len(mock_server.requests) == 1
+    request = mock_server.requests[0]
+    assert (request.method, request.url.path) == (
+        "PUT",
+        "/v2/<entity>/<project>/runtimes/<runtime_name>",
+    )
+    assert json.loads(request.content) == body
+
+
+@pytest.mark.parametrize(
+    ("method_name", "params_type", "expected_path"),
+    [
+        pytest.param(
+            "feedback_create",
+            FeedbackCreateParams,
+            "/feedback/create",
+            id="feedback_create",
+        ),
+        pytest.param(
+            "feedback_create_batch",
+            FeedbackBatchCreateParams,
+            "/feedback/batch/create",
+            id="feedback_create_batch",
+        ),
+    ],
+)
+def test_feedback_create_sends_every_key(
+    method_name: str, params_type: type, expected_path: str
+):
+    """Feedback creation sends every key it is given, the feedback id included."""
+    mock_server = _mock_server(httpx.Response(200, json=V1_RESPONSE))
+    params = _sentinel_params(params_type)
+
+    getattr(mock_server.server, method_name)(params)
+
+    assert len(mock_server.requests) == 1
+    request = mock_server.requests[0]
+    assert (request.method, request.url.path) == ("POST", expected_path)
+    body = dict(_leaves(json.loads(request.content)))
+    assert sorted(body.values()) == sorted(value for _, value in _leaves(params))
+    assert all(value == f"<{path}>" for path, value in body.items())
+
+
+@pytest.mark.parametrize(
+    ("method_name", "generated_method", "params_type"),
+    [
+        pytest.param("op_create", "v2_ops.create", V2OpCreateParams),
+        pytest.param("op_read", "v2_ops.read", None),
+        pytest.param("op_list", "v2_ops.list", V2OpListParams),
+        pytest.param("op_delete", "v2_ops.delete", V2OpDeleteParams),
+        pytest.param("dataset_create", "v2_datasets.create", V2DatasetCreateParams),
+        pytest.param("dataset_read", "v2_datasets.read", None),
+        pytest.param("dataset_list", "v2_datasets.list", V2DatasetListParams),
+        pytest.param("dataset_delete", "v2_datasets.delete", V2DatasetDeleteParams),
+        pytest.param("scorer_create", "v2_scorers.create", V2ScorerCreateParams),
+        pytest.param("scorer_read", "v2_scorers.read", None),
+        pytest.param("scorer_list", "v2_scorers.list", V2ScorerListParams),
+        pytest.param("scorer_delete", "v2_scorers.delete", V2ScorerDeleteParams),
+        pytest.param(
+            "evaluation_create", "v2_evaluations.create", V2EvaluationCreateParams
+        ),
+        pytest.param("evaluation_read", "v2_evaluations.read", None),
+        pytest.param("evaluation_list", "v2_evaluations.list", V2EvaluationListParams),
+        pytest.param(
+            "evaluation_delete", "v2_evaluations.delete", V2EvaluationDeleteParams
+        ),
+        pytest.param("model_create", "v2_models.create", V2ModelCreateParams),
+        pytest.param("model_read", "v2_models.read", None),
+        pytest.param("model_list", "v2_models.list", V2ModelListParams),
+        pytest.param("model_delete", "v2_models.delete", V2ModelDeleteParams),
+        pytest.param(
+            "evaluation_run_create",
+            "v2_evaluation_runs.create",
+            V2EvaluationRunCreateParams,
+        ),
+        pytest.param("evaluation_run_read", "v2_evaluation_runs.read", None),
+        pytest.param(
+            "evaluation_run_list", "v2_evaluation_runs.list", V2EvaluationRunListParams
+        ),
+        pytest.param(
+            "evaluation_run_delete",
+            "v2_evaluation_runs.delete",
+            V2EvaluationRunDeleteParams,
+        ),
+        pytest.param(
+            "evaluation_run_finish",
+            "v2_evaluation_runs.finish",
+            V2EvaluationRunFinishParams,
+        ),
+        pytest.param(
+            "prediction_create", "v2_predictions.create", V2PredictionCreateParams
+        ),
+        pytest.param("prediction_read", "v2_predictions.read", None),
+        pytest.param("prediction_list", "v2_predictions.list", V2PredictionListParams),
+        pytest.param(
+            "prediction_delete", "v2_predictions.delete", V2PredictionDeleteParams
+        ),
+        pytest.param("prediction_finish", "v2_predictions.finish", None),
+        pytest.param("score_create", "v2_scores.create", V2ScoreCreateParams),
+        pytest.param("score_read", "v2_scores.read", None),
+        pytest.param("score_list", "v2_scores.list", V2ScoreListParams),
+        pytest.param("score_delete", "v2_scores.delete", V2ScoreDeleteParams),
+        pytest.param(
+            "eval_results_query", "v2_eval_results.query", V2EvalResultQueryParams
+        ),
+    ],
+)
+def test_every_v2_argument_reaches_the_request(
+    method_name: str, generated_method: str, params_type: type | None
+):
+    """A v2 binding method must pass on every argument of its generated method.
+
+    The binding takes the project as `project_id`, which fills the route's
+    `entity` and `project` path parameters.
+    """
+    mock_server = _mock_server(httpx.Response(200, json=V2_RESPONSE))
+    generated = operator.attrgetter(generated_method)(
+        mock_server.server._stainless_client
+    )
+    typed = _sentinel_params(params_type) if params_type is not None else {}
+    arguments = {
+        name: typed.get(name, f"<{name}>")
+        for name in inspect.signature(generated).parameters
+        if name not in {"extra_headers", "extra_query", "extra_body", "timeout"}
+    }
+    req = {
+        "project_id": f"{arguments.pop('entity')}/{arguments.pop('project')}",
+        **arguments,
+    }
+
+    res = getattr(mock_server.server, method_name)(req)
+    if inspect.isgenerator(res):
+        list(res)
+
+    assert len(mock_server.requests) == 1
+    request = mock_server.requests[0]
+    body = dict(_leaves(json.loads(request.content))) if request.content else {}
+    sent = sorted(
+        [*body.values(), *request.url.params.values(), *request.url.path.split("/")]
+    )
+    assert [s for s in sent if s.startswith("<")] == sorted(
+        ["<entity>", "<project>", *(value for _, value in _leaves(arguments))]
+    )
+    # Each body value sits under the key path it names.
+    assert all(value == f"<{path}>" for path, value in body.items())
+
+
+def test_evaluation_run_list_sends_the_filter_as_query_params():
+    """Test that each filter field of a request model becomes its own query param."""
+    mock_server = _mock_server(
+        httpx.Response(200, content=b"", headers={"content-type": "application/jsonl"})
+    )
+
+    res = mock_server.server.evaluation_run_list(
+        tsi.EvaluationRunListReq(
+            project_id=PROJECT,
+            filter=tsi.EvaluationRunFilter(
+                evaluations=["ev-ref"], models=["m1", "m2"], evaluation_run_ids=["r1"]
+            ),
+            limit=10,
+        )
+    )
+
+    assert list(res) == []
+    assert len(mock_server.requests) == 1
+    assert mock_server.requests[0].url.path == f"{V2}/evaluation_runs"
+    assert mock_server.requests[0].url.params.multi_items() == [
+        ("evaluation_run_ids", "r1"),
+        ("evaluations", "ev-ref"),
+        ("limit", "10"),
+        ("models", "m1"),
+        ("models", "m2"),
     ]
+
+
+@pytest.mark.parametrize("should_batch", [False, True])
+def test_call_records_written_from_models_replay(should_batch: bool, monkeypatch):
+    """A WAL record holds a request model's JSON dump; replaying sends it."""
+    monkeypatch.setenv("WEAVE_USE_CALLS_COMPLETE", "true")
+    requests: list[httpx.Request] = []
+
+    def handle(request: httpx.Request) -> httpx.Response:
+        requests.append(request)
+        return httpx.Response(200, json={"id": "call-id", "trace_id": "test_trace_id"})
+
+    server = StainlessRemoteHTTPTraceServer(BASE_URL, should_batch=should_batch)
+    server._stainless_client = StainlessClient(
+        base_url=BASE_URL,
+        username="",
+        password="",
+        http_client=httpx.Client(transport=httpx.MockTransport(handle)),
+    )
+    start, end = generate_call_start_end_pair(id="call-id", project_id=PROJECT)
+    records = [
+        {"type": "call_start", "req": start.model_dump(mode="json")},
+        {"type": "call_end", "req": end.model_dump(mode="json")},
+    ]
+
+    handlers = build_trace_server_handlers(server)
+    for record in records:
+        handlers[record["type"]](record)
+    if server.call_processor is not None:
+        server.call_processor.stop_accepting_new_work_and_flush_queue()
+
+    sent = [(r.url.path, json.loads(r.content)) for r in requests]
+    if not should_batch:
+        assert sent == [
+            ("/call/start", records[0]["req"]),
+            ("/call/end", records[1]["req"]),
+        ]
+    else:
+        paired = tsi.CompletedCallSchemaForInsert(
+            project_id=PROJECT,
+            id="call-id",
+            trace_id=start.start.trace_id,
+            op_name=start.start.op_name,
+            parent_id=start.start.parent_id,
+            started_at=start.start.started_at,
+            attributes=start.start.attributes,
+            inputs=start.start.inputs,
+            ended_at=end.end.ended_at,
+            summary=end.end.summary,
+        )
+        assert sent == [
+            (
+                f"{V2}/calls/complete",
+                tsi.CallsUpsertCompleteReq(batch=[paired]).model_dump(mode="json"),
+            )
+        ]
+
+
+def _sent(request: httpx.Request) -> tuple[str, str, bytes]:
+    """A request's method, path and body, with any multipart boundary made fixed."""
+    body = request.read()
+    content_type = request.headers.get("content-type", "")
+    if "boundary=" in content_type:
+        body = body.replace(content_type.split("boundary=")[1].encode(), b"BOUNDARY")
+    return request.method, request.url.path, body
+
+
+def test_object_records_written_from_models_replay():
+    """WAL records hold a request model's JSON dump; replaying sends what the model did."""
+    models: dict[str, BaseModel] = {
+        "obj_create": tsi.ObjCreateReq(
+            obj=tsi.ObjSchemaForInsert(
+                project_id=PROJECT, object_id="o", val={"a": [1, "b", None]}
+            )
+        ),
+        "table_create": tsi.TableCreateReq(
+            table=tsi.TableSchemaForInsert(project_id=PROJECT, rows=[{"x": 1.5}])
+        ),
+        "file_create": tsi.FileCreateReq(
+            project_id=PROJECT,
+            name="f.txt",
+            content="café".encode(),
+            expected_digest="d",
+        ),
+    }
+    direct = _mock_server(httpx.Response(200, json={"digest": "d"}))
+    for method_name, req in models.items():
+        getattr(direct.server, method_name)(req)
+
+    replayed = _mock_server(httpx.Response(200, json={"digest": "d"}))
+    handlers = build_trace_server_handlers(replayed.server)
+    for record_type, req in models.items():
+        handlers[record_type]({"type": record_type, "req": req.model_dump(mode="json")})
+
+    assert len(direct.requests) == 3
+    assert [_sent(r) for r in replayed.requests] == [_sent(r) for r in direct.requests]
 
 
 @pytest.mark.parametrize(
@@ -1660,7 +2595,7 @@ def test_call_start_batch_reads_the_response_list():
                 },
             ],
             [
-                tsi.ThreadSchema(
+                ThreadStreamQueryResponse(
                     thread_id="t1",
                     turn_count=1,
                     start_time="2026-08-20T00:00:00Z",
@@ -1670,7 +2605,7 @@ def test_call_start_batch_reads_the_response_list():
                     p50_turn_duration_ms=None,
                     p99_turn_duration_ms=None,
                 ),
-                tsi.ThreadSchema(
+                ThreadStreamQueryResponse(
                     thread_id="t2",
                     turn_count=2,
                     start_time="2026-08-20T00:00:00Z",
@@ -1704,14 +2639,14 @@ def test_call_start_batch_reads_the_response_list():
                 },
             ],
             [
-                tsi.OpReadRes(
+                V2OpListResponse(
                     object_id="op-1",
                     digest="d1",
                     version_index=0,
                     created_at="2026-08-20T00:00:00Z",
                     code="def f(): pass",
                 ),
-                tsi.OpReadRes(
+                V2OpListResponse(
                     object_id="op-2",
                     digest="d2",
                     version_index=1,
@@ -1744,7 +2679,7 @@ def test_call_start_batch_reads_the_response_list():
                 },
             ],
             [
-                tsi.DatasetReadRes(
+                V2DatasetListResponse(
                     object_id="ds-1",
                     digest="d1",
                     version_index=0,
@@ -1752,7 +2687,7 @@ def test_call_start_batch_reads_the_response_list():
                     name="ds-1",
                     rows="weave:///entity/project/table/abc123",
                 ),
-                tsi.DatasetReadRes(
+                V2DatasetListResponse(
                     object_id="ds-2",
                     digest="d2",
                     version_index=1,
@@ -1786,7 +2721,7 @@ def test_call_start_batch_reads_the_response_list():
                 },
             ],
             [
-                tsi.ScorerReadRes(
+                V2ScorerListResponse(
                     object_id="s-1",
                     digest="d1",
                     version_index=0,
@@ -1794,7 +2729,7 @@ def test_call_start_batch_reads_the_response_list():
                     name="s-1",
                     score_op="weave:///entity/project/op/s:abc123",
                 ),
-                tsi.ScorerReadRes(
+                V2ScorerListResponse(
                     object_id="s-2",
                     digest="d2",
                     version_index=1,
@@ -1832,7 +2767,7 @@ def test_call_start_batch_reads_the_response_list():
                 },
             ],
             [
-                tsi.EvaluationReadRes(
+                V2EvaluationListResponse(
                     object_id="ev-1",
                     digest="d1",
                     version_index=0,
@@ -1842,7 +2777,7 @@ def test_call_start_batch_reads_the_response_list():
                     scorers=[],
                     trials=1,
                 ),
-                tsi.EvaluationReadRes(
+                V2EvaluationListResponse(
                     object_id="ev-2",
                     digest="d2",
                     version_index=1,
@@ -1878,7 +2813,7 @@ def test_call_start_batch_reads_the_response_list():
                 },
             ],
             [
-                tsi.ModelReadRes(
+                V2ModelListResponse(
                     object_id="m-1",
                     digest="d1",
                     version_index=0,
@@ -1886,7 +2821,7 @@ def test_call_start_batch_reads_the_response_list():
                     name="m-1",
                     source_code="def f(): pass",
                 ),
-                tsi.ModelReadRes(
+                V2ModelListResponse(
                     object_id="m-2",
                     digest="d2",
                     version_index=1,
@@ -1906,10 +2841,10 @@ def test_call_start_batch_reads_the_response_list():
                 {"evaluation_run_id": "r2", "evaluation": "ev-ref", "model": "m-ref"},
             ],
             [
-                tsi.EvaluationRunReadRes(
+                V2EvaluationRunListResponse(
                     evaluation_run_id="r1", evaluation="ev-ref", model="m-ref"
                 ),
-                tsi.EvaluationRunReadRes(
+                V2EvaluationRunListResponse(
                     evaluation_run_id="r2", evaluation="ev-ref", model="m-ref"
                 ),
             ],
@@ -1924,10 +2859,10 @@ def test_call_start_batch_reads_the_response_list():
                 {"prediction_id": "p2", "model": "m-ref", "inputs": {}, "output": None},
             ],
             [
-                tsi.PredictionReadRes(
+                V2PredictionListResponse(
                     prediction_id="p1", model="m-ref", inputs={}, output=None
                 ),
-                tsi.PredictionReadRes(
+                V2PredictionListResponse(
                     prediction_id="p2", model="m-ref", inputs={}, output=None
                 ),
             ],
@@ -1942,8 +2877,8 @@ def test_call_start_batch_reads_the_response_list():
                 {"score_id": "s2", "scorer": "s-ref", "value": 2},
             ],
             [
-                tsi.ScoreReadRes(score_id="s1", scorer="s-ref", value=1),
-                tsi.ScoreReadRes(score_id="s2", scorer="s-ref", value=2),
+                V2ScoreListResponse(score_id="s1", scorer="s-ref", value=1),
+                V2ScoreListResponse(score_id="s2", scorer="s-ref", value=2),
             ],
             id="score_list",
         ),
@@ -1953,8 +2888,8 @@ def test_call_start_batch_reads_the_response_list():
             "/annotation_queues/query",
             [QUEUE, {**QUEUE, "id": "q2"}],
             [
-                tsi.AnnotationQueueSchema.model_validate(QUEUE),
-                tsi.AnnotationQueueSchema.model_validate({**QUEUE, "id": "q2"}),
+                AnnotationQueueSchema.construct(**QUEUE),
+                AnnotationQueueSchema.construct(**{**QUEUE, "id": "q2"}),
             ],
             id="annotation_queues_query_stream",
         ),
@@ -1983,6 +2918,26 @@ def test_typed_stream_reads_one_item_per_line(
     assert res == expected
 
 
+def test_dataset_sources_link_delete_reads_the_entries():
+    mock_server = _mock_server(
+        httpx.Response(200, json={"entries": [{"link_id": "l1", "deleted": True}]})
+    )
+
+    res = mock_server.server.dataset_sources_link_delete(
+        {"project_id": PROJECT, "link_ids": ["l1"]}
+    )
+
+    assert [(r.method, r.url.path) for r in mock_server.requests] == [
+        ("POST", "/dataset_sources/link_delete")
+    ]
+    assert json.loads(mock_server.requests[0].content) == {
+        "project_id": PROJECT,
+        "link_ids": ["l1"],
+    }
+    assert res.entries[0].link_id == "l1"
+    assert res.entries[0].deleted is True
+
+
 def test_file_content_read_keeps_bytes():
     """Test that a non-text file comes back as the bytes the server sent."""
     content = b"\x89PNG\r\n\x1a\n\xff\xfe"
@@ -1999,6 +2954,170 @@ def test_file_content_read_keeps_bytes():
     assert len(mock_server.requests) == 1
     assert mock_server.requests[0].url.path == "/file/content"
     assert res.content == content
+
+
+@dataclass
+class _Payload:
+    n: int
+
+
+def _table_update_response() -> httpx.Response:
+    return httpx.Response(200, json={"digest": "d", "updated_row_digests": ["r"]})
+
+
+def test_table_update_sends_a_generator_of_updates():
+    """Updates read once for the size estimate still reach the request."""
+    mock_server = _mock_server(_table_update_response())
+
+    mock_server.server.table_update(
+        {
+            "project_id": PROJECT,
+            "base_digest": "b",
+            "updates": (u for u in [{"append": {"row": {"x": 1}}}]),
+        }
+    )
+
+    assert len(mock_server.requests) == 1
+    body = json.loads(mock_server.requests[0].content)
+    assert body["updates"] == [{"append": {"row": {"x": 1}}}]
+
+
+def test_table_update_splits_a_generator_of_updates():
+    """A large request built from a generator is split without losing updates."""
+    mock_server = _mock_server(_table_update_response())
+    mock_server.server.remote_request_bytes_limit = 10
+
+    res = mock_server.server.table_update(
+        {
+            "project_id": PROJECT,
+            "base_digest": "b",
+            "updates": (u for u in [{"append": {"row": {"x": i}}} for i in range(4)]),
+        }
+    )
+
+    sent = [json.loads(r.content)["updates"] for r in mock_server.requests]
+    assert sent == [[{"append": {"row": {"x": i}}}] for i in range(4)]
+    assert res.updated_row_digests == ["r"] * 4
+
+
+def test_table_update_sends_a_dataclass_row_as_a_dict():
+    """A row holding a dataclass encodes the way the request model encoded it."""
+    mock_server = _mock_server(_table_update_response())
+
+    mock_server.server.table_update(
+        {
+            "project_id": PROJECT,
+            "base_digest": "b",
+            "updates": [{"append": {"row": {"nested": _Payload(1)}}}],
+        }
+    )
+
+    body = json.loads(mock_server.requests[0].content)
+    assert body["updates"] == [{"append": {"row": {"nested": {"n": 1}}}}]
+
+
+def test_table_create_sends_a_dataclass_row_as_a_dict():
+    """A row holding a dataclass encodes the way the request model encoded it."""
+    mock_server = _mock_server(httpx.Response(200, json={"digest": "d"}))
+
+    mock_server.server.table_create(
+        {"table": {"project_id": PROJECT, "rows": [{"nested": _Payload(1)}]}}
+    )
+
+    body = json.loads(mock_server.requests[0].content)
+    assert body["table"]["rows"] == [{"nested": {"n": 1}}]
+
+
+def test_obj_create_sends_a_dataclass_value_as_a_dict():
+    """An object value holding a dataclass encodes the way the request model encoded it."""
+    mock_server = _mock_server(httpx.Response(200, json={"digest": "d"}))
+
+    mock_server.server.obj_create(
+        {
+            "obj": {
+                "project_id": PROJECT,
+                "object_id": "o",
+                "val": {"nested": _Payload(1)},
+            }
+        }
+    )
+
+    body = json.loads(mock_server.requests[0].content)
+    assert body["obj"]["val"] == {"nested": {"n": 1}}
+
+
+_NON_STR_KEYS = {None: "first", "None": "second", True: "t"}
+_JSON_KEYS = {"null": "first", "None": "second", "true": "t"}
+
+
+def test_obj_create_sends_dict_keys_the_way_the_digest_reads_them():
+    """A non-str key goes out as json.dumps writes it, so the digest still matches."""
+    mock_server = _mock_server(httpx.Response(200, json={"digest": "d"}))
+
+    mock_server.server.obj_create(
+        {"obj": {"project_id": PROJECT, "object_id": "o", "val": dict(_NON_STR_KEYS)}}
+    )
+
+    sent = json.loads(mock_server.requests[0].content)["obj"]["val"]
+    assert sent == _JSON_KEYS
+    assert compute_object_digest(sent) == compute_object_digest(dict(_NON_STR_KEYS))
+
+
+def test_table_rows_send_dict_keys_the_way_the_digest_reads_them():
+    """A row with a non-str key goes out as json.dumps writes it, on create and update."""
+    create_server = _mock_server(httpx.Response(200, json={"digest": "d"}))
+    update_server = _mock_server(_table_update_response())
+
+    create_server.server.table_create(
+        {"table": {"project_id": PROJECT, "rows": [dict(_NON_STR_KEYS)]}}
+    )
+    update_server.server.table_update(
+        {
+            "project_id": PROJECT,
+            "base_digest": "b",
+            "updates": [{"append": {"row": dict(_NON_STR_KEYS)}}],
+        }
+    )
+
+    created = json.loads(create_server.requests[0].content)["table"]["rows"]
+    updated = json.loads(update_server.requests[0].content)["updates"]
+    assert created == [_JSON_KEYS]
+    assert updated == [{"append": {"row": _JSON_KEYS}}]
+    assert compute_row_digest(created[0]) == compute_row_digest(dict(_NON_STR_KEYS))
+
+
+@dataclasses.dataclass
+class _KeyHolder:
+    m: dict
+
+
+def test_dict_keys_inside_a_dataclass_go_out_the_way_the_digest_reads_them():
+    """Keys inside a dataclass are converted too, in object values and table rows."""
+    obj_server = _mock_server(httpx.Response(200, json={"digest": "d"}))
+    table_server = _mock_server(httpx.Response(200, json={"digest": "d"}))
+
+    obj_server.server.obj_create(
+        {
+            "obj": {
+                "project_id": PROJECT,
+                "object_id": "o",
+                "val": {"holder": _KeyHolder(dict(_NON_STR_KEYS))},
+            }
+        }
+    )
+    table_server.server.table_create(
+        {
+            "table": {
+                "project_id": PROJECT,
+                "rows": [{"holder": _KeyHolder(dict(_NON_STR_KEYS))}],
+            }
+        }
+    )
+
+    sent_val = json.loads(obj_server.requests[0].content)["obj"]["val"]
+    sent_rows = json.loads(table_server.requests[0].content)["table"]["rows"]
+    assert sent_val == {"holder": {"m": _JSON_KEYS}}
+    assert sent_rows == [{"holder": {"m": _JSON_KEYS}}]
 
 
 def test_custom_runtime_name_keeps_its_colon():
@@ -2076,18 +3195,33 @@ def test_completions_create_stream_reads_ndjson_chunks():
     assert json.loads(request.content)["wb_user_id"] == "user-id"
 
 
-def test_file_create_sends_the_filename():
+@pytest.mark.parametrize(
+    "req",
+    [
+        pytest.param(
+            tsi.FileCreateReq(
+                project_id=PROJECT,
+                name="pic.png",
+                content=b"\x89PNG",
+                expected_digest="deadbeef",
+            ),
+            id="model",
+        ),
+        pytest.param(
+            {
+                "project_id": PROJECT,
+                "file": ("pic.png", b"\x89PNG"),
+                "expected_digest": "deadbeef",
+            },
+            id="dict",
+        ),
+    ],
+)
+def test_file_create_sends_the_filename(req):
     """Test that the upload keeps the filename on the multipart part."""
     mock_server = _mock_server(httpx.Response(200, json={"digest": "abc123"}))
 
-    res = mock_server.server.file_create(
-        tsi.FileCreateReq(
-            project_id=PROJECT,
-            name="pic.png",
-            content=b"\x89PNG",
-            expected_digest="deadbeef",
-        )
-    )
+    res = mock_server.server.file_create(req)
 
     assert len(mock_server.requests) == 1
     assert (mock_server.requests[0].method, mock_server.requests[0].url.path) == (
@@ -2099,7 +3233,7 @@ def test_file_create_sends_the_filename():
     assert b'filename="pic.png"' in body
     assert b"\x89PNG" in body
     assert b"deadbeef" in body
-    assert res == tsi.FileCreateRes(digest="abc123")
+    assert res == FileCreateResponse(digest="abc123")
 
 
 @pytest.mark.parametrize(
@@ -2139,3 +3273,76 @@ def test_list_sends_limit_and_offset(
         expected_path,
     )
     assert dict(mock_server.requests[0].url.params) == {"limit": "10", "offset": "5"}
+
+
+def _streamed_call_line(**overrides: Any) -> dict[str, Any]:
+    line: dict[str, Any] = {
+        "id": "call-1",
+        "project_id": PROJECT,
+        "op_name": "weave:///entity/project/op/predict:abc",
+        "display_name": "predict",
+        "trace_id": "trace-1",
+        "parent_id": None,
+        "started_at": "2026-10-21T12:00:00.123456+00:00",
+        "ended_at": "2026-10-21T12:00:01+00:00",
+        "exception": None,
+        "attributes": {"weave": {"client_version": "0.53.12"}},
+        "inputs": {"messages": [{"role": "user", "content": "hi"}]},
+        "output": {"choices": [{"message": {"content": "hello"}}]},
+        "summary": {
+            "usage": {"gpt-4o": {"prompt_tokens": 1, "total_tokens": 2}},
+            "weave": {"status": "success", "feedback": [{"id": "fb-1"}]},
+        },
+        "wb_user_id": "user-1",
+    }
+    line.update(overrides)
+    return line
+
+
+def _stream_calls(*lines: dict[str, Any]) -> list[Call]:
+    mock_server = _mock_server(
+        httpx.Response(
+            200,
+            content="\n".join(json.dumps(line) for line in lines).encode(),
+            headers={"content-type": "application/x-ndjson"},
+        )
+    )
+    return list(
+        mock_server.server.calls_query_stream(CallStreamQueryParams(project_id=PROJECT))
+    )
+
+
+def test_calls_query_stream_validates_lines_like_construct():
+    """A valid line validates into the same Call that Call.construct builds."""
+    line = _streamed_call_line()
+
+    (call,) = _stream_calls(line)
+    constructed = Call.construct(**line)
+
+    assert isinstance(call, Call)
+    for name in Call.model_fields:
+        assert getattr(call, name) == getattr(constructed, name), name
+    assert call.started_at == datetime.datetime(
+        2026, 10, 21, 12, 0, 0, 123456, tzinfo=datetime.timezone.utc
+    )
+    assert call.ended_at == datetime.datetime(
+        2026, 10, 21, 12, 0, 1, tzinfo=datetime.timezone.utc
+    )
+    assert call.summary == line["summary"]
+    assert call.model_dump(mode="json") == constructed.model_dump(mode="json")
+
+
+def test_calls_query_stream_falls_back_to_construct_on_invalid_line():
+    """A line the vendored model rejects still parses through Call.construct."""
+    bad = _streamed_call_line(id=None, started_at="not a datetime")
+    good = _streamed_call_line(id="call-2")
+
+    first, second = _stream_calls(bad, good)
+
+    assert first.id is None
+    assert first.started_at == "not a datetime"
+    assert first.summary == bad["summary"]
+    assert second.id == "call-2"
+    assert second.started_at == datetime.datetime(
+        2026, 10, 21, 12, 0, 0, 123456, tzinfo=datetime.timezone.utc
+    )

@@ -2,7 +2,7 @@ import urllib
 
 import pytest
 
-from weave.shared.refs_internal import InvalidInternalRef
+from weave.trace.refs_internal import InvalidInternalRef
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.errors import RefObjectsNotFoundError
 

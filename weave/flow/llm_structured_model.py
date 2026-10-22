@@ -1,15 +1,16 @@
 import json
-from typing import Annotated, Any, ClassVar
+from typing import Annotated, Any, ClassVar, cast
 
 from pydantic import BeforeValidator, Field
 
 from weave.flow.model import Model
 from weave.prompt.prompt import format_message_with_template_vars
-from weave.shared.interface.builtin_object_classes import base_object_def
-from weave.shared.interface.builtin_object_classes import (
+from weave.trace import vals
+from weave.trace.builtin_object_classes import base_object_def
+from weave.trace.builtin_object_classes import (
     llm_structured_model as llm_structured_model_schema,
 )
-from weave.shared.interface.builtin_object_classes.llm_structured_model import (
+from weave.trace.builtin_object_classes.llm_structured_model import (
     LLMStructuredCompletionModelDefaultParams,
     Message,
     MessageListLike,
@@ -18,14 +19,13 @@ from weave.shared.interface.builtin_object_classes.llm_structured_model import (
     parse_params_to_litellm_params,
     parse_response,
 )
-from weave.shared.trace_server_interface import (
-    CompletionsCreateReq,
-    CompletionsCreateRequestInputs,
-)
-from weave.trace import vals
 from weave.trace.context.weave_client_context import WeaveInitError, get_weave_client
 from weave.trace.op import op
 from weave.utils.project_id import to_project_id
+from weave.vendor.weave_server_sdk.types import (
+    CompletionCreateParams,
+    completion_create_params,
+)
 
 
 def cast_to_llm_structured_model_params(
@@ -105,10 +105,9 @@ class LLMStructuredCompletionModel(Model):
         try:
             # The 'response' attribute of CompletionsCreateRes is a dict
             response_payload = api_response.response
+            requested_format: Any = req["inputs"].get("response_format")
             response_format = (
-                req.inputs.response_format.get("type")
-                if req.inputs.response_format is not None
-                else None
+                requested_format.get("type") if requested_format is not None else None
             )
             return parse_response(response_payload, response_format)
         except (
@@ -129,7 +128,7 @@ class LLMStructuredCompletionModel(Model):
         user_input: MessageListLike,
         config: LLMStructuredModelParamsLike | None,
         **template_vars: Any,
-    ) -> CompletionsCreateReq:
+    ) -> CompletionCreateParams:
         # Ensure user_input is properly converted to a list of Message objects
         # This is needed because the @op decorator might interfere with Pydantic validation
         if not isinstance(user_input, list) or (
@@ -181,12 +180,48 @@ class LLMStructuredCompletionModel(Model):
         if template_vars:
             completion_params["template_vars"] = template_vars
 
-        completion_inputs = CompletionsCreateRequestInputs(
-            model=model_id_str, messages=prepared_messages_dicts, **completion_params
-        )
-        req = CompletionsCreateReq(
-            project_id=project_id,
-            inputs=completion_inputs,
-        )
-
-        return req
+        completion_inputs: dict[str, Any] = {
+            "model": model_id_str,
+            "messages": prepared_messages_dicts,
+            "timeout": None,
+            "temperature": None,
+            "top_p": None,
+            "n": None,
+            "stop": None,
+            "max_completion_tokens": None,
+            "max_tokens": None,
+            "modalities": None,
+            "presence_penalty": None,
+            "frequency_penalty": None,
+            "stream": None,
+            "logit_bias": None,
+            "user": None,
+            "response_format": None,
+            "seed": None,
+            "tools": None,
+            "tool_choice": None,
+            "logprobs": None,
+            "top_logprobs": None,
+            "parallel_tool_calls": None,
+            "reasoning_effort": None,
+            "extra_headers": None,
+            "functions": None,
+            "function_call": None,
+            "api_version": None,
+            "prompt": None,
+            "template_vars": None,
+            "vertex_credentials": None,
+        }
+        completion_inputs.update(completion_params)
+        return {
+            "project_id": project_id,
+            "inputs": cast(completion_create_params.Inputs, completion_inputs),
+            "inference_route": None,
+            "wb_user_id": None,
+            "track_llm_call": True,
+            "trace_id": None,
+            "parent_id": None,
+            "conversation_id": None,
+            "conversation_name": None,
+            "source": None,
+        }

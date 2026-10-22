@@ -3,8 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
-from weave.shared.interface.builtin_object_classes import leaderboard
-from weave.shared.trace_server_interface import CallsFilter
+from weave.trace.builtin_object_classes import leaderboard
 from weave.trace.refs import OpRef
 from weave.trace.weave_client import WeaveClient, get_ref
 from weave.utils.project_id import from_project_id
@@ -32,8 +31,8 @@ def get_leaderboard_results(
 ) -> list[LeaderboardModelResult]:
     entity, project = from_project_id(client.project_id)
     calls = client.get_calls(
-        filter=CallsFilter(
-            op_names=[
+        filter={
+            "op_names": [
                 OpRef(
                     entity=entity,
                     project=project,
@@ -41,8 +40,8 @@ def get_leaderboard_results(
                     _digest="*",
                 ).uri
             ],
-            input_refs=[c.evaluation_object_ref for c in spec.columns],
-        )
+            "input_refs": [c.evaluation_object_ref for c in spec.columns],
+        }
     )
 
     res_map: dict[str, LeaderboardModelResult] = {}

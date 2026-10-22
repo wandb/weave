@@ -7,12 +7,14 @@ the expected_digest field.
 
 from __future__ import annotations
 
+from typing import Any
+
 import pytest
 from PIL import Image
 
 import weave
 from tests.trace.server_utils import find_server_layer
-from weave.shared.digest import (
+from weave.trace.serialization.digest import (
     compute_file_digest,
     compute_object_digest,
     compute_row_digest,
@@ -30,7 +32,9 @@ from weave.trace.weave_client import (
 )
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.errors import DigestMismatchError
-from weave.trace_server_bindings.remote_http_trace_server import RemoteHTTPTraceServer
+from weave.trace_server_bindings.stainless_remote_http_trace_server import (
+    StainlessRemoteHTTPTraceServer,
+)
 
 
 def _configure_digests(client: WeaveClient, *, enable: bool) -> None:
@@ -409,11 +413,11 @@ class TestConvertRefsToInternal:
         """
         # Spy on obj_create to capture expected_digest values
         captured: list[str | None] = []
-        adapter = find_server_layer(client.server, RemoteHTTPTraceServer)
+        adapter = find_server_layer(client.server, StainlessRemoteHTTPTraceServer)
         original = type(adapter).obj_create
 
         def spy(self, req):
-            captured.append(req.obj.expected_digest)
+            captured.append(req["obj"]["expected_digest"])
             return original(self, req)
 
         monkeypatch.setattr(type(adapter), "obj_create", spy)
@@ -448,15 +452,15 @@ class TestDigestMismatchAutoDisable:
         """First obj_create with expected_digest fails; client retries without
         it and disables fast path for subsequent saves.
         """
-        adapter = find_server_layer(client.server, RemoteHTTPTraceServer)
+        adapter = find_server_layer(client.server, StainlessRemoteHTTPTraceServer)
         original = adapter.obj_create
         seen_digests: list[str | None] = []
         injected = False
 
-        def mismatch_once(req: tsi.ObjCreateReq) -> tsi.ObjCreateRes:
+        def mismatch_once(req: dict[str, Any]) -> tsi.ObjCreateRes:
             nonlocal injected
-            seen_digests.append(req.obj.expected_digest)
-            if not injected and req.obj.expected_digest is not None:
+            seen_digests.append(req["obj"]["expected_digest"])
+            if not injected and req["obj"]["expected_digest"] is not None:
                 injected = True
                 raise DigestMismatchError("forced mismatch")
             return original(req)
@@ -483,13 +487,13 @@ class TestDigestMismatchAutoDisable:
         self, client: WeaveClient, fast_path: None, monkeypatch
     ) -> None:
         """Table digest mismatch retries and disables fast path."""
-        adapter = find_server_layer(client.server, RemoteHTTPTraceServer)
+        adapter = find_server_layer(client.server, StainlessRemoteHTTPTraceServer)
         original = adapter.table_create
         injected = False
 
-        def mismatch_once(req: tsi.TableCreateReq) -> tsi.TableCreateRes:
+        def mismatch_once(req: dict[str, Any]) -> tsi.TableCreateRes:
             nonlocal injected
-            if not injected and req.table.expected_digest is not None:
+            if not injected and req["table"]["expected_digest"] is not None:
                 injected = True
                 raise DigestMismatchError("forced table mismatch")
             return original(req)
@@ -512,13 +516,13 @@ class TestDigestMismatchAutoDisable:
         self, client: WeaveClient, fast_path: None, monkeypatch
     ) -> None:
         """File digest mismatch retries and disables fast path."""
-        adapter = find_server_layer(client.server, RemoteHTTPTraceServer)
+        adapter = find_server_layer(client.server, StainlessRemoteHTTPTraceServer)
         original = adapter.file_create
         injected = False
 
-        def mismatch_once(req: tsi.FileCreateReq) -> tsi.FileCreateRes:
+        def mismatch_once(req: dict[str, Any]) -> tsi.FileCreateRes:
             nonlocal injected
-            if not injected and req.expected_digest is not None:
+            if not injected and req["expected_digest"] is not None:
                 injected = True
                 raise DigestMismatchError("forced file mismatch")
             return original(req)

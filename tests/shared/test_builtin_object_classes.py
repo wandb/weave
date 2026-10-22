@@ -1,7 +1,7 @@
 import pytest
 
 from weave.flow import llm_structured_model as llm_structured_model_sdk
-from weave.shared.interface.builtin_object_classes import (
+from weave.trace.builtin_object_classes import (
     annotation_spec,
     builtin_object_registry,
     leaderboard,

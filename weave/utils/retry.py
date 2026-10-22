@@ -9,10 +9,11 @@ from typing import Any, TypeVar, cast, overload
 import httpx
 import tenacity
 from pydantic import ValidationError
+from pydantic_core import PydanticSerializationError
 from typing_extensions import ParamSpec
 
-from weave.shared.ids import generate_id
 from weave.trace.settings import retry_max_attempts, retry_max_interval
+from weave.utils.ids import generate_id
 
 logger = logging.getLogger(__name__)
 
@@ -108,8 +109,9 @@ def _http_response(e: BaseException) -> httpx.Response | None:
 
 
 def _is_retryable_exception(e: BaseException) -> bool:
-    # Don't retry pydantic validation errors
-    if isinstance(e, ValidationError):
+    # Don't retry pydantic validation or serialization errors: the same input
+    # fails the same way every time
+    if isinstance(e, (ValidationError, PydanticSerializationError)):
         return False
 
     # Don't retry CallsCompleteModeRequired - should trigger immediate mode switch

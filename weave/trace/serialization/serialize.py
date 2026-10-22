@@ -7,15 +7,12 @@ from typing import TYPE_CHECKING, Any, Literal, Protocol, TypeAlias, TypedDict
 
 from pydantic import BaseModel
 
-from weave.shared.digest import bytes_digest
-from weave.shared.trace_server_interface import (
-    FileCreateReq,
-    TraceServerInterface,
-)
 from weave.trace.object_record import ObjectRecord
 from weave.trace.refs import ObjectRef, Ref, TableRef
 from weave.trace.serialization import custom_objs
 from weave.trace.serialization.dictifiable import try_to_dict
+from weave.trace.serialization.digest import bytes_digest
+from weave.trace_server_bindings.client_interface import TraceServerClientInterface
 from weave.utils.sanitize import (
     REDACTED_VALUE,
     should_redact,
@@ -257,12 +254,11 @@ def _build_result_from_encoded(
             contents_as_bytes = contents_as_bytes.encode("utf-8")
         digest = bytes_digest(contents_as_bytes)
         client._send_file_create(
-            FileCreateReq(
-                project_id=project_id,
-                name=name,
-                content=val,
-                expected_digest=digest,
-            )
+            {
+                "project_id": project_id,
+                "file": (name, contents_as_bytes),
+                "expected_digest": digest,
+            }
         )
         file_digests[name] = digest
 
@@ -414,7 +410,7 @@ def isinstance_namedtuple(obj: Any) -> bool:
     )
 
 
-def from_json(obj: Any, project_id: str, server: TraceServerInterface) -> Any:
+def from_json(obj: Any, project_id: str, server: TraceServerClientInterface) -> Any:
     if isinstance(obj, list):
         return [from_json(v, project_id, server) for v in obj]
     elif isinstance(obj, dict):

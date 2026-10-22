@@ -1,4 +1,5 @@
 import datetime
+import warnings
 from collections.abc import Iterator
 from enum import Enum
 from typing import TYPE_CHECKING, Annotated, Any, Literal, Protocol, TypeAlias, get_args
@@ -23,28 +24,41 @@ else:
     except ImportError:
         ResourceSpans = Any
 
-from weave.shared import http_service_interface as his
-from weave.shared.agents import types as agent_types
-from weave.shared.common_interface import (
-    RESPONSE_DEFAULTS_REQUIRED,
-    WB_USER_ID_DESCRIPTION,
-    AnnotationState,
-    BaseModelStrict,
-    SortBy,
-)
-from weave.shared.constants import (
-    DEFAULT_CUSTOM_RUNTIME_MAX_TOKENS,
-    MAX_OBJECT_NAME_LENGTH,
-)
-from weave.shared.errors import InvalidRequest
-from weave.shared.interface.query import Query
+# Sibling modules warn too; one warning, this module's, is enough.
+with warnings.catch_warnings():
+    warnings.simplefilter("ignore", FutureWarning)
+    from weave.shared import http_service_interface as his
+    from weave.shared.agents import types as agent_types
+    from weave.shared.common_interface import (
+        RESPONSE_DEFAULTS_REQUIRED,
+        WB_USER_ID_DESCRIPTION,
+        AnnotationState,
+        BaseModelStrict,
+        SortBy,
+    )
+    from weave.shared.interface.query import Query
 
-# Re-exported from service_interface for backwards compatibility.
-# New code should import from weave.shared.service_interface directly.
-from weave.shared.service_interface import (  # noqa: F401
-    EnsureProjectExistsRes,
-    ProjectsInfoReq,
-    ProjectsInfoRes,
+    # Re-exported from service_interface for backwards compatibility.
+    # New code should import from weave.shared.service_interface directly.
+    from weave.shared.service_interface import (  # noqa: F401
+        EnsureProjectExistsRes,
+        ProjectsInfoReq,
+        ProjectsInfoRes,
+    )
+    from weave.shared.validation import validate_alias_name, validate_tag_name
+
+# Re-exported: the client owns these models, so both paths name the same classes.
+from weave.trace.builtin_object_classes.query import CallsFilter
+from weave.trace.constants import MAX_OBJECT_NAME_LENGTH, TraceStatus
+from weave.trace.custom_runtime import CustomRuntimeID
+from weave.trace.errors import InvalidRequest
+
+# TODO: delete this module together with weave.shared.
+warnings.warn(
+    "weave.shared.trace_server_interface is deprecated and will be removed in a "
+    "future release.",
+    FutureWarning,
+    stacklevel=2,
 )
 
 DEFAULT_FEEDBACK_SAMPLE_LIMIT = 2000
@@ -91,13 +105,6 @@ class FeedbackDict(TypedDict, total=False):
     creator: str | None
     created_at: datetime.datetime | None
     wb_user_id: str | None
-
-
-class TraceStatus(str, Enum):
-    SUCCESS = "success"
-    ERROR = "error"
-    RUNNING = "running"
-    DESCENDANT_ERROR = "descendant_error"
 
 
 class WeaveSummarySchema(ExtraKeysTypedDict, total=False):
@@ -614,21 +621,6 @@ class ImageGenerationCreateRes(BaseModel):
     weave_call_id: str | None = None
 
 
-class CallsFilter(BaseModelStrict):
-    op_names: list[str] | None = None
-    input_refs: list[str] | None = None
-    output_refs: list[str] | None = None
-    parent_ids: list[str] | None = None
-    trace_ids: list[str] | None = None
-    call_ids: list[str] | None = None
-    thread_ids: list[str] | None = None
-    turn_ids: list[str] | None = None
-    trace_roots_only: bool | None = None
-    wb_user_ids: list[str] | None = None
-    # "entity/project/run", or a bare run id (qualified to the queried project).
-    wb_run_ids: list[str] | None = None
-
-
 class CallsQueryReq(BaseModelStrict):
     project_id: str
     filter: CallsFilter | None = None
@@ -878,8 +870,6 @@ class ObjDeleteRes(BaseModel):
 
 
 # --- Tag and Alias types ---
-# Validation logic lives in weave.shared.validation
-from weave.shared.validation import validate_alias_name, validate_tag_name
 
 
 class ObjAddTagsReq(BaseModelStrict):
@@ -2755,23 +2745,6 @@ CustomRuntimeName: TypeAlias = Annotated[
         pattern=r"^[^\s:]*(?::[^\s:]+)*:?$",
     ),
 ]
-
-
-class CustomRuntimeID(BaseModelStrict):
-    id: Annotated[
-        str,
-        StringConstraints(
-            strip_whitespace=True,
-            min_length=1,
-            # Forbid whitespace.
-            pattern=r"^\S+$",
-        ),
-    ] = Field(description="Value sent in the OpenAI-compatible request model field")
-    max_tokens: int = Field(
-        default=DEFAULT_CUSTOM_RUNTIME_MAX_TOKENS,
-        gt=0,
-        description="Maximum tokens supported by this runtime ID",
-    )
 
 
 class CustomRuntimeApplyBody(BaseModelStrict):

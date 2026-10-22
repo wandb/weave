@@ -1,6 +1,6 @@
 from pydantic import BaseModel, Field
 
-from weave.shared.pydantic_util import pydantic_asdict_one_level
+from weave.utils.pydantic_util import pydantic_asdict_one_level
 
 
 class MyClass(BaseModel):

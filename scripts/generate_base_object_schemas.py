@@ -3,7 +3,7 @@ from pathlib import Path
 
 from pydantic import create_model
 
-from weave.shared.interface.builtin_object_classes.builtin_object_registry import (
+from weave.trace.builtin_object_classes.builtin_object_registry import (
     BUILTIN_OBJECT_REGISTRY,
 )
 
@@ -11,14 +11,7 @@ REPO_ROOT = Path(__file__).parent.parent
 FILENAME = "generated_builtin_object_class_schemas.json"
 
 # Canonical location, next to the registry the schema is generated from.
-OUTPUT_DIR = (
-    REPO_ROOT
-    / "weave"
-    / "shared"
-    / "interface"
-    / "builtin_object_classes"
-    / "generated"
-)
+OUTPUT_DIR = REPO_ROOT / "weave" / "trace" / "builtin_object_classes" / "generated"
 OUTPUT_PATH = OUTPUT_DIR / FILENAME
 
 

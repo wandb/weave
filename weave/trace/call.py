@@ -3,22 +3,20 @@ from __future__ import annotations
 import dataclasses
 import datetime
 import logging
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from concurrent.futures import Future
-from typing import TYPE_CHECKING, Any, TypedDict
+from typing import TYPE_CHECKING, Any, TypedDict, cast
+
+import pydantic
 
 from weave.evaluation.eval_meta import EVAL_META_KEY
-from weave.shared.common_interface import SortBy
-from weave.shared.constants import EVALUATION_RUN_OP_NAME, MAX_DISPLAY_NAME_LENGTH
-from weave.shared.interface.query import Query
-from weave.shared.trace_server_interface import (
-    CallSchema,
-    CallsFilter,
-    CallsQueryReq,
-    CallsQueryStatsReq,
-    TraceServerInterface,
-)
 from weave.trace import urls
+from weave.trace.casting import cast_to_calls_filter
+from weave.trace.constants import (
+    EVALUATION_RUN_OP_NAME,
+    MAX_DISPLAY_NAME_LENGTH,
+    TraceStatus,
+)
 from weave.trace.context import weave_client_context
 from weave.trace.feedback import RefFeedbackQuery
 from weave.trace.isinstance import weave_isinstance
@@ -28,9 +26,15 @@ from weave.trace.refs import CallRef, ObjectRef, OpRef
 from weave.trace.serialization.serialize import from_json
 from weave.trace.util import log_once
 from weave.trace.vals import WeaveObject
+from weave.trace_server_bindings.client_interface import TraceServerClientInterface
 from weave.utils.attributes_dict import AttributesDict
 from weave.utils.paginated_iterator import PaginatedIterator
 from weave.utils.project_id import from_project_id
+from weave.vendor.weave_server_sdk.types import (
+    call_query_stats_params,
+    call_read_response,
+    call_stream_query_params,
+)
 
 if TYPE_CHECKING:
     from weave.flow.scorer import ApplyScorerResult, Scorer
@@ -178,7 +182,7 @@ class Call:
         return _make_calls_iterator(
             client.server,
             self.project_id,
-            CallsFilter(parent_ids=[self.id]),
+            cast_to_calls_filter({"parent_ids": [self.id]}),
             page_size=page_size,
         )
 
@@ -345,7 +349,7 @@ class CallDict(TypedDict):
     total_storage_size_bytes: int | None
 
 
-CallsIter = PaginatedIterator[CallSchema, WeaveObject]
+CallsIter = PaginatedIterator[call_read_response.Call, WeaveObject]
 
 
 def elide_display_name(name: str) -> str:
@@ -359,13 +363,13 @@ def elide_display_name(name: str) -> str:
 
 
 def _make_calls_iterator(
-    server: TraceServerInterface,
+    server: TraceServerClientInterface,
     project_id: str,
-    filter: CallsFilter,
+    filter: call_stream_query_params.Filter,
     limit_override: int | None = None,
     offset_override: int | None = None,
-    sort_by: list[SortBy] | None = None,
-    query: Query | None = None,
+    sort_by: list[call_stream_query_params.SortBy] | None = None,
+    query: Mapping[str, Any] | None = None,
     include_costs: bool = False,
     include_feedback: bool = False,
     include_storage_size: bool = False,
@@ -376,7 +380,7 @@ def _make_calls_iterator(
     return_expanded_column_values: bool = True,
     page_size: int = DEFAULT_CALLS_PAGE_SIZE,
 ) -> CallsIter:
-    def fetch_func(offset: int, limit: int) -> list[CallSchema]:
+    def fetch_func(offset: int, limit: int) -> list[call_read_response.Call]:
         # Add the global offset to the page offset
         # This ensures the offset is applied only once
         effective_offset = offset
@@ -385,38 +389,42 @@ def _make_calls_iterator(
 
         return list(
             server.calls_query_stream(
-                CallsQueryReq(
-                    project_id=project_id,
-                    filter=filter,
-                    offset=effective_offset,
-                    limit=limit,
-                    include_costs=include_costs,
-                    include_feedback=include_feedback,
-                    include_storage_size=include_storage_size,
-                    include_total_storage_size=include_total_storage_size,
-                    include_usernames=include_usernames,
-                    query=query,
-                    sort_by=sort_by,
-                    columns=columns,
-                    expand_columns=expand_columns,
-                    return_expanded_column_values=return_expanded_column_values,
-                )
+                {
+                    "project_id": project_id,
+                    "filter": filter,
+                    "limit": limit,
+                    "offset": effective_offset,
+                    "latest_only": False,
+                    "sort_by": sort_by,
+                    # Wire form: the generated type maps only the top two levels.
+                    "query": cast("call_stream_query_params.Query | None", query),
+                    "include_costs": include_costs,
+                    "include_feedback": include_feedback,
+                    "include_storage_size": include_storage_size,
+                    "include_total_storage_size": include_total_storage_size,
+                    "include_usernames": include_usernames,
+                    "columns": columns,
+                    "expand_columns": expand_columns,
+                    "return_expanded_column_values": return_expanded_column_values,
+                }
             )
         )
 
     # TODO: Should be Call, not WeaveObject
-    def transform_func(call: CallSchema) -> WeaveObject:
+    def transform_func(call: call_read_response.Call) -> WeaveObject:
         entity, project = from_project_id(project_id)
         return make_client_call(entity, project, call, server)
 
     def size_func() -> int:
         response = server.calls_query_stats(
-            CallsQueryStatsReq(
-                project_id=project_id,
-                filter=filter,
-                query=query,
-                expand_columns=expand_columns,
-            )
+            {
+                "project_id": project_id,
+                "filter": filter,
+                "query": cast("call_query_stats_params.Query | None", query),
+                "limit": None,
+                "include_total_storage_size": False,
+                "expand_columns": expand_columns,
+            }
         )
         if limit_override is not None:
             offset = offset_override or 0
@@ -437,8 +445,56 @@ def _make_calls_iterator(
     )
 
 
+_DATETIME = pydantic.TypeAdapter(datetime.datetime)
+
+
+def _parse_status(value: Any) -> Any:
+    try:
+        return TraceStatus(value)
+    except (TypeError, ValueError):
+        return value
+
+
+def _parse_datetime(value: Any) -> Any:
+    try:
+        return _DATETIME.validate_python(value)
+    except pydantic.ValidationError:
+        return value
+
+
+def _parse_summary(summary: Mapping[str, Any] | None) -> dict[str, Any]:
+    """Return a call's summary with its statuses and feedback times parsed.
+
+    The response types the summary as a plain dict, so these arrive as JSON
+    strings: statuses become `TraceStatus` and each feedback `created_at` a
+    datetime, the types `Call.summary` has always held.
+    """
+    if summary is None:
+        return {}
+    parsed = dict(summary)
+    if isinstance(status_counts := parsed.get("status_counts"), Mapping):
+        parsed["status_counts"] = {
+            _parse_status(status): count for status, count in status_counts.items()
+        }
+    if isinstance(weave_summary := parsed.get("weave"), Mapping):
+        weave_summary = parsed["weave"] = dict(weave_summary)
+        if "status" in weave_summary:
+            weave_summary["status"] = _parse_status(weave_summary["status"])
+        if isinstance(feedback := weave_summary.get("feedback"), list):
+            weave_summary["feedback"] = [
+                {**item, "created_at": _parse_datetime(item["created_at"])}
+                if isinstance(item, Mapping) and item.get("created_at") is not None
+                else item
+                for item in feedback
+            ]
+    return parsed
+
+
 def make_client_call(
-    entity: str, project: str, server_call: CallSchema, server: TraceServerInterface
+    entity: str,
+    project: str,
+    server_call: call_read_response.Call,
+    server: TraceServerClientInterface,
 ) -> WeaveObject:
     if (call_id := server_call.id) is None:
         raise ValueError("Call ID is None")
@@ -452,7 +508,7 @@ def make_client_call(
         inputs=from_json(server_call.inputs, server_call.project_id, server),
         output=from_json(server_call.output, server_call.project_id, server),
         exception=server_call.exception,
-        summary=dict(server_call.summary) if server_call.summary is not None else {},
+        summary=_parse_summary(server_call.summary),
         _display_name=server_call.display_name,
         attributes=server_call.attributes,
         started_at=server_call.started_at,

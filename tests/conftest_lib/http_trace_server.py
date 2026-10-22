@@ -11,10 +11,11 @@ from tests.conftest_lib.http_error_decoding import HTTPErrorDecodingTraceServer
 from tests.trace.server_utils import TEST_ENTITY
 from weave.shared import common_interface
 from weave.shared import trace_server_interface as tsi
-from weave.shared.ids import generate_id
-from weave.trace_server_bindings.remote_http_trace_server import RemoteHTTPTraceServer
+from weave.trace_server_bindings.stainless_remote_http_trace_server import (
+    StainlessRemoteHTTPTraceServer,
+)
+from weave.utils.ids import generate_id
 from weave.wandb_interface import project_creator
-from weave.wandb_interface.auth import ApiKeyCredentials
 
 
 def pytest_addoption(parser):
@@ -91,7 +92,7 @@ def reset_extra_field_warnings():
 _http_user_ids: dict[str, str] = {}
 
 
-def _probe_http_user_id(server: RemoteHTTPTraceServer) -> str:
+def _probe_http_user_id(server: StainlessRemoteHTTPTraceServer) -> str:
     """Write one call and read back the user id the server stamped on it."""
     project_id = f"{TEST_ENTITY}/test-project"
     call_id = generate_id()
@@ -123,9 +124,8 @@ def trace_server() -> HTTPErrorDecodingTraceServer:
     WANDB_API_KEY must belong to a user named TEST_ENTITY.
     """
     url = os.environ["WF_TRACE_SERVER_URL"]
-    server = RemoteHTTPTraceServer(
-        url, auth=ApiKeyCredentials(os.environ["WANDB_API_KEY"])
-    )
+    # The client users get by default (`use_stainless_server`).
+    server = StainlessRemoteHTTPTraceServer(url, password=os.environ["WANDB_API_KEY"])
     if url not in _http_user_ids:
         httpx.post(f"{url}/testonly/reset").raise_for_status()
         _http_user_ids[url] = _probe_http_user_id(server)
