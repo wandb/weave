@@ -13,8 +13,10 @@ get_agents / get_agent_versions / get_agent_spans return a PaginatedIterator
 from __future__ import annotations
 
 import datetime
+import json
 
 import pytest
+from pydantic import ValidationError
 
 from weave.trace.weave_client import WeaveClient
 from weave.trace_server.interface.query import Query
@@ -119,7 +121,7 @@ def _make_client(server: FakeAgentReadServer | FakePagingAgentServer) -> WeaveCl
             "stats_res",
             {
                 "start": START,
-                "metrics": [METRIC],
+                "metrics": [METRIC.model_dump(by_alias=True)],
                 "granularity": 3600,
                 "timezone": "UTC",
             },
@@ -167,9 +169,9 @@ def test_method_builds_request(method, kwargs, key, res_attr, expected):
 
     assert res is getattr(server, res_attr)
     req = server.requests[key]
-    assert req.project_id == "entity/project"
-    for attr, value in expected.items():
-        assert getattr(req, attr) == value
+    assert req["project_id"] == "entity/project"
+    for name, value in expected.items():
+        assert req[name] == value
 
 
 # ---------------------------------------------------------------------------
@@ -234,22 +236,22 @@ class FakePagingAgentServer:
 
     def agent_agents_query(self, req):
         self.requests["agents"] = req
-        self.fetches.append((req.offset, req.limit))
-        page = self._agents[req.offset : req.offset + req.limit]
+        self.fetches.append((req["offset"], req["limit"]))
+        page = self._agents[req["offset"] : req["offset"] + req["limit"]]
         return agent_types.AgentsQueryRes(agents=page, total_count=len(self._agents))
 
     def agent_versions_query(self, req):
         self.requests["versions"] = req
-        self.fetches.append((req.offset, req.limit))
-        page = self._versions[req.offset : req.offset + req.limit]
+        self.fetches.append((req["offset"], req["limit"]))
+        page = self._versions[req["offset"] : req["offset"] + req["limit"]]
         return agent_types.AgentVersionsQueryRes(
             versions=page, total_count=len(self._versions)
         )
 
     def agent_spans_query(self, req):
         self.requests["spans"] = req
-        self.fetches.append((req.offset, req.limit))
-        page = self._spans[req.offset : req.offset + req.limit]
+        self.fetches.append((req["offset"], req["limit"]))
+        page = self._spans[req["offset"] : req["offset"] + req["limit"]]
         return agent_types.AgentSpansQueryRes(
             spans=page, groups=[], total_count=len(self._spans)
         )
@@ -291,7 +293,7 @@ def test_iterator_method_pages_through_all_items(
     page_fetches = [f for f in server.fetches if f[1] == 2]
     assert page_fetches == [(0, 2), (2, 2), (4, 2)]
     # project_id is inferred on every request.
-    assert server.requests[kind].project_id == "entity/project"
+    assert server.requests[kind]["project_id"] == "entity/project"
     # len() reports the server total_count.
     assert len(iterator) == 5
 
@@ -327,8 +329,8 @@ def test_get_agents_respects_offset():
             _agent,
             {"agent_name": "agent-0", "sort_by": SORT_BY},
             {
-                "filters": agent_types.AgentsQueryFilters(agent_name="agent-0"),
-                "sort_by": SORT_BY,
+                "filters": {"agent_name": "agent-0"},
+                "sort_by": [{"field": "last_seen", "direction": "desc"}],
             },
             id="get_agents",
         ),
@@ -337,7 +339,10 @@ def test_get_agents_respects_offset():
             "versions",
             _agent_version,
             {"agent_name": "agent-0", "sort_by": SORT_BY},
-            {"agent_name": "agent-0", "sort_by": SORT_BY},
+            {
+                "agent_name": "agent-0",
+                "sort_by": [{"field": "last_seen", "direction": "desc"}],
+            },
             id="get_agent_versions",
         ),
     ],
@@ -349,9 +354,9 @@ def test_iterator_method_builds_request(method, kind, builder, kwargs, expected)
     list(getattr(client, method)(**kwargs))
 
     req = server.requests[kind]
-    assert req.project_id == "entity/project"
-    for attr, value in expected.items():
-        assert getattr(req, attr) == value
+    assert req["project_id"] == "entity/project"
+    for name, value in expected.items():
+        assert req[name] == value
 
 
 @pytest.mark.parametrize(
@@ -361,20 +366,38 @@ def test_iterator_method_builds_request(method, kind, builder, kwargs, expected)
         pytest.param(
             "my-agent",
             None,
-            Query.model_validate({"$expr": AGENT_NAME_EXPR}),
+            {"$expr": AGENT_NAME_EXPR},
             id="agent_name_only",
         ),
         pytest.param(
             None,
             Query.model_validate({"$expr": GT_EXPR}),
-            Query.model_validate({"$expr": GT_EXPR}),
+            {"$expr": GT_EXPR},
             id="query_only",
         ),
         pytest.param(
             "my-agent",
             Query.model_validate({"$expr": GT_EXPR}),
-            Query.model_validate({"$expr": {"$and": [AGENT_NAME_EXPR, GT_EXPR]}}),
+            {"$expr": {"$and": [AGENT_NAME_EXPR, GT_EXPR]}},
             id="agent_name_and_query_combined_with_and",
+        ),
+        pytest.param(
+            "my-agent",
+            {"$expr": GT_EXPR},
+            {"$expr": {"$and": [AGENT_NAME_EXPR, GT_EXPR]}},
+            id="agent_name_and_wire_form_query",
+        ),
+        pytest.param(
+            "my-agent",
+            Query.model_validate({"$expr": GT_EXPR}).model_dump(),
+            {"$expr": {"$and": [AGENT_NAME_EXPR, GT_EXPR]}},
+            id="agent_name_and_model_dump_query_without_alias",
+        ),
+        pytest.param(
+            "my-agent",
+            {"$expr": GT_EXPR, "$and": [GT_EXPR]},
+            {"$expr": {"$and": [AGENT_NAME_EXPR, GT_EXPR]}, "$and": [GT_EXPR]},
+            id="agent_name_keeps_extra_top_level_keys_for_the_server",
         ),
     ],
 )
@@ -385,5 +408,19 @@ def test_get_agent_spans_query_translation(agent_name, query, expected_query):
     list(client.get_agent_spans(agent_name=agent_name, query=query))
 
     req = server.requests["spans"]
-    assert req.project_id == "entity/project"
-    assert req.query == expected_query
+    assert req["project_id"] == "entity/project"
+    # A query model dumps its operands as tuples; the request encodes them as lists.
+    assert json.loads(json.dumps(req["query"])) == expected_query
+
+
+@pytest.mark.parametrize("query", [{}, {"nope": 1}])
+@pytest.mark.trace_server
+def test_get_agent_spans_rejects_query_missing_expr(query):
+    server = FakePagingAgentServer()
+    client = _make_client(server)
+
+    with pytest.raises(ValidationError) as exc_info:
+        client.get_agent_spans(agent_name="x", query=query)
+
+    assert any(err["loc"] == ("$expr",) for err in exc_info.value.errors())
+    assert server.requests == {}

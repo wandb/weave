@@ -2,23 +2,25 @@
 
 from __future__ import annotations
 
+import datetime
 import json
-from collections.abc import Iterable, Iterator
-from typing import Any
+import logging
+from collections.abc import Iterable, Iterator, Mapping
+from typing import Any, cast
 
-from weave.shared import trace_server_interface as tsi
-from weave.shared.interface.feedback_types import (
-    AGENT_USER_FEEDBACK_TYPE,
-    NOTE_FEEDBACK_TYPE,
-    REACTION_FEEDBACK_TYPE,
-)
-from weave.shared.interface.query import Query
+from pydantic import BaseModel, Field, model_validator
+
 from weave.trace import util
 from weave.trace.context import weave_client_context
 from weave.trace.display import display
 from weave.trace.display.rich import pydantic_util
 from weave.trace.display.rich.container import AbstractRichContainer
 from weave.trace.display.rich.refs import Refs
+from weave.trace.feedback_types import (
+    AGENT_USER_FEEDBACK_TYPE,
+    NOTE_FEEDBACK_TYPE,
+    REACTION_FEEDBACK_TYPE,
+)
 from weave.trace.refs import (
     AgentConversationRef,
     AgentSpanRef,
@@ -28,18 +30,81 @@ from weave.trace.refs import (
     Ref,
 )
 from weave.utils.project_id import to_project_id
+from weave.vendor.weave_server_sdk.types import (
+    FeedbackCreateParams,
+    feedback_purge_params,
+    feedback_query_params,
+)
 
 # Reason the Agent UI records for human reactions; keep in sync with Reactions.tsx.
 AGENT_REACTION_REASON = "Set by user"
 
+# The old warning used this logger name, not this module's.
+logger = logging.getLogger("weave.trace_server.common_interface")
+_warned_feedback_fields: set[tuple[str, ...]] = set()
 
-class Feedbacks(AbstractRichContainer[tsi.Feedback]):
+
+class Feedback(BaseModel):
+    """A feedback row, as a feedback query returns it."""
+
+    id: str
+    project_id: str
+    weave_ref: str
+    creator: str | None = None
+    feedback_type: str
+    payload: dict[str, Any]
+    annotation_ref: str | None = None
+    runnable_ref: str | None = None
+    call_ref: str | None = None
+    trigger_ref: str | None = None
+    queue_id: str | None = None
+    scorer_tags: list[str] = Field(default_factory=list)
+    scorer_tag_reasons: dict[str, str] = Field(default_factory=dict)
+    scorer_tag_confidences: dict[str, float] = Field(default_factory=dict)
+    scorer_ratings: dict[str, float] = Field(default_factory=dict)
+    scorer_rating_reasons: dict[str, str] = Field(default_factory=dict)
+    scorer_rating_confidences: dict[str, float] = Field(default_factory=dict)
+    span_agent_name: str = ""
+    span_agent_version: str = ""
+    span_status_code: str = "UNSET"
+    span_conversation_id: str = ""
+    span_trace_id: str = ""
+    scorer_trace_id: str = ""
+    wb_user_id: str | None = None
+    created_at: datetime.datetime
+
+    @model_validator(mode="before")
+    @classmethod
+    def warn_on_extra_fields(cls, values: Any) -> Any:
+        if not isinstance(values, dict):
+            return values
+        known = set(cls.model_fields)
+        known.update(
+            field.alias
+            for field in cls.model_fields.values()
+            if field.alias is not None
+        )
+        extra_fields = set(values) - known
+        if not extra_fields or not logger.isEnabledFor(logging.WARNING):
+            return values
+        fields = tuple(sorted(extra_fields))
+        if fields not in _warned_feedback_fields:
+            _warned_feedback_fields.add(fields)
+            logger.warning(
+                "Ignoring unexpected fields while validating %s: %s",
+                cls.__name__,
+                ", ".join(fields),
+            )
+        return values
+
+
+class Feedbacks(AbstractRichContainer[Feedback]):
     """A collection of Feedback objects with utilities."""
 
     show_refs: bool
 
     def __init__(
-        self, show_refs: bool, feedbacks: Iterable[tsi.Feedback] | None = None
+        self, show_refs: bool, feedbacks: Iterable[Feedback] | None = None
     ) -> None:
         super().__init__("Feedback", feedbacks)
         self.show_refs = show_refs
@@ -58,7 +123,7 @@ class Feedbacks(AbstractRichContainer[tsi.Feedback]):
         table.add_column("ID", overflow="fold")
         table.add_column("Creator")
 
-    def _item_to_row(self, item: tsi.Feedback) -> list:
+    def _item_to_row(self, item: Feedback) -> list:
         feedback = item
 
         type_ = feedback.feedback_type
@@ -103,7 +168,7 @@ class FeedbackQuery:
     project: str
 
     show_refs: bool
-    _query: tsi.Query
+    _query: Mapping[str, Any]
     offset: int | None
     limit: int | None
 
@@ -113,7 +178,7 @@ class FeedbackQuery:
         self,
         entity: str,
         project: str,
-        query: Query,
+        query: Mapping[str, Any],
         offset: int | None = None,
         limit: int | None = None,
         show_refs: bool = False,
@@ -129,33 +194,35 @@ class FeedbackQuery:
 
         self.feedbacks = None
 
-    def __iter__(self) -> Iterator[tsi.Feedback]:
+    def __iter__(self) -> Iterator[Feedback]:
         yield from self.execute()
 
-    def __getitem__(self, index: int) -> tsi.Feedback:
+    def __getitem__(self, index: int) -> Feedback:
         return self.execute()[index]
 
     def __len__(self) -> int:
         return len(self.execute())
 
     def refresh(self) -> Feedbacks:
-        sort_by = [
+        sort_by: list[feedback_query_params.SortBy] = [
             {
                 "field": "created_at",
                 "direction": "asc",
             },
         ]
-        req = tsi.FeedbackQueryReq(
-            project_id=to_project_id(self.entity, self.project),
-            query=self._query,
-            sort_by=sort_by,
-            offset=self.offset,
-            limit=self.limit,
+        response = self.client.server.feedback_query(
+            {
+                "project_id": to_project_id(self.entity, self.project),
+                "fields": None,
+                "query": cast(feedback_query_params.Query, self._query),
+                "sort_by": sort_by,
+                "limit": self.limit,
+                "offset": self.offset,
+            }
         )
-        response = self.client.server.feedback_query(req)
         # Response is dicts because API allows user to specify fields, but we don't
         # expose that in this Python API.
-        return Feedbacks(self.show_refs, (tsi.Feedback(**r) for r in response.result))
+        return Feedbacks(self.show_refs, (Feedback(**r) for r in response.result))
 
     def execute(self) -> Feedbacks:
         if self.feedbacks is not None:
@@ -199,12 +266,12 @@ class RefFeedbackQuery(FeedbackQuery):
         super().__init__(
             entity=parsed_ref.entity,
             project=parsed_ref.project,
-            query=Query(**query),
+            query=query,
         )
         self.weave_ref = ref
         self._parsed_ref = parsed_ref
 
-    def _create(self, freq: tsi.FeedbackCreateReq) -> str:
+    def _create(self, freq: FeedbackCreateParams) -> str:
         response = self.client.server.feedback_create(freq)
         self.feedbacks = None  # Clear cache
         return response.id
@@ -216,13 +283,6 @@ class RefFeedbackQuery(FeedbackQuery):
         creator: str | None,
         annotation_ref: str | None = None,
     ) -> str:
-        freq = tsi.FeedbackCreateReq(
-            project_id=to_project_id(self.entity, self.project),
-            weave_ref=self.weave_ref,
-            feedback_type=feedback_type,
-            payload=payload,
-            creator=creator,
-        )
         if annotation_ref:
             try:
                 ObjectRef.parse_uri(annotation_ref)
@@ -230,12 +290,19 @@ class RefFeedbackQuery(FeedbackQuery):
                 raise TypeError(
                     "annotation_ref must be a valid object ref, eg weave:///<entity>/<project>/object/<name>:<digest>"
                 ) from None
-            freq.annotation_ref = annotation_ref
+        freq = feedback_create_params(
+            project_id=to_project_id(self.entity, self.project),
+            weave_ref=self.weave_ref,
+            feedback_type=feedback_type,
+            payload=payload,
+            creator=creator,
+            annotation_ref=annotation_ref or None,
+        )
         return self._create(freq)
 
     def _add_agent_reaction(self, emoji: str, creator: str | None) -> str:
         return self._create(
-            tsi.FeedbackCreateReq(
+            feedback_create_params(
                 project_id=to_project_id(self.entity, self.project),
                 weave_ref=self.weave_ref,
                 feedback_type=AGENT_USER_FEEDBACK_TYPE,
@@ -302,12 +369,56 @@ class RefFeedbackQuery(FeedbackQuery):
                 ],
             }
         }
-        req = tsi.FeedbackPurgeReq(
-            project_id=to_project_id(self.entity, self.project),
-            query=Query(**query),
+        self.client.server.feedback_purge(
+            {
+                "project_id": to_project_id(self.entity, self.project),
+                "query": cast(feedback_purge_params.Query, query),
+            }
         )
-        self.client.server.feedback_purge(req)
         self.feedbacks = None  # Clear cache
+
+
+def feedback_create_params(
+    *,
+    project_id: str,
+    weave_ref: str,
+    feedback_type: str,
+    payload: dict[str, Any],
+    creator: str | None = None,
+    annotation_ref: str | None = None,
+    runnable_ref: str | None = None,
+    call_ref: str | None = None,
+    scorer_tags: list[str] | None = None,
+    scorer_tag_reasons: dict[str, str] | None = None,
+    scorer_tag_confidences: dict[str, float] | None = None,
+) -> FeedbackCreateParams:
+    """A feedback create request with every field, in a fixed order.
+
+    The scorer and span fields get the server's defaults unless given, and batched
+    feedback goes out in this key order.
+    """
+    return {
+        "project_id": project_id,
+        "weave_ref": weave_ref,
+        "creator": creator,
+        "feedback_type": feedback_type,
+        "payload": payload,
+        "annotation_ref": annotation_ref,
+        "runnable_ref": runnable_ref,
+        "call_ref": call_ref,
+        "scorer_tags": scorer_tags or [],
+        "scorer_tag_reasons": scorer_tag_reasons or {},
+        "scorer_tag_confidences": scorer_tag_confidences or {},
+        "scorer_ratings": {},
+        "scorer_rating_reasons": {},
+        "scorer_rating_confidences": {},
+        "span_agent_name": "",
+        "span_agent_version": "",
+        "span_status_code": "UNSET",
+        "span_conversation_id": "",
+        "span_trace_id": "",
+        "scorer_trace_id": "",
+    }
 
 
 def _validate_feedback_type(feedback_type: str, annotation_ref: str | None) -> None:

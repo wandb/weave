@@ -5,8 +5,8 @@ from typing_extensions import NotRequired, Self, TypedDict
 
 from weave.flow.casting import Scorer
 from weave.object.obj import Object
-from weave.shared.interface.query import Query
 from weave.trace.api import ObjectRef, publish
+from weave.trace.builtin_object_classes.query import Query
 from weave.trace.context.weave_client_context import (
     get_weave_client,
     require_weave_client,

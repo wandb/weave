@@ -31,6 +31,7 @@ from weave.durability.wal_sender import (
 )
 from weave.durability.wal_writer import JSONLWALWriter
 from weave.trace import weave_client
+from weave.trace.serialization.digest import compute_row_digest
 from weave.trace.settings import UserSettings, override_settings
 from weave.trace_server import trace_server_interface as tsi
 
@@ -143,6 +144,16 @@ class TestWALClientWrites:
             },
         }
 
+    def test_table_create_keeps_json_dict_keys(self, wal_client):
+        """A row key that is not a str is written as json.dumps writes it."""
+        res = wal_client._send_table_create([{None: "first", "None": "second"}])
+        wal_client._flush()
+
+        records = _read_all_wal_records(wal_client)
+        rows = records[0]["req"]["table"]["rows"]
+        assert rows == [{"null": "first", "None": "second"}]
+        assert res.row_digests == [compute_row_digest(rows[0])]
+
     def test_file_create(self, wal_client):
         img = Image.new("RGB", (2, 2), color="red")
         weave.publish(img, name="my_image")
@@ -159,6 +170,8 @@ class TestWALClientWrites:
         assert file_rec["type"] == "file_create"
         assert file_rec["req"]["project_id"] == project_id
         assert file_rec["req"]["name"] == "obj.py"
+        # Earlier SDK versions replay the record through this model.
+        assert tsi.FileCreateReq.model_validate(file_rec["req"]).name == "obj.py"
 
         image_obj = records[2]
         assert image_obj["type"] == "obj_create"
@@ -448,8 +461,8 @@ class TestTraceServerHandlers:
 
         mock_server.obj_create.assert_called_once()
         call_arg = mock_server.obj_create.call_args[0][0]
-        assert isinstance(call_arg, tsi.ObjCreateReq)
-        assert call_arg.obj.object_id == "test"
+        assert call_arg == record["req"]
+        assert tsi.ObjCreateReq.model_validate(call_arg) == req
 
     def test_handler_calls_table_create(self):
         """table_create handler should call server.table_create."""
@@ -467,43 +480,95 @@ class TestTraceServerHandlers:
 
         mock_server.table_create.assert_called_once()
 
-    def test_file_create_roundtrips_bytes_content(self):
+    @pytest.mark.parametrize("written_from", ["client", "model"])
+    def test_file_create_roundtrips_bytes_content(
+        self, written_from, tmp_path, monkeypatch
+    ):
         """file_create handler must preserve bytes content through replay.
 
-        Regression guard for the model_validate(dict) replay path: Pydantic
-        v2 dumps bytes fields as utf-8 strings under mode="json", and
-        model_validate accepts strings for bytes fields by re-encoding them.
-        The round-trip must be lossless for content that actually reaches
-        the WAL (non-utf8 bytes already fail at write time, so they never
-        reach replay).
+        Regression guard for the replay path: the WAL's JSON dump writes bytes
+        as utf-8 strings, and the handler re-encodes them. The round-trip must
+        be lossless for content that actually reaches the WAL (non-utf8 bytes
+        already fail at write time, so they never reach replay). Records from
+        earlier versions hold a request model's dump and must replay the same.
         """
         mock_server = MagicMock()
         handlers = TraceServerHandlers(mock_server).as_dict()
 
         # utf-8-decodable content — this is the only kind that can reach the
-        # WAL today (model_dump(mode="json") rejects non-utf8 bytes at write
-        # time, so non-utf8 content never appears in a replayed record).
+        # WAL today (the JSON dump rejects non-utf8 bytes at write time, so
+        # non-utf8 content never appears in a replayed record).
         original_content = "small file body — including non-ascii: café 🎉".encode()
-        req = tsi.FileCreateReq(
-            project_id="e/p",
-            name="note.txt",
-            content=original_content,
+        # An earlier version's request model, or the dict the client writes.
+        req = (
+            tsi.FileCreateReq(
+                project_id="e/p", name="note.txt", content=original_content
+            )
+            if written_from == "model"
+            else {
+                "project_id": "e/p",
+                "name": "note.txt",
+                "content": original_content,
+                "expected_digest": None,
+            }
         )
-        # Match the write path exactly: same call as wal_manager.write does.
-        record = {"type": "file_create", "req": req.model_dump(mode="json")}
+        # Match the write path exactly: write the record with WALManager.
+        monkeypatch.setattr("weave.durability.wal_manager.WAL_ROOT", str(tmp_path))
+        mgr = WALManager("e", "p")
+        mgr.write("file_create", req)
+        mgr.close()
+        (record,) = [
+            json.loads(line)
+            for path in Path(mgr.wal_dir).glob("*.jsonl")
+            for line in path.read_text(encoding="utf-8").splitlines()
+        ]
         handlers["file_create"](record)
 
         mock_server.file_create.assert_called_once()
         call_arg = mock_server.file_create.call_args[0][0]
-        assert isinstance(call_arg, tsi.FileCreateReq)
-        assert call_arg.content == original_content
+        assert call_arg == {
+            "project_id": "e/p",
+            "file": ("note.txt", original_content),
+            "expected_digest": None,
+        }
+
+    def test_client_file_create_record_replays_on_earlier_versions(
+        self, tmp_path, monkeypatch
+    ):
+        """The client writes file_create records in the shape earlier SDKs replay."""
+        monkeypatch.setattr("weave.durability.wal_manager.WAL_ROOT", str(tmp_path))
+        client = weave_client.WeaveClient(
+            "e", "p", MagicMock(), ensure_project_exists=False
+        )
+        client._wal = WALManager("e", "p")
+        content = "small file body: café".encode()
+
+        client._send_file_create(
+            {
+                "project_id": "e/p",
+                "file": ("note.txt", content),
+                "expected_digest": None,
+            }
+        )
+        client._wal.close()
+
+        (record,) = [
+            json.loads(line)
+            for path in Path(client._wal.wal_dir).glob("*.jsonl")
+            for line in path.read_text(encoding="utf-8").splitlines()
+        ]
+        # Earlier SDK versions replay the record through this model.
+        expected = tsi.FileCreateReq(project_id="e/p", name="note.txt", content=content)
+        assert record["req"] == expected.model_dump(mode="json")
+        assert tsi.FileCreateReq.model_validate(record["req"]) == expected
 
     def test_call_start_roundtrips_through_handler(self):
-        """call_start handler validates the dict directly (no json.dumps).
+        """call_start handler replays the record's dict as written.
 
         Regression guard for the dominant WAL replay path — every traced
-        op produces a call_start record.  datetime, dict, and string
-        fields must all round-trip correctly via model_validate(dict).
+        op produces a call_start record, and records written from a request
+        model must still replay.  datetime, dict, and string fields must all
+        round-trip.
         """
         mock_server = MagicMock()
         handlers = TraceServerHandlers(mock_server).as_dict()
@@ -524,11 +589,8 @@ class TestTraceServerHandlers:
 
         mock_server.call_start.assert_called_once()
         call_arg = mock_server.call_start.call_args[0][0]
-        assert isinstance(call_arg, tsi.CallStartReq)
-        assert call_arg.start.op_name == "predict"
-        assert call_arg.start.started_at == started
-        assert call_arg.start.attributes == {"k": "v"}
-        assert call_arg.start.inputs == {"x": 1}
+        assert call_arg == record["req"]
+        assert tsi.CallStartReq.model_validate(call_arg) == req
 
     def test_convenience_function_matches_class(self):
         """build_trace_server_handlers should return the same keys as the class."""

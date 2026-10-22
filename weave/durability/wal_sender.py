@@ -41,7 +41,6 @@ import threading
 from collections.abc import Callable
 from typing import Any
 
-from pydantic import BaseModel
 from typing_extensions import Self
 
 from weave.durability.wal import (
@@ -55,12 +54,9 @@ from weave.durability.wal_client_id import WAL_ROOT, compute_client_id
 from weave.durability.wal_consumer import JSONLWALConsumer
 from weave.durability.wal_directory_manager import FileWALDirectoryManager
 from weave.durability.wal_lock import is_writer_alive
-from weave.shared import trace_server_interface as tsi
 from weave.telemetry.trace_sentry import log_error
 from weave.trace_server_bindings.client_interface import TraceServerClientInterface
-from weave.trace_server_bindings.remote_http_trace_server import (
-    RemoteHTTPTraceServer,
-)
+from weave.vendor.weave_server_sdk.types import FileCreateParams
 from weave.wandb_interface.auth import ApiKeyCredentials
 
 logger = logging.getLogger(__name__)
@@ -291,15 +287,27 @@ class BackgroundWALSender:
             log_error("WAL sender final drain error")
 
 
-# Static mapping from WAL record type to its request class.
+def _file_create_params(req: dict[str, Any]) -> FileCreateParams:
+    """A file_create record's request, with the content back as bytes.
+
+    The record holds `name` and `content`, the content written as utf-8 text.
+    """
+    return {
+        "project_id": req["project_id"],
+        "file": (req["name"], req["content"].encode("utf-8")),
+        "expected_digest": req.get("expected_digest"),
+    }
+
+
+# Static mapping from WAL record type to what turns its record into a request.
 # Prefer this over dynamic getattr — type checkers and humans can
-# verify correctness at a glance.
-_RECORD_TYPE_TO_REQ: dict[str, type[BaseModel]] = {
-    "call_start": tsi.CallStartReq,
-    "call_end": tsi.CallEndReq,
-    "obj_create": tsi.ObjCreateReq,
-    "table_create": tsi.TableCreateReq,
-    "file_create": tsi.FileCreateReq,
+# verify correctness at a glance.  ``None`` replays the record's dict as is.
+_RECORD_TYPE_TO_REQ: dict[str, Callable[[dict[str, Any]], Any] | None] = {
+    "call_start": None,
+    "call_end": None,
+    "obj_create": None,
+    "table_create": None,
+    "file_create": _file_create_params,
 }
 
 
@@ -319,23 +327,19 @@ class TraceServerHandlers:
             def _handler(
                 record: WALRecord,
                 _m: Callable = method,
-                _rc: type[BaseModel] = req_cls,
+                _rc: Callable[[dict[str, Any]], Any] | None = req_cls,
                 _rt: str = record_type,
             ) -> None:
                 # We already have a parsed dict in ``record["req"]`` (the WAL
-                # consumer json.loads'd the line).  model_validate on the dict
-                # is strictly cheaper than model_validate_json(json.dumps(...)):
-                # one Pydantic validation pass vs. a JSON encode + Pydantic's
-                # internal JSON decode.
+                # consumer json.loads'd the line).
                 #
-                # bytes round-trip safety: Pydantic v2's mode="json" dump
+                # bytes round-trip safety: the write side's JSON dump
                 # represents bytes as utf-8 strings (NOT base64), and
-                # model_validate accepts strings for bytes fields by
-                # re-encoding them as utf-8 — so the round-trip is lossless.
-                # Non-utf8 content can't reach the WAL at all because the
-                # write-side model_dump(mode="json") raises before the record
+                # _file_create_params re-encodes them as utf-8 — so the
+                # round-trip is lossless. Non-utf8 content can't reach the WAL
+                # at all because the write-side dump raises before the record
                 # is persisted.
-                _m(_rc.model_validate(record["req"]))
+                _m(record["req"] if _rc is None else _rc(record["req"]))
                 if on_success is not None:
                     on_success(_rt, record)
 
@@ -448,7 +452,12 @@ def main(argv: list[str] | None = None) -> None:
 
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
 
-    # RemoteHTTPTraceServer is missing a few abstract methods that the
+    # Imported here: it loads weave.shared, which `import weave` must not load.
+    from weave.trace_server_bindings.remote_http_trace_server import (
+        RemoteHTTPTraceServer,
+    )
+
+    # RemoteHTTPTraceServer is missing a few protocol methods that the
     # WAL sender doesn't use.  Suppress via Any intermediate.
     remote_cls: Any = RemoteHTTPTraceServer
     server: TraceServerClientInterface = remote_cls(

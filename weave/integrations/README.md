@@ -117,7 +117,6 @@ When developing a new integration, it will automatically work with both implicit
    ```
    import pytest
    import weave
-   from weave.shared import trace_server_interface as tsi
    from typing import Generator
 
    @pytest.fixture()

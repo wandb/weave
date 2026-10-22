@@ -3,14 +3,16 @@
 import sys
 import warnings
 
-from weave.shared import validation_util as _canonical
-from weave.shared.validation_util import *  # noqa: F403
+# weave.shared.validation_util warns too; one warning, this module's, is enough.
+with warnings.catch_warnings():
+    warnings.simplefilter("ignore", FutureWarning)
+    from weave.shared import validation_util as _canonical
+    from weave.shared.validation_util import *  # noqa: F403
 
-# TODO: delete this alias after weave 0.53.13.
+# TODO: delete this alias together with weave.shared.
 warnings.warn(
     "weave.trace_server.validation_util is deprecated since weave 0.53.13 and "
-    "will be removed after weave 0.53.13; import weave.shared.validation_util "
-    "instead.",
+    "will be removed in a future release.",
     FutureWarning,
     stacklevel=2,
 )

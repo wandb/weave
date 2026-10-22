@@ -1,18 +1,19 @@
 import json
 import logging
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from typing import TYPE_CHECKING, Any, TypeVar
 
 import httpx
 import tenacity
+from pydantic import BaseModel
 from typing_extensions import ParamSpec
 
-from weave.shared import trace_server_interface as tsi
-from weave.shared.errors import NotFoundError, ObjectDeletedError
+from weave.trace.errors import NotFoundError, ObjectDeletedError
 from weave.trace_server_bindings.async_batch_processor import AsyncBatchProcessor
 from weave.utils.retry import _http_response, _is_retryable_exception, with_retry
 
 if TYPE_CHECKING:
+    from weave.shared import trace_server_interface as tsi
     from weave.trace_server_bindings.models import EndBatchItem, StartBatchItem
 
 logger = logging.getLogger(__name__)
@@ -52,6 +53,21 @@ R = TypeVar("R")
 BatchProcessor = AsyncBatchProcessor
 
 
+def as_params(
+    req: Mapping[str, Any] | BaseModel, *, exclude: set[str] | None = None
+) -> Mapping[str, Any]:
+    """Return a request as the mapping the generated client takes.
+
+    A request model is dumped the way the bindings always dumped it. The keys
+    in `exclude`, which the generated method does not take, are left out.
+    """
+    if isinstance(req, BaseModel):
+        return req.model_dump(by_alias=True, exclude=exclude)
+    if exclude:
+        return {key: value for key, value in req.items() if key not in exclude}
+    return req
+
+
 def log_dropped_call_batch(
     batch: "list[StartBatchItem | EndBatchItem]", e: Exception
 ) -> None:
@@ -60,13 +76,11 @@ def log_dropped_call_batch(
     dropped_start_ids = []
     dropped_end_ids = []
     for item in batch:
-        # Use string comparison to avoid circular imports
-        if hasattr(item, "req") and hasattr(item.req, "start"):
-            # For start items, access the start request
-            dropped_start_ids.append(item.req.start.id)
-        elif hasattr(item, "req") and hasattr(item.req, "end"):
-            # For end items, access the end request
-            dropped_end_ids.append(item.req.end.id)
+        req = as_params(item.req)
+        if "start" in req:
+            dropped_start_ids.append(req["start"].get("id"))
+        elif "end" in req:
+            dropped_end_ids.append(req["end"].get("id"))
     if dropped_start_ids:
         logger.error("dropped call start ids: %s", dropped_start_ids)
     if dropped_end_ids:
@@ -81,14 +95,14 @@ def log_dropped_call_batch(
 
 
 def log_dropped_feedback_batch(
-    batch: list[tsi.FeedbackCreateReq], e: Exception
+    batch: "list[Mapping[str, Any] | tsi.FeedbackCreateReq]", e: Exception
 ) -> None:
     """Log details about a dropped feedback batch for debugging purposes."""
     logger.error("Error sending batch of %s feedback events to server", len(batch))
     dropped_feedback_types = []
     for item in batch:
         feedback_item = item.req if hasattr(item, "req") else item
-        dropped_feedback_types.append(feedback_item.feedback_type)
+        dropped_feedback_types.append(as_params(feedback_item)["feedback_type"])
     if dropped_feedback_types:
         logger.error("dropped feedback types: %s", dropped_feedback_types)
     response = getattr(e, "response", None)
@@ -127,6 +141,89 @@ def _split_and_process_halves(
         )
 
 
+class _InvalidBatchError(Exception):
+    """The server rejected a batch as invalid (422), and the caller decides what to drop."""
+
+    def __init__(self, error: Exception) -> None:
+        super().__init__(str(error))
+        self.error = error
+
+
+def _split_invalid_batch(
+    batch: list[T],
+    error: Exception,
+    *,
+    batch_name: str,
+    remote_request_bytes_limit: int,
+    send_batch_fn: Callable[[bytes], None],
+    processor_obj: BatchProcessor[T] | None,
+    get_item_id_fn: Callable[[T], str] | None,
+    log_dropped_fn: Callable[[list[T], Exception], None] | None,
+    encode_batch_fn: Callable[[list[T]], bytes],
+) -> None:
+    """Find the items that made the server reject a batch as invalid.
+
+    Each half is sent once. A half the server rejects too is split again, so one
+    bad item is dropped alone. When both halves are rejected, the rejection is
+    most likely about every item, for example a field an older server does not
+    accept, so the batch is dropped instead of being split item by item.
+    """
+    split_idx = len(batch) // 2
+    rejected: list[tuple[list[T], Exception]] = []
+    for half in (batch[:split_idx], batch[split_idx:]):
+        try:
+            process_batch_with_retry(
+                half,
+                batch_name=batch_name,
+                remote_request_bytes_limit=remote_request_bytes_limit,
+                send_batch_fn=send_batch_fn,
+                processor_obj=processor_obj,
+                should_update_batch_size=False,
+                get_item_id_fn=get_item_id_fn,
+                log_dropped_fn=log_dropped_fn,
+                encode_batch_fn=encode_batch_fn,
+                split_invalid=False,
+            )
+        except _InvalidBatchError as e:
+            rejected.append((half, e.error))
+
+    if len(rejected) == 2:
+        _log_dropped_batch(batch, rejected[-1][1], batch_name, log_dropped_fn)
+        return
+    for half, half_error in rejected:
+        if len(half) > 1:
+            _split_invalid_batch(
+                half,
+                half_error,
+                batch_name=batch_name,
+                remote_request_bytes_limit=remote_request_bytes_limit,
+                send_batch_fn=send_batch_fn,
+                processor_obj=processor_obj,
+                get_item_id_fn=get_item_id_fn,
+                log_dropped_fn=log_dropped_fn,
+                encode_batch_fn=encode_batch_fn,
+            )
+        else:
+            _log_dropped_batch(half, half_error, batch_name, log_dropped_fn)
+
+
+def _log_dropped_batch(
+    batch: list[T],
+    e: Exception,
+    batch_name: str,
+    log_dropped_fn: Callable[[list[T], Exception], None] | None,
+) -> None:
+    """Log a batch that is dropped because of a non-retryable error."""
+    if log_dropped_fn:
+        log_dropped_fn(batch, e)
+    else:
+        logger.exception(
+            "Error sending batch of %s %s to server.",
+            len(batch),
+            batch_name,
+        )
+
+
 def process_batch_with_retry(
     batch: list[T],
     *,
@@ -138,12 +235,14 @@ def process_batch_with_retry(
     get_item_id_fn: Callable[[T], str] | None = None,
     log_dropped_fn: Callable[[list[T], Exception], None] | None = None,
     encode_batch_fn: Callable[[list[T]], bytes],
+    split_invalid: bool = True,
 ) -> None:
     """Process a batch with common retry and error handling logic.
 
     This function handles the common pattern of:
     - Dynamic batch size adjustment
-    - Batch splitting for oversized batches
+    - Batch splitting for oversized batches and for batches rejected as too
+      large or invalid, so a bad item is dropped alone
     - Error handling with retry logic
     - Requeuing failed batches
 
@@ -157,11 +256,37 @@ def process_batch_with_retry(
         get_item_id_fn: Optional function to extract item IDs for debug logging
         log_dropped_fn: Optional function to log dropped batches
         encode_batch_fn: Function to encode the batch into bytes
+        split_invalid: Whether to split a batch the server rejects as invalid.
+            When False, the rejection raises `_InvalidBatchError` instead, so
+            `_split_invalid_batch` can compare the two halves.
     """
     if len(batch) == 0:
         return
 
-    encoded_data = encode_batch_fn(batch)
+    try:
+        encoded_data = encode_batch_fn(batch)
+    except Exception as e:
+        # Encoding sends nothing, so a failure here repeats on every attempt: the
+        # item that fails is dropped rather than requeued.
+        if len(batch) > 1:
+            logger.warning(
+                "%s batch of %s items failed validation, splitting and retrying",
+                batch_name.capitalize(),
+                len(batch),
+            )
+            _split_and_process_halves(
+                batch,
+                batch_name=batch_name,
+                remote_request_bytes_limit=remote_request_bytes_limit,
+                send_batch_fn=send_batch_fn,
+                processor_obj=processor_obj,
+                get_item_id_fn=get_item_id_fn,
+                log_dropped_fn=log_dropped_fn,
+                encode_batch_fn=encode_batch_fn,
+            )
+        else:
+            _log_dropped_batch(batch, e, batch_name, log_dropped_fn)
+        return
     encoded_bytes = len(encoded_data)
 
     # Update target batch size dynamically based on actual data size
@@ -200,34 +325,36 @@ def process_batch_with_retry(
         # Re-raise so caller can handle the upgrade to calls_complete mode
         raise
     except Exception as e:
-        # Handle 413 specially: server rejected as too large, split and retry
-        if _is_413_error(e) and len(batch) > 1:
+        # The server rejected the whole batch for what may be one item in it:
+        # too large (413) or invalid (422). Split and retry, so only that item
+        # is dropped.
+        status_code = _split_status_code(e)
+        if status_code == INVALID_BATCH_STATUS_CODE and not split_invalid:
+            raise _InvalidBatchError(e) from e
+        if status_code is not None and len(batch) > 1:
             logger.warning(
-                "Server returned 413 for %s batch of %s items, splitting and retrying",
+                "Server returned %s for %s batch of %s items, splitting and retrying",
+                status_code,
                 batch_name,
                 len(batch),
             )
-            _split_and_process_halves(
-                batch,
-                batch_name=batch_name,
-                remote_request_bytes_limit=remote_request_bytes_limit,
-                send_batch_fn=send_batch_fn,
-                processor_obj=processor_obj,
-                get_item_id_fn=get_item_id_fn,
-                log_dropped_fn=log_dropped_fn,
-                encode_batch_fn=encode_batch_fn,
-            )
+            split_kwargs: dict[str, Any] = {
+                "batch_name": batch_name,
+                "remote_request_bytes_limit": remote_request_bytes_limit,
+                "send_batch_fn": send_batch_fn,
+                "processor_obj": processor_obj,
+                "get_item_id_fn": get_item_id_fn,
+                "log_dropped_fn": log_dropped_fn,
+                "encode_batch_fn": encode_batch_fn,
+            }
+            if status_code == INVALID_BATCH_STATUS_CODE:
+                _split_invalid_batch(batch, e, **split_kwargs)
+            else:
+                _split_and_process_halves(batch, **split_kwargs)
             return
 
         if not _is_retryable_exception(e):
-            if log_dropped_fn:
-                log_dropped_fn(batch, e)
-            else:
-                logger.exception(
-                    "Error sending batch of %s %s to server.",
-                    len(batch),
-                    batch_name,
-                )
+            _log_dropped_batch(batch, e, batch_name, log_dropped_fn)
         else:
             # Add items back to the queue for later processing
             logger.warning(
@@ -356,10 +483,19 @@ def check_endpoint_exists(
     return endpoint_exists
 
 
-def _is_413_error(e: Exception) -> bool:
-    """Check if an exception is an HTTP 413 (Payload Too Large) error."""
+# Statuses that reject a whole batch for what may be one item in it: 413 Payload
+# Too Large and 422 Unprocessable Content. Other 4xx (auth, not found, the
+# calls_complete mode 400) apply to every item, so splitting would not help.
+SPLIT_BATCH_STATUS_CODES = frozenset({413, 422})
+INVALID_BATCH_STATUS_CODE = 422
+
+
+def _split_status_code(e: Exception) -> int | None:
+    """The status of an HTTP error that calls for splitting the batch, if any."""
     response = _http_response(e)
-    return response is not None and response.status_code == 413
+    if response is not None and response.status_code in SPLIT_BATCH_STATUS_CODES:
+        return response.status_code
+    return None
 
 
 def _is_retryable_not_found(exc: BaseException) -> bool:
@@ -404,7 +540,7 @@ def retry_on_not_found(func: Callable[P, R]) -> Callable[P, R]:
 
 
 # Error code from server when project requires calls_complete mode
-# This matches the ErrorCode.CALLS_COMPLETE_MODE_REQUIRED from weave.shared.errors
+# This matches the ErrorCode.CALLS_COMPLETE_MODE_REQUIRED from weave.trace.errors
 ERROR_CODE_CALLS_COMPLETE_MODE_REQUIRED = "CALLS_COMPLETE_MODE_REQUIRED"
 
 

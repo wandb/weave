@@ -20,8 +20,17 @@ Usage:
 
 from __future__ import annotations
 
+import warnings
 from dataclasses import dataclass, field
 from typing import Literal
+
+# TODO: delete this module together with weave.shared.
+warnings.warn(
+    "weave.shared.agents.semconv is deprecated and will be removed in a future "
+    "release.",
+    FutureWarning,
+    stacklevel=2,
+)
 
 AttributeType = Literal["string", "int", "float", "string[]", "json"]
 

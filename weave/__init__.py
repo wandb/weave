@@ -1,5 +1,6 @@
 """The top-level functions and classes for working with Weave."""
 
+import importlib
 import sys
 import warnings
 from typing import Any
@@ -92,7 +93,7 @@ from weave.flow.saved_view import SavedView
 from weave.flow.scorer import Scorer
 from weave.object.obj import Object
 from weave.prompt.prompt import EasyPrompt, MessagesPrompt, Prompt, StringPrompt
-from weave.shared.trace_server_interface import CustomRuntimeID
+from weave.trace.custom_runtime import CustomRuntimeID
 from weave.trace.log_call import log_call
 from weave.trace.urls import otel_traces_endpoint
 from weave.trace.util import Thread as Thread
@@ -197,4 +198,7 @@ def __getattr__(name: str) -> Any:
         from weave.trace.otel_op_linker import OpLinkSpanProcessor
 
         return OpLinkSpanProcessor
+    if name == "shared":
+        # `import weave` no longer loads it; its deprecated modules warn when loaded.
+        return importlib.import_module("weave.shared")
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

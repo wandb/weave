@@ -4,8 +4,8 @@ from urllib.parse import urlparse
 
 from pydantic import ConfigDict, Field, field_validator
 
-from weave.shared.errors import InvalidRequest
 from weave.trace.builtin_object_classes import base_object_def
+from weave.trace.errors import InvalidRequest
 from weave.utils.url_safety import is_publicly_routable_url
 
 # Headers that must not appear in user-supplied extra_headers.

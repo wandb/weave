@@ -3,8 +3,11 @@
 import sys
 import warnings
 
-from weave.shared.interface import feedback_types as _canonical
-from weave.shared.interface.feedback_types import *  # noqa: F403
+# weave.shared.interface.feedback_types warns too; one warning, this module's, is enough.
+with warnings.catch_warnings():
+    warnings.simplefilter("ignore", FutureWarning)
+    from weave.shared.interface import feedback_types as _canonical
+    from weave.shared.interface.feedback_types import *  # noqa: F403
 
 # TODO: delete this alias together with weave.shared.
 warnings.warn(

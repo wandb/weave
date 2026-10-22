@@ -5,6 +5,15 @@ the agent query builder. Keeping them here avoids duplication and makes it
 easy to see all tunable values at a glance.
 """
 
+import warnings
+
+# TODO: delete this module together with weave.shared.
+warnings.warn(
+    "weave.shared.agents.constants is deprecated and will be removed in a future "
+    "release.",
+    FutureWarning,
+    stacklevel=2,
+)
 # ---------------------------------------------------------------------------
 # Query limits
 # ---------------------------------------------------------------------------

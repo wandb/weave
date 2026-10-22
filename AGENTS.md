@@ -10,7 +10,7 @@
 
 ## The trace server moved to wandb/core (2026-10-13)
 
-Since 2026-10-13 the trace server runs from wandb/core, in `services/weave-trace/src/trace_server_backend/` (wandb/core#58291). Send changes to the server, its migrations and its tests there, not to `weave/trace_server/`, `tests/trace_server/` or `tests/trace_server_migrator/` in this repo: that copy no longer runs, and wandb/weave#8018 deleted it. The server also has its own copy of `weave/shared/`, in `services/weave-trace/src/trace_server_backend/contract/` (wandb/core#58624), and the UI's builtin object schema is generated from that copy (wandb/core#58719). `weave/shared/` is now only the client's: a change the server must see goes to core, and a field that both the client and the server use needs a PR in each repo. PRs that touch the old server paths or `weave/shared/` need a review from their code owners. The generated model provider and cost files are regenerated in core too, with `make update_model_providers` and `make update_costs` in `services/weave-trace`.
+Since 2026-10-13 the trace server runs from wandb/core, in `services/weave-trace/src/trace_server_backend/` (wandb/core#58291). Send changes to the server, its migrations and its tests there, not to `weave/trace_server/`, `tests/trace_server/` or `tests/trace_server_migrator/` in this repo: that copy no longer runs, and wandb/weave#8018 deleted it. The server also has its own copy of `weave/shared/`, in `services/weave-trace/src/trace_server_backend/contract/` (wandb/core#58624), and the UI's builtin object schema is generated from that copy (wandb/core#58719). The client no longer loads `weave/shared/`: it sends plain dicts in the generated client's params shape and reads the generated client's types, and everything in `weave/shared/` is deprecated until the package is deleted. A request or response field is therefore added in core only and reaches the client with the regenerated client (see *Generated Files* below); a weave PR is needed only for client code that sets or reads it. The exception is the client's own copies of server models, which ignore or reject fields they do not know: the query, filter and sort models that a `SavedView` or `Monitor` stores, in `weave/trace/builtin_object_classes/query.py`, and the `Feedback` rows `get_feedback` returns, in `weave/trace/feedback.py`. A field the server adds to those needs a PR here too. PRs that touch the old server paths or `weave/shared/` need a review from their code owners. The generated model provider and cost files are regenerated in core too, with `make update_model_providers` and `make update_costs` in `services/weave-trace`.
 
 ## Python Import Rules
 
@@ -114,15 +114,16 @@ A new field on a trace-server request is not a reason to regenerate or edit
 either vendored client, or its `origin.json`, in that same PR. Core's OpenAPI
 spec does not contain the field until the server's copy in core has it and core
 exports the spec. The Stainless bot opens the PR that updates these copies. Until that
-PR lands, a Python binding that passes every dumped field into the generated
-method raises `TypeError` on the new name. Pass `exclude={"<field>"}` plus
-`extra_body={"<field>": ...}` to `_stainless_request`, under the comment
+PR lands, a Python binding that passes every request key into the generated
+method raises `TypeError` on the new name. The binding method pops the field
+from the request into `extra_body`, under the comment
 `# The vendored SDK is generated from core and may lag this server's API.`, so
-grepping that line finds every live bridge. Dump a nested model yourself: the
-client's encoder serializes a bare `BaseModel` with `exclude_unset=True` and
-drops every default the caller did not set. Delete those lines once the bot PR
-has merged. The Node client takes one body object, so it does not need that
-bridge.
+grepping that line finds every live bridge, and client code that sends the
+field casts its dict to the params TypedDict, under the same comment. Dump a
+nested model yourself: the client's encoder serializes a bare `BaseModel` with
+`exclude_unset=True` and drops every default the caller did not set. Delete
+those lines once the bot PR has merged. The Node client takes one body object,
+so it does not need that bridge.
 
 Persisted `AgentDashboard` objects intentionally use a closed, discriminated
 schema. Supported panel variants and their configuration fields must be added

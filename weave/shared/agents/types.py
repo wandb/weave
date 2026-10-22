@@ -11,6 +11,7 @@ in the serialization JSON Schema. Request models stay on BaseModel.
 from __future__ import annotations
 
 import datetime
+import warnings
 from typing import TYPE_CHECKING, Annotated, Any, Literal, get_args
 from uuid import UUID
 
@@ -23,31 +24,41 @@ from pydantic import (
     model_validator,
 )
 
-from weave.shared.agents import semconv
-from weave.shared.agents.constants import (
-    DEFAULT_AGENT_CUSTOM_ATTR_SCHEMA_LIMIT,
-    DEFAULT_AGENT_QUERY_LIMIT,
-    DEFAULT_AGENT_STATS_GROUP_LIMIT,
-    DEFAULT_SEARCH_LIMIT,
-    MAX_AGENT_CUSTOM_ATTR_DISTRIBUTION_BINS,
-    MAX_AGENT_CUSTOM_ATTR_DISTRIBUTION_SPECS,
-    MAX_AGENT_CUSTOM_ATTR_DISTRIBUTION_TOP_N,
-    MAX_AGENT_CUSTOM_ATTR_SCHEMA_LIMIT,
-    MAX_AGENT_QUERY_LIMIT,
-    MAX_AGENT_STATS_GROUP_LIMIT,
-    MAX_AGENT_STATS_RANGE_DAYS,
-    MAX_CONVERSATION_CHAT_TURNS,
-    MAX_SEARCH_LIMIT,
-    SPAN_GROUP_RESULT_COLS,
+# Sibling modules warn too; one warning, this module's, is enough.
+with warnings.catch_warnings():
+    warnings.simplefilter("ignore", FutureWarning)
+    from weave.shared.agents import semconv
+    from weave.shared.agents.constants import (
+        DEFAULT_AGENT_CUSTOM_ATTR_SCHEMA_LIMIT,
+        DEFAULT_AGENT_QUERY_LIMIT,
+        DEFAULT_AGENT_STATS_GROUP_LIMIT,
+        DEFAULT_SEARCH_LIMIT,
+        MAX_AGENT_CUSTOM_ATTR_DISTRIBUTION_BINS,
+        MAX_AGENT_CUSTOM_ATTR_DISTRIBUTION_SPECS,
+        MAX_AGENT_CUSTOM_ATTR_DISTRIBUTION_TOP_N,
+        MAX_AGENT_CUSTOM_ATTR_SCHEMA_LIMIT,
+        MAX_AGENT_QUERY_LIMIT,
+        MAX_AGENT_STATS_GROUP_LIMIT,
+        MAX_AGENT_STATS_RANGE_DAYS,
+        MAX_CONVERSATION_CHAT_TURNS,
+        MAX_SEARCH_LIMIT,
+        SPAN_GROUP_RESULT_COLS,
+    )
+    from weave.shared.agents.schema import (
+        NormalizedMessage,
+        SpanKindLiteral,
+        StatusCodeLiteral,
+    )
+    from weave.shared.interface.feedback_types import AgentSpanFeedbackType
+    from weave.shared.interface.query import Query
+    from weave.shared.sensitive_data.policy import SensitiveDataPolicy
+
+# TODO: delete this module together with weave.shared.
+warnings.warn(
+    "weave.shared.agents.types is deprecated and will be removed in a future release.",
+    FutureWarning,
+    stacklevel=2,
 )
-from weave.shared.agents.schema import (
-    NormalizedMessage,
-    SpanKindLiteral,
-    StatusCodeLiteral,
-)
-from weave.shared.interface.feedback_types import AgentSpanFeedbackType
-from weave.shared.interface.query import Query
-from weave.shared.sensitive_data.policy import SensitiveDataPolicy
 
 if TYPE_CHECKING:
     from weave.shared.trace_server_interface import ProcessedResourceSpans

@@ -2,8 +2,7 @@ import random
 
 import pytest
 
-from weave.shared import refs_internal
-from weave.trace import refs
+from weave.trace import refs, refs_internal
 from weave.trace.weave_client import sanitize_object_name
 
 quote = refs_internal.extra_value_quoter

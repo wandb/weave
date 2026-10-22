@@ -11,16 +11,6 @@ from __future__ import annotations
 
 from typing import Protocol, overload
 
-from weave.shared.refs_internal import (
-    InternalAgentConversationRef,
-    InternalAgentSpanRef,
-    InternalAgentTurnRef,
-    InternalCallRef,
-    InternalObjectRef,
-    InternalOpRef,
-    InternalRef,
-    InternalTableRef,
-)
 from weave.trace.refs import (
     AgentConversationRef,
     AgentSpanRef,
@@ -30,6 +20,16 @@ from weave.trace.refs import (
     OpRef,
     Ref,
     TableRef,
+)
+from weave.trace.refs_internal import (
+    InternalAgentConversationRef,
+    InternalAgentSpanRef,
+    InternalAgentTurnRef,
+    InternalCallRef,
+    InternalObjectRef,
+    InternalOpRef,
+    InternalRef,
+    InternalTableRef,
 )
 
 

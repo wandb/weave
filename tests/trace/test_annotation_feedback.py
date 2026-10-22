@@ -3,7 +3,7 @@ from pydantic import BaseModel, Field
 
 import weave
 from weave import AnnotationSpec
-from weave.shared.errors import InvalidRequest
+from weave.trace.errors import InvalidRequest
 from weave.trace_server.trace_server_interface import (
     FeedbackCreateReq,
     ObjDeleteReq,

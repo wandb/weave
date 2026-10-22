@@ -7,9 +7,21 @@ trace_server_interface.py and http_service_interface.py to avoid circular depend
 import hashlib
 import logging
 import threading
+import warnings
 from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
+
+# Re-exported: the client owns this model, so both paths name the same class.
+from weave.trace.builtin_object_classes.query import SortBy  # noqa: F401
+
+# TODO: delete this module together with weave.shared.
+warnings.warn(
+    "weave.shared.common_interface is deprecated and will be removed in a future "
+    "release.",
+    FutureWarning,
+    stacklevel=2,
+)
 
 WB_USER_ID_DESCRIPTION = (
     "Do not set directly. Server will automatically populate this field."
@@ -91,15 +103,6 @@ class BaseModelStrict(BaseModel):
         if extra_fields:
             _warn_ignored_fields_once(cls.__name__, extra_fields)
         return values
-
-
-class SortBy(BaseModelStrict):
-    # Field should be a key of `CallSchema`. For dictionary fields
-    # (`attributes`, `inputs`, `outputs`, `summary`), the field can be
-    # dot-separated.
-    field: str  # Consider changing this to _FieldSelect
-    # Direction should be either 'asc' or 'desc'
-    direction: Literal["asc", "desc"]
 
 
 AnnotationState = Literal["unstarted", "in_progress", "completed", "skipped"]

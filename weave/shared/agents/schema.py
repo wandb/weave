@@ -1,8 +1,16 @@
 """Span and message shapes shared by the agent API models and the spans table."""
 
+import warnings
 from typing import Literal
 
 from pydantic import BaseModel, ConfigDict
+
+# TODO: delete this module together with weave.shared.
+warnings.warn(
+    "weave.shared.agents.schema is deprecated and will be removed in a future release.",
+    FutureWarning,
+    stacklevel=2,
+)
 
 SpanKindLiteral = Literal[
     "UNSPECIFIED",

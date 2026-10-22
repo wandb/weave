@@ -309,11 +309,11 @@ def test_llm_structured_completion_model_predict_text_response(mock_get_client):
     # Verify API call was made correctly
     mock_client.server.completions_create.assert_called_once()
     call_args = mock_client.server.completions_create.call_args[1]["req"]
-    assert call_args.project_id == "test_entity/test_project"
-    assert call_args.inputs.model == "gpt-4"
-    assert call_args.inputs.temperature == 0.7
-    assert call_args.inputs.max_tokens == 100
-    assert call_args.inputs.messages == [{"role": "user", "content": "Hello"}]
+    assert call_args["project_id"] == "test_entity/test_project"
+    assert call_args["inputs"]["model"] == "gpt-4"
+    assert call_args["inputs"]["temperature"] == 0.7
+    assert call_args["inputs"]["max_tokens"] == 100
+    assert call_args["inputs"]["messages"] == [{"role": "user", "content": "Hello"}]
 
 
 @patch("weave.flow.llm_structured_model.get_weave_client")
@@ -407,7 +407,7 @@ def test_llm_structured_completion_model_predict_with_template(mock_get_client):
         {"role": "user", "content": "Hello, my name is Alice"},
         {"role": "user", "content": "What's your name?"},
     ]
-    assert call_args.inputs.messages == expected_messages
+    assert call_args["inputs"]["messages"] == expected_messages
 
 
 @patch("weave.flow.llm_structured_model.get_weave_client")
@@ -456,8 +456,8 @@ def test_llm_structured_completion_model_predict_with_config_override(mock_get_c
 
     # Verify override was applied
     call_args = mock_client.server.completions_create.call_args[1]["req"]
-    assert call_args.inputs.temperature == 0.9  # Overridden
-    assert call_args.inputs.max_tokens == 200  # Overridden
+    assert call_args["inputs"]["temperature"] == 0.9  # Overridden
+    assert call_args["inputs"]["max_tokens"] == 200  # Overridden
 
 
 @patch("weave.flow.llm_structured_model.get_weave_client")
@@ -781,8 +781,8 @@ def test_llm_structured_completion_model_predict_with_prompt(
     call_args = mock_client.server.completions_create.call_args[1]["req"]
 
     # Should have the prompt reference and template_vars in the request
-    assert call_args.inputs.prompt == prompt_ref.uri
-    assert call_args.inputs.template_vars == {
+    assert call_args["inputs"]["prompt"] == prompt_ref.uri
+    assert call_args["inputs"]["template_vars"] == {
         "assistant_name": "Claude",
         "user_name": "Alice",
     }
@@ -791,7 +791,7 @@ def test_llm_structured_completion_model_predict_with_prompt(
     expected_messages = [
         {"role": "user", "content": "What's your name?"},
     ]
-    assert call_args.inputs.messages == expected_messages
+    assert call_args["inputs"]["messages"] == expected_messages
 
 
 @patch("weave.flow.llm_structured_model.get_weave_client")
@@ -842,12 +842,12 @@ def test_llm_structured_completion_model_prompt_takes_precedence(
     call_args = mock_client.server.completions_create.call_args[1]["req"]
 
     # Should have prompt reference and template_vars
-    assert call_args.inputs.prompt == prompt_ref.uri
-    assert call_args.inputs.template_vars == {"var": "test_value"}
+    assert call_args["inputs"]["prompt"] == prompt_ref.uri
+    assert call_args["inputs"]["template_vars"] == {"var": "test_value"}
 
     # Should NOT have messages from messages_template (prompt takes precedence)
     # Messages should be empty since no user_input was provided
-    assert call_args.inputs.messages == []
+    assert call_args["inputs"]["messages"] == []
 
 
 def test_llm_structured_completion_model_schema_validation(client: WeaveClient):

@@ -327,8 +327,7 @@ class UserSettings:
 
     Defaults True, matching historical behavior. Set False to harden a client so it
     only reconstructs data-only custom objects (images, audio, datetimes, etc.) and
-    refuses to import or run any stored `.py`. Server-side workers force this off
-    regardless via `require_secure_weave_client`; deployments can disable it globally
+    refuses to import or run any stored `.py`. Deployments can disable it globally
     with the environment variable `WEAVE_ALLOW_UNSAFE_CUSTOM_OBJ_DECODE=false`.
     """
 
