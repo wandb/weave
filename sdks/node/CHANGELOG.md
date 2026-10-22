@@ -4,6 +4,22 @@ All notable changes to the Weave TypeScript SDK will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.16.10] - 2026-10-22
+
+### Added
+
+- Trace `systemOne` calls from `@typesafe-ai/sdk` (0.6.0 and later) as `chat <model>` spans with provider `typesafe`, recording the response model, input and output token counts, and the `x-typesafe-request-id` header as `gen_ai.response.id`. The SDK is patched on import; `wrapTypeSafe(client, {captureContent})` wraps one client and controls whether state, questions, and answers are kept. ([#7987](https://github.com/wandb/weave/pull/7987))
+
+### Changed
+
+- Identify the SDK on every emitted span with the resource attributes `wandb.sdk.name` (`weave`), `wandb.sdk.version`, and `wandb.sdk.language`. The old `weave.sdk.version` and `weave.sdk.language` attributes are no longer set. ([#7953](https://github.com/wandb/weave/pull/7953))
+- Record cache-write tokens as `gen_ai.usage.cache_write.input_tokens` instead of `gen_ai.usage.cache_creation.input_tokens`, following the current OTel GenAI conventions. Google ADK spans drop the per-message `finish_reason` from `gen_ai.output.messages`. Pi coding agent spans drop it from both `gen_ai.input.messages` and `gen_ai.output.messages` and report it in `gen_ai.response.finish_reasons` instead. ([#8045](https://github.com/wandb/weave/pull/8045))
+
+### Fixed
+
+- Export the schema types behind `Agent`, `AgentMessage`, `AgentSpan`, `AgentTurn`, and `AgentVersion` (such as `AgentSchema`, `AgentChatMessage`, and `NormalizedMessage`), so they can be imported directly and the TypeScript reference links to their fields. ([#8003](https://github.com/wandb/weave/pull/8003))
+
+
 ## [0.16.9] - 2026-09-24
 
 ### Added
