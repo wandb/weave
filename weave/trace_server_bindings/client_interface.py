@@ -428,6 +428,10 @@ class TraceServerClientInterface(Protocol):
         self, req: DatasetSourceLinkParams
     ) -> DatasetSourceLinkResponse: ...
 
+    def dataset_sources_link_delete(
+        self, req: Mapping[str, Any]
+    ) -> DatasetSourcesLinkDeleteRes: ...
+
     def dataset_sources_query(
         self, req: DatasetSourceQueryParams
     ) -> DatasetSourceQueryResponse: ...

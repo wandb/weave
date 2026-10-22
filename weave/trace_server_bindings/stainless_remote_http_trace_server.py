@@ -1623,7 +1623,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
 
     @with_retry
     def dataset_sources_link_delete(
-        self, req: Mapping[str, Any] | tsi.DatasetSourcesLinkDeleteReq
+        self, req: Mapping[str, Any]
     ) -> DatasetSourcesLinkDeleteRes:
         """Soft-delete dataset source links by id.
 

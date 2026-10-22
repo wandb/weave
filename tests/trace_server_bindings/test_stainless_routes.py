@@ -781,7 +781,7 @@ def test_v2_method_reaches_its_flat_route(
         ),
         pytest.param(
             "dataset_sources_link_delete",
-            tsi.DatasetSourcesLinkDeleteReq(project_id=PROJECT, link_ids=["l1"]),
+            {"project_id": PROJECT, "link_ids": ["l1"]},
             "POST",
             "/dataset_sources/link_delete",
             DatasetSourcesLinkDeleteRes,
@@ -1463,9 +1463,11 @@ COMPLETION_INPUTS = {
         ),
         pytest.param(
             "dataset_sources_link_delete",
-            tsi.DatasetSourcesLinkDeleteReq(
-                project_id=PROJECT, link_ids=["l1", "l2"], wb_user_id="user-id"
-            ),
+            {
+                "project_id": PROJECT,
+                "link_ids": ["l1", "l2"],
+                "wb_user_id": "user-id",
+            },
             {
                 "project_id": PROJECT,
                 "link_ids": ["l1", "l2"],
