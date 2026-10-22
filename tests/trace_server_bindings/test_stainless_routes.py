@@ -12,6 +12,7 @@ import collections.abc
 import datetime
 import inspect
 import json
+import operator
 import types
 import typing
 from collections.abc import Iterator
@@ -36,6 +37,11 @@ from weave.trace_server_bindings.stainless_remote_http_trace_server import (
 )
 from weave.vendor.weave_server_sdk import Client as StainlessClient
 from weave.vendor.weave_server_sdk.types import (
+    AgentQueryParams,
+    AgentQueryResponse,
+    AgentSearchParams,
+    AgentSearchResponse,
+    AgentTraceChatRes,
     AnnotationQueueCreateParams,
     AnnotationQueueCreateResponse,
     AnnotationQueueDeleteParams,
@@ -96,8 +102,77 @@ from weave.vendor.weave_server_sdk.types import (
     ThreadStreamQueryParams,
     ThreadStreamQueryResponse,
     TraceUsageParams,
+    V2DatasetCreateParams,
+    V2DatasetCreateResponse,
+    V2DatasetDeleteParams,
+    V2DatasetListParams,
+    V2DatasetListResponse,
+    V2EvalResultQueryParams,
+    V2EvalResultQueryResponse,
+    V2EvaluationCreateParams,
+    V2EvaluationCreateResponse,
+    V2EvaluationDeleteParams,
+    V2EvaluationListParams,
+    V2EvaluationListResponse,
+    V2EvaluationReadResponse,
+    V2EvaluationRunCreateParams,
+    V2EvaluationRunCreateResponse,
+    V2EvaluationRunDeleteParams,
+    V2EvaluationRunDeleteResponse,
+    V2EvaluationRunFinishParams,
+    V2EvaluationRunFinishResponse,
+    V2EvaluationRunListParams,
+    V2EvaluationRunListResponse,
+    V2EvaluationRunReadResponse,
+    V2ModelCreateParams,
+    V2ModelCreateResponse,
+    V2ModelDeleteParams,
+    V2ModelListParams,
+    V2ModelListResponse,
+    V2ModelReadResponse,
+    V2OpCreateParams,
+    V2OpCreateResponse,
+    V2OpDeleteParams,
+    V2OpListParams,
+    V2OpListResponse,
+    V2PredictionCreateParams,
+    V2PredictionCreateResponse,
+    V2PredictionDeleteParams,
+    V2PredictionDeleteResponse,
+    V2PredictionFinishResponse,
+    V2PredictionListParams,
+    V2PredictionListResponse,
+    V2PredictionReadResponse,
     V2RuntimeApplyParams,
     V2RuntimeApplyResponse,
+    V2ScoreCreateParams,
+    V2ScoreCreateResponse,
+    V2ScoreDeleteParams,
+    V2ScoreDeleteResponse,
+    V2ScoreListParams,
+    V2ScoreListResponse,
+    V2ScorerCreateParams,
+    V2ScorerCreateResponse,
+    V2ScorerDeleteParams,
+    V2ScoreReadResponse,
+    V2ScorerListParams,
+    V2ScorerListResponse,
+    V2ScorerReadResponse,
+)
+from weave.vendor.weave_server_sdk.types.agents import (
+    AgentVersionQueryParams,
+    AgentVersionQueryResponse,
+    ConversationChatParams,
+    ConversationChatResponse,
+    ConversationSpansParams,
+    ConversationSpansResponse,
+    SpanCustomAttrsSchemaParams,
+    SpanCustomAttrsSchemaResponse,
+    SpanQueryParams,
+    SpanQueryResponse,
+    SpanStatsParams,
+    SpanStatsResponse,
+    TraceChatParams,
 )
 from weave.vendor.weave_server_sdk.types.annotation_queues import (
     ItemAddParams,
@@ -281,7 +356,7 @@ def _mock_server(
             ),
             "POST",
             f"{V2}/ops",
-            tsi.OpCreateRes,
+            V2OpCreateResponse,
             id="op_create",
         ),
         pytest.param(
@@ -297,7 +372,7 @@ def _mock_server(
             tsi.DatasetCreateReq(project_id=PROJECT, name="my-object", rows=[]),
             "POST",
             f"{V2}/datasets",
-            tsi.DatasetCreateRes,
+            V2DatasetCreateResponse,
             id="dataset_create",
         ),
         pytest.param(
@@ -317,7 +392,7 @@ def _mock_server(
             ),
             "POST",
             f"{V2}/scorers",
-            tsi.ScorerCreateRes,
+            V2ScorerCreateResponse,
             id="scorer_create",
         ),
         pytest.param(
@@ -327,7 +402,7 @@ def _mock_server(
             ),
             "GET",
             f"{V2}/scorers/my-object/versions/abc123",
-            tsi.ScorerReadRes,
+            V2ScorerReadResponse,
             id="scorer_read",
         ),
         pytest.param(
@@ -337,7 +412,7 @@ def _mock_server(
             ),
             "POST",
             f"{V2}/evaluations",
-            tsi.EvaluationCreateRes,
+            V2EvaluationCreateResponse,
             id="evaluation_create",
         ),
         pytest.param(
@@ -347,7 +422,7 @@ def _mock_server(
             ),
             "GET",
             f"{V2}/evaluations/my-object/versions/abc123",
-            tsi.EvaluationReadRes,
+            V2EvaluationReadResponse,
             id="evaluation_read",
         ),
         pytest.param(
@@ -357,7 +432,7 @@ def _mock_server(
             ),
             "POST",
             f"{V2}/models",
-            tsi.ModelCreateRes,
+            V2ModelCreateResponse,
             id="model_create",
         ),
         pytest.param(
@@ -367,7 +442,7 @@ def _mock_server(
             ),
             "GET",
             f"{V2}/models/my-object/versions/abc123",
-            tsi.ModelReadRes,
+            V2ModelReadResponse,
             id="model_read",
         ),
         pytest.param(
@@ -377,7 +452,7 @@ def _mock_server(
             ),
             "POST",
             f"{V2}/evaluation_runs",
-            tsi.EvaluationRunCreateRes,
+            V2EvaluationRunCreateResponse,
             id="evaluation_run_create",
         ),
         pytest.param(
@@ -385,7 +460,7 @@ def _mock_server(
             tsi.EvaluationRunReadReq(project_id=PROJECT, evaluation_run_id="run-id"),
             "GET",
             f"{V2}/evaluation_runs/run-id",
-            tsi.EvaluationRunReadRes,
+            V2EvaluationRunReadResponse,
             id="evaluation_run_read",
         ),
         pytest.param(
@@ -395,7 +470,7 @@ def _mock_server(
             ),
             "DELETE",
             f"{V2}/evaluation_runs",
-            tsi.EvaluationRunDeleteRes,
+            V2EvaluationRunDeleteResponse,
             id="evaluation_run_delete",
         ),
         pytest.param(
@@ -403,7 +478,7 @@ def _mock_server(
             tsi.EvaluationRunFinishReq(project_id=PROJECT, evaluation_run_id="run-id"),
             "POST",
             f"{V2}/evaluation_runs/run-id/finish",
-            tsi.EvaluationRunFinishRes,
+            V2EvaluationRunFinishResponse,
             id="evaluation_run_finish",
         ),
         pytest.param(
@@ -413,7 +488,7 @@ def _mock_server(
             ),
             "POST",
             f"{V2}/predictions",
-            tsi.PredictionCreateRes,
+            V2PredictionCreateResponse,
             id="prediction_create",
         ),
         pytest.param(
@@ -421,7 +496,7 @@ def _mock_server(
             tsi.PredictionReadReq(project_id=PROJECT, prediction_id="prediction-id"),
             "GET",
             f"{V2}/predictions/prediction-id",
-            tsi.PredictionReadRes,
+            V2PredictionReadResponse,
             id="prediction_read",
         ),
         pytest.param(
@@ -431,7 +506,7 @@ def _mock_server(
             ),
             "DELETE",
             f"{V2}/predictions",
-            tsi.PredictionDeleteRes,
+            V2PredictionDeleteResponse,
             id="prediction_delete",
         ),
         pytest.param(
@@ -439,7 +514,7 @@ def _mock_server(
             tsi.PredictionFinishReq(project_id=PROJECT, prediction_id="prediction-id"),
             "POST",
             f"{V2}/predictions/prediction-id/finish",
-            tsi.PredictionFinishRes,
+            V2PredictionFinishResponse,
             id="prediction_finish",
         ),
         pytest.param(
@@ -452,7 +527,7 @@ def _mock_server(
             ),
             "POST",
             f"{V2}/scores",
-            tsi.ScoreCreateRes,
+            V2ScoreCreateResponse,
             id="score_create",
         ),
         pytest.param(
@@ -460,7 +535,7 @@ def _mock_server(
             tsi.ScoreReadReq(project_id=PROJECT, score_id="score-id"),
             "GET",
             f"{V2}/scores/score-id",
-            tsi.ScoreReadRes,
+            V2ScoreReadResponse,
             id="score_read",
         ),
         pytest.param(
@@ -468,7 +543,7 @@ def _mock_server(
             tsi.ScoreDeleteReq(project_id=PROJECT, score_ids=["score-id"]),
             "DELETE",
             f"{V2}/scores",
-            tsi.ScoreDeleteRes,
+            V2ScoreDeleteResponse,
             id="score_delete",
         ),
     ],
@@ -499,7 +574,7 @@ def test_v2_method_reaches_its_flat_route(
             agent_types.AgentSpansQueryReq(project_id=PROJECT),
             "POST",
             "/agents/spans/query",
-            agent_types.AgentSpansQueryRes,
+            SpanQueryResponse,
             id="agent_spans_query",
         ),
         pytest.param(
@@ -507,7 +582,7 @@ def test_v2_method_reaches_its_flat_route(
             agent_types.AgentTraceChatReq(project_id=PROJECT, trace_id="t1"),
             "POST",
             "/agents/traces/chat",
-            agent_types.AgentTraceChatRes,
+            AgentTraceChatRes,
             id="agent_traces_chat",
         ),
         pytest.param(
@@ -517,7 +592,7 @@ def test_v2_method_reaches_its_flat_route(
             ),
             "POST",
             "/agents/conversations/chat",
-            agent_types.AgentConversationChatRes,
+            ConversationChatResponse,
             id="agent_conversation_chat",
         ),
         pytest.param(
@@ -525,7 +600,7 @@ def test_v2_method_reaches_its_flat_route(
             agent_types.AgentConversationSpansReq(project_id=PROJECT),
             "POST",
             "/agents/conversations/spans",
-            agent_types.AgentConversationSpansRes,
+            ConversationSpansResponse,
             id="agent_conversation_spans",
         ),
         pytest.param(
@@ -533,7 +608,7 @@ def test_v2_method_reaches_its_flat_route(
             agent_types.AgentsQueryReq(project_id=PROJECT),
             "POST",
             "/agents/query",
-            agent_types.AgentsQueryRes,
+            AgentQueryResponse,
             id="agent_agents_query",
         ),
         pytest.param(
@@ -543,7 +618,7 @@ def test_v2_method_reaches_its_flat_route(
             ),
             "POST",
             "/agents/agent-versions/query",
-            agent_types.AgentVersionsQueryRes,
+            AgentVersionQueryResponse,
             id="agent_versions_query",
         ),
         pytest.param(
@@ -575,7 +650,7 @@ def test_v2_method_reaches_its_flat_route(
             ),
             "POST",
             "/agents/spans/stats",
-            agent_types.AgentSpanStatsRes,
+            SpanStatsResponse,
             id="agent_spans_stats",
         ),
         pytest.param(
@@ -583,7 +658,7 @@ def test_v2_method_reaches_its_flat_route(
             agent_types.AgentCustomAttrsSchemaReq(project_id=PROJECT),
             "POST",
             "/agents/spans/custom-attrs/schema",
-            agent_types.AgentCustomAttrsSchemaRes,
+            SpanCustomAttrsSchemaResponse,
             id="agent_custom_attrs_schema",
         ),
         pytest.param(
@@ -591,7 +666,7 @@ def test_v2_method_reaches_its_flat_route(
             agent_types.AgentSearchReq(project_id=PROJECT),
             "POST",
             "/agents/search",
-            agent_types.AgentSearchRes,
+            AgentSearchResponse,
             id="agent_search",
         ),
         pytest.param(
@@ -821,7 +896,7 @@ def test_v2_method_reaches_its_flat_route(
             tsi.EvalResultsQueryReq(project_id=PROJECT, evaluation_call_ids=["c1"]),
             "POST",
             f"{V2}/eval_results/query",
-            tsi.EvalResultsQueryRes,
+            V2EvalResultQueryResponse,
             id="eval_results_query",
         ),
     ],
@@ -1593,9 +1668,10 @@ def test_route_sends_every_supported_field(
     assert json.loads(mock_server.requests[0].content) == expected_body
 
 
+@pytest.mark.parametrize("as_dict", [False, True])
 @pytest.mark.parametrize("include_model_tool_calls", [None, False, True])
 def test_chat_tool_call_option_reaches_http(
-    include_model_tool_calls: bool | None,
+    include_model_tool_calls: bool | None, as_dict: bool
 ) -> None:
     mock_server = _mock_server(httpx.Response(200, json=V1_RESPONSE))
     trace_req = agent_types.AgentTraceChatReq(project_id=PROJECT, trace_id="t1")
@@ -1606,11 +1682,15 @@ def test_chat_tool_call_option_reaches_http(
         trace_req.include_model_tool_calls = include_model_tool_calls
         conversation_req.include_model_tool_calls = include_model_tool_calls
 
-    trace = mock_server.server.agent_traces_chat(trace_req)
-    conversation = mock_server.server.agent_conversation_chat(conversation_req)
+    trace = mock_server.server.agent_traces_chat(
+        trace_req.model_dump() if as_dict else trace_req
+    )
+    conversation = mock_server.server.agent_conversation_chat(
+        conversation_req.model_dump() if as_dict else conversation_req
+    )
 
-    assert isinstance(trace, agent_types.AgentTraceChatRes)
-    assert isinstance(conversation, agent_types.AgentConversationChatRes)
+    assert isinstance(trace, AgentTraceChatRes)
+    assert isinstance(conversation, ConversationChatResponse)
     assert [request.url.path for request in mock_server.requests] == [
         "/agents/traces/chat",
         "/agents/conversations/chat",
@@ -1950,6 +2030,41 @@ def _leaves(value: Any, here: str = "") -> Iterator[tuple[str, Any]]:
             "POST",
             "/service/projects_info",
         ),
+        pytest.param(
+            "agent_spans_query", SpanQueryParams, "POST", "/agents/spans/query"
+        ),
+        pytest.param(
+            "agent_traces_chat", TraceChatParams, "POST", "/agents/traces/chat"
+        ),
+        pytest.param(
+            "agent_conversation_chat",
+            ConversationChatParams,
+            "POST",
+            "/agents/conversations/chat",
+        ),
+        pytest.param(
+            "agent_conversation_spans",
+            ConversationSpansParams,
+            "POST",
+            "/agents/conversations/spans",
+        ),
+        pytest.param("agent_agents_query", AgentQueryParams, "POST", "/agents/query"),
+        pytest.param(
+            "agent_versions_query",
+            AgentVersionQueryParams,
+            "POST",
+            "/agents/agent-versions/query",
+        ),
+        pytest.param(
+            "agent_spans_stats", SpanStatsParams, "POST", "/agents/spans/stats"
+        ),
+        pytest.param(
+            "agent_custom_attrs_schema",
+            SpanCustomAttrsSchemaParams,
+            "POST",
+            "/agents/spans/custom-attrs/schema",
+        ),
+        pytest.param("agent_search", AgentSearchParams, "POST", "/agents/search"),
     ],
 )
 def test_every_params_key_reaches_the_request(
@@ -2132,6 +2247,136 @@ def test_feedback_create_sends_every_key(
     assert all(value == f"<{path}>" for path, value in body.items())
 
 
+@pytest.mark.parametrize(
+    ("method_name", "generated_method", "params_type"),
+    [
+        pytest.param("op_create", "v2_ops.create", V2OpCreateParams),
+        pytest.param("op_list", "v2_ops.list", V2OpListParams),
+        pytest.param("op_delete", "v2_ops.delete", V2OpDeleteParams),
+        pytest.param("dataset_create", "v2_datasets.create", V2DatasetCreateParams),
+        pytest.param("dataset_list", "v2_datasets.list", V2DatasetListParams),
+        pytest.param("dataset_delete", "v2_datasets.delete", V2DatasetDeleteParams),
+        pytest.param("scorer_create", "v2_scorers.create", V2ScorerCreateParams),
+        pytest.param("scorer_read", "v2_scorers.read", None),
+        pytest.param("scorer_list", "v2_scorers.list", V2ScorerListParams),
+        pytest.param("scorer_delete", "v2_scorers.delete", V2ScorerDeleteParams),
+        pytest.param(
+            "evaluation_create", "v2_evaluations.create", V2EvaluationCreateParams
+        ),
+        pytest.param("evaluation_read", "v2_evaluations.read", None),
+        pytest.param("evaluation_list", "v2_evaluations.list", V2EvaluationListParams),
+        pytest.param(
+            "evaluation_delete", "v2_evaluations.delete", V2EvaluationDeleteParams
+        ),
+        pytest.param("model_create", "v2_models.create", V2ModelCreateParams),
+        pytest.param("model_read", "v2_models.read", None),
+        pytest.param("model_list", "v2_models.list", V2ModelListParams),
+        pytest.param("model_delete", "v2_models.delete", V2ModelDeleteParams),
+        pytest.param(
+            "evaluation_run_create",
+            "v2_evaluation_runs.create",
+            V2EvaluationRunCreateParams,
+        ),
+        pytest.param("evaluation_run_read", "v2_evaluation_runs.read", None),
+        pytest.param(
+            "evaluation_run_list", "v2_evaluation_runs.list", V2EvaluationRunListParams
+        ),
+        pytest.param(
+            "evaluation_run_delete",
+            "v2_evaluation_runs.delete",
+            V2EvaluationRunDeleteParams,
+        ),
+        pytest.param(
+            "evaluation_run_finish",
+            "v2_evaluation_runs.finish",
+            V2EvaluationRunFinishParams,
+        ),
+        pytest.param(
+            "prediction_create", "v2_predictions.create", V2PredictionCreateParams
+        ),
+        pytest.param("prediction_read", "v2_predictions.read", None),
+        pytest.param("prediction_list", "v2_predictions.list", V2PredictionListParams),
+        pytest.param(
+            "prediction_delete", "v2_predictions.delete", V2PredictionDeleteParams
+        ),
+        pytest.param("prediction_finish", "v2_predictions.finish", None),
+        pytest.param("score_create", "v2_scores.create", V2ScoreCreateParams),
+        pytest.param("score_read", "v2_scores.read", None),
+        pytest.param("score_list", "v2_scores.list", V2ScoreListParams),
+        pytest.param("score_delete", "v2_scores.delete", V2ScoreDeleteParams),
+        pytest.param(
+            "eval_results_query", "v2_eval_results.query", V2EvalResultQueryParams
+        ),
+    ],
+)
+def test_every_v2_argument_reaches_the_request(
+    method_name: str, generated_method: str, params_type: type | None
+):
+    """A v2 binding method must pass on every argument of its generated method.
+
+    The binding takes the project as `project_id`, which fills the route's
+    `entity` and `project` path parameters.
+    """
+    mock_server = _mock_server(httpx.Response(200, json=V2_RESPONSE))
+    generated = operator.attrgetter(generated_method)(
+        mock_server.server._stainless_client
+    )
+    typed = _sentinel_params(params_type) if params_type is not None else {}
+    arguments = {
+        name: typed.get(name, f"<{name}>")
+        for name in inspect.signature(generated).parameters
+        if name not in {"extra_headers", "extra_query", "extra_body", "timeout"}
+    }
+    req = {
+        "project_id": f"{arguments.pop('entity')}/{arguments.pop('project')}",
+        **arguments,
+    }
+
+    res = getattr(mock_server.server, method_name)(req)
+    if inspect.isgenerator(res):
+        list(res)
+
+    assert len(mock_server.requests) == 1
+    request = mock_server.requests[0]
+    body = dict(_leaves(json.loads(request.content))) if request.content else {}
+    sent = sorted(
+        [*body.values(), *request.url.params.values(), *request.url.path.split("/")]
+    )
+    assert [s for s in sent if s.startswith("<")] == sorted(
+        ["<entity>", "<project>", *(value for _, value in _leaves(arguments))]
+    )
+    # Each body value sits under the key path it names.
+    assert all(value == f"<{path}>" for path, value in body.items())
+
+
+def test_evaluation_run_list_sends_the_filter_as_query_params():
+    """Test that each filter field of a request model becomes its own query param."""
+    mock_server = _mock_server(
+        httpx.Response(200, content=b"", headers={"content-type": "application/jsonl"})
+    )
+
+    res = mock_server.server.evaluation_run_list(
+        tsi.EvaluationRunListReq(
+            project_id=PROJECT,
+            filter=tsi.EvaluationRunFilter(
+                evaluations=["ev-ref"], models=["m1", "m2"], evaluation_run_ids=["r1"]
+            ),
+            limit=10,
+        )
+    )
+
+    assert list(res) == []
+    assert len(mock_server.requests) == 1
+    assert mock_server.requests[0].url.path == f"{V2}/evaluation_runs"
+    assert mock_server.requests[0].url.params.multi_items() == [
+        ("evaluation_run_ids", "r1"),
+        ("evaluations", "ev-ref"),
+        ("limit", "10"),
+        ("models", "m1"),
+        ("models", "m2"),
+    ]
+
+
 @pytest.mark.parametrize("should_batch", [False, True])
 def test_call_records_written_from_models_replay(should_batch: bool, monkeypatch):
     """A WAL record holds a request model's JSON dump; replaying sends it."""
@@ -2262,14 +2507,14 @@ def test_call_records_written_from_models_replay(should_batch: bool, monkeypatch
                 },
             ],
             [
-                tsi.OpReadRes(
+                V2OpListResponse(
                     object_id="op-1",
                     digest="d1",
                     version_index=0,
                     created_at="2026-08-20T00:00:00Z",
                     code="def f(): pass",
                 ),
-                tsi.OpReadRes(
+                V2OpListResponse(
                     object_id="op-2",
                     digest="d2",
                     version_index=1,
@@ -2302,7 +2547,7 @@ def test_call_records_written_from_models_replay(should_batch: bool, monkeypatch
                 },
             ],
             [
-                tsi.DatasetReadRes(
+                V2DatasetListResponse(
                     object_id="ds-1",
                     digest="d1",
                     version_index=0,
@@ -2310,7 +2555,7 @@ def test_call_records_written_from_models_replay(should_batch: bool, monkeypatch
                     name="ds-1",
                     rows="weave:///entity/project/table/abc123",
                 ),
-                tsi.DatasetReadRes(
+                V2DatasetListResponse(
                     object_id="ds-2",
                     digest="d2",
                     version_index=1,
@@ -2344,7 +2589,7 @@ def test_call_records_written_from_models_replay(should_batch: bool, monkeypatch
                 },
             ],
             [
-                tsi.ScorerReadRes(
+                V2ScorerListResponse(
                     object_id="s-1",
                     digest="d1",
                     version_index=0,
@@ -2352,7 +2597,7 @@ def test_call_records_written_from_models_replay(should_batch: bool, monkeypatch
                     name="s-1",
                     score_op="weave:///entity/project/op/s:abc123",
                 ),
-                tsi.ScorerReadRes(
+                V2ScorerListResponse(
                     object_id="s-2",
                     digest="d2",
                     version_index=1,
@@ -2390,7 +2635,7 @@ def test_call_records_written_from_models_replay(should_batch: bool, monkeypatch
                 },
             ],
             [
-                tsi.EvaluationReadRes(
+                V2EvaluationListResponse(
                     object_id="ev-1",
                     digest="d1",
                     version_index=0,
@@ -2400,7 +2645,7 @@ def test_call_records_written_from_models_replay(should_batch: bool, monkeypatch
                     scorers=[],
                     trials=1,
                 ),
-                tsi.EvaluationReadRes(
+                V2EvaluationListResponse(
                     object_id="ev-2",
                     digest="d2",
                     version_index=1,
@@ -2436,7 +2681,7 @@ def test_call_records_written_from_models_replay(should_batch: bool, monkeypatch
                 },
             ],
             [
-                tsi.ModelReadRes(
+                V2ModelListResponse(
                     object_id="m-1",
                     digest="d1",
                     version_index=0,
@@ -2444,7 +2689,7 @@ def test_call_records_written_from_models_replay(should_batch: bool, monkeypatch
                     name="m-1",
                     source_code="def f(): pass",
                 ),
-                tsi.ModelReadRes(
+                V2ModelListResponse(
                     object_id="m-2",
                     digest="d2",
                     version_index=1,
@@ -2464,10 +2709,10 @@ def test_call_records_written_from_models_replay(should_batch: bool, monkeypatch
                 {"evaluation_run_id": "r2", "evaluation": "ev-ref", "model": "m-ref"},
             ],
             [
-                tsi.EvaluationRunReadRes(
+                V2EvaluationRunListResponse(
                     evaluation_run_id="r1", evaluation="ev-ref", model="m-ref"
                 ),
-                tsi.EvaluationRunReadRes(
+                V2EvaluationRunListResponse(
                     evaluation_run_id="r2", evaluation="ev-ref", model="m-ref"
                 ),
             ],
@@ -2482,10 +2727,10 @@ def test_call_records_written_from_models_replay(should_batch: bool, monkeypatch
                 {"prediction_id": "p2", "model": "m-ref", "inputs": {}, "output": None},
             ],
             [
-                tsi.PredictionReadRes(
+                V2PredictionListResponse(
                     prediction_id="p1", model="m-ref", inputs={}, output=None
                 ),
-                tsi.PredictionReadRes(
+                V2PredictionListResponse(
                     prediction_id="p2", model="m-ref", inputs={}, output=None
                 ),
             ],
@@ -2500,8 +2745,8 @@ def test_call_records_written_from_models_replay(should_batch: bool, monkeypatch
                 {"score_id": "s2", "scorer": "s-ref", "value": 2},
             ],
             [
-                tsi.ScoreReadRes(score_id="s1", scorer="s-ref", value=1),
-                tsi.ScoreReadRes(score_id="s2", scorer="s-ref", value=2),
+                V2ScoreListResponse(score_id="s1", scorer="s-ref", value=1),
+                V2ScoreListResponse(score_id="s2", scorer="s-ref", value=2),
             ],
             id="score_list",
         ),
