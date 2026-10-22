@@ -2,8 +2,7 @@
 
 These tests drive the binding through the vendored generated client over an
 httpx.MockTransport, so what they assert is the request the generated resource
-builds. The file is not gated to the stainless shard, so it also runs against
-the default one.
+builds.
 """
 
 from __future__ import annotations
