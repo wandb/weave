@@ -1141,6 +1141,38 @@ def test_edited_object_reaches_call_start_and_end():
         assert value["_type"]["name"] == "thing"
 
 
+def test_edited_object_publishes_again():
+    """A fetched object edited and saved again is sent as a new object version.
+
+    Its serialized `_type` holds the object's ref, which has to go out as JSON.
+    """
+    sent: list[tuple[str, dict]] = []
+    client = _client_storing_objects(sent)
+    ref = client._save_object(_EditedThing(a="hello"), "thing")
+    thing = client.get(ref)
+    thing.a = "newer"
+
+    client._save_object(thing, "thing")
+    client._flush()
+
+    creates = [body["obj"] for path, body in sent if path == "/obj/create"]
+    assert len(creates) == 2
+    assert creates[1]["val"]["a"] == "newer"
+    assert creates[1]["val"]["_type"]["name"] == "thing"
+
+
+def test_saved_object_sends_dict_keys_the_way_the_digest_reads_them():
+    """A dict key that is not a str goes out as json.dumps writes it."""
+    sent: list[tuple[str, dict]] = []
+    client = _client_storing_objects(sent)
+
+    client._save_object({None: "first", "None": "second"}, "keys")
+    client._flush()
+
+    creates = [body["obj"] for path, body in sent if path == "/obj/create"]
+    assert [obj["val"] for obj in creates] == [{"null": "first", "None": "second"}]
+
+
 class _Config(pydantic.BaseModel):
     retries: int = 3
 

@@ -135,6 +135,49 @@ def test_call_start_batch_takes_a_dict(mock_post, unbatched_server):
     )
 
 
+@pytest.mark.parametrize(
+    "req",
+    [
+        pytest.param(
+            tsi.FileCreateReq(
+                project_id="entity/project",
+                name="pic.png",
+                content=b"\x89PNG",
+                expected_digest="deadbeef",
+            ),
+            id="model",
+        ),
+        pytest.param(
+            {
+                "project_id": "entity/project",
+                "file": ("pic.png", b"\x89PNG"),
+                "expected_digest": "deadbeef",
+            },
+            id="dict",
+        ),
+    ],
+)
+@patch("weave.utils.http_requests.post")
+def test_file_create_takes_the_generated_params(mock_post, req, unbatched_server):
+    """A dict in the generated client's shape uploads what the request model does."""
+    mock_post.return_value = httpx.Response(
+        200,
+        json={"digest": "abc123"},
+        request=httpx.Request("POST", "http://example.com"),
+    )
+
+    res = unbatched_server.file_create(req)
+
+    mock_post.assert_called_once()
+    assert mock_post.call_args.args[0] == "http://example.com/files/create"
+    assert mock_post.call_args.kwargs["data"] == {
+        "project_id": "entity/project",
+        "expected_digest": "deadbeef",
+    }
+    assert mock_post.call_args.kwargs["files"] == {"file": ("pic.png", b"\x89PNG")}
+    assert res == tsi.FileCreateRes(digest="abc123")
+
+
 @patch("weave.utils.http_requests.put")
 def test_custom_runtime_apply_sends_put_request(mock_put, unbatched_server):
     expected = tsi.CustomRuntimeApplyRes(

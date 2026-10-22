@@ -114,17 +114,16 @@ A new field on a trace-server request is not a reason to regenerate or edit
 either vendored client, or its `origin.json`, in that same PR. Core's OpenAPI
 spec does not contain the field until the server's copy in core has it and core
 exports the spec. The Stainless bot opens the PR that updates these copies. Until that
-PR lands, a Python binding that passes every dumped field into the generated
-method raises `TypeError` on the new name. Pass `exclude={"<field>"}` plus
-`extra_body={"<field>": ...}` to `_stainless_request`, under the comment
+PR lands, a Python binding that passes every request key into the generated
+method raises `TypeError` on the new name. The binding method pops the field
+from the request into `extra_body`, under the comment
 `# The vendored SDK is generated from core and may lag this server's API.`, so
-grepping that line finds every live bridge. A binding method that takes the
-request as a dict pops the field into `extra_body` instead, and client code that
-sends the field casts its dict to the params TypedDict, under the same comment.
-Dump a nested model yourself: the client's encoder serializes a bare
-`BaseModel` with `exclude_unset=True` and drops every default the caller did
-not set. Delete those lines once the bot PR has merged. The Node client takes
-one body object, so it does not need that bridge.
+grepping that line finds every live bridge, and client code that sends the
+field casts its dict to the params TypedDict, under the same comment. Dump a
+nested model yourself: the client's encoder serializes a bare `BaseModel` with
+`exclude_unset=True` and drops every default the caller did not set. Delete
+those lines once the bot PR has merged. The Node client takes one body object,
+so it does not need that bridge.
 
 Persisted `AgentDashboard` objects intentionally use a closed, discriminated
 schema. Supported panel variants and their configuration fields must be added

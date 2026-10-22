@@ -399,10 +399,8 @@ def test_delete_reports_deleted_versions(client: WeaveClient):
         )
     )
     assert res.num_deleted == 1
-    assert res.deleted_versions == [
-        tsi.DeletedObjVersion(
-            digest=v0.digest, base_object_class=None, leaf_object_class=None
-        )
+    assert [dv.model_dump() for dv in res.deleted_versions] == [
+        {"digest": v0.digest, "base_object_class": None, "leaf_object_class": None}
     ]
 
     # Alias digests are resolved to content digests in the report.
@@ -413,10 +411,8 @@ def test_delete_reports_deleted_versions(client: WeaveClient):
             digests=["latest"],
         )
     )
-    assert res.deleted_versions == [
-        tsi.DeletedObjVersion(
-            digest=v1.digest, base_object_class=None, leaf_object_class=None
-        )
+    assert [dv.model_dump() for dv in res.deleted_versions] == [
+        {"digest": v1.digest, "base_object_class": None, "leaf_object_class": None}
     ]
 
 

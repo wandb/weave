@@ -9,6 +9,7 @@ the default one.
 from __future__ import annotations
 
 import collections.abc
+import dataclasses
 import datetime
 import inspect
 import json
@@ -26,10 +27,17 @@ from pydantic import BaseModel
 
 from tests.trace_server_bindings.conftest import generate_call_start_end_pair
 from weave.durability.wal_sender import build_trace_server_handlers
+from weave.trace.serialization.digest import compute_object_digest, compute_row_digest
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.agents import types as agent_types
 from weave.trace_server_bindings import (
     stainless_remote_http_trace_server as stainless_binding,
+)
+from weave.trace_server_bindings.client_interface import (
+    ObjAddTagsParams,
+    ObjRemoveAliasesParams,
+    ObjRemoveTagsParams,
+    ObjSetAliasesParams,
 )
 from weave.trace_server_bindings.models import DatasetSourcesLinkDeleteRes
 from weave.trace_server_bindings.stainless_remote_http_trace_server import (
@@ -94,11 +102,25 @@ from weave.vendor.weave_server_sdk.types import (
     FeedbackReplaceParams,
     FeedbackStatsParams,
     FeedbackStatsResponse,
+    FileContentParams,
+    FileCreateResponse,
+    FileStatsParams,
     ImageCreateParams,
     ImageCreateResponse,
+    ObjectCreateParams,
+    ObjectDeleteParams,
+    ObjectQueryParams,
+    ObjectReadParams,
     ProjectStatsParams,
     ProjectStatsResponse,
+    RefReadBatchParams,
     ServiceProjectsInfoParams,
+    TableCreateFromDigestsParams,
+    TableCreateParams,
+    TableQueryParams,
+    TableQueryStatsBatchParams,
+    TableQueryStatsParams,
+    TableUpdateParams,
     ThreadStreamQueryParams,
     ThreadStreamQueryResponse,
     TraceUsageParams,
@@ -183,6 +205,10 @@ from weave.vendor.weave_server_sdk.types.annotation_queues import (
 from weave.vendor.weave_server_sdk.types.call_read_response import Call
 from weave.vendor.weave_server_sdk.types.call_upsert_batch_response import (
     ReCallStartRes,
+)
+from weave.vendor.weave_server_sdk.types.objects import (
+    AliasListParams,
+    TagListParams,
 )
 from weave.vendor.weave_server_sdk.types.projects import (
     TtlSettingReadParams,
@@ -979,17 +1005,19 @@ def test_route_reaches_its_path(
         ),
     ],
 )
+@pytest.mark.parametrize("as_dict", [False, True], ids=["model", "dict"])
 def test_tag_and_alias_method_omits_wb_user_id(
     method_name: str,
     req: BaseModel,
     expected_method: str,
     expected_path: str,
     expected_body: dict,
+    as_dict: bool,
 ):
     """Test that the server-populated wb_user_id stays out of the request."""
     mock_server = _mock_server(httpx.Response(200, json={}))
 
-    getattr(mock_server.server, method_name)(req)
+    getattr(mock_server.server, method_name)(req.model_dump() if as_dict else req)
 
     assert len(mock_server.requests) == 1
     assert (mock_server.requests[0].method, mock_server.requests[0].url.path) == (
@@ -997,6 +1025,18 @@ def test_tag_and_alias_method_omits_wb_user_id(
         expected_path,
     )
     assert json.loads(mock_server.requests[0].content) == expected_body
+
+
+def test_objs_query_drops_a_query_key():
+    """A dict with a `query` key, which the route lacks, sends the model's body."""
+    mock_server = _mock_server(httpx.Response(200, json={"objs": []}))
+    req = tsi.ObjQueryReq(project_id=PROJECT)
+
+    mock_server.server.objs_query(req)
+    mock_server.server.objs_query({**req.model_dump(), "query": {"$expr": {}}})
+
+    first, second = (json.loads(r.content) for r in mock_server.requests)
+    assert first == second
 
 
 @pytest.mark.parametrize(
@@ -2065,6 +2105,54 @@ def _leaves(value: Any, here: str = "") -> Iterator[tuple[str, Any]]:
             "/agents/spans/custom-attrs/schema",
         ),
         pytest.param("agent_search", AgentSearchParams, "POST", "/agents/search"),
+        pytest.param("obj_create", ObjectCreateParams, "POST", "/obj/create"),
+        pytest.param("obj_read", ObjectReadParams, "POST", "/obj/read"),
+        pytest.param("objs_query", ObjectQueryParams, "POST", "/objs/query"),
+        pytest.param("obj_delete", ObjectDeleteParams, "POST", "/obj/delete"),
+        pytest.param(
+            "obj_add_tags",
+            ObjAddTagsParams,
+            "PUT",
+            "/objs/<object_id>/versions/<digest>/tags",
+        ),
+        pytest.param(
+            "obj_remove_tags",
+            ObjRemoveTagsParams,
+            "POST",
+            "/objs/<object_id>/versions/<digest>/tags/remove",
+        ),
+        pytest.param(
+            "obj_set_aliases", ObjSetAliasesParams, "PUT", "/objs/<object_id>/aliases"
+        ),
+        pytest.param(
+            "obj_remove_aliases",
+            ObjRemoveAliasesParams,
+            "POST",
+            "/objs/<object_id>/aliases/remove",
+        ),
+        pytest.param("tags_list", TagListParams, "GET", "/tags"),
+        pytest.param("aliases_list", AliasListParams, "GET", "/aliases"),
+        pytest.param("table_create", TableCreateParams, "POST", "/table/create"),
+        pytest.param("table_update", TableUpdateParams, "POST", "/table/update"),
+        pytest.param("table_query", TableQueryParams, "POST", "/table/query"),
+        pytest.param(
+            "table_query_stats", TableQueryStatsParams, "POST", "/table/query_stats"
+        ),
+        pytest.param(
+            "table_query_stats_batch",
+            TableQueryStatsBatchParams,
+            "POST",
+            "/table/query_stats_batch",
+        ),
+        pytest.param(
+            "table_create_from_digests",
+            TableCreateFromDigestsParams,
+            "POST",
+            "/table/create_from_digests",
+        ),
+        pytest.param("refs_read_batch", RefReadBatchParams, "POST", "/refs/read_batch"),
+        pytest.param("file_content_read", FileContentParams, "POST", "/file/content"),
+        pytest.param("files_stats", FileStatsParams, "POST", "/files/query_stats"),
     ],
 )
 def test_every_params_key_reaches_the_request(
@@ -2092,7 +2180,7 @@ def test_every_params_key_reaches_the_request(
     assert len(mock_server.requests) == 1
     request = mock_server.requests[0]
     assert (request.method, request.url.path) == (expected_method, expected_path)
-    body = dict(_leaves(json.loads(request.content)))
+    body = dict(_leaves(json.loads(request.content) if request.content else {}))
     # A header parameter (the stream's `accept`) joins the generated default.
     headers = [v for h in request.headers.values() for v in h.split(", ")]
     sent = sorted(
@@ -2431,6 +2519,46 @@ def test_call_records_written_from_models_replay(should_batch: bool, monkeypatch
                 tsi.CallsUpsertCompleteReq(batch=[paired]).model_dump(mode="json"),
             )
         ]
+
+
+def _sent(request: httpx.Request) -> tuple[str, str, bytes]:
+    """A request's method, path and body, with any multipart boundary made fixed."""
+    body = request.read()
+    content_type = request.headers.get("content-type", "")
+    if "boundary=" in content_type:
+        body = body.replace(content_type.split("boundary=")[1].encode(), b"BOUNDARY")
+    return request.method, request.url.path, body
+
+
+def test_object_records_written_from_models_replay():
+    """WAL records hold a request model's JSON dump; replaying sends what the model did."""
+    models: dict[str, BaseModel] = {
+        "obj_create": tsi.ObjCreateReq(
+            obj=tsi.ObjSchemaForInsert(
+                project_id=PROJECT, object_id="o", val={"a": [1, "b", None]}
+            )
+        ),
+        "table_create": tsi.TableCreateReq(
+            table=tsi.TableSchemaForInsert(project_id=PROJECT, rows=[{"x": 1.5}])
+        ),
+        "file_create": tsi.FileCreateReq(
+            project_id=PROJECT,
+            name="f.txt",
+            content="café".encode(),
+            expected_digest="d",
+        ),
+    }
+    direct = _mock_server(httpx.Response(200, json={"digest": "d"}))
+    for method_name, req in models.items():
+        getattr(direct.server, method_name)(req)
+
+    replayed = _mock_server(httpx.Response(200, json={"digest": "d"}))
+    handlers = build_trace_server_handlers(replayed.server)
+    for record_type, req in models.items():
+        handlers[record_type]({"type": record_type, "req": req.model_dump(mode="json")})
+
+    assert len(direct.requests) == 3
+    assert [_sent(r) for r in replayed.requests] == [_sent(r) for r in direct.requests]
 
 
 @pytest.mark.parametrize(
@@ -2824,6 +2952,170 @@ def test_file_content_read_keeps_bytes():
     assert res.content == content
 
 
+@dataclass
+class _Payload:
+    n: int
+
+
+def _table_update_response() -> httpx.Response:
+    return httpx.Response(200, json={"digest": "d", "updated_row_digests": ["r"]})
+
+
+def test_table_update_sends_a_generator_of_updates():
+    """Updates read once for the size estimate still reach the request."""
+    mock_server = _mock_server(_table_update_response())
+
+    mock_server.server.table_update(
+        {
+            "project_id": PROJECT,
+            "base_digest": "b",
+            "updates": (u for u in [{"append": {"row": {"x": 1}}}]),
+        }
+    )
+
+    assert len(mock_server.requests) == 1
+    body = json.loads(mock_server.requests[0].content)
+    assert body["updates"] == [{"append": {"row": {"x": 1}}}]
+
+
+def test_table_update_splits_a_generator_of_updates():
+    """A large request built from a generator is split without losing updates."""
+    mock_server = _mock_server(_table_update_response())
+    mock_server.server.remote_request_bytes_limit = 10
+
+    res = mock_server.server.table_update(
+        {
+            "project_id": PROJECT,
+            "base_digest": "b",
+            "updates": (u for u in [{"append": {"row": {"x": i}}} for i in range(4)]),
+        }
+    )
+
+    sent = [json.loads(r.content)["updates"] for r in mock_server.requests]
+    assert sent == [[{"append": {"row": {"x": i}}}] for i in range(4)]
+    assert res.updated_row_digests == ["r"] * 4
+
+
+def test_table_update_sends_a_dataclass_row_as_a_dict():
+    """A row holding a dataclass encodes the way the request model encoded it."""
+    mock_server = _mock_server(_table_update_response())
+
+    mock_server.server.table_update(
+        {
+            "project_id": PROJECT,
+            "base_digest": "b",
+            "updates": [{"append": {"row": {"nested": _Payload(1)}}}],
+        }
+    )
+
+    body = json.loads(mock_server.requests[0].content)
+    assert body["updates"] == [{"append": {"row": {"nested": {"n": 1}}}}]
+
+
+def test_table_create_sends_a_dataclass_row_as_a_dict():
+    """A row holding a dataclass encodes the way the request model encoded it."""
+    mock_server = _mock_server(httpx.Response(200, json={"digest": "d"}))
+
+    mock_server.server.table_create(
+        {"table": {"project_id": PROJECT, "rows": [{"nested": _Payload(1)}]}}
+    )
+
+    body = json.loads(mock_server.requests[0].content)
+    assert body["table"]["rows"] == [{"nested": {"n": 1}}]
+
+
+def test_obj_create_sends_a_dataclass_value_as_a_dict():
+    """An object value holding a dataclass encodes the way the request model encoded it."""
+    mock_server = _mock_server(httpx.Response(200, json={"digest": "d"}))
+
+    mock_server.server.obj_create(
+        {
+            "obj": {
+                "project_id": PROJECT,
+                "object_id": "o",
+                "val": {"nested": _Payload(1)},
+            }
+        }
+    )
+
+    body = json.loads(mock_server.requests[0].content)
+    assert body["obj"]["val"] == {"nested": {"n": 1}}
+
+
+_NON_STR_KEYS = {None: "first", "None": "second", True: "t"}
+_JSON_KEYS = {"null": "first", "None": "second", "true": "t"}
+
+
+def test_obj_create_sends_dict_keys_the_way_the_digest_reads_them():
+    """A non-str key goes out as json.dumps writes it, so the digest still matches."""
+    mock_server = _mock_server(httpx.Response(200, json={"digest": "d"}))
+
+    mock_server.server.obj_create(
+        {"obj": {"project_id": PROJECT, "object_id": "o", "val": dict(_NON_STR_KEYS)}}
+    )
+
+    sent = json.loads(mock_server.requests[0].content)["obj"]["val"]
+    assert sent == _JSON_KEYS
+    assert compute_object_digest(sent) == compute_object_digest(dict(_NON_STR_KEYS))
+
+
+def test_table_rows_send_dict_keys_the_way_the_digest_reads_them():
+    """A row with a non-str key goes out as json.dumps writes it, on create and update."""
+    create_server = _mock_server(httpx.Response(200, json={"digest": "d"}))
+    update_server = _mock_server(_table_update_response())
+
+    create_server.server.table_create(
+        {"table": {"project_id": PROJECT, "rows": [dict(_NON_STR_KEYS)]}}
+    )
+    update_server.server.table_update(
+        {
+            "project_id": PROJECT,
+            "base_digest": "b",
+            "updates": [{"append": {"row": dict(_NON_STR_KEYS)}}],
+        }
+    )
+
+    created = json.loads(create_server.requests[0].content)["table"]["rows"]
+    updated = json.loads(update_server.requests[0].content)["updates"]
+    assert created == [_JSON_KEYS]
+    assert updated == [{"append": {"row": _JSON_KEYS}}]
+    assert compute_row_digest(created[0]) == compute_row_digest(dict(_NON_STR_KEYS))
+
+
+@dataclasses.dataclass
+class _KeyHolder:
+    m: dict
+
+
+def test_dict_keys_inside_a_dataclass_go_out_the_way_the_digest_reads_them():
+    """Keys inside a dataclass are converted too, in object values and table rows."""
+    obj_server = _mock_server(httpx.Response(200, json={"digest": "d"}))
+    table_server = _mock_server(httpx.Response(200, json={"digest": "d"}))
+
+    obj_server.server.obj_create(
+        {
+            "obj": {
+                "project_id": PROJECT,
+                "object_id": "o",
+                "val": {"holder": _KeyHolder(dict(_NON_STR_KEYS))},
+            }
+        }
+    )
+    table_server.server.table_create(
+        {
+            "table": {
+                "project_id": PROJECT,
+                "rows": [{"holder": _KeyHolder(dict(_NON_STR_KEYS))}],
+            }
+        }
+    )
+
+    sent_val = json.loads(obj_server.requests[0].content)["obj"]["val"]
+    sent_rows = json.loads(table_server.requests[0].content)["table"]["rows"]
+    assert sent_val == {"holder": {"m": _JSON_KEYS}}
+    assert sent_rows == [{"holder": {"m": _JSON_KEYS}}]
+
+
 def test_custom_runtime_name_keeps_its_colon():
     """Test that a runtime name reaches the path without percent-encoding."""
     mock_server = _mock_server(httpx.Response(200, json=V1_RESPONSE))
@@ -2899,18 +3191,33 @@ def test_completions_create_stream_reads_ndjson_chunks():
     assert json.loads(request.content)["wb_user_id"] == "user-id"
 
 
-def test_file_create_sends_the_filename():
+@pytest.mark.parametrize(
+    "req",
+    [
+        pytest.param(
+            tsi.FileCreateReq(
+                project_id=PROJECT,
+                name="pic.png",
+                content=b"\x89PNG",
+                expected_digest="deadbeef",
+            ),
+            id="model",
+        ),
+        pytest.param(
+            {
+                "project_id": PROJECT,
+                "file": ("pic.png", b"\x89PNG"),
+                "expected_digest": "deadbeef",
+            },
+            id="dict",
+        ),
+    ],
+)
+def test_file_create_sends_the_filename(req):
     """Test that the upload keeps the filename on the multipart part."""
     mock_server = _mock_server(httpx.Response(200, json={"digest": "abc123"}))
 
-    res = mock_server.server.file_create(
-        tsi.FileCreateReq(
-            project_id=PROJECT,
-            name="pic.png",
-            content=b"\x89PNG",
-            expected_digest="deadbeef",
-        )
-    )
+    res = mock_server.server.file_create(req)
 
     assert len(mock_server.requests) == 1
     assert (mock_server.requests[0].method, mock_server.requests[0].url.path) == (
@@ -2922,7 +3229,7 @@ def test_file_create_sends_the_filename():
     assert b'filename="pic.png"' in body
     assert b"\x89PNG" in body
     assert b"deadbeef" in body
-    assert res == tsi.FileCreateRes(digest="abc123")
+    assert res == FileCreateResponse(digest="abc123")
 
 
 @pytest.mark.parametrize(
