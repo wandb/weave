@@ -453,6 +453,9 @@ def from_json(obj: Any, project_id: str, server: TraceServerClientInterface) -> 
             {k: from_json(v, project_id, server) for k, v in obj.items()}
         )
     elif isinstance(obj, str) and obj.startswith("weave://"):
-        return Ref.parse_uri(obj)
+        # Keep plain strings that look like refs but are not valid Weave URIs
+        # (e.g. doc links). Invalid URIs must not break call/object reads.
+        parsed = Ref.maybe_parse_uri(obj)
+        return parsed if parsed is not None else obj
 
     return obj
