@@ -45,8 +45,8 @@ if TYPE_CHECKING:
     )
     from opentelemetry.sdk.trace import TracerProvider
 
-    from weave.shared.service_interface import ServerInfoRes
     from weave.trace.op import PostprocessInputsFunc, PostprocessOutputFunc
+    from weave.vendor.weave_server_sdk.types import ServerInfoRes
 
 logger = logging.getLogger(__name__)
 

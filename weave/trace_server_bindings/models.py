@@ -39,6 +39,28 @@ class CallsQueryRes:
     calls: list[Call]
 
 
+@dataclass
+class DatasetSourcesLinkDeleteEntry:
+    """Whether one link was deleted; False if it was already deleted."""
+
+    link_id: str
+    deleted: bool
+
+
+@dataclass
+class DatasetSourcesLinkDeleteRes:
+    """The `dataset_sources_link_delete` response, which the generated client lacks."""
+
+    entries: list[DatasetSourcesLinkDeleteEntry]
+
+
+@dataclass
+class EnsureProjectExistsRes:
+    """What `ensure_project_exists` returns: it calls W&B, not a trace server route."""
+
+    project_name: str
+
+
 class EntityProjectInfo(BaseModel):
     """Extracted entity and project information from a project_id."""
 

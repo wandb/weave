@@ -18,7 +18,6 @@ from pydantic_core import to_jsonable_python
 from weave.chat.chat import Chat
 from weave.chat.inference_models import InferenceModels
 from weave.durability.wal_manager import WALManager
-from weave.shared.common_interface import AnnotationQueueItemsFilter, SortBy
 from weave.shared.interface.feedback_types import (
     RUNNABLE_FEEDBACK_TYPE_PREFIX,
     runnable_feedback_output_selector,
@@ -26,28 +25,7 @@ from weave.shared.interface.feedback_types import (
 )
 from weave.shared.trace_server_interface import (
     AliasesListReq,
-    AnnotationQueueAddCallsReq,
-    AnnotationQueueAddCallsRes,
-    AnnotationQueueCreateReq,
-    AnnotationQueueDeleteReq,
-    AnnotationQueueItemSchema,
-    AnnotationQueueItemsQueryReq,
-    AnnotationQueueReadReq,
-    AnnotationQueueSchema,
-    AnnotationQueuesQueryReq,
-    AnnotationQueuesStatsReq,
-    AnnotationQueueStatsSchema,
-    AnnotationQueueUpdateReq,
-    CostCreateInput,
-    CostCreateReq,
-    CostCreateRes,
-    CostPurgeReq,
-    CostQueryOutput,
-    CostQueryReq,
-    CustomRuntimeApplyReq,
-    CustomRuntimeApplyRes,
     CustomRuntimeID,
-    FeedbackCreateReq,
     FileCreateReq,
     FileCreateRes,
     ObjAddTagsReq,
@@ -97,6 +75,7 @@ from weave.trace.casting import (
 )
 from weave.trace.concurrent.futures import FutureExecutor
 from weave.trace.constants import (
+    DEFAULT_CUSTOM_RUNTIME_MAX_TOKENS,
     INVOKING_SPAN_ATTR_KEY,
     MAX_OBJECT_NAME_LENGTH,
     TRACE_CALL_EMOJI,
@@ -107,7 +86,11 @@ from weave.trace.errors import (
     InvalidExternalRef,
     format_http_error,
 )
-from weave.trace.feedback import FeedbackQuery, RefFeedbackQuery
+from weave.trace.feedback import (
+    FeedbackQuery,
+    RefFeedbackQuery,
+    feedback_create_params,
+)
 from weave.trace.interface_query_builder import (
     exists_expr,
     get_field_expr,
@@ -190,6 +173,7 @@ from weave.trace_server_bindings.client_interface import TraceServerClientInterf
 from weave.trace_server_bindings.http_utils import (
     REMOTE_REQUEST_BYTES_LIMIT,
     ROW_COUNT_CHUNKING_THRESHOLD,
+    as_params,
     check_endpoint_exists,
     retry_on_not_found,
 )
@@ -210,9 +194,23 @@ from weave.utils.project_id import from_project_id, to_project_id
 from weave.utils.retry import _http_response
 from weave.utils.sanitize import REDACTED_VALUE, redact_dataclass_fields, should_redact
 from weave.vendor.weave_server_sdk.types import (
+    AnnotationQueueSchema,
     CallEndParams,
     CallStartParams,
     CallUpdateParams,
+    CostCreateResponse,
+    V2RuntimeApplyResponse,
+    annotation_queue_query_params,
+    annotation_queue_stats_response,
+    cost_create_params,
+    cost_purge_params,
+    cost_query_params,
+    cost_query_response,
+)
+from weave.vendor.weave_server_sdk.types.annotation_queues import (
+    ItemAddResponse,
+    item_query_params,
+    item_query_response,
 )
 from weave.vendor.weave_server_sdk.types.call_end_params import EndSummary
 
@@ -610,7 +608,7 @@ class WeaveClient:
         runtime_ids: Iterable[str | CustomRuntimeID],
         api_key_secret: str | None = None,
         headers: Mapping[str, str] | None = None,
-    ) -> CustomRuntimeApplyRes:
+    ) -> V2RuntimeApplyResponse:
         """Register a custom runtime, replacing its configuration if it exists.
 
         Runtime IDs omitted from this call are removed. String IDs use the
@@ -619,20 +617,20 @@ class WeaveClient:
         update.
         """
         normalized_runtime_ids = [
-            CustomRuntimeID(id=runtime_id)
+            {"id": runtime_id, "max_tokens": DEFAULT_CUSTOM_RUNTIME_MAX_TOKENS}
             if isinstance(runtime_id, str)
-            else runtime_id
+            else as_params(runtime_id)
             for runtime_id in runtime_ids
         ]
         return self.server.custom_runtime_apply(
-            CustomRuntimeApplyReq(
-                project_id=self.project_id,
-                runtime_name=name,
-                base_url=base_url,
-                api_key_secret=api_key_secret,
-                headers=headers or {},
-                runtime_ids=normalized_runtime_ids,
-            )
+            {
+                "project_id": self.project_id,
+                "runtime_name": name,
+                "base_url": base_url,
+                "api_key_secret": api_key_secret,
+                "headers": dict(headers or {}),
+                "runtime_ids": normalized_runtime_ids,
+            }
         )
 
     @trace_sentry.global_trace_sentry.watch()
@@ -1358,12 +1356,13 @@ class WeaveClient:
             The ID of the created annotation queue.
         """
         res = self.server.annotation_queue_create(
-            AnnotationQueueCreateReq(
-                project_id=self.project_id,
-                name=name,
-                description=description,
-                scorer_refs=scorer_refs,
-            )
+            {
+                "project_id": self.project_id,
+                "name": name,
+                "description": description,
+                "scorer_refs": scorer_refs,
+                "wb_user_id": None,
+            }
         )
         return res.id
 
@@ -1371,7 +1370,7 @@ class WeaveClient:
     def get_annotation_queue(self, queue_id: str) -> AnnotationQueueSchema:
         """Read a single annotation queue by ID."""
         res = self.server.annotation_queue_read(
-            AnnotationQueueReadReq(project_id=self.project_id, queue_id=queue_id)
+            {"project_id": self.project_id, "queue_id": queue_id}
         )
         return res.queue
 
@@ -1380,20 +1379,22 @@ class WeaveClient:
         self,
         *,
         name: str | None = None,
-        sort_by: list[SortBy] | None = None,
+        sort_by: list[annotation_queue_query_params.SortBy] | None = None,
         limit: int | None = None,
         offset: int | None = None,
     ) -> list[AnnotationQueueSchema]:
         """List annotation queues for this project."""
         return list(
             self.server.annotation_queues_query_stream(
-                AnnotationQueuesQueryReq(
-                    project_id=self.project_id,
-                    name=name,
-                    sort_by=sort_by,
-                    limit=limit,
-                    offset=offset,
-                )
+                {
+                    "project_id": self.project_id,
+                    "name": name,
+                    "sort_by": None
+                    if sort_by is None
+                    else [cast_to_sort_by(s) for s in sort_by],
+                    "limit": limit,
+                    "offset": offset,
+                }
             )
         )
 
@@ -1408,13 +1409,13 @@ class WeaveClient:
     ) -> AnnotationQueueSchema:
         """Update annotation queue metadata."""
         res = self.server.annotation_queue_update(
-            AnnotationQueueUpdateReq(
-                project_id=self.project_id,
-                queue_id=queue_id,
-                name=name,
-                description=description,
-                scorer_refs=scorer_refs,
-            )
+            {
+                "project_id": self.project_id,
+                "queue_id": queue_id,
+                "name": name,
+                "description": description,
+                "scorer_refs": scorer_refs,
+            }
         )
         return res.queue
 
@@ -1422,7 +1423,7 @@ class WeaveClient:
     def delete_annotation_queue(self, queue_id: str) -> AnnotationQueueSchema:
         """Soft-delete an annotation queue."""
         res = self.server.annotation_queue_delete(
-            AnnotationQueueDeleteReq(project_id=self.project_id, queue_id=queue_id)
+            {"project_id": self.project_id, "queue_id": queue_id}
         )
         return res.queue
 
@@ -1433,7 +1434,7 @@ class WeaveClient:
         *,
         call_ids: list[str],
         display_fields: list[str],
-    ) -> AnnotationQueueAddCallsRes:
+    ) -> ItemAddResponse:
         """Add calls to an annotation queue.
 
         Args:
@@ -1445,12 +1446,12 @@ class WeaveClient:
         # Ensure newly created calls are persisted before queue membership is created.
         self._flush()
         return self.server.annotation_queue_add_calls(
-            AnnotationQueueAddCallsReq(
-                project_id=self.project_id,
-                queue_id=queue_id,
-                call_ids=call_ids,
-                display_fields=display_fields,
-            )
+            {
+                "project_id": self.project_id,
+                "call_ids": call_ids,
+                "display_fields": display_fields,
+                "queue_id": queue_id,
+            }
         )
 
     @trace_sentry.global_trace_sentry.watch()
@@ -1458,33 +1459,37 @@ class WeaveClient:
         self,
         queue_id: str,
         *,
-        filter: AnnotationQueueItemsFilter | None = None,
-        sort_by: list[SortBy] | None = None,
+        filter: item_query_params.Filter | None = None,
+        sort_by: list[item_query_params.SortBy] | None = None,
         limit: int | None = None,
         offset: int | None = None,
         include_position: bool = False,
-    ) -> list[AnnotationQueueItemSchema]:
+    ) -> list[item_query_response.Item]:
         """List calls assigned to an annotation queue."""
         res = self.server.annotation_queue_items_query(
-            AnnotationQueueItemsQueryReq(
-                project_id=self.project_id,
-                queue_id=queue_id,
-                filter=filter,
-                sort_by=sort_by,
-                limit=limit,
-                offset=offset,
-                include_position=include_position,
-            )
+            {
+                "project_id": self.project_id,
+                "filter": None
+                if filter is None
+                else cast(item_query_params.Filter, as_params(filter)),
+                "sort_by": None
+                if sort_by is None
+                else [cast_to_sort_by(s) for s in sort_by],
+                "limit": limit,
+                "offset": offset,
+                "include_position": include_position,
+                "queue_id": queue_id,
+            }
         )
         return res.items
 
     @trace_sentry.global_trace_sentry.watch()
     def get_annotation_queue_stats(
         self, queue_ids: list[str]
-    ) -> list[AnnotationQueueStatsSchema]:
+    ) -> list[annotation_queue_stats_response.Stat]:
         """Get item completion stats for annotation queues."""
         res = self.server.annotation_queues_stats(
-            AnnotationQueuesStatsReq(project_id=self.project_id, queue_ids=queue_ids)
+            {"project_id": self.project_id, "queue_ids": queue_ids}
         )
         return res.stats
 
@@ -2287,7 +2292,7 @@ class WeaveClient:
 
     def get_feedback(
         self,
-        query: Query | str | None = None,
+        query: Mapping[str, Any] | str | None = None,
         *,
         reaction: str | None = None,
         offset: int = 0,
@@ -2307,18 +2312,14 @@ class WeaveClient:
 
             # Find all feedback objects with a specific feedback type with
             # mongo-style query.
-            from weave.shared.interface.query import Query
-
-            query = Query(
-                **{
-                    "$expr": {
-                        "$eq": [
-                            {"$getField": "feedback_type"},
-                            {"$literal": "wandb.reaction.1"},
-                        ],
-                    }
+            query = {
+                "$expr": {
+                    "$eq": [
+                        {"$getField": "feedback_type"},
+                        {"$literal": "wandb.reaction.1"},
+                    ],
                 }
-            )
+            }
             client.get_feedback(query=query)
             ```
 
@@ -2344,8 +2345,8 @@ class WeaveClient:
                     {"$literal": query},
                 ],
             }
-        elif isinstance(query, Query):
-            expr = query.expr_
+        elif query is not None:
+            expr = cast_to_query(query)["$expr"]
 
         if reaction:
             expr = {
@@ -2365,7 +2366,7 @@ class WeaveClient:
                     },
                 ]
             }
-        rewritten_query = Query(**{"$expr": expr})
+        rewritten_query = {"$expr": expr}
 
         return FeedbackQuery(
             entity=self.entity,
@@ -2426,7 +2427,7 @@ class WeaveClient:
         provider_id: str | None = "default",
         cache_read_input_token_cost: float = 0,
         cache_creation_input_token_cost: float = 0,
-    ) -> CostCreateRes:
+    ) -> CostCreateResponse:
         """Add a cost to the current project.
 
         Examples:
@@ -2447,24 +2448,24 @@ class WeaveClient:
             cache_creation_input_token_cost: The cost per cache-creation input token. Defaults to 0.
 
         Returns:
-            A CostCreateRes object.
-            Which has one field called a list of tuples called ids.
-            Each tuple contains the llm_id and the id of the created cost object.
+            A CostCreateResponse object.
+            Which has one field called ids, a list of two-item lists.
+            Each list holds the llm_id and the id of the created cost object.
         """
         if effective_date is None:
             effective_date = datetime.datetime.now(datetime.timezone.utc)
-        cost = CostCreateInput(
-            prompt_token_cost=prompt_token_cost,
-            completion_token_cost=completion_token_cost,
-            cache_read_input_token_cost=cache_read_input_token_cost,
-            cache_creation_input_token_cost=cache_creation_input_token_cost,
-            effective_date=effective_date,
-            prompt_token_cost_unit=prompt_token_cost_unit,
-            completion_token_cost_unit=completion_token_cost_unit,
-            provider_id=provider_id,
-        )
+        cost: cost_create_params.Costs = {
+            "prompt_token_cost": float(prompt_token_cost),
+            "completion_token_cost": float(completion_token_cost),
+            "cache_read_input_token_cost": float(cache_read_input_token_cost),
+            "cache_creation_input_token_cost": float(cache_creation_input_token_cost),
+            "prompt_token_cost_unit": prompt_token_cost_unit,
+            "completion_token_cost_unit": completion_token_cost_unit,
+            "effective_date": effective_date,
+            "provider_id": provider_id,
+        }
         return self.server.cost_create(
-            CostCreateReq(project_id=self.project_id, costs={llm_id: cost})
+            {"project_id": self.project_id, "costs": {llm_id: cost}, "wb_user_id": None}
         )
 
     def purge_costs(self, ids: list[str] | str) -> None:
@@ -2488,16 +2489,19 @@ class WeaveClient:
             ]
         }
         self.server.cost_purge(
-            CostPurgeReq(project_id=self.project_id, query=Query(**{"$expr": expr}))
+            {
+                "project_id": self.project_id,
+                "query": cast(cost_purge_params.Query, {"$expr": expr}),
+            }
         )
 
     def query_costs(
         self,
-        query: Query | str | None = None,
+        query: Mapping[str, Any] | str | None = None,
         llm_ids: list[str] | None = None,
         offset: int = 0,
         limit: int = 100,
-    ) -> list[CostQueryOutput]:
+    ) -> list[cost_query_response.Result]:
         """Query project for costs.
 
         Examples:
@@ -2533,8 +2537,8 @@ class WeaveClient:
                     {"$literal": query},
                 ],
             }
-        elif isinstance(query, Query):
-            expr = query.expr_
+        elif query is not None:
+            expr = cast_to_query(query)["$expr"]
 
         if llm_ids:
             expr = {
@@ -2548,15 +2552,15 @@ class WeaveClient:
                     },
                 ]
             }
-        rewritten_query = Query(**{"$expr": expr})
-
         res = self.server.cost_query(
-            CostQueryReq(
-                project_id=self.project_id,
-                query=rewritten_query,
-                offset=offset,
-                limit=limit,
-            )
+            {
+                "project_id": self.project_id,
+                "fields": None,
+                "query": cast(cost_query_params.Query, {"$expr": expr}),
+                "sort_by": None,
+                "limit": limit,
+                "offset": offset,
+            }
         )
         return res.results
 
@@ -2629,7 +2633,7 @@ class WeaveClient:
             "output": results_json,
         }
 
-        freq = FeedbackCreateReq(
+        freq = feedback_create_params(
             project_id=self.project_id,
             weave_ref=weave_ref_uri,
             feedback_type=RUNNABLE_FEEDBACK_TYPE_PREFIX + "." + runnable_ref.name,

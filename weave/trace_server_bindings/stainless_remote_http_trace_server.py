@@ -12,7 +12,6 @@ from pydantic_core import to_json, to_jsonable_python
 from typing_extensions import Self
 
 from weave.shared import trace_server_interface as tsi
-from weave.shared.service_interface import ServerInfoRes
 from weave.shared.trace_server_interface import agent_types
 from weave.trace.call_request_validation import validate_call_end, validate_call_start
 from weave.trace.env import ssl_verify, weave_trace_server_url
@@ -24,7 +23,15 @@ from weave.trace.settings import (
 )
 from weave.trace_server_bindings.async_batch_processor import AsyncBatchProcessor
 from weave.trace_server_bindings.call_batch_processor import CallBatchProcessor
-from weave.trace_server_bindings.client_interface import TraceServerClientInterface
+from weave.trace_server_bindings.client_interface import (
+    QueueAddCallsParams,
+    QueueDeleteParams,
+    QueueItemProgressUpdateParams,
+    QueueItemsQueryParams,
+    QueueReadParams,
+    QueueUpdateParams,
+    TraceServerClientInterface,
+)
 from weave.trace_server_bindings.http_utils import (
     CLIENT_CAPABILITIES,
     CLIENT_CAPABILITIES_HEADER,
@@ -40,7 +47,10 @@ from weave.trace_server_bindings.http_utils import (
 from weave.trace_server_bindings.models import (
     CallsQueryRes,
     CompleteBatchItem,
+    DatasetSourcesLinkDeleteEntry,
+    DatasetSourcesLinkDeleteRes,
     EndBatchItem,
+    EnsureProjectExistsRes,
     StartBatchItem,
 )
 from weave.utils.ids import generate_id
@@ -49,6 +59,15 @@ from weave.utils.retry import get_current_retry_id, with_retry
 from weave.vendor.weave_server_sdk import APIStatusError, DefaultHttpxClient
 from weave.vendor.weave_server_sdk import Client as StainlessClient
 from weave.vendor.weave_server_sdk.types import (
+    AnnotationQueueCreateParams,
+    AnnotationQueueCreateResponse,
+    AnnotationQueueDeleteResponse,
+    AnnotationQueueQueryParams,
+    AnnotationQueueReadResponse,
+    AnnotationQueueSchema,
+    AnnotationQueueStatsParams,
+    AnnotationQueueStatsResponse,
+    AnnotationQueueUpdateResponse,
     CallDeleteParams,
     CallDeleteResponse,
     CallEndParams,
@@ -56,6 +75,7 @@ from weave.vendor.weave_server_sdk.types import (
     CallQueryStatsResponse,
     CallReadParams,
     CallReadResponse,
+    CallScoreParams,
     CallStartParams,
     CallStartResponse,
     CallStatsParams,
@@ -66,12 +86,67 @@ from weave.vendor.weave_server_sdk.types import (
     CallUpsertBatchResponse,
     CallUsageParams,
     CallUsageResponse,
+    CompletionCreateParams,
+    CompletionCreateResponse,
+    CompletionCreateStreamParams,
+    CostCreateParams,
+    CostCreateResponse,
+    CostPurgeParams,
+    CostQueryParams,
+    CostQueryResponse,
+    DatasetSourceLinkParams,
+    DatasetSourceLinkResponse,
+    DatasetSourceQueryParams,
+    DatasetSourceQueryResponse,
+    DatasetSourceSourceDatasetsQueryParams,
+    DatasetSourceSourceDatasetsQueryResponse,
+    EvaluationEvaluateModelParams,
+    EvaluationEvaluateModelResponse,
+    EvaluationRescoreParams,
+    EvaluationRescoreResponse,
+    EvaluationStatusParams,
+    EvaluationStatusResponse,
+    FeedbackAggregateParams,
+    FeedbackAggregateResponse,
+    FeedbackBatchCreateParams,
+    FeedbackBatchCreateResponse,
+    FeedbackCreateParams,
+    FeedbackCreateResponse,
+    FeedbackPayloadSchemaParams,
+    FeedbackPayloadSchemaResponse,
+    FeedbackPurgeParams,
+    FeedbackQueryParams,
+    FeedbackQueryResponse,
+    FeedbackReplaceParams,
+    FeedbackReplaceResponse,
+    FeedbackStatsParams,
+    FeedbackStatsResponse,
+    ImageCreateParams,
+    ImageCreateResponse,
+    ProjectStatsParams,
+    ProjectStatsResponse,
+    ServerInfoRes,
+    ServiceProjectsInfoParams,
+    ServiceProjectsInfoResponse,
     ThreadStreamQueryParams,
     ThreadStreamQueryResponse,
     TraceUsageParams,
     TraceUsageResponse,
+    V2RuntimeApplyResponse,
+    feedback_batch_create_params,
+)
+from weave.vendor.weave_server_sdk.types.annotation_queues import (
+    ItemAddResponse,
+    ItemQueryResponse,
+    ItemUpdateProgressResponse,
 )
 from weave.vendor.weave_server_sdk.types.call_read_response import Call
+from weave.vendor.weave_server_sdk.types.projects import (
+    TtlSettingReadParams,
+    TtlSettingReadResponse,
+    TtlSettingUpdateParams,
+    TtlSettingUpdateResponse,
+)
 from weave.wandb_interface import project_creator
 from weave.wandb_interface.auth import (
     ApiKeyCredentials,
@@ -82,6 +157,29 @@ TReq = TypeVar("TReq", bound=BaseModel)
 TRes = TypeVar("TRes", bound=BaseModel)
 
 logger = logging.getLogger(__name__)
+
+
+def _feedback_body(
+    req: Mapping[str, Any] | BaseModel, *, keep_id: bool = True
+) -> feedback_batch_create_params.Batch:
+    """The feedback fields this binding sends: those set, but not created_at.
+
+    The id goes too, so the stored feedback has the id the client returned.
+    Only the per-item fallback, for a server without the batch route, drops it.
+
+    The body is dumped to plain JSON values first, so a nested Pydantic model in
+    a user payload keeps its default-valued fields. The generated client dumps
+    nested models with exclude_unset and would drop them.
+    """
+    body = {
+        key: value
+        for key, value in as_params(req).items()
+        if value is not None and key != "created_at" and (keep_id or key != "id")
+    }
+    return cast(
+        feedback_batch_create_params.Batch,
+        to_jsonable_python(body, inf_nan_mode="null"),
+    )
 
 
 def _parse_streamed_call(item: dict[str, Any]) -> Call:
@@ -151,12 +249,11 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
 
     def ensure_project_exists(
         self, entity: str, project: str
-    ) -> tsi.EnsureProjectExistsRes:
+    ) -> EnsureProjectExistsRes:
         # TODO: This should happen in the wandb backend, not here, and it's slow
         # (hundreds of ms)
-        return tsi.EnsureProjectExistsRes.model_validate(
-            project_creator.ensure_project_exists(entity, project)
-        )
+        res = project_creator.ensure_project_exists(entity, project)
+        return EnsureProjectExistsRes(project_name=res["project_name"])
 
     @classmethod
     def from_env(cls, should_batch: bool = False) -> Self:
@@ -253,6 +350,18 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         """
         self._update_client_headers()
         return from_project_id(as_params(req)["project_id"])
+
+    def _v2_params(self, req: Mapping[str, Any] | BaseModel) -> dict[str, Any]:
+        """Return a v2 request as the keyword arguments of its generated method.
+
+        The project goes in the route's `entity` and `project` path parameters,
+        and the route takes no `wb_user_id`: the server sets the user itself.
+        """
+        params = dict(as_params(req))
+        entity, project = self._prepare_v2_request(params)
+        del params["project_id"]
+        params.pop("wb_user_id", None)
+        return {"entity": entity, "project": project, **params}
 
     @with_retry
     def _send_batch_to_server(self, encoded_data: bytes) -> None:
@@ -493,7 +602,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
 
     def _flush_feedback(
         self,
-        batch: list[tsi.FeedbackCreateReq],
+        batch: list[Mapping[str, Any]],
     ) -> None:
         """Process a batch of feedback, splitting if necessary and sending to the server.
 
@@ -504,26 +613,19 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         if len(batch) == 0:
             return
 
-        def get_item_id(item: tsi.FeedbackCreateReq) -> str:
-            return f"{item.id}"
+        def get_item_id(item: Mapping[str, Any]) -> str:
+            return f"{item['id']}"
 
-        def encode_batch(batch: list[tsi.FeedbackCreateReq]) -> bytes:
-            batch_req = tsi.FeedbackCreateBatchReq(batch=batch)
-            data = batch_req.model_dump_json()
-            return data.encode("utf-8")
+        def encode_batch(batch: list[Mapping[str, Any]]) -> bytes:
+            return to_json({"batch": batch}, inf_nan_mode="null")
 
         def send_feedback_batch(encoded_data: bytes) -> None:
             self._update_client_headers()
             try:
-                batch_req = tsi.FeedbackCreateBatchReq.model_validate_json(
-                    encoded_data.decode("utf-8")
+                items = json.loads(encoded_data)["batch"]
+                self._stainless_client.feedback.batch_create(
+                    batch=[_feedback_body(item) for item in items]
                 )
-                # Convert to stainless format
-                stainless_batch = [
-                    item.model_dump(exclude={"created_at"}, exclude_none=True)
-                    for item in batch_req.batch
-                ]
-                self._stainless_client.feedback.batch_create(batch=stainless_batch)
             except Exception as e:
                 # If batching endpoint doesn't exist (404) fall back to individual calls
                 if hasattr(e, "status_code") and e.status_code == 404:
@@ -532,12 +634,11 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
                         e,
                     )
                     # Fall back to individual feedback creation calls
-                    for item in batch_req.batch:
+                    for item in items:
                         try:
-                            item_dict = item.model_dump(
-                                exclude={"id", "created_at"}, exclude_none=True
+                            self._stainless_client.feedback.create(
+                                **_feedback_body(item, keep_id=False)
                             )
-                            self._stainless_client.feedback.create(**item_dict)
                         except Exception as individual_error:
                             logger.warning(
                                 "Failed to create individual feedback: %s",
@@ -573,18 +674,13 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
             ServerInfoRes with server information.
         """
         self._update_client_headers()
-        response = self._stainless_client.services.server_info()
-        return ServerInfoRes.model_validate(response.model_dump())
+        return self._stainless_client.services.server_info()
 
-    @validate_call
-    def projects_info(self, req: tsi.ProjectsInfoReq) -> list[tsi.ProjectsInfoRes]:
+    def projects_info(
+        self, req: ServiceProjectsInfoParams | tsi.ProjectsInfoReq
+    ) -> ServiceProjectsInfoResponse:
         self._update_client_headers()
-        response = self._stainless_client.services.projects_info(
-            project_ids=req.project_ids,
-        )
-        return [
-            tsi.ProjectsInfoRes.model_validate(item.model_dump()) for item in response
-        ]
+        return self._stainless_client.services.projects_info(**as_params(req))
 
     @validate_call
     def otel_export(self, req: tsi.OTelExportReq) -> tsi.OTelExportRes:
@@ -1289,8 +1385,9 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
             self._stainless_client.files.stats,
         )
 
-    @validate_call
-    def feedback_create(self, req: tsi.FeedbackCreateReq) -> tsi.FeedbackCreateRes:
+    def feedback_create(
+        self, req: FeedbackCreateParams | tsi.FeedbackCreateReq
+    ) -> FeedbackCreateResponse:
         """Create feedback.
 
         Args:
@@ -1302,29 +1399,29 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         if self.should_batch:
             assert self.feedback_processor is not None
 
-            feedback_id = req.id or generate_id()
-            req.id = feedback_id
+            params = dict(as_params(req))
+            params["id"] = params.get("id") or generate_id()
 
-            self.feedback_processor.enqueue([req])
-            return tsi.FeedbackCreateRes(
-                id=feedback_id,
+            res = FeedbackCreateResponse(
+                id=params["id"],
                 # technically incorrect, this can be off by a few seconds
                 created_at=datetime.datetime.now(ZoneInfo("UTC")),
-                wb_user_id=req.wb_user_id or "",
-                payload=req.payload,
+                wb_user_id=params.get("wb_user_id") or "",
+                payload=params["payload"],
             )
+            # Snapshot the payload so a caller's later edits do not reach the queue.
+            params["payload"] = to_jsonable_python(
+                params["payload"], inf_nan_mode="null"
+            )
+            self.feedback_processor.enqueue([params])
+            return res
         else:
             self._update_client_headers()
-            req_dict = req.model_dump(
-                exclude={"created_at"}, exclude_none=True, by_alias=True
-            )
-            response = self._stainless_client.feedback.create(**req_dict)
-            return tsi.FeedbackCreateRes.model_validate(response.model_dump())
+            return self._stainless_client.feedback.create(**_feedback_body(req))
 
-    @validate_call
     def feedback_create_batch(
-        self, req: tsi.FeedbackCreateBatchReq
-    ) -> tsi.FeedbackCreateBatchRes:
+        self, req: FeedbackBatchCreateParams | tsi.FeedbackCreateBatchReq
+    ) -> FeedbackBatchCreateResponse:
         """Create feedback in batch.
 
         Args:
@@ -1334,16 +1431,13 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
             Feedback create batch response.
         """
         self._update_client_headers()
-        # Convert to stainless format
-        stainless_batch = [
-            item.model_dump(exclude={"created_at"}, exclude_none=True, by_alias=True)
-            for item in req.batch
-        ]
-        response = self._stainless_client.feedback.batch_create(batch=stainless_batch)
-        return tsi.FeedbackCreateBatchRes.model_validate(response.model_dump())
+        return self._stainless_client.feedback.batch_create(
+            batch=[_feedback_body(item) for item in as_params(req)["batch"]]
+        )
 
-    @validate_call
-    def feedback_query(self, req: tsi.FeedbackQueryReq) -> tsi.FeedbackQueryRes:
+    def feedback_query(
+        self, req: FeedbackQueryParams | tsi.FeedbackQueryReq
+    ) -> FeedbackQueryResponse:
         """Query feedback.
 
         Args:
@@ -1352,14 +1446,11 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         Returns:
             Feedback query response.
         """
-        return self._stainless_request(
-            req,
-            tsi.FeedbackQueryRes,
-            self._stainless_client.feedback.query,
+        return self._stainless_client.feedback.query(
+            extra_headers=self._compose_headers(), **as_params(req)
         )
 
-    @validate_call
-    def feedback_purge(self, req: tsi.FeedbackPurgeReq) -> tsi.FeedbackPurgeRes:
+    def feedback_purge(self, req: FeedbackPurgeParams | tsi.FeedbackPurgeReq) -> object:
         """Purge feedback.
 
         Args:
@@ -1368,14 +1459,13 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         Returns:
             Feedback purge response.
         """
-        return self._stainless_request(
-            req,
-            tsi.FeedbackPurgeRes,
-            self._stainless_client.feedback.purge,
+        return self._stainless_client.feedback.purge(
+            extra_headers=self._compose_headers(), **as_params(req)
         )
 
-    @validate_call
-    def feedback_replace(self, req: tsi.FeedbackReplaceReq) -> tsi.FeedbackReplaceRes:
+    def feedback_replace(
+        self, req: FeedbackReplaceParams | tsi.FeedbackReplaceReq
+    ) -> FeedbackReplaceResponse:
         """Replace feedback.
 
         Args:
@@ -1384,14 +1474,16 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         Returns:
             Feedback replace response.
         """
-        return self._stainless_request(
-            req,
-            tsi.FeedbackReplaceRes,
-            self._stainless_client.feedback.replace,
+        # Same normalization as _feedback_body: the user payload must not lose
+        # the default fields of a nested model to the client's exclude_unset dump.
+        return self._stainless_client.feedback.replace(
+            extra_headers=self._compose_headers(),
+            **to_jsonable_python(as_params(req), inf_nan_mode="null"),
         )
 
-    @validate_call
-    def feedback_stats(self, req: tsi.FeedbackStatsReq) -> tsi.FeedbackStatsRes:
+    def feedback_stats(
+        self, req: FeedbackStatsParams | tsi.FeedbackStatsReq
+    ) -> FeedbackStatsResponse:
         """Query feedback statistics bucketed over time.
 
         Args:
@@ -1400,16 +1492,13 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         Returns:
             Feedback stats response.
         """
-        return self._stainless_request(
-            req,
-            tsi.FeedbackStatsRes,
-            self._stainless_client.feedback.stats,
+        return self._stainless_client.feedback.stats(
+            extra_headers=self._compose_headers(), **as_params(req)
         )
 
-    @validate_call
     def feedback_aggregate(
-        self, req: tsi.FeedbackAggregateReq
-    ) -> tsi.FeedbackAggregateRes:
+        self, req: FeedbackAggregateParams | tsi.FeedbackAggregateReq
+    ) -> FeedbackAggregateResponse:
         """Aggregate feedback payload values.
 
         Args:
@@ -1418,16 +1507,13 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         Returns:
             Feedback aggregate response.
         """
-        return self._stainless_request(
-            req,
-            tsi.FeedbackAggregateRes,
-            self._stainless_client.feedback.aggregate,
+        return self._stainless_client.feedback.aggregate(
+            extra_headers=self._compose_headers(), **as_params(req)
         )
 
-    @validate_call
     def feedback_payload_schema(
-        self, req: tsi.FeedbackPayloadSchemaReq
-    ) -> tsi.FeedbackPayloadSchemaRes:
+        self, req: FeedbackPayloadSchemaParams | tsi.FeedbackPayloadSchemaReq
+    ) -> FeedbackPayloadSchemaResponse:
         """Discover the payload paths feedback rows use.
 
         Args:
@@ -1436,15 +1522,12 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         Returns:
             Feedback payload schema response.
         """
-        return self._stainless_request(
-            req,
-            tsi.FeedbackPayloadSchemaRes,
-            self._stainless_client.feedback.payload_schema,
+        return self._stainless_client.feedback.payload_schema(
+            extra_headers=self._compose_headers(), **as_params(req)
         )
 
     # Cost API
-    @validate_call
-    def cost_query(self, req: tsi.CostQueryReq) -> tsi.CostQueryRes:
+    def cost_query(self, req: CostQueryParams | tsi.CostQueryReq) -> CostQueryResponse:
         """Query costs.
 
         Args:
@@ -1453,14 +1536,13 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         Returns:
             Cost query response.
         """
-        return self._stainless_request(
-            req,
-            tsi.CostQueryRes,
-            self._stainless_client.costs.query,
+        return self._stainless_client.costs.query(
+            extra_headers=self._compose_headers(), **as_params(req)
         )
 
-    @validate_call
-    def cost_create(self, req: tsi.CostCreateReq) -> tsi.CostCreateRes:
+    def cost_create(
+        self, req: CostCreateParams | tsi.CostCreateReq
+    ) -> CostCreateResponse:
         """Create cost.
 
         Args:
@@ -1469,14 +1551,11 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         Returns:
             Cost create response.
         """
-        return self._stainless_request(
-            req,
-            tsi.CostCreateRes,
-            self._stainless_client.costs.create,
+        return self._stainless_client.costs.create(
+            extra_headers=self._compose_headers(), **as_params(req)
         )
 
-    @validate_call
-    def cost_purge(self, req: tsi.CostPurgeReq) -> tsi.CostPurgeRes:
+    def cost_purge(self, req: CostPurgeParams | tsi.CostPurgeReq) -> object:
         """Purge costs.
 
         Args:
@@ -1485,16 +1564,13 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         Returns:
             Cost purge response.
         """
-        return self._stainless_request(
-            req,
-            tsi.CostPurgeRes,
-            self._stainless_client.costs.purge,
+        return self._stainless_client.costs.purge(
+            extra_headers=self._compose_headers(), **as_params(req)
         )
 
-    @validate_call
     def completions_create(
-        self, req: tsi.CompletionsCreateReq
-    ) -> tsi.CompletionsCreateRes:
+        self, req: CompletionCreateParams | tsi.CompletionsCreateReq
+    ) -> CompletionCreateResponse:
         """Create completion.
 
         Args:
@@ -1503,15 +1579,12 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         Returns:
             Completions create response.
         """
-        return self._stainless_request(
-            req,
-            tsi.CompletionsCreateRes,
-            self._stainless_client.completions.create,
+        return self._stainless_client.completions.create(
+            extra_headers=self._compose_headers(), **as_params(req)
         )
 
-    @validate_call
     def completions_create_stream(
-        self, req: tsi.CompletionsCreateReq
+        self, req: CompletionCreateStreamParams | tsi.CompletionsCreateReq
     ) -> Iterator[dict[str, Any]]:
         """Create completion stream.
 
@@ -1522,15 +1595,13 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
             Dictionary chunks of the streamed response.
         """
         self._update_client_headers()
-        req_dict = req.model_dump(by_alias=True)
-        response = self._stainless_client.completions.create_stream(**req_dict)
+        response = self._stainless_client.completions.create_stream(**as_params(req))
         for item in response:
             yield item.model_dump(by_alias=True, exclude_unset=True)
 
-    @validate_call
     def image_create(
-        self, req: tsi.ImageGenerationCreateReq
-    ) -> tsi.ImageGenerationCreateRes:
+        self, req: ImageCreateParams | tsi.ImageGenerationCreateReq
+    ) -> ImageCreateResponse:
         """Create image generation.
 
         Args:
@@ -1539,14 +1610,13 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         Returns:
             Image generation create response.
         """
-        return self._stainless_request(
-            req,
-            tsi.ImageGenerationCreateRes,
-            self._stainless_client.images.create,
+        return self._stainless_client.images.create(
+            extra_headers=self._compose_headers(), **as_params(req)
         )
 
-    @validate_call
-    def project_stats(self, req: tsi.ProjectStatsReq) -> tsi.ProjectStatsRes:
+    def project_stats(
+        self, req: ProjectStatsParams | tsi.ProjectStatsReq
+    ) -> ProjectStatsResponse:
         """Get project statistics.
 
         Args:
@@ -1555,16 +1625,13 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         Returns:
             Project stats response.
         """
-        return self._stainless_request(
-            req,
-            tsi.ProjectStatsRes,
-            self._stainless_client.projects.stats,
+        return self._stainless_client.projects.stats(
+            extra_headers=self._compose_headers(), **as_params(req)
         )
 
-    @validate_call
     def project_ttl_settings_read(
-        self, req: tsi.ProjectTTLSettingsReadReq
-    ) -> tsi.ProjectTTLSettingsReadRes:
+        self, req: TtlSettingReadParams | tsi.ProjectTTLSettingsReadReq
+    ) -> TtlSettingReadResponse:
         """Read project TTL settings.
 
         Args:
@@ -1573,16 +1640,13 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         Returns:
             Project TTL settings read response.
         """
-        return self._stainless_request(
-            req,
-            tsi.ProjectTTLSettingsReadRes,
-            self._stainless_client.projects.ttl_settings.read,
+        return self._stainless_client.projects.ttl_settings.read(
+            extra_headers=self._compose_headers(), **as_params(req)
         )
 
-    @validate_call
     def project_ttl_settings_update(
-        self, req: tsi.ProjectTTLSettingsUpdateReq
-    ) -> tsi.ProjectTTLSettingsUpdateRes:
+        self, req: TtlSettingUpdateParams | tsi.ProjectTTLSettingsUpdateReq
+    ) -> TtlSettingUpdateResponse:
         """Update project TTL settings.
 
         Args:
@@ -1591,16 +1655,13 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         Returns:
             Project TTL settings update response.
         """
-        return self._stainless_request(
-            req,
-            tsi.ProjectTTLSettingsUpdateRes,
-            self._stainless_client.projects.ttl_settings.update,
+        return self._stainless_client.projects.ttl_settings.update(
+            extra_headers=self._compose_headers(), **as_params(req)
         )
 
-    @validate_call
     def dataset_sources_link(
-        self, req: tsi.DatasetSourcesLinkReq
-    ) -> tsi.DatasetSourcesLinkRes:
+        self, req: DatasetSourceLinkParams | tsi.DatasetSourcesLinkReq
+    ) -> DatasetSourceLinkResponse:
         """Link dataset rows to their provenance sources.
 
         Args:
@@ -1609,17 +1670,14 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         Returns:
             Dataset sources link response.
         """
-        return self._stainless_request(
-            req,
-            tsi.DatasetSourcesLinkRes,
-            self._stainless_client.dataset_sources.link,
+        return self._stainless_client.dataset_sources.link(
+            extra_headers=self._compose_headers(), **as_params(req)
         )
 
-    @validate_call
     @with_retry
     def dataset_sources_link_delete(
-        self, req: tsi.DatasetSourcesLinkDeleteReq
-    ) -> tsi.DatasetSourcesLinkDeleteRes:
+        self, req: Mapping[str, Any] | tsi.DatasetSourcesLinkDeleteReq
+    ) -> DatasetSourcesLinkDeleteRes:
         """Soft-delete dataset source links by id.
 
         Args:
@@ -1631,16 +1689,22 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         # Hidden from the OpenAPI spec, so the generator emits no method for it.
         response = self._stainless_client.post(
             "/dataset_sources/link_delete",
-            body=req.model_dump(mode="json"),
+            body=to_jsonable_python(as_params(req), inf_nan_mode="null"),
             cast_to=object,
             options={"headers": self._compose_headers(), "max_retries": 0},
         )
-        return tsi.DatasetSourcesLinkDeleteRes.model_validate(response)
+        return DatasetSourcesLinkDeleteRes(
+            entries=[
+                DatasetSourcesLinkDeleteEntry(
+                    link_id=entry["link_id"], deleted=entry["deleted"]
+                )
+                for entry in cast(dict[str, Any], response)["entries"]
+            ]
+        )
 
-    @validate_call
     def dataset_sources_query(
-        self, req: tsi.DatasetSourcesQueryReq
-    ) -> tsi.DatasetSourcesQueryRes:
+        self, req: DatasetSourceQueryParams | tsi.DatasetSourcesQueryReq
+    ) -> DatasetSourceQueryResponse:
         """Query sources linked to a dataset.
 
         Args:
@@ -1649,16 +1713,13 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         Returns:
             Dataset sources query response.
         """
-        return self._stainless_request(
-            req,
-            tsi.DatasetSourcesQueryRes,
-            self._stainless_client.dataset_sources.query,
+        return self._stainless_client.dataset_sources.query(
+            extra_headers=self._compose_headers(), **as_params(req)
         )
 
-    @validate_call
     def source_datasets_query(
-        self, req: tsi.SourceDatasetsQueryReq
-    ) -> tsi.SourceDatasetsQueryRes:
+        self, req: DatasetSourceSourceDatasetsQueryParams | tsi.SourceDatasetsQueryReq
+    ) -> DatasetSourceSourceDatasetsQueryResponse:
         """Query datasets that contain the given sources.
 
         Args:
@@ -1667,10 +1728,8 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         Returns:
             Source datasets query response.
         """
-        return self._stainless_request(
-            req,
-            tsi.SourceDatasetsQueryRes,
-            self._stainless_client.dataset_sources.source_datasets_query,
+        return self._stainless_client.dataset_sources.source_datasets_query(
+            extra_headers=self._compose_headers(), **as_params(req)
         )
 
     def threads_query_stream(
@@ -1688,10 +1747,9 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         yield from self._stainless_client.threads.stream_query(**as_params(req))
 
     # Annotation Queue API
-    @validate_call
     def annotation_queue_create(
-        self, req: tsi.AnnotationQueueCreateReq
-    ) -> tsi.AnnotationQueueCreateRes:
+        self, req: AnnotationQueueCreateParams | tsi.AnnotationQueueCreateReq
+    ) -> AnnotationQueueCreateResponse:
         """Create an annotation queue.
 
         Args:
@@ -1700,16 +1758,13 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         Returns:
             Annotation queue create response.
         """
-        return self._stainless_request(
-            req,
-            tsi.AnnotationQueueCreateRes,
-            self._stainless_client.annotation_queues.create,
+        return self._stainless_client.annotation_queues.create(
+            extra_headers=self._compose_headers(), **as_params(req)
         )
 
-    @validate_call
     def annotation_queues_query_stream(
-        self, req: tsi.AnnotationQueuesQueryReq
-    ) -> Iterator[tsi.AnnotationQueueSchema]:
+        self, req: AnnotationQueueQueryParams | tsi.AnnotationQueuesQueryReq
+    ) -> Iterator[AnnotationQueueSchema]:
         """Stream query annotation queues.
 
         Args:
@@ -1719,15 +1774,11 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
             AnnotationQueueSchema instances.
         """
         self._update_client_headers()
-        req_dict = req.model_dump(by_alias=True)
-        response: Any = self._stainless_client.annotation_queues.query(**req_dict)
-        for item in response:
-            yield tsi.AnnotationQueueSchema.model_validate(item.model_dump())
+        yield from self._stainless_client.annotation_queues.query(**as_params(req))
 
-    @validate_call
     def annotation_queue_read(
-        self, req: tsi.AnnotationQueueReadReq
-    ) -> tsi.AnnotationQueueReadRes:
+        self, req: QueueReadParams | tsi.AnnotationQueueReadReq
+    ) -> AnnotationQueueReadResponse:
         """Read an annotation queue.
 
         Args:
@@ -1736,16 +1787,13 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         Returns:
             Annotation queue read response.
         """
-        return self._stainless_request(
-            req,
-            tsi.AnnotationQueueReadRes,
-            self._stainless_client.annotation_queues.read,
+        return self._stainless_client.annotation_queues.read(
+            extra_headers=self._compose_headers(), **as_params(req)
         )
 
-    @validate_call
     def annotation_queue_delete(
-        self, req: tsi.AnnotationQueueDeleteReq
-    ) -> tsi.AnnotationQueueDeleteRes:
+        self, req: QueueDeleteParams | tsi.AnnotationQueueDeleteReq
+    ) -> AnnotationQueueDeleteResponse:
         """Soft-delete an annotation queue.
 
         Args:
@@ -1754,17 +1802,14 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         Returns:
             Annotation queue delete response.
         """
-        return self._stainless_request(
-            req,
-            tsi.AnnotationQueueDeleteRes,
-            self._stainless_client.annotation_queues.delete,
-            exclude={"wb_user_id"},
+        return self._stainless_client.annotation_queues.delete(
+            extra_headers=self._compose_headers(),
+            **as_params(req, exclude={"wb_user_id"}),
         )
 
-    @validate_call
     def annotation_queue_update(
-        self, req: tsi.AnnotationQueueUpdateReq
-    ) -> tsi.AnnotationQueueUpdateRes:
+        self, req: QueueUpdateParams | tsi.AnnotationQueueUpdateReq
+    ) -> AnnotationQueueUpdateResponse:
         """Update an annotation queue's metadata.
 
         Args:
@@ -1773,17 +1818,14 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         Returns:
             Annotation queue update response.
         """
-        return self._stainless_request(
-            req,
-            tsi.AnnotationQueueUpdateRes,
-            self._stainless_client.annotation_queues.update,
-            exclude={"wb_user_id"},
+        return self._stainless_client.annotation_queues.update(
+            extra_headers=self._compose_headers(),
+            **as_params(req, exclude={"wb_user_id"}),
         )
 
-    @validate_call
     def annotation_queue_add_calls(
-        self, req: tsi.AnnotationQueueAddCallsReq
-    ) -> tsi.AnnotationQueueAddCallsRes:
+        self, req: QueueAddCallsParams | tsi.AnnotationQueueAddCallsReq
+    ) -> ItemAddResponse:
         """Add calls to an annotation queue.
 
         Args:
@@ -1792,17 +1834,14 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         Returns:
             Annotation queue add calls response.
         """
-        return self._stainless_request(
-            req,
-            tsi.AnnotationQueueAddCallsRes,
-            self._stainless_client.annotation_queues.items.add,
-            exclude={"wb_user_id"},
+        return self._stainless_client.annotation_queues.items.add(
+            extra_headers=self._compose_headers(),
+            **as_params(req, exclude={"wb_user_id"}),
         )
 
-    @validate_call
     def annotation_queue_items_query(
-        self, req: tsi.AnnotationQueueItemsQueryReq
-    ) -> tsi.AnnotationQueueItemsQueryRes:
+        self, req: QueueItemsQueryParams | tsi.AnnotationQueueItemsQueryReq
+    ) -> ItemQueryResponse:
         """Query the items of an annotation queue.
 
         Args:
@@ -1811,16 +1850,13 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         Returns:
             Annotation queue items query response.
         """
-        return self._stainless_request(
-            req,
-            tsi.AnnotationQueueItemsQueryRes,
-            self._stainless_client.annotation_queues.items.query,
+        return self._stainless_client.annotation_queues.items.query(
+            extra_headers=self._compose_headers(), **as_params(req)
         )
 
-    @validate_call
     def annotation_queues_stats(
-        self, req: tsi.AnnotationQueuesStatsReq
-    ) -> tsi.AnnotationQueuesStatsRes:
+        self, req: AnnotationQueueStatsParams | tsi.AnnotationQueuesStatsReq
+    ) -> AnnotationQueueStatsResponse:
         """Get stats for multiple annotation queues.
 
         Args:
@@ -1829,16 +1865,14 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         Returns:
             Annotation queues stats response.
         """
-        return self._stainless_request(
-            req,
-            tsi.AnnotationQueuesStatsRes,
-            self._stainless_client.annotation_queues.stats,
+        return self._stainless_client.annotation_queues.stats(
+            extra_headers=self._compose_headers(), **as_params(req)
         )
 
-    @validate_call
     def annotator_queue_items_progress_update(
-        self, req: tsi.AnnotatorQueueItemsProgressUpdateReq
-    ) -> tsi.AnnotatorQueueItemsProgressUpdateRes:
+        self,
+        req: QueueItemProgressUpdateParams | tsi.AnnotatorQueueItemsProgressUpdateReq,
+    ) -> ItemUpdateProgressResponse:
         """Update the annotation state of a queue item.
 
         Args:
@@ -1847,15 +1881,14 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         Returns:
             Annotator queue items progress update response.
         """
-        return self._stainless_request(
-            req,
-            tsi.AnnotatorQueueItemsProgressUpdateRes,
-            self._stainless_client.annotation_queues.items.update_progress,
-            exclude={"wb_user_id"},
+        return self._stainless_client.annotation_queues.items.update_progress(
+            extra_headers=self._compose_headers(),
+            **as_params(req, exclude={"wb_user_id"}),
         )
 
-    @validate_call
-    def evaluate_model(self, req: tsi.EvaluateModelReq) -> tsi.EvaluateModelRes:
+    def evaluate_model(
+        self, req: EvaluationEvaluateModelParams | tsi.EvaluateModelReq
+    ) -> EvaluationEvaluateModelResponse:
         """Evaluate model.
 
         Args:
@@ -1864,16 +1897,13 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         Returns:
             Evaluate model response.
         """
-        return self._stainless_request(
-            req,
-            tsi.EvaluateModelRes,
-            self._stainless_client.evaluations.evaluate_model,
+        return self._stainless_client.evaluations.evaluate_model(
+            extra_headers=self._compose_headers(), **as_params(req)
         )
 
-    @validate_call
     def evaluation_status(
-        self, req: tsi.EvaluationStatusReq
-    ) -> tsi.EvaluationStatusRes:
+        self, req: EvaluationStatusParams | tsi.EvaluationStatusReq
+    ) -> EvaluationStatusResponse:
         """Get evaluation status.
 
         Args:
@@ -1882,14 +1912,13 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         Returns:
             Evaluation status response.
         """
-        return self._stainless_request(
-            req,
-            tsi.EvaluationStatusRes,
-            self._stainless_client.evaluations.status,
+        return self._stainless_client.evaluations.status(
+            extra_headers=self._compose_headers(), **as_params(req)
         )
 
-    @validate_call
-    def rescore(self, req: tsi.RescoreReq) -> tsi.RescoreRes:
+    def rescore(
+        self, req: EvaluationRescoreParams | tsi.RescoreReq
+    ) -> EvaluationRescoreResponse:
         """Rescore an existing evaluation run with different scorers.
 
         Args:
@@ -1898,14 +1927,11 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         Returns:
             Rescore response.
         """
-        return self._stainless_request(
-            req,
-            tsi.RescoreRes,
-            self._stainless_client.evaluations.rescore,
+        return self._stainless_client.evaluations.rescore(
+            extra_headers=self._compose_headers(), **as_params(req)
         )
 
-    @validate_call
-    def calls_score(self, req: tsi.CallsScoreReq) -> tsi.CallsScoreRes:
+    def calls_score(self, req: CallScoreParams | tsi.CallsScoreReq) -> object:
         """Score calls.
 
         Args:
@@ -1914,10 +1940,8 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         Returns:
             Calls score response.
         """
-        return self._stainless_request(
-            req,
-            tsi.CallsScoreRes,
-            self._stainless_client.calls.score,
+        return self._stainless_client.calls.score(
+            extra_headers=self._compose_headers(), **as_params(req)
         )
 
     # === Object APIs ===
@@ -2077,10 +2101,9 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         )
         return tsi.DatasetDeleteRes.model_validate(response.model_dump())
 
-    @validate_call
     def custom_runtime_apply(
-        self, req: tsi.CustomRuntimeApplyReq
-    ) -> tsi.CustomRuntimeApplyRes:
+        self, req: Mapping[str, Any] | tsi.CustomRuntimeApplyReq
+    ) -> V2RuntimeApplyResponse:
         """Apply custom runtime.
 
         Args:
@@ -2089,14 +2112,8 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         Returns:
             Custom runtime apply response.
         """
-        entity, project = self._prepare_v2_request(req)
-        return self._stainless_request(
-            req,
-            tsi.CustomRuntimeApplyRes,
-            self._stainless_client.v2_runtimes.apply,
-            exclude={"project_id", "wb_user_id"},
-            entity=entity,
-            project=project,
+        return self._stainless_client.v2_runtimes.apply(
+            extra_headers=self._compose_headers(), **self._v2_params(req)
         )
 
     @validate_call

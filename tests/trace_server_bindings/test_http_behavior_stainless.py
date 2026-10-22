@@ -18,7 +18,7 @@ import httpx
 import pytest
 import requests
 import tenacity
-from pydantic import ValidationError
+from pydantic import BaseModel, ValidationError
 
 from tests.trace_server_bindings.conftest import (
     generate_end,
@@ -578,6 +578,99 @@ def test_other_400s_do_not_upgrade(monkeypatch):
         assert server.use_calls_complete is False
         assert type(server.call_processor) is AsyncBatchProcessor
         assert [r.url.path for r in requests] == ["/call/upsert_batch"]
+
+
+def test_batched_feedback_that_fails_on_the_client_is_not_sent():
+    """A feedback item whose response cannot be built raises and is not queued."""
+    feedback = {
+        "project_id": PROJECT,
+        "weave_ref": f"weave:///{PROJECT}/call/call-id",
+        "feedback_type": "note",
+    }
+    with _batching_server(_ok) as (server, requests):
+        with pytest.raises(ValidationError):
+            server.feedback_create({**feedback, "payload": "not a dict"})
+        server.feedback_create({**feedback, "payload": {"note": "ok"}})
+        assert server.feedback_processor is not None
+        server.feedback_processor.stop_accepting_new_work_and_flush_queue()
+
+    (request,) = requests
+    batch = json.loads(request.read())["batch"]
+    assert [item["payload"] for item in batch] == [{"note": "ok"}]
+
+
+def test_batched_feedback_keeps_the_payload_as_passed():
+    """Editing the payload after feedback_create and before the flush changes nothing sent."""
+    payload = {"note": "submitted", "scores": {"quality": 1}}
+    with _batching_server(_ok) as (server, requests):
+        res = server.feedback_create(
+            {
+                "project_id": PROJECT,
+                "weave_ref": f"weave:///{PROJECT}/call/call-id",
+                "feedback_type": "note",
+                "payload": payload,
+            }
+        )
+        payload["note"] = "reused"
+        payload["scores"]["quality"] = 0
+        assert server.feedback_processor is not None
+        server.feedback_processor.stop_accepting_new_work_and_flush_queue()
+
+    (request,) = requests
+    (sent,) = json.loads(request.read())["batch"]
+    assert sent["payload"] == {"note": "submitted", "scores": {"quality": 1}}
+    assert res.payload["note"] == "submitted"
+
+
+def test_feedback_payload_keeps_nested_model_defaults():
+    """Unbatched, batched and replace sends carry a nested model's default fields."""
+
+    class Rating(BaseModel):
+        score: float = 1.0
+
+    feedback = {
+        "project_id": PROJECT,
+        "weave_ref": f"weave:///{PROJECT}/call/call-id",
+        "feedback_type": "quality",
+        "payload": {"rating": Rating()},
+    }
+    created = {
+        "id": "feedback-id",
+        "created_at": "2026-01-01T00:00:00Z",
+        "wb_user_id": "user",
+        "payload": {},
+    }
+
+    sent: list[httpx.Request] = []
+
+    def handle(request: httpx.Request) -> httpx.Response:
+        sent.append(request)
+        body = {"res": []} if request.url.path.endswith("/batch/create") else created
+        return httpx.Response(200, json=body, request=request)
+
+    with _batching_server(handle) as (server, _):
+        server.feedback_create(feedback)
+        assert server.feedback_processor is not None
+        server.feedback_processor.stop_accepting_new_work_and_flush_queue()
+    (batched,) = json.loads(sent[-1].read())["batch"]
+
+    unbatched_server = StainlessRemoteHTTPTraceServer("http://example.com")
+    unbatched_server._stainless_client = unbatched_server._stainless_client.copy(
+        http_client=httpx.Client(transport=httpx.MockTransport(handle))
+    )
+    unbatched_server.feedback_create(feedback)
+    unbatched = json.loads(sent[-1].read())
+    unbatched_server.feedback_replace({**feedback, "feedback_id": "feedback-id"})
+    replaced = json.loads(sent[-1].read())
+
+    # The batched path sends the id it hands back; the direct path lets the
+    # server pick one.
+    batched_id = batched.pop("id")
+    assert isinstance(batched_id, str)
+    assert batched_id != ""
+    assert unbatched == batched
+    assert unbatched["payload"] == {"rating": {"score": 1.0}}
+    assert replaced["payload"] == {"rating": {"score": 1.0}}
 
 
 def test_calls_complete_needs_batching(monkeypatch):

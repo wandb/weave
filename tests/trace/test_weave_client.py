@@ -5320,21 +5320,21 @@ def test_evaluate_with_llm_completion_model_and_prompt_template_vars(client):
     )
 
     # Verify the request has prompt reference and template_vars
-    assert req.inputs.prompt == prompt_ref.uri, (
+    assert req["inputs"]["prompt"] == prompt_ref.uri, (
         "Request should include prompt reference"
     )
-    assert req.inputs.template_vars == {
+    assert req["inputs"]["template_vars"] == {
         "assistant_name": "MathBot",
         "topic": "mathematics",
         "question": "What is 2+2?",
     }, "Request should include template_vars"
 
     # Verify messages are empty (prompt resolution happens in completions endpoint)
-    assert req.inputs.messages == [], "Messages should be empty when using prompt"
+    assert req["inputs"]["messages"] == [], "Messages should be empty when using prompt"
 
     # Verify other params are set
-    assert req.inputs.temperature == 0.7
-    assert req.inputs.max_tokens == 50
+    assert req["inputs"]["temperature"] == 0.7
+    assert req["inputs"]["max_tokens"] == 50
 
     # Test with additional user_input messages
     req_with_input = model.prepare_completion_request(
@@ -5347,14 +5347,14 @@ def test_evaluate_with_llm_completion_model_and_prompt_template_vars(client):
     )
 
     # Should still have prompt and template_vars
-    assert req_with_input.inputs.prompt == prompt_ref.uri
-    assert req_with_input.inputs.template_vars == {
+    assert req_with_input["inputs"]["prompt"] == prompt_ref.uri
+    assert req_with_input["inputs"]["template_vars"] == {
         "assistant_name": "MathBot",
         "topic": "mathematics",
         "question": "What is 2+2?",
     }
 
     # Should have user_input messages
-    assert req_with_input.inputs.messages == [
+    assert req_with_input["inputs"]["messages"] == [
         {"role": "user", "content": "Additional context"}
     ]

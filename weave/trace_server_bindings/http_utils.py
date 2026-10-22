@@ -53,13 +53,18 @@ R = TypeVar("R")
 BatchProcessor = AsyncBatchProcessor
 
 
-def as_params(req: Mapping[str, Any] | BaseModel) -> Mapping[str, Any]:
+def as_params(
+    req: Mapping[str, Any] | BaseModel, *, exclude: set[str] | None = None
+) -> Mapping[str, Any]:
     """Return a request as the mapping the generated client takes.
 
-    A request model is dumped the way the bindings always dumped it.
+    A request model is dumped the way the bindings always dumped it. The keys
+    in `exclude`, which the generated method does not take, are left out.
     """
     if isinstance(req, BaseModel):
-        return req.model_dump(by_alias=True)
+        return req.model_dump(by_alias=True, exclude=exclude)
+    if exclude:
+        return {key: value for key, value in req.items() if key not in exclude}
     return req
 
 
@@ -90,14 +95,14 @@ def log_dropped_call_batch(
 
 
 def log_dropped_feedback_batch(
-    batch: list[tsi.FeedbackCreateReq], e: Exception
+    batch: list[Mapping[str, Any] | tsi.FeedbackCreateReq], e: Exception
 ) -> None:
     """Log details about a dropped feedback batch for debugging purposes."""
     logger.error("Error sending batch of %s feedback events to server", len(batch))
     dropped_feedback_types = []
     for item in batch:
         feedback_item = item.req if hasattr(item, "req") else item
-        dropped_feedback_types.append(feedback_item.feedback_type)
+        dropped_feedback_types.append(as_params(feedback_item)["feedback_type"])
     if dropped_feedback_types:
         logger.error("dropped feedback types: %s", dropped_feedback_types)
     response = getattr(e, "response", None)
