@@ -30,6 +30,7 @@ from agents.tracing import (
     Span,
     TaskSpanData,
     Trace,
+    TracingProcessor,
     TurnSpanData,
     generation_span,
     get_trace_provider,
@@ -55,7 +56,10 @@ from weave.integrations.openai_agents.otel_processor import (
     WeaveOtelTracingProcessor,
     _iso_to_ns,
 )
-from weave.integrations.openai_agents.patcher import OpenAIAgentsOtelPatcher
+from weave.integrations.openai_agents.patcher import (
+    OpenAIAgentsOtelPatcher,
+    _registered_processors,
+)
 from weave.trace.autopatch import IntegrationSettings
 from weave.trace.constants import INVOKING_SPAN_ATTR_KEY
 from weave.trace.otel_op_linker import OpLinkSpanProcessor
@@ -858,14 +862,6 @@ def test_patcher_install_and_uninstall_lifecycle() -> None:
     processors — we install a sentinel processor first, then install our
     patcher, then uninstall, and confirm the sentinel is still there.
     """
-    from agents.tracing import TracingProcessor, set_trace_processors
-
-    from weave.integrations.openai_agents.patcher import (
-        OpenAIAgentsOtelPatcher,
-        _registered_processors,
-    )
-    from weave.trace.autopatch import IntegrationSettings
-
     original = _registered_processors() or []
 
     class _Sentinel(TracingProcessor):
@@ -1170,9 +1166,6 @@ def test_unhandled_span_type_emits_warning(
 
 def test_undo_patch_is_noop_when_not_patched() -> None:
     """Calling undo_patch on a non-installed patcher returns True without error."""
-    from weave.integrations.openai_agents.patcher import OpenAIAgentsOtelPatcher
-    from weave.trace.autopatch import IntegrationSettings
-
     patcher = OpenAIAgentsOtelPatcher(IntegrationSettings())
     assert patcher.patched is False
     assert patcher.undo_patch() is True
