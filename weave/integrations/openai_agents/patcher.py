@@ -1,21 +1,26 @@
 """Lifecycle patchers for the OpenAI Agents integration.
 
 The patchers install a Weave tracing processor (either the calls-based one
-from ``openai_agents.py`` or the OTel-emitting one from ``otel_processor.py``)
+from `openai_agents.py` or the OTel-emitting one from `otel_processor.py`)
 into the OpenAI Agents tracing system.
 
-The two variants are intentionally near-identical — only the processor class
-they instantiate differs. They're kept as separate classes (rather than a
-parameterized base) so each variant's lifecycle stays trivial to read; the
-dispatcher in ``weave/integrations/patch.py`` picks which one runs based on
-``WEAVE_USE_OTEL_V2``.
+The two variants differ in the processor class they instantiate, and the OTel
+variant also installs the tool call id hook that feeds its processor. They're
+kept as separate classes (rather than a parameterized base) so each variant's
+lifecycle stays trivial to read; the dispatcher in
+`weave/integrations/patch.py` picks which one runs based on
+`WEAVE_USE_OTEL_V2`.
 """
 
 from __future__ import annotations
 
 import logging
+from collections.abc import Callable
 from typing import Any
 
+from agents.tracing import add_trace_processor
+
+from weave.integrations.openai_agents._tool_call_ids import install_tool_call_id_hook
 from weave.integrations.openai_agents.openai_agents import WeaveTracingProcessor
 from weave.integrations.openai_agents.otel_processor import WeaveOtelTracingProcessor
 from weave.integrations.patcher import NoOpPatcher, Patcher
@@ -99,8 +104,6 @@ class OpenAIAgentsPatcher(Patcher):
             return True
 
         try:
-            from agents.tracing import add_trace_processor
-
             self.processor = WeaveTracingProcessor()
             add_trace_processor(self.processor)
             self.patched = True
@@ -160,33 +163,47 @@ class OpenAIAgentsOtelPatcher(Patcher):
         self.settings = settings
         self.patched = False
         self.processor: WeaveOtelTracingProcessor | None = None
+        self._undo_tool_call_id_hook: Callable[[], None] | None = None
 
     def attempt_patch(self) -> bool:
-        """Install a WeaveOtelTracingProcessor in the OpenAI Agents tracing system."""
+        """Install a WeaveOtelTracingProcessor and the tool call id hook that feeds it."""
         if self.patched:
             return True
 
         try:
-            from agents.tracing import add_trace_processor
-
-            self.processor = WeaveOtelTracingProcessor()
-            add_trace_processor(self.processor)
+            processor = WeaveOtelTracingProcessor()
+            self._undo_tool_call_id_hook = install_tool_call_id_hook(
+                processor.record_tool_call_id
+            )
+            add_trace_processor(processor)
+            self.processor = processor
             self.patched = True
         except Exception:
+            logger.exception("Failed to install the openai_agents OTel processor")
+            self._remove_tool_call_id_hook()
             self.processor = None
             return False
         else:
             return True
 
     def undo_patch(self) -> bool:
-        """Remove the previously-installed processor from the agents pipeline."""
+        """Remove the previously-installed processor and tool call id hook."""
         if not self.patched or self.processor is None:
             return True
         ok = _remove_processor(self.processor)
         if ok:
+            self._remove_tool_call_id_hook()
             self.processor = None
             self.patched = False
         return ok
+
+    def _remove_tool_call_id_hook(self) -> None:
+        """Restore `ToolContext.from_agent_context` if this patcher wrapped it."""
+        if self._undo_tool_call_id_hook is None:
+            return
+
+        self._undo_tool_call_id_hook()
+        self._undo_tool_call_id_hook = None
 
 
 def get_openai_agents_otel_patcher(

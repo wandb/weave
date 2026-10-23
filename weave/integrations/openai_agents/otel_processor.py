@@ -58,6 +58,7 @@ from agents.tracing import (
 from opentelemetry import context as otel_context
 from opentelemetry import trace as otel_trace
 from opentelemetry.trace import StatusCode
+from opentelemetry.util.types import AttributeValue
 
 from weave.conversation.adapters.openai import (
     message_from_openai_responses_input,
@@ -201,13 +202,14 @@ def _turn_attrs(span: Span, conversation_id: str) -> dict[str, Any]:
 
 
 def _function_attrs(
-    span: Span[FunctionSpanData], conversation_id: str
+    span: Span[FunctionSpanData], conversation_id: str, tool_call_id: str
 ) -> dict[str, Any]:
     return execute_tool_attributes(
         tool_name=span.span_data.name or "",
         conversation_id=conversation_id,
         tool_call_arguments=span.span_data.input or "",
         tool_call_result=span.span_data.output or "",
+        tool_call_id=tool_call_id,
     )
 
 
@@ -413,7 +415,9 @@ def _custom_attrs(span: Span[CustomSpanData]) -> dict[str, Any]:
     return out
 
 
-def _attrs_for_span(span: Span, conversation_id: str) -> dict[str, Any]:
+def _attrs_for_span(
+    span: Span, conversation_id: str, *, tool_call_id: str
+) -> dict[str, AttributeValue]:
     """Pick the attribute builder for a span type and produce the final attrs dict."""
     sd = span.span_data
     if isinstance(sd, AgentSpanData):
@@ -427,7 +431,7 @@ def _attrs_for_span(span: Span, conversation_id: str) -> dict[str, Any]:
     if isinstance(sd, GenerationSpanData):
         return _generation_chat_attrs(span, conversation_id)
     if isinstance(sd, FunctionSpanData):
-        return _function_attrs(span, conversation_id)
+        return _function_attrs(span, conversation_id, tool_call_id)
     if isinstance(sd, HandoffSpanData):
         return _handoff_attrs(span)
     if isinstance(sd, GuardrailSpanData):
@@ -499,6 +503,8 @@ class WeaveOtelTracingProcessor(TracingProcessor):  # pyright: ignore[reportGene
         # almost never match LIFO. Lets the sweep handle spans the SDK never
         # closed without leaking state across Runner.run calls.
         self._trace_spans: dict[str, dict[str, None]] = {}
+        # Model tool call id per in-flight function span id.
+        self._tool_call_ids: dict[str, str] = {}
 
     def _tracer(self) -> Any:
         return otel_trace.get_tracer(_TRACER_NAME)
@@ -513,6 +519,14 @@ class WeaveOtelTracingProcessor(TracingProcessor):  # pyright: ignore[reportGene
         if span.parent_id and (parent := self._span_otel.get(span.parent_id)):
             return otel_trace.set_span_in_context(parent)
         return None
+
+    def record_tool_call_id(self, span_id: str, call_id: str) -> None:
+        """Remember the model's `call_id` for the in-flight function span `span_id`."""
+        if span_id not in self._span_otel:
+            return
+
+        # A tool body can build its own `ToolContext`; the SDK's first one names the call.
+        self._tool_call_ids.setdefault(span_id, call_id)
 
     def on_trace_start(self, trace: Trace) -> None:
         self._conversation_ids[trace.trace_id] = _conversation_id_for_trace(trace)
@@ -529,6 +543,7 @@ class WeaveOtelTracingProcessor(TracingProcessor):  # pyright: ignore[reportGene
             token = self._span_tokens.pop(span_id, None)
             if token is not None:
                 otel_context.detach(token)
+            self._tool_call_ids.pop(span_id, None)
             otel_span = self._span_otel.pop(span_id, None)
             if otel_span is not None and otel_span.is_recording():
                 otel_span.end()
@@ -556,6 +571,7 @@ class WeaveOtelTracingProcessor(TracingProcessor):  # pyright: ignore[reportGene
 
     def on_span_end(self, span: Span) -> None:
         otel_span = self._span_otel.pop(span.span_id, None)
+        tool_call_id = self._tool_call_ids.pop(span.span_id, "")
         if otel_span is None:
             return
         trace_spans = self._trace_spans.get(span.trace_id)
@@ -577,7 +593,7 @@ class WeaveOtelTracingProcessor(TracingProcessor):  # pyright: ignore[reportGene
             otel_span.update_name(_otel_span_name(span))
 
             conversation_id = self._conversation_ids.get(span.trace_id, "")
-            attrs = _attrs_for_span(span, conversation_id)
+            attrs = _attrs_for_span(span, conversation_id, tool_call_id=tool_call_id)
             _set_attrs(otel_span, attrs)
 
             if span.error:
@@ -621,6 +637,7 @@ class WeaveOtelTracingProcessor(TracingProcessor):  # pyright: ignore[reportGene
         self._span_otel.clear()
         self._conversation_ids.clear()
         self._trace_spans.clear()
+        self._tool_call_ids.clear()
 
 
 def _otel_span_name(span: Span) -> str:
