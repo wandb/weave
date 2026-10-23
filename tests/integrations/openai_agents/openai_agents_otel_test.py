@@ -8,6 +8,7 @@ emitted OTel spans instead of Weave calls.
 from __future__ import annotations
 
 import asyncio
+import inspect
 import json
 from collections.abc import Generator
 from typing import Any
@@ -17,6 +18,7 @@ import httpx
 import pytest
 from agents import Agent, Runner, function_tool
 from agents.models.openai_responses import OpenAIResponsesModel
+from agents.tool_context import ToolContext
 from agents.tracing import (
     AgentSpanData,
     CustomSpanData,
@@ -53,6 +55,8 @@ from weave.integrations.openai_agents.otel_processor import (
     WeaveOtelTracingProcessor,
     _iso_to_ns,
 )
+from weave.integrations.openai_agents.patcher import OpenAIAgentsOtelPatcher
+from weave.trace.autopatch import IntegrationSettings
 from weave.trace.constants import INVOKING_SPAN_ATTR_KEY
 from weave.trace.otel_op_linker import OpLinkSpanProcessor
 from weave.trace.otel_span_attrs import (
@@ -228,20 +232,24 @@ def _chat_completion_payload(response_id: str) -> dict[str, Any]:
     }
 
 
+def _function_call_item(call_id: str, tool_name: str, arguments: str) -> dict[str, str]:
+    return {
+        "type": "function_call",
+        "id": f"fc_{call_id}",
+        "call_id": call_id,
+        "name": tool_name,
+        "arguments": arguments,
+        "status": "completed",
+    }
+
+
 def _tool_call_payload(
     response_id: str, tool_name: str, arguments: str
 ) -> dict[str, Any]:
     """A Responses payload whose only output item calls ``tool_name``."""
     payload = _response_payload(response_id, "")
     payload["output"] = [
-        {
-            "type": "function_call",
-            "id": f"fc_{response_id}",
-            "call_id": f"call_{response_id}",
-            "name": tool_name,
-            "arguments": arguments,
-            "status": "completed",
-        }
+        _function_call_item(f"call_{response_id}", tool_name, arguments)
     ]
     return payload
 
@@ -1421,6 +1429,55 @@ async def test_op_tool_records_the_execute_tool_span_that_invoked_it(
         "trace_id": otel_trace.format_trace_id(span_ctx.trace_id),
         "span_id": otel_trace.format_span_id(span_ctx.span_id),
     }
+
+
+@pytest.mark.trace_server
+@pytest.mark.asyncio
+async def test_execute_tool_spans_carry_the_model_call_id(
+    otel_spans: InMemorySpanExporter,
+) -> None:
+    """Each tool run names the request it answers, even beside an identical request."""
+    arguments = '{"query": "papers"}'
+    tool_calls = _response_payload("resp_tools", "")
+    tool_calls["output"] = [
+        _function_call_item("call_a", "lookup", arguments),
+        _function_call_item("call_b", "lookup", arguments),
+    ]
+    transport, _ = _mock_transport(tool_calls, _response_payload("resp_final", "done"))
+    openai_client = AsyncOpenAI(
+        api_key="test", http_client=httpx.AsyncClient(transport=transport)
+    )
+    factory = inspect.getattr_static(ToolContext, "from_agent_context")
+
+    @function_tool
+    def lookup(query: str) -> str:
+        return "ok"
+
+    original_provider = get_trace_provider()
+    set_trace_provider(DefaultTraceProvider())
+    patcher = OpenAIAgentsOtelPatcher(IntegrationSettings())
+    assert patcher.attempt_patch() is True
+    try:
+        model = OpenAIResponsesModel(model="gpt-4o", openai_client=openai_client)
+        agent = Agent(name="researcher", model=model, tools=[lookup])
+        await Runner.run(agent, "find papers")
+    finally:
+        patcher.undo_patch()
+        set_trace_provider(original_provider)
+        await openai_client.close()
+
+    spans = otel_spans.get_finished_spans()
+    tool_spans = _by_name(spans, "execute_tool lookup")
+    requests = json.loads(
+        _attrs(_by_name(spans, "chat ")[0])["gen_ai.output.messages"]
+    )[0]["parts"]
+
+    assert sorted(_attrs(s)["gen_ai.tool.call.id"] for s in tool_spans) == [
+        "call_a",
+        "call_b",
+    ]
+    assert [part["id"] for part in requests] == ["call_a", "call_b"]
+    assert inspect.getattr_static(ToolContext, "from_agent_context") is factory
 
 
 def test_agents_spans_link_to_enclosing_op_call(
