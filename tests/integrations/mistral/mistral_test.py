@@ -3,9 +3,21 @@ from collections.abc import Generator
 
 import pytest
 from mistralai import Mistral
+from mistralai.models import (
+    CompletionChunk,
+    CompletionEvent,
+    CompletionResponseStreamChoice,
+    DeltaMessage,
+    TextChunk,
+    ThinkChunk,
+    UsageInfo,
+)
 
 import weave
-from weave.integrations.mistral.mistral_sdk import get_mistral_patcher
+from weave.integrations.mistral.mistral_sdk import (
+    get_mistral_patcher,
+    mistral_accumulator,
+)
 
 
 @pytest.fixture(autouse=True)
@@ -260,3 +272,55 @@ Each of these cheeses has its unique characteristics, so the "best" one depends 
     assert output.usage.completion_tokens == model_usage["completion_tokens"] == 459
     assert output.usage.prompt_tokens == model_usage["prompt_tokens"] == 10
     assert output.usage.total_tokens == model_usage["total_tokens"] == 469
+
+
+def _stream_event(content, finish_reason=None, usage=None) -> CompletionEvent:
+    return CompletionEvent(
+        data=CompletionChunk(
+            id="cmpl-1",
+            object="chat.completion.chunk",
+            created=1,
+            model="magistral-medium-latest",
+            choices=[
+                CompletionResponseStreamChoice(
+                    index=0,
+                    delta=DeltaMessage(role="assistant", content=content),
+                    finish_reason=finish_reason,
+                )
+            ],
+            usage=usage,
+        )
+    )
+
+
+def test_mistral_accumulator_keeps_list_content() -> None:
+    events = [
+        _stream_event([ThinkChunk(thinking=[TextChunk(text="Let me ")])]),
+        _stream_event([ThinkChunk(thinking=[TextChunk(text="think.")])]),
+        _stream_event([TextChunk(text="Hello")]),
+        _stream_event([TextChunk(text=" there")]),
+        _stream_event(
+            "",
+            finish_reason="stop",
+            usage=UsageInfo(prompt_tokens=3, completion_tokens=4, total_tokens=7),
+        ),
+    ]
+
+    acc = None
+    for event in events:
+        acc = mistral_accumulator(acc, event)
+
+    assert acc.choices[0].message.content == [
+        ThinkChunk(thinking=[TextChunk(text="Let me think.")]),
+        TextChunk(text="Hello there"),
+    ]
+    assert acc.choices[0].finish_reason == "stop"
+    assert acc.usage.total_tokens == 7
+
+
+def test_mistral_accumulator_joins_text_deltas() -> None:
+    acc = None
+    for event in [_stream_event("Hel"), _stream_event("lo")]:
+        acc = mistral_accumulator(acc, event)
+
+    assert acc.choices[0].message.content == "Hello"

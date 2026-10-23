@@ -2,13 +2,14 @@ from __future__ import annotations
 
 import importlib
 from collections.abc import Callable
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from mistralai.models import (
     AssistantMessage,
     ChatCompletionChoice,
     ChatCompletionResponse,
     CompletionEvent,
+    TextChunk,
     UsageInfo,
 )
 
@@ -27,6 +28,29 @@ if TYPE_CHECKING:
 _mistral_patcher: MultiPatcher | None = None
 
 MISTRAL_INTEGRATION = library_integration("mistral", distribution_name="mistralai")
+
+
+def _merge_content(current: Any, delta: Any) -> Any:
+    if not delta:
+        return current
+    if isinstance(current, str) and isinstance(delta, str):
+        return current + delta
+
+    if isinstance(current, str):
+        chunks = [TextChunk(text=current)] if current else []
+    else:
+        chunks = list(current or [])
+    for chunk in [TextChunk(text=delta)] if isinstance(delta, str) else delta:
+        last = chunks[-1] if chunks else None
+        if last is not None and chunk.type == last.type == "text":
+            chunks[-1] = last.model_copy(update={"text": last.text + chunk.text})
+        elif last is not None and chunk.type == last.type == "thinking":
+            chunks[-1] = last.model_copy(
+                update={"thinking": _merge_content(last.thinking, chunk.thinking)}
+            )
+        else:
+            chunks.append(chunk)
+    return chunks
 
 
 def mistral_accumulator(
@@ -79,7 +103,9 @@ def mistral_accumulator(
         target_choice.message.role = (
             delta_choice.delta.role or target_choice.message.role
         )
-        target_choice.message.content += delta_choice.delta.content or ""
+        target_choice.message.content = _merge_content(
+            target_choice.message.content, delta_choice.delta.content
+        )
         if delta_choice.delta.tool_calls:
             # treat UNSET or None as empty
             if not isinstance(target_choice.message.tool_calls, list):
