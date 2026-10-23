@@ -7,7 +7,7 @@ from cerebras.cloud.sdk import AsyncCerebras, Cerebras
 import weave
 from weave.integrations.cerebras.cerebras_sdk import get_cerebras_patcher
 
-model = "llama3.1-8b"  # Cerebras model
+model = "gpt-oss-120b"  # Cerebras model
 
 
 @pytest.fixture(autouse=True)
@@ -27,9 +27,11 @@ def test_cerebras_sync(client: weave.trace.weave_client.WeaveClient) -> None:
     response = cerebras_client.chat.completions.create(
         model=model,
         messages=[{"role": "user", "content": "What is the capital of France?"}],
+        temperature=0,
+        seed=0,
     )
 
-    exp = "The capital of France is Paris."
+    exp = "The capital of France is **Paris**."
     assert response.choices[0].message.content.strip() == exp
 
     calls = list(client.get_calls())
@@ -66,9 +68,11 @@ async def test_cerebras_async(client: weave.trace.weave_client.WeaveClient) -> N
     response = await cerebras_client.chat.completions.create(
         model=model,
         messages=[{"role": "user", "content": "What is the capital of France?"}],
+        temperature=0,
+        seed=0,
     )
 
-    exp = "The capital of France is Paris."
+    exp = "The capital of France is **Paris**."
     assert response.choices[0].message.content.strip() == exp
 
     calls = list(client.get_calls())
