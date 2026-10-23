@@ -7,6 +7,12 @@ from typing import TYPE_CHECKING
 from groq.types.chat import ChatCompletion, ChatCompletionChunk, ChatCompletionMessage
 from groq.types.chat.chat_completion import Choice
 from groq.types.chat.chat_completion_chunk import Choice as ChoiceChunk
+from groq.types.chat.chat_completion_chunk import ChoiceDelta
+from groq.types.chat.chat_completion_message import FunctionCall
+from groq.types.chat.chat_completion_message_tool_call import (
+    ChatCompletionMessageToolCall,
+    Function,
+)
 from groq.types.completion_usage import CompletionUsage
 
 import weave
@@ -37,12 +43,7 @@ def groq_accumulator(
             if isinstance(choice, ChoiceChunk):
                 choices.append(
                     Choice(
-                        message=ChatCompletionMessage(
-                            content=choice.delta.content,
-                            role=choice.delta.role,
-                            function_call=choice.delta.function_call,
-                            tool_call=choice.delta.tool_calls,
-                        ),
+                        message=ChatCompletionMessage(role="assistant"),
                         finish_reason="stop",
                         index=choice.index,
                         logprobs=choice.logprobs,
@@ -77,20 +78,39 @@ def groq_accumulator(
         acc.usage.queue_time += value.x_groq.usage.queue_time
         acc.usage.total_time += value.x_groq.usage.total_time
 
-    if value.choices:
-        for idx, choice in enumerate(value.choices):
-            if isinstance(acc.choices[idx].message.content, str) and isinstance(
-                choice.delta.content, str
-            ):
-                acc.choices[idx].message.content += choice.delta.content
-            if acc.choices[idx].message.function_call:
-                acc.choices[idx].message.function_call.append(
-                    choice.delta.function_call
-                )
-            if acc.choices[idx].message.tool_call:
-                acc.choices[idx].message.tool_call.append(choice.delta.tool_call)
+    for idx, choice in enumerate(value.choices):
+        _merge_delta(acc.choices[idx].message, choice.delta)
+        if choice.finish_reason:
+            acc.choices[idx].finish_reason = choice.finish_reason  # type: ignore[assignment]
 
     return acc
+
+
+def _merge_delta(message: ChatCompletionMessage, delta: ChoiceDelta) -> None:
+    if delta.content is not None:
+        message.content = (message.content or "") + delta.content
+    if delta.reasoning is not None:
+        message.reasoning = (message.reasoning or "") + delta.reasoning
+    if delta.function_call is not None:
+        if message.function_call is None:
+            message.function_call = FunctionCall(name="", arguments="")
+        message.function_call.name += delta.function_call.name or ""
+        message.function_call.arguments += delta.function_call.arguments or ""
+    for tool_call in delta.tool_calls or []:
+        if message.tool_calls is None:
+            message.tool_calls = []
+        while tool_call.index >= len(message.tool_calls):
+            message.tool_calls.append(
+                ChatCompletionMessageToolCall(
+                    id="", type="function", function=Function(name="", arguments="")
+                )
+            )
+        merged = message.tool_calls[tool_call.index]
+        if tool_call.id:
+            merged.id = tool_call.id
+        if tool_call.function is not None:
+            merged.function.name += tool_call.function.name or ""
+            merged.function.arguments += tool_call.function.arguments or ""
 
 
 def groq_wrapper(settings: OpSettings) -> Callable[[Callable], Callable]:
