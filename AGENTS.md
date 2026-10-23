@@ -748,6 +748,9 @@ deterministic.
 
 ### Documentation
 
+- Route supported agent instrumentation to the matching CoreWeave Agent Lens
+  guide and Conversations view. Keep Weave Calls and evaluation instructions
+  scoped to those workflows; SDK package names do not determine the UI destination.
 - Update relevant docstrings for Python code
 - Add JSDoc comments for TypeScript code
 - Update this file when introducing new patterns or concepts
