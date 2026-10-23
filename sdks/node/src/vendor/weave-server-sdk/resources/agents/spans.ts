@@ -291,6 +291,10 @@ export namespace SpanQueryResponse {
 
     input_tokens: number | null;
 
+    main_agent_id: string | null;
+
+    main_agent_name: string | null;
+
     object_refs: Array<string>;
 
     operation_name: string | null;
@@ -341,6 +345,8 @@ export namespace SpanQueryResponse {
 
     response_model: string | null;
 
+    response_time_to_first_chunk: number | null;
+
     server_address: string | null;
 
     server_port: number | null;
@@ -384,6 +390,8 @@ export namespace SpanQueryResponse {
     wb_run_step_end: number | null;
 
     wb_user_id: string | null;
+
+    workflow_name: string | null;
   }
 
   export namespace Span {
