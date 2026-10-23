@@ -16,18 +16,16 @@ You can use Weave to:
 
 ## Documentation
 
-Read the [Weave documentation](https://docs.coreweave.com/products/wandb/weave) for function tracing and evaluations.
-
 Start here for agents:
 
-- [Choose an Agent Lens integration](https://docs.coreweave.com/products/agent-lens/get-started/integrations?utm_source=github&utm_medium=referral&utm_campaign=agent-lens-integrations-2026q4&utm_content=weave-readme-agent-quickstart) — choose the guide for your provider SDK, agent SDK, or harness. OpenAI Agents SDK, Claude Agent SDK, Google ADK, and Pi still use Weave; each guide explains conversation grouping.
+- [Choose an Agent Lens integration](https://docs.coreweave.com/products/agent-lens/get-started/integrations?utm_source=github&utm_medium=referral&utm_campaign=agent-lens-integrations-2026q4&utm_content=weave-readme-agent-quickstart) — choose the guide for your provider SDK, agent SDK, or harness. Each guide specifies the required package and conversation grouping.
 - [Custom agents](https://docs.coreweave.com/products/agent-lens/get-started/custom-agents) — instrument a multi-turn agent with the Forge SDK. Existing Weave Conversation SDK instrumentation can also send agent spans to Agent Lens.
 
 ## Prerequisites
 
 - Python 3.10 or higher
 - A [CoreWeave Forge account](https://forge.coreweave.com) with access to the destination project
-- A W&B API key from [https://forge.coreweave.com/settings#apikeys](https://forge.coreweave.com/settings#apikeys). Set `WANDB_API_KEY`.
+- A Forge API key from [API key settings](https://forge.coreweave.com/settings#apikeys). Set `WANDB_API_KEY`.
 - An [OpenAI API key](https://platform.openai.com/api-keys) in `OPENAI_API_KEY`, for the example below.
 
 ## Quick start: trace an agent
