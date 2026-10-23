@@ -1,15 +1,15 @@
 """Lifecycle patchers for the OpenAI Agents integration.
 
 The patchers install a Weave tracing processor (either the calls-based one
-from ``openai_agents.py`` or the OTel-emitting one from ``otel_processor.py``)
+from `openai_agents.py` or the OTel-emitting one from `otel_processor.py`)
 into the OpenAI Agents tracing system.
 
 The two variants differ in the processor class they instantiate, and the OTel
 variant also installs the tool call id hook that feeds its processor. They're
 kept as separate classes (rather than a parameterized base) so each variant's
 lifecycle stays trivial to read; the dispatcher in
-``weave/integrations/patch.py`` picks which one runs based on
-``WEAVE_USE_OTEL_V2``.
+`weave/integrations/patch.py` picks which one runs based on
+`WEAVE_USE_OTEL_V2`.
 """
 
 from __future__ import annotations
