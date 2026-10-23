@@ -7,6 +7,7 @@ import pytest
 import weave
 from weave.integrations.openai.openai_sdk import (
     _normalize_openai_cache_tokens,
+    should_use_accumulator,
     create_wrapper_async,
     create_wrapper_sync,
     openai_on_finish,
@@ -461,3 +462,16 @@ async def test_stream_options_not_injected_for_non_openai_base_url_async() -> No
     await wrapped(DummyCompletion("https://api.mistral.ai"), stream=True)
 
     assert "stream_options" not in captured
+
+
+def test_should_use_accumulator_with_explicit_none_extra_headers() -> None:
+    """extra_headers: Headers | None — explicit None must not raise or skip accumulation."""
+    assert should_use_accumulator({"stream": True, "extra_headers": None}) is True
+    assert should_use_accumulator({"stream": True}) is True
+    assert (
+        should_use_accumulator(
+            {"stream": True, "extra_headers": {"X-Stainless-Raw-Response": "true"}}
+        )
+        is False
+    )
+    assert should_use_accumulator({"stream": False, "extra_headers": None}) is False
