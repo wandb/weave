@@ -1141,7 +1141,7 @@ class EvaluationLogger:
         final_summary = {}
         if summary_data:
             final_summary = summary_data
-        if summary is not None:
+        if auto_summarize and summary is not None:
             final_summary = {**final_summary, "output": summary}
 
         # Call the summarize op
