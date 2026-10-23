@@ -1171,6 +1171,40 @@ def test_undo_patch_is_noop_when_not_patched() -> None:
     assert patcher.undo_patch() is True
 
 
+@pytest.mark.disable_logging_error_check
+def test_patcher_survives_tool_call_id_hook_failures(
+    monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    """A missing hook still installs tracing; a failed install restores the factory."""
+    caplog.set_level("WARNING")
+    factory = inspect.getattr_static(ToolContext, "from_agent_context")
+
+    def reject(processor: TracingProcessor) -> None:
+        raise RuntimeError("registry closed")
+
+    with monkeypatch.context() as patch:
+        patch.setattr(
+            "weave.integrations.openai_agents.patcher.add_trace_processor", reject
+        )
+        rejected = OpenAIAgentsOtelPatcher(IntegrationSettings())
+
+        assert rejected.attempt_patch() is False
+        assert inspect.getattr_static(ToolContext, "from_agent_context") is factory
+        assert "Failed to install the openai_agents OTel processor" in caplog.text
+
+    with monkeypatch.context() as patch:
+        patch.setattr(ToolContext, "from_agent_context", factory.__func__)
+        patcher = OpenAIAgentsOtelPatcher(IntegrationSettings())
+        try:
+            assert patcher.attempt_patch() is True
+            assert patcher.processor in (_registered_processors() or [])
+        finally:
+            patcher.undo_patch()
+
+    assert "will not carry gen_ai.tool.call.id" in caplog.text
+    assert inspect.getattr_static(ToolContext, "from_agent_context") is factory
+
+
 @pytest.mark.asyncio
 async def test_responses_model_and_direct_call_emit_one_record_each(
     client: WeaveClient,
