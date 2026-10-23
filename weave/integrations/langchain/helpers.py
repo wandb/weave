@@ -7,6 +7,7 @@ Supported providers:
 - OpenAI: "token_usage" with "prompt_tokens", "completion_tokens", "total_tokens"
 - Google GenAI: "usage_metadata" with "input_tokens", "output_tokens", "total_tokens"
 - Google Vertex AI: "usage_metadata" with "prompt_token_count", "candidates_token_count", "total_token_count"
+- LangChain Anthropic/Bedrock/OpenAI: cache subsets in "input_token_details"
 """
 
 from collections import defaultdict
@@ -22,16 +23,26 @@ class TokenUsage:
     prompt_tokens: int
     completion_tokens: int
     total_tokens: int
+    cache_read_input_tokens: int | None = None
+    cache_creation_input_tokens: int | None = None
 
 
-def _normalize_usage_metadata(usage_metadata: dict) -> TokenUsage:
+def _cache_detail_value(details: dict[str, Any], *keys: str) -> int | None:
+    """Return the first present cache-detail key, treating missing as None."""
+    for key in keys:
+        if key in details:
+            return details.get(key) or 0
+    return None
+
+
+def _normalize_usage_metadata(usage_metadata: dict[str, Any] | None) -> TokenUsage:
     """Normalize usage metadata from different provider formats to standard format.
 
     Args:
         usage_metadata: Raw usage metadata dictionary from provider
 
     Returns:
-        Tuple of (prompt_tokens, completion_tokens, total_tokens)
+        Normalized token usage, including LangChain cache subset fields when present.
 
     """
     if not usage_metadata:
@@ -41,6 +52,8 @@ def _normalize_usage_metadata(usage_metadata: dict) -> TokenUsage:
     # - OpenAI: prompt_tokens, completion_tokens, total_tokens
     # - Google GenAI: input_tokens, output_tokens, total_tokens
     # - Google Vertex AI: prompt_token_count, candidates_token_count, total_token_count
+    # - LangChain Anthropic/Bedrock/OpenAI: inclusive input_tokens plus
+    #   input_token_details.{cache_read,cache_creation,ephemeral_*_input_tokens}
 
     # Try different provider formats
     variations = {
@@ -59,11 +72,34 @@ def _normalize_usage_metadata(usage_metadata: dict) -> TokenUsage:
                 normalized_usage[key] = usage_metadata.get(value)
                 break
 
+    input_token_details = usage_metadata.get("input_token_details")
+    if not isinstance(input_token_details, dict):
+        input_token_details = {}
+
+    cache_read_input_tokens = _cache_detail_value(
+        input_token_details, "cache_read", "cache_read_input_tokens"
+    )
+    # langchain-anthropic / langchain-aws may report TTL cache writes under
+    # ephemeral_* keys with cache_creation set to 0.
+    cache_creation_input_tokens = _cache_detail_value(
+        input_token_details, "cache_creation", "cache_creation_input_tokens"
+    )
+    ephemeral_write = 0
+    for ttl_key in ("ephemeral_5m_input_tokens", "ephemeral_1h_input_tokens"):
+        if ttl_key in input_token_details:
+            ephemeral_write += input_token_details.get(ttl_key) or 0
+    if ephemeral_write:
+        cache_creation_input_tokens = (
+            cache_creation_input_tokens or 0
+        ) + ephemeral_write
+
     # Ensure all required fields have default values and handle None values
     return TokenUsage(
         prompt_tokens=normalized_usage.get("prompt_tokens") or 0,
         completion_tokens=normalized_usage.get("completion_tokens") or 0,
         total_tokens=normalized_usage.get("total_tokens") or 0,
+        cache_read_input_tokens=cache_read_input_tokens,
+        cache_creation_input_tokens=cache_creation_input_tokens,
     )
 
 
@@ -144,6 +180,14 @@ def _extract_usage_data(call: Call, output: Any) -> None:
                     token_usage.completion_tokens
                 )
                 usage_dict[model_name]["total_tokens"] += token_usage.total_tokens
+                if token_usage.cache_read_input_tokens is not None:
+                    usage_dict[model_name]["cache_read_input_tokens"] += (
+                        token_usage.cache_read_input_tokens
+                    )
+                if token_usage.cache_creation_input_tokens is not None:
+                    usage_dict[model_name]["cache_creation_input_tokens"] += (
+                        token_usage.cache_creation_input_tokens
+                    )
 
     if usage_dict:
         if call.summary is None:
