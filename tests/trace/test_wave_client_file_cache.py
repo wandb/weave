@@ -10,8 +10,8 @@ from weave.trace.weave_client_send_file_cache import (
     ThreadSafeLRUCache,
     WeaveClientSendFileCache,
 )
-from weave.trace_server_bindings.stainless_remote_http_trace_server import (
-    StainlessRemoteHTTPTraceServer,
+from weave.trace_server_bindings.remote_http_trace_server import (
+    RemoteHTTPTraceServer,
 )
 from weave.vendor.weave_server_sdk.types import FileCreateResponse
 
@@ -404,7 +404,7 @@ def offline_client(monkeypatch):
     monkeypatch.setenv("WEAVE_RETRY_MAX_ATTEMPTS", "2")
     monkeypatch.setenv("WEAVE_RETRY_MAX_INTERVAL", "0.01")
     monkeypatch.setenv("WEAVE_ENABLE_WAL", "false")
-    server = StainlessRemoteHTTPTraceServer("http://example.com")
+    server = RemoteHTTPTraceServer("http://example.com")
     client = WeaveClient(
         entity="ent",
         project="proj",

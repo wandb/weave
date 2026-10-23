@@ -1,4 +1,4 @@
-"""Tests for the requests StainlessRemoteHTTPTraceServer sends.
+"""Tests for the requests RemoteHTTPTraceServer sends.
 
 These tests drive the binding through the vendored generated client over an
 httpx.MockTransport, so what they assert is the request the generated resource
@@ -35,7 +35,7 @@ from weave.trace.constants import MAX_CONVERSATION_CHAT_TURNS
 from weave.trace.custom_runtime import CustomRuntimeID
 from weave.trace.serialization.digest import compute_object_digest, compute_row_digest
 from weave.trace_server_bindings import (
-    stainless_remote_http_trace_server as stainless_binding,
+    remote_http_trace_server as stainless_binding,
 )
 from weave.trace_server_bindings.client_interface import (
     ObjAddTagsParams,
@@ -44,8 +44,8 @@ from weave.trace_server_bindings.client_interface import (
     ObjSetAliasesParams,
 )
 from weave.trace_server_bindings.models import DatasetSourcesLinkDeleteRes
-from weave.trace_server_bindings.stainless_remote_http_trace_server import (
-    StainlessRemoteHTTPTraceServer,
+from weave.trace_server_bindings.remote_http_trace_server import (
+    RemoteHTTPTraceServer,
 )
 from weave.vendor.weave_server_sdk import Client as StainlessClient
 from weave.vendor.weave_server_sdk.types import (
@@ -350,7 +350,7 @@ V1_RESPONSE = {
 
 @dataclass
 class _MockServerResult:
-    server: StainlessRemoteHTTPTraceServer
+    server: RemoteHTTPTraceServer
     requests: list[httpx.Request]
 
 
@@ -368,7 +368,7 @@ def _mock_server(
         requests.append(request)
         return response
 
-    server = StainlessRemoteHTTPTraceServer(BASE_URL, should_batch=False)
+    server = RemoteHTTPTraceServer(BASE_URL, should_batch=False)
     server._stainless_client = StainlessClient(
         base_url=BASE_URL,
         username="",
@@ -2541,7 +2541,7 @@ def test_call_records_written_from_models_replay(should_batch: bool, monkeypatch
         requests.append(request)
         return httpx.Response(200, json={"id": "call-id", "trace_id": "test_trace_id"})
 
-    server = StainlessRemoteHTTPTraceServer(BASE_URL, should_batch=should_batch)
+    server = RemoteHTTPTraceServer(BASE_URL, should_batch=should_batch)
     server._stainless_client = StainlessClient(
         base_url=BASE_URL,
         username="",

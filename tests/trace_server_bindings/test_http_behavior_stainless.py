@@ -1,7 +1,7 @@
-"""HTTP behavior tests for StainlessRemoteHTTPTraceServer.
+"""HTTP behavior tests for RemoteHTTPTraceServer.
 
 These tests verify HTTP request/response handling, retry behavior for various
-status codes, and error handling specific to StainlessRemoteHTTPTraceServer.
+status codes, and error handling specific to RemoteHTTPTraceServer.
 """
 
 from __future__ import annotations
@@ -43,8 +43,8 @@ from weave.trace_server_bindings.models import (
     EndBatchItem,
     StartBatchItem,
 )
-from weave.trace_server_bindings.stainless_remote_http_trace_server import (
-    StainlessRemoteHTTPTraceServer,
+from weave.trace_server_bindings.remote_http_trace_server import (
+    RemoteHTTPTraceServer,
 )
 from weave.utils.retry import with_retry
 from weave.vendor.weave_server_sdk import APIStatusError, DefaultHttpxClient
@@ -54,8 +54,8 @@ from weave.wandb_interface.auth import ApiKeyCredentials, WandbCredentials
 
 @pytest.fixture
 def unbatched_server():
-    """Create a StainlessRemoteHTTPTraceServer instance without batching for testing."""
-    return StainlessRemoteHTTPTraceServer("http://example.com")
+    """Create a RemoteHTTPTraceServer instance without batching for testing."""
+    return RemoteHTTPTraceServer("http://example.com")
 
 
 def test_federated_auth_refreshes_headers(unbatched_server):
@@ -146,9 +146,7 @@ def test_a_bad_dict_start_or_end_is_rejected_before_it_is_sent(should_batch):
         requests.append(request)
         return httpx.Response(200, json={}, request=request)
 
-    server = StainlessRemoteHTTPTraceServer(
-        "http://example.com", should_batch=should_batch
-    )
+    server = RemoteHTTPTraceServer("http://example.com", should_batch=should_batch)
     server._stainless_client = server._stainless_client.copy(
         http_client=httpx.Client(transport=httpx.MockTransport(handle))
     )
@@ -172,7 +170,7 @@ def test_a_bad_dict_start_or_end_is_rejected_before_it_is_sent(should_batch):
 def test_timeout_retry_mechanism(success_response, monkeypatch):
     """Test that timeouts trigger the retry mechanism."""
     monkeypatch.setenv("WEAVE_USE_CALLS_COMPLETE", "false")
-    server = StainlessRemoteHTTPTraceServer("http://example.com", should_batch=True)
+    server = RemoteHTTPTraceServer("http://example.com", should_batch=True)
 
     # Mock _send_batch_to_server to raise errors twice, then succeed
     call_count = 0
@@ -200,9 +198,9 @@ def test_timeout_retry_mechanism(success_response, monkeypatch):
 
 @pytest.fixture
 def batched_server(monkeypatch):
-    """Create a batching StainlessRemoteHTTPTraceServer; the test sets the retried send."""
+    """Create a batching RemoteHTTPTraceServer; the test sets the retried send."""
     monkeypatch.setenv("WEAVE_USE_CALLS_COMPLETE", "false")
-    server = StainlessRemoteHTTPTraceServer("http://example.com", should_batch=True)
+    server = RemoteHTTPTraceServer("http://example.com", should_batch=True)
     yield server
     if server.call_processor:
         server.call_processor.stop_accepting_new_work_and_flush_queue()
@@ -249,9 +247,7 @@ def test_post_timeout(success_response, batched_server, log_collector):
             return CallStartResponse(id="test_id", trace_id="test_trace_id")
 
     # Create a new server since the old one has shutdown its batch processor
-    new_server = StainlessRemoteHTTPTraceServer(
-        "http://example.com", should_batch=False
-    )
+    new_server = RemoteHTTPTraceServer("http://example.com", should_batch=False)
     fast_retry = tenacity.retry(
         wait=tenacity.wait_fixed(0.1),
         stop=tenacity.stop_after_attempt(2),
@@ -280,7 +276,7 @@ V2 = "/v2/entity/project"
 @contextmanager
 def _batching_server(
     handle: Callable[[httpx.Request], httpx.Response],
-) -> Iterator[tuple[StainlessRemoteHTTPTraceServer, list[httpx.Request]]]:
+) -> Iterator[tuple[RemoteHTTPTraceServer, list[httpx.Request]]]:
     """Yield a batching server whose generated client talks to `handle`."""
     requests: list[httpx.Request] = []
 
@@ -288,7 +284,7 @@ def _batching_server(
         requests.append(request)
         return handle(request)
 
-    server = StainlessRemoteHTTPTraceServer("http://example.com", should_batch=True)
+    server = RemoteHTTPTraceServer("http://example.com", should_batch=True)
     server._stainless_client = server._stainless_client.copy(
         http_client=httpx.Client(transport=httpx.MockTransport(record))
     )
@@ -672,7 +668,7 @@ def test_feedback_payload_keeps_nested_model_defaults():
         server.feedback_processor.stop_accepting_new_work_and_flush_queue()
     (batched,) = json.loads(sent[-1].read())["batch"]
 
-    unbatched_server = StainlessRemoteHTTPTraceServer("http://example.com")
+    unbatched_server = RemoteHTTPTraceServer("http://example.com")
     unbatched_server._stainless_client = unbatched_server._stainless_client.copy(
         http_client=httpx.Client(transport=httpx.MockTransport(handle))
     )
@@ -695,7 +691,7 @@ def test_calls_complete_needs_batching(monkeypatch):
     """Without batching there is no processor to pair calls in."""
     monkeypatch.setenv("WEAVE_USE_CALLS_COMPLETE", "true")
 
-    server = StainlessRemoteHTTPTraceServer("http://example.com")
+    server = RemoteHTTPTraceServer("http://example.com")
 
     assert server.use_calls_complete is False
     assert server.call_processor is None
@@ -710,7 +706,7 @@ def test_calls_complete_needs_batching(monkeypatch):
 # =============================================================================
 
 
-def _weave_client(server: StainlessRemoteHTTPTraceServer) -> WeaveClient:
+def _weave_client(server: RemoteHTTPTraceServer) -> WeaveClient:
     entity, project = PROJECT.split("/")
     return WeaveClient(entity, project, server, ensure_project_exists=False)
 
@@ -783,11 +779,11 @@ def test_generated_client_gets_our_ssl_and_timeout_settings(monkeypatch):
         return DefaultHttpxClient(**kwargs)
 
     monkeypatch.setattr(
-        "weave.trace_server_bindings.stainless_remote_http_trace_server.DefaultHttpxClient",
+        "weave.trace_server_bindings.remote_http_trace_server.DefaultHttpxClient",
         spy,
     )
 
-    server = StainlessRemoteHTTPTraceServer("http://example.com")
+    server = RemoteHTTPTraceServer("http://example.com")
 
     assert captured == {"verify": False}
     assert server._stainless_client.timeout == 7.0
@@ -818,7 +814,7 @@ def test_table_update_over_the_byte_limit_is_split():
             request=request,
         )
 
-    server = StainlessRemoteHTTPTraceServer("http://example.com")
+    server = RemoteHTTPTraceServer("http://example.com")
     server._stainless_client = server._stainless_client.copy(
         http_client=httpx.Client(transport=httpx.MockTransport(handle))
     )
@@ -897,9 +893,7 @@ def test_feedback_create_sends_an_explicit_id(should_batch):
         requests.append(request)
         return _store_feedback(request)
 
-    server = StainlessRemoteHTTPTraceServer(
-        "http://example.com", should_batch=should_batch
-    )
+    server = RemoteHTTPTraceServer("http://example.com", should_batch=should_batch)
     server._stainless_client = server._stainless_client.copy(
         http_client=httpx.Client(transport=httpx.MockTransport(record))
     )

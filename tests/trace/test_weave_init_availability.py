@@ -6,14 +6,14 @@ from unittest.mock import MagicMock
 import pytest
 
 from weave.trace import weave_init
-from weave.trace_server_bindings.stainless_remote_http_trace_server import (
-    StainlessRemoteHTTPTraceServer,
+from weave.trace_server_bindings.remote_http_trace_server import (
+    RemoteHTTPTraceServer,
 )
 
 
 def test_get_server_info_reports_the_underlying_error():
     """Test that _get_server_info surfaces why the server could not be reached."""
-    mock_server = MagicMock(spec=StainlessRemoteHTTPTraceServer)
+    mock_server = MagicMock(spec=RemoteHTTPTraceServer)
     underlying = json.JSONDecodeError("test error", "doc", 0)
     mock_server.server_info.side_effect = underlying
 
@@ -29,7 +29,7 @@ def test_get_server_info_reports_the_underlying_error():
 
 def test_get_server_info_success():
     """Test that _get_server_info returns server info when server is available."""
-    mock_server = MagicMock(spec=StainlessRemoteHTTPTraceServer)
+    mock_server = MagicMock(spec=RemoteHTTPTraceServer)
     server_info = {"version": "1.0.0"}
     mock_server.server_info.return_value = server_info
 

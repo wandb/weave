@@ -465,8 +465,8 @@ def init_weave_get_server(
     credentials: WandbCredentials | None = None,
     should_batch: bool = True,
 ) -> TraceServerClientInterface:
-    from weave.trace_server_bindings.stainless_remote_http_trace_server import (
-        StainlessRemoteHTTPTraceServer,
+    from weave.trace_server_bindings.remote_http_trace_server import (
+        RemoteHTTPTraceServer,
     )
 
     if not should_use_stainless_server():
@@ -475,7 +475,7 @@ def init_weave_get_server(
             "use_stainless_server=False has no effect: the hand-written trace "
             "server client was removed, and Weave always uses the generated one.",
         )
-    res = StainlessRemoteHTTPTraceServer.from_env(should_batch)
+    res = RemoteHTTPTraceServer.from_env(should_batch)
     if credentials is not None:
         res.set_auth(credentials)
     return res

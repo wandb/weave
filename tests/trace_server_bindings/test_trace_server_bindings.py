@@ -1,4 +1,4 @@
-"""Tests for the StainlessRemoteHTTPTraceServer binding.
+"""Tests for the RemoteHTTPTraceServer binding.
 
 These tests verify the batching, splitting, and retry behavior of the binding.
 """
@@ -29,8 +29,8 @@ from weave.trace_server_bindings.models import (
     EndBatchItem,
     StartBatchItem,
 )
-from weave.trace_server_bindings.stainless_remote_http_trace_server import (
-    StainlessRemoteHTTPTraceServer,
+from weave.trace_server_bindings.remote_http_trace_server import (
+    RemoteHTTPTraceServer,
 )
 
 
@@ -366,7 +366,7 @@ def _server_over_transport(
         return httpx.Response(200, json={}, request=request)
 
     http_client = httpx.Client(transport=httpx.MockTransport(handle))
-    server = StainlessRemoteHTTPTraceServer("http://example.com", should_batch=True)
+    server = RemoteHTTPTraceServer("http://example.com", should_batch=True)
     server._stainless_client = server._stainless_client.copy(http_client=http_client)
     try:
         yield server, requests_seen, stored

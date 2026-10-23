@@ -62,8 +62,8 @@ from weave.trace_server_bindings.http_utils import (
     ERROR_CODE_CALLS_COMPLETE_MODE_REQUIRED,
     ROW_COUNT_CHUNKING_THRESHOLD,
 )
-from weave.trace_server_bindings.stainless_remote_http_trace_server import (
-    StainlessRemoteHTTPTraceServer,
+from weave.trace_server_bindings.remote_http_trace_server import (
+    RemoteHTTPTraceServer,
 )
 from weave.utils.ids import generate_id
 from weave.vendor.weave_server_sdk import APIStatusError, UnprocessableEntityError
@@ -378,7 +378,7 @@ def test_call_readers_parse_the_summary():
             return httpx.Response(200, json={"count": 1}, request=request)
         return httpx.Response(200, content=json.dumps(row) + "\n", request=request)
 
-    server = StainlessRemoteHTTPTraceServer("http://example.com")
+    server = RemoteHTTPTraceServer("http://example.com")
     server._stainless_client = server._stainless_client.copy(
         http_client=httpx.Client(transport=httpx.MockTransport(handle))
     )
@@ -422,7 +422,7 @@ def test_get_calls_sends_column_iterables_as_lists():
             return httpx.Response(200, json={"count": 0}, request=request)
         return httpx.Response(200, content=b"", request=request)
 
-    server = StainlessRemoteHTTPTraceServer("http://example.com")
+    server = RemoteHTTPTraceServer("http://example.com")
     server._stainless_client = server._stainless_client.copy(
         http_client=httpx.Client(transport=httpx.MockTransport(handle))
     )
@@ -452,7 +452,7 @@ def test_get_calls_sends_every_keyword():
             return httpx.Response(200, json={"count": 0}, request=request)
         return httpx.Response(200, content=b"", request=request)
 
-    server = StainlessRemoteHTTPTraceServer("http://example.com")
+    server = RemoteHTTPTraceServer("http://example.com")
     server._stainless_client = server._stainless_client.copy(
         http_client=httpx.Client(transport=httpx.MockTransport(handle))
     )
@@ -1102,7 +1102,7 @@ def _client_storing_objects(
             return httpx.Response(200, json=res, request=request)
         return httpx.Response(200, json={}, request=request)
 
-    server = StainlessRemoteHTTPTraceServer("http://example.com", should_batch=False)
+    server = RemoteHTTPTraceServer("http://example.com", should_batch=False)
     server._stainless_client = server._stainless_client.copy(
         http_client=httpx.Client(transport=httpx.MockTransport(handle))
     )
@@ -1226,7 +1226,7 @@ def test_a_call_with_a_bad_field_does_not_take_its_batch_down(monkeypatch):
             return httpx.Response(200, json={"digest": "d"}, request=request)
         return httpx.Response(200, json={}, request=request)
 
-    server = StainlessRemoteHTTPTraceServer("http://example.com", should_batch=True)
+    server = RemoteHTTPTraceServer("http://example.com", should_batch=True)
     server._stainless_client = server._stainless_client.copy(
         http_client=httpx.Client(transport=httpx.MockTransport(handle))
     )
@@ -2030,8 +2030,8 @@ def test_table_partitioning_on_the_generated_client(
 def test_parallel_chunk_probe_works_for_the_generated_client(client, monkeypatch):
     """The probe must work for any client, not just the hand-written one.
 
-    It used to reach for `_post_request_executor`, an attribute only
-    RemoteHTTPTraceServer has, so it always answered "endpoint missing" for the
+    It used to reach for `_post_request_executor`, an attribute only the
+    hand-written client had, so it always answered "endpoint missing" for the
     generated client and silently disabled parallel table upload.
     """
     probed: list[httpx.Request] = []
@@ -2042,7 +2042,7 @@ def test_parallel_chunk_probe_works_for_the_generated_client(client, monkeypatch
             200, json={"digest": "d", "row_digests": []}, request=request
         )
 
-    server = StainlessRemoteHTTPTraceServer("http://example.com")
+    server = RemoteHTTPTraceServer("http://example.com")
     server._stainless_client = server._stainless_client.copy(
         http_client=httpx.Client(transport=httpx.MockTransport(handle))
     )
@@ -2080,7 +2080,7 @@ def test_flush_drains_the_processor_installed_by_a_calls_complete_upgrade(monkey
             )
         return httpx.Response(200, json={}, request=request)
 
-    server = StainlessRemoteHTTPTraceServer("http://example.com", should_batch=True)
+    server = RemoteHTTPTraceServer("http://example.com", should_batch=True)
     server._stainless_client = server._stainless_client.copy(
         http_client=httpx.Client(transport=httpx.MockTransport(handle))
     )

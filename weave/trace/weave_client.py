@@ -568,7 +568,7 @@ class WeaveClient:
         self._server_feedback_processor: AsyncBatchProcessor | None = None
         # This is a short-term hack to get around the fact that we are reaching into
         # the underlying implementation of the specific server to get the feedback processor.
-        # The `StainlessRemoteHTTPTraceServer` contains a feedback processor and we use that to control
+        # The `RemoteHTTPTraceServer` contains a feedback processor and we use that to control
         # some client-side flushing mechanics. We should move this to the interface layer. However,
         # we don't really want the server-side implementations to need to define no-ops as that is
         # even uglier. So we are using this "hasattr" check to avoid forcing the server-side implementations
@@ -3822,7 +3822,7 @@ def _warn_if_object_name_truncated(name: str, object_id: str) -> None:
 def _get_call_processor(server: Any) -> Any:
     """Get the call processor from a server, traversing through middleware wrappers.
 
-    The production client (StainlessRemoteHTTPTraceServer) uses batching and
+    The production client (RemoteHTTPTraceServer) uses batching and
     has a call_processor. This traverses through middleware like
     CachingMiddlewareTraceServer to find it.
 

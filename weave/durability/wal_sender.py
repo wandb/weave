@@ -56,8 +56,8 @@ from weave.durability.wal_directory_manager import FileWALDirectoryManager
 from weave.durability.wal_lock import is_writer_alive
 from weave.telemetry.trace_sentry import log_error
 from weave.trace_server_bindings.client_interface import TraceServerClientInterface
-from weave.trace_server_bindings.stainless_remote_http_trace_server import (
-    StainlessRemoteHTTPTraceServer,
+from weave.trace_server_bindings.remote_http_trace_server import (
+    RemoteHTTPTraceServer,
 )
 from weave.vendor.weave_server_sdk.types import FileCreateParams
 
@@ -454,7 +454,7 @@ def main(argv: list[str] | None = None) -> None:
 
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
 
-    server: TraceServerClientInterface = StainlessRemoteHTTPTraceServer(
+    server: TraceServerClientInterface = RemoteHTTPTraceServer(
         args.trace_server_url, password=args.api_key
     )
     sender = create_sender(wal_dir, server, poll_interval=args.poll_interval)

@@ -15,15 +15,15 @@ from weave.trace.context import weave_client_context
 from weave.trace.context.call_context import set_call_stack
 from weave.trace.env import ssl_verify
 from weave.trace.settings import replace_settings
-from weave.trace_server_bindings import stainless_remote_http_trace_server
+from weave.trace_server_bindings import remote_http_trace_server
 from weave.trace_server_bindings.async_batch_processor import AsyncBatchProcessor
 from weave.trace_server_bindings.caching_middleware_trace_server import (
     CachingMiddlewareTraceServer,
 )
 from weave.trace_server_bindings.call_batch_processor import CallBatchProcessor
 from weave.trace_server_bindings.client_interface import TraceServerClientInterface
-from weave.trace_server_bindings.stainless_remote_http_trace_server import (
-    StainlessRemoteHTTPTraceServer,
+from weave.trace_server_bindings.remote_http_trace_server import (
+    RemoteHTTPTraceServer,
 )
 from weave.vendor.weave_server_sdk import DefaultHttpxClient
 
@@ -554,7 +554,7 @@ def client_creator(zero_stack, trace_server, caching_client_isolation):
 
 @pytest.fixture
 def stainless_recording_server(client, monkeypatch):
-    """A batching `StainlessRemoteHTTPTraceServer` on the test server, recording its requests.
+    """A batching `RemoteHTTPTraceServer` on the test server, recording its requests.
 
     It covers the generated client's batching and splitting against the real
     server, and yields the server with the path of every request it sent.
@@ -569,16 +569,16 @@ def stainless_recording_server(client, monkeypatch):
         return CallBatchProcessor(*args, **kwargs)
 
     monkeypatch.setattr(
-        stainless_remote_http_trace_server,
+        remote_http_trace_server,
         "AsyncBatchProcessor",
         make_fast_async_batch_processor,
     )
     monkeypatch.setattr(
-        stainless_remote_http_trace_server,
+        remote_http_trace_server,
         "CallBatchProcessor",
         make_fast_call_batch_processor,
     )
-    server = StainlessRemoteHTTPTraceServer(
+    server = RemoteHTTPTraceServer(
         os.environ["WF_TRACE_SERVER_URL"],
         should_batch=True,
         password=os.environ["WANDB_API_KEY"],
