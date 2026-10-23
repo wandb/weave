@@ -525,7 +525,8 @@ class WeaveOtelTracingProcessor(TracingProcessor):  # pyright: ignore[reportGene
         if span_id not in self._span_otel:
             return
 
-        self._tool_call_ids[span_id] = call_id
+        # A tool body can build its own `ToolContext`; the SDK's first one names the call.
+        self._tool_call_ids.setdefault(span_id, call_id)
 
     def on_trace_start(self, trace: Trace) -> None:
         self._conversation_ids[trace.trace_id] = _conversation_id_for_trace(trace)

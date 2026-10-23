@@ -1436,7 +1436,10 @@ async def test_op_tool_records_the_execute_tool_span_that_invoked_it(
 async def test_execute_tool_spans_carry_the_model_call_id(
     otel_spans: InMemorySpanExporter,
 ) -> None:
-    """Each tool run names the request it answers, even beside an identical request."""
+    """Each tool run names the request it answers, even beside an identical request.
+
+    The tool returns the id it ran under, and builds a nested `ToolContext` that must not rename it.
+    """
     arguments = '{"query": "papers"}'
     tool_calls = _response_payload("resp_tools", "")
     tool_calls["output"] = [
@@ -1450,14 +1453,20 @@ async def test_execute_tool_spans_carry_the_model_call_id(
     factory = inspect.getattr_static(ToolContext, "from_agent_context")
 
     @function_tool
-    def lookup(query: str) -> str:
-        return "ok"
+    def lookup(ctx: ToolContext[None], query: str) -> str:
+        ToolContext.from_agent_context(
+            ctx,
+            "call_nested",
+            tool_name=ctx.tool_name,
+            tool_arguments=ctx.tool_arguments,
+        )
+        return ctx.tool_call_id
 
     original_provider = get_trace_provider()
     set_trace_provider(DefaultTraceProvider())
     patcher = OpenAIAgentsOtelPatcher(IntegrationSettings())
-    assert patcher.attempt_patch() is True
     try:
+        assert patcher.attempt_patch() is True
         model = OpenAIResponsesModel(model="gpt-4o", openai_client=openai_client)
         agent = Agent(name="researcher", model=model, tools=[lookup])
         await Runner.run(agent, "find papers")
@@ -1472,10 +1481,12 @@ async def test_execute_tool_spans_carry_the_model_call_id(
         _attrs(_by_name(spans, "chat ")[0])["gen_ai.output.messages"]
     )[0]["parts"]
 
-    assert sorted(_attrs(s)["gen_ai.tool.call.id"] for s in tool_spans) == [
-        "call_a",
-        "call_b",
-    ]
+    results = {
+        _attrs(s)["gen_ai.tool.call.id"]: _attrs(s)["gen_ai.tool.call.result"]
+        for s in tool_spans
+    }
+
+    assert results == {"call_a": "call_a", "call_b": "call_b"}
     assert [part["id"] for part in requests] == ["call_a", "call_b"]
     assert inspect.getattr_static(ToolContext, "from_agent_context") is factory
 
