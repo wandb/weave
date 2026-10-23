@@ -423,6 +423,61 @@ def should_skip_tracing_for_op(op: Op) -> bool:
     return not op._tracing_enabled
 
 
+def _advance_sync_generator(
+    gen: Generator[Any, Any, Any], action: str, value: Any
+) -> Any:
+    with tracing_disabled():
+        if action == "next":
+            return next(gen)
+        if action == "send":
+            return gen.send(value)
+        return gen.throw(value)
+
+
+async def _advance_async_generator(gen: AsyncGenerator[Any, Any]) -> Any:
+    with tracing_disabled():
+        return await anext(gen)
+
+
+def _untraced_sync_generator(gen: Generator[Any, Any, Any]) -> Generator[Any, Any, Any]:
+    action = "next"
+    value: Any = None
+
+    while True:
+        try:
+            yielded = _advance_sync_generator(gen, action, value)
+        except StopIteration as e:
+            return e.value  # noqa: B901
+
+        try:
+            value = yield yielded
+        except GeneratorExit:
+            with tracing_disabled():
+                gen.close()
+            raise
+        except BaseException as e:
+            action = "throw"
+            value = e.with_traceback(e.__traceback__)
+        else:
+            action = "send"
+
+
+async def _untraced_async_generator(
+    gen: AsyncGenerator[Any, Any],
+) -> AsyncGenerator[Any, Any]:
+    try:
+        while True:
+            try:
+                yielded = await _advance_async_generator(gen)
+            except StopAsyncIteration:
+                return
+
+            yield yielded
+    finally:
+        with tracing_disabled():
+            await gen.aclose()
+
+
 def _should_sample_traces(op: Op) -> bool:
     if call_context.get_current_call():
         return False  # Don't sample traces for child calls
@@ -736,15 +791,8 @@ def _call_sync_gen(
         return gen, call
 
     if _should_sample_traces(op):
-        # Generator bodies run at iteration time, so tracing must remain disabled
-        # while consuming the iterator (not only while constructing it).
         gen = func(*args, **kwargs)
-
-        def untraced_gen() -> Generator[Any]:
-            with tracing_disabled():
-                yield from gen
-
-        wrapped_gen = untraced_gen()
+        wrapped_gen = _untraced_sync_generator(gen)
         call.output = wrapped_gen
         return wrapped_gen, call
 
@@ -946,7 +994,7 @@ def _call_async_gen(
     __should_raise: bool = False,
     __require_explicit_finish: bool = False,
     **kwargs: Any,
-) -> tuple[AsyncIterator, Call]:
+) -> tuple[AsyncGenerator[Any, Any], Call]:
     func = op.resolve_fn
     call = placeholder_call()
 
@@ -957,16 +1005,8 @@ def _call_async_gen(
         return gen, call
 
     if _should_sample_traces(op):
-        # Async generator bodies run at iteration time, so tracing must remain
-        # disabled while consuming the async iterator.
         gen = func(*args, **kwargs)
-
-        async def untraced_gen() -> AsyncIterator[Any]:
-            with tracing_disabled():
-                async for item in gen:
-                    yield item
-
-        wrapped_gen = untraced_gen()
+        wrapped_gen = _untraced_async_generator(gen)
         call.output = wrapped_gen
         return wrapped_gen, call
 
@@ -1032,7 +1072,7 @@ def _call_async_gen(
     # Create the generator wrapper
     try:
         # Define the wrapper generator that will handle the call context properly
-        async def wrapped_generator() -> AsyncIterator:
+        async def wrapped_generator() -> AsyncGenerator[Any, Any]:
             nonlocal accumulated_state, has_finished
 
             # Set the call context before creating the original generator
@@ -1154,7 +1194,7 @@ def _call_async_gen(
         if __should_raise:
             raise
 
-        async def empty_async_gen() -> AsyncIterator[Any]:  # noqa: RUF029 — must be async to produce AsyncIterator
+        async def empty_async_gen() -> AsyncGenerator[Any, Any]:  # noqa: RUF029 — must be async to produce AsyncGenerator
             # Re-raise the original exception if __should_raise is False
             # but we're evaluating the generator, to maintain expected behavior
             if not has_finished:
@@ -1316,8 +1356,11 @@ def op(
                     res, _ = _call_async_gen(
                         cast(Op[P, R], wrapper), *args, __should_raise=True, **kwargs
                     )
-                    async for item in res:
-                        yield item
+                    try:
+                        async for item in res:
+                            yield item
+                    finally:
+                        await res.aclose()
             else:
 
                 @wraps(func)

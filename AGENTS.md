@@ -97,6 +97,10 @@ prevent request traffic from repeatedly calling an unavailable token endpoint.
 If the credentials file is not writable, the exchanged token remains cached
 in-process and credential persistence emits one warning per credentials object.
 
+## Sampled generators
+
+Sampled sync and async generator adapters must disable tracing only while advancing the underlying generator. Restore the caller context before each outward yield, and close the underlying iterator under the same scoped setting. Do not hold a context manager across a yield or copy the caller's whole `Context`, because generators can resume in a different context or task.
+
 ## Generated Files — Do Not Hand-Edit
 
 `weave/vendor/weave_server_sdk/` is the generated Weave Trace API client, copied
