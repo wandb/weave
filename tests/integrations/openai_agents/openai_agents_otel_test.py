@@ -8,15 +8,18 @@ emitted OTel spans instead of Weave calls.
 from __future__ import annotations
 
 import asyncio
+import inspect
 import json
+import logging
 from collections.abc import Generator
 from typing import Any
 from unittest.mock import Mock
 
 import httpx
 import pytest
-from agents import Agent, Runner, function_tool
+from agents import Agent, RunContextWrapper, Runner, function_tool
 from agents.models.openai_responses import OpenAIResponsesModel
+from agents.tool_context import ToolContext
 from agents.tracing import (
     AgentSpanData,
     CustomSpanData,
@@ -28,7 +31,9 @@ from agents.tracing import (
     Span,
     TaskSpanData,
     Trace,
+    TracingProcessor,
     TurnSpanData,
+    function_span,
     generation_span,
     get_trace_provider,
     response_span,
@@ -49,10 +54,16 @@ import weave
 from weave.conversation import agent_name_override
 from weave.integrations.integration_utilities import op_name_from_ref
 from weave.integrations.openai.openai_sdk import get_openai_patcher
+from weave.integrations.openai_agents._tool_call_ids import install_tool_call_id_hook
 from weave.integrations.openai_agents.otel_processor import (
     WeaveOtelTracingProcessor,
     _iso_to_ns,
 )
+from weave.integrations.openai_agents.patcher import (
+    OpenAIAgentsOtelPatcher,
+    _registered_processors,
+)
+from weave.trace.autopatch import IntegrationSettings
 from weave.trace.constants import INVOKING_SPAN_ATTR_KEY
 from weave.trace.otel_op_linker import OpLinkSpanProcessor
 from weave.trace.otel_span_attrs import (
@@ -228,20 +239,24 @@ def _chat_completion_payload(response_id: str) -> dict[str, Any]:
     }
 
 
+def _function_call_item(call_id: str, tool_name: str, arguments: str) -> dict[str, str]:
+    return {
+        "type": "function_call",
+        "id": f"fc_{call_id}",
+        "call_id": call_id,
+        "name": tool_name,
+        "arguments": arguments,
+        "status": "completed",
+    }
+
+
 def _tool_call_payload(
     response_id: str, tool_name: str, arguments: str
 ) -> dict[str, Any]:
     """A Responses payload whose only output item calls ``tool_name``."""
     payload = _response_payload(response_id, "")
     payload["output"] = [
-        {
-            "type": "function_call",
-            "id": f"fc_{response_id}",
-            "call_id": f"call_{response_id}",
-            "name": tool_name,
-            "arguments": arguments,
-            "status": "completed",
-        }
+        _function_call_item(f"call_{response_id}", tool_name, arguments)
     ]
     return payload
 
@@ -843,21 +858,15 @@ def test_iso_to_ns_roundtrip() -> None:
     assert _iso_to_ns("") is None
 
 
-def test_patcher_install_and_uninstall_lifecycle() -> None:
+def test_patcher_install_and_uninstall_lifecycle(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """``attempt_patch`` adds the processor; ``undo_patch`` removes it cleanly.
 
     Verifies the uninstall path doesn't blow away other registered
     processors — we install a sentinel processor first, then install our
     patcher, then uninstall, and confirm the sentinel is still there.
     """
-    from agents.tracing import TracingProcessor, set_trace_processors
-
-    from weave.integrations.openai_agents.patcher import (
-        OpenAIAgentsOtelPatcher,
-        _registered_processors,
-    )
-    from weave.trace.autopatch import IntegrationSettings
-
     original = _registered_processors() or []
 
     class _Sentinel(TracingProcessor):
@@ -899,7 +908,7 @@ def test_patcher_install_and_uninstall_lifecycle() -> None:
         shutdown_calls.append(True)
         original_shutdown()
 
-    installed_processor.shutdown = _tracking_shutdown  # type: ignore[method-assign]
+    monkeypatch.setattr(installed_processor, "shutdown", _tracking_shutdown)
 
     assert patcher.undo_patch() is True
     assert patcher.patched is False
@@ -1162,12 +1171,93 @@ def test_unhandled_span_type_emits_warning(
 
 def test_undo_patch_is_noop_when_not_patched() -> None:
     """Calling undo_patch on a non-installed patcher returns True without error."""
-    from weave.integrations.openai_agents.patcher import OpenAIAgentsOtelPatcher
-    from weave.trace.autopatch import IntegrationSettings
-
     patcher = OpenAIAgentsOtelPatcher(IntegrationSettings())
     assert patcher.patched is False
     assert patcher.undo_patch() is True
+
+
+@pytest.mark.trace_server
+@pytest.mark.disable_logging_error_check
+def test_patcher_survives_tool_call_id_hook_failures(
+    monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    """A missing hook still installs tracing, a failed install restores the factory, and a failing sink keeps the tool running."""
+    caplog.set_level("WARNING")
+    factory = inspect.getattr_static(ToolContext, "from_agent_context")
+
+    def reject(processor: TracingProcessor) -> None:
+        raise RuntimeError("registry closed")
+
+    with monkeypatch.context() as patch:
+        patch.setattr(
+            "weave.integrations.openai_agents.patcher.add_trace_processor", reject
+        )
+        rejected = OpenAIAgentsOtelPatcher(IntegrationSettings())
+
+        assert rejected.attempt_patch() is False
+        assert inspect.getattr_static(ToolContext, "from_agent_context") is factory
+        assert caplog.record_tuples == [
+            (
+                "weave.integrations.openai_agents.patcher",
+                logging.ERROR,
+                "Failed to install the openai_agents OTel processor",
+            )
+        ]
+
+    caplog.clear()
+    with monkeypatch.context() as patch:
+        patch.setattr(ToolContext, "from_agent_context", factory.__func__)
+        patcher = OpenAIAgentsOtelPatcher(IntegrationSettings())
+        try:
+            assert patcher.attempt_patch() is True
+            assert patcher.processor in (_registered_processors() or [])
+        finally:
+            patcher.undo_patch()
+
+    assert caplog.record_tuples == [
+        (
+            "weave.integrations.openai_agents._tool_call_ids",
+            logging.WARNING,
+            "ToolContext.from_agent_context is not a classmethod in this "
+            "openai-agents version; execute_tool spans will not carry "
+            "gen_ai.tool.call.id.",
+        )
+    ]
+    assert inspect.getattr_static(ToolContext, "from_agent_context") is factory
+
+    def broken_sink(span_id: str, call_id: str) -> None:
+        raise RuntimeError("sink closed")
+
+    caplog.clear()
+    original_provider = get_trace_provider()
+    set_trace_provider(DefaultTraceProvider())
+    undo = None
+    try:
+        undo = install_tool_call_id_hook(broken_sink)
+        with trace("hook"), function_span("lookup"):
+            tool_context = ToolContext.from_agent_context(
+                RunContextWrapper(context=None),
+                "call_a",
+                tool_name="lookup",
+                tool_arguments="{}",
+            )
+    finally:
+        set_trace_provider(original_provider)
+        if undo is not None:
+            undo()
+
+    assert undo is not None
+    assert tool_context.tool_call_id == "call_a"
+    assert caplog.record_tuples == [
+        (
+            "weave.integrations.openai_agents._tool_call_ids",
+            logging.ERROR,
+            "Failed to record the openai_agents tool call id for lookup: "
+            "RuntimeError('sink closed') (subsequent messages of this type "
+            "will be suppressed)",
+        )
+    ]
+    assert inspect.getattr_static(ToolContext, "from_agent_context") is factory
 
 
 @pytest.mark.asyncio
@@ -1421,6 +1511,66 @@ async def test_op_tool_records_the_execute_tool_span_that_invoked_it(
         "trace_id": otel_trace.format_trace_id(span_ctx.trace_id),
         "span_id": otel_trace.format_span_id(span_ctx.span_id),
     }
+
+
+@pytest.mark.trace_server
+@pytest.mark.asyncio
+async def test_execute_tool_spans_carry_the_model_call_id(
+    otel_spans: InMemorySpanExporter,
+) -> None:
+    """Each tool run names the request it answers, even beside an identical request.
+
+    The tool returns the id it ran under, and builds a nested `ToolContext` that must not rename it.
+    """
+    arguments = '{"query": "papers"}'
+    tool_calls = _response_payload("resp_tools", "")
+    tool_calls["output"] = [
+        _function_call_item("call_a", "lookup", arguments),
+        _function_call_item("call_b", "lookup", arguments),
+    ]
+    transport, _ = _mock_transport(tool_calls, _response_payload("resp_final", "done"))
+    openai_client = AsyncOpenAI(
+        api_key="test", http_client=httpx.AsyncClient(transport=transport)
+    )
+    factory = inspect.getattr_static(ToolContext, "from_agent_context")
+
+    @function_tool
+    def lookup(ctx: ToolContext[None], query: str) -> str:
+        ToolContext.from_agent_context(
+            ctx,
+            "call_nested",
+            tool_name=ctx.tool_name,
+            tool_arguments=ctx.tool_arguments,
+        )
+        return ctx.tool_call_id
+
+    original_provider = get_trace_provider()
+    set_trace_provider(DefaultTraceProvider())
+    patcher = OpenAIAgentsOtelPatcher(IntegrationSettings())
+    try:
+        assert patcher.attempt_patch() is True
+        model = OpenAIResponsesModel(model="gpt-4o", openai_client=openai_client)
+        agent = Agent(name="researcher", model=model, tools=[lookup])
+        await Runner.run(agent, "find papers")
+    finally:
+        patcher.undo_patch()
+        set_trace_provider(original_provider)
+        await openai_client.close()
+
+    spans = otel_spans.get_finished_spans()
+    tool_spans = _by_name(spans, "execute_tool lookup")
+    requests = json.loads(
+        _attrs(_by_name(spans, "chat ")[0])["gen_ai.output.messages"]
+    )[0]["parts"]
+
+    results = {
+        _attrs(s)["gen_ai.tool.call.id"]: _attrs(s)["gen_ai.tool.call.result"]
+        for s in tool_spans
+    }
+
+    assert results == {"call_a": "call_a", "call_b": "call_b"}
+    assert [part["id"] for part in requests] == ["call_a", "call_b"]
+    assert inspect.getattr_static(ToolContext, "from_agent_context") is factory
 
 
 def test_agents_spans_link_to_enclosing_op_call(
