@@ -858,7 +858,9 @@ def test_iso_to_ns_roundtrip() -> None:
     assert _iso_to_ns("") is None
 
 
-def test_patcher_install_and_uninstall_lifecycle() -> None:
+def test_patcher_install_and_uninstall_lifecycle(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """``attempt_patch`` adds the processor; ``undo_patch`` removes it cleanly.
 
     Verifies the uninstall path doesn't blow away other registered
@@ -906,7 +908,7 @@ def test_patcher_install_and_uninstall_lifecycle() -> None:
         shutdown_calls.append(True)
         original_shutdown()
 
-    installed_processor.shutdown = _tracking_shutdown  # type: ignore[method-assign]
+    monkeypatch.setattr(installed_processor, "shutdown", _tracking_shutdown)
 
     assert patcher.undo_patch() is True
     assert patcher.patched is False
