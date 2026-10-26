@@ -1231,8 +1231,9 @@ def test_patcher_survives_tool_call_id_hook_failures(
     caplog.clear()
     original_provider = get_trace_provider()
     set_trace_provider(DefaultTraceProvider())
-    undo = install_tool_call_id_hook(broken_sink)
+    undo = None
     try:
+        undo = install_tool_call_id_hook(broken_sink)
         with trace("hook"), function_span("lookup"):
             tool_context = ToolContext.from_agent_context(
                 RunContextWrapper(context=None),
@@ -1241,16 +1242,19 @@ def test_patcher_survives_tool_call_id_hook_failures(
                 tool_arguments="{}",
             )
     finally:
-        assert undo is not None
-        undo()
         set_trace_provider(original_provider)
+        if undo is not None:
+            undo()
 
+    assert undo is not None
     assert tool_context.tool_call_id == "call_a"
     assert caplog.record_tuples == [
         (
             "weave.integrations.openai_agents._tool_call_ids",
             logging.ERROR,
-            "Failed to record the openai_agents tool call id",
+            "Failed to record the openai_agents tool call id for lookup: "
+            "RuntimeError('sink closed') (subsequent messages of this type "
+            "will be suppressed)",
         )
     ]
     assert inspect.getattr_static(ToolContext, "from_agent_context") is factory
