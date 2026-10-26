@@ -10,6 +10,7 @@ from __future__ import annotations
 import asyncio
 import inspect
 import json
+import logging
 from collections.abc import Generator
 from typing import Any
 from unittest.mock import Mock
@@ -1191,8 +1192,15 @@ def test_patcher_survives_tool_call_id_hook_failures(
 
         assert rejected.attempt_patch() is False
         assert inspect.getattr_static(ToolContext, "from_agent_context") is factory
-        assert "Failed to install the openai_agents OTel processor" in caplog.text
+        assert caplog.record_tuples == [
+            (
+                "weave.integrations.openai_agents.patcher",
+                logging.ERROR,
+                "Failed to install the openai_agents OTel processor",
+            )
+        ]
 
+    caplog.clear()
     with monkeypatch.context() as patch:
         patch.setattr(ToolContext, "from_agent_context", factory.__func__)
         patcher = OpenAIAgentsOtelPatcher(IntegrationSettings())
@@ -1202,7 +1210,15 @@ def test_patcher_survives_tool_call_id_hook_failures(
         finally:
             patcher.undo_patch()
 
-    assert "will not carry gen_ai.tool.call.id" in caplog.text
+    assert caplog.record_tuples == [
+        (
+            "weave.integrations.openai_agents._tool_call_ids",
+            logging.WARNING,
+            "ToolContext.from_agent_context is not a classmethod in this "
+            "openai-agents version; execute_tool spans will not carry "
+            "gen_ai.tool.call.id.",
+        )
+    ]
     assert inspect.getattr_static(ToolContext, "from_agent_context") is factory
 
 
