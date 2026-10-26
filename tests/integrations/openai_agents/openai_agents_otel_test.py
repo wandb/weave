@@ -1171,6 +1171,7 @@ def test_undo_patch_is_noop_when_not_patched() -> None:
     assert patcher.undo_patch() is True
 
 
+@pytest.mark.trace_server
 @pytest.mark.disable_logging_error_check
 def test_patcher_survives_tool_call_id_hook_failures(
     monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
