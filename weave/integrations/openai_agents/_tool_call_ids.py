@@ -34,17 +34,13 @@ def install_tool_call_id_hook(sink: ToolCallIdSink) -> Callable[[], None] | None
     factory = original.__func__
 
     def from_agent_context(
-        cls: type[ToolContext],
-        context: object,
-        tool_call_id: str,
-        *args: object,
-        **kwargs: object,
+        cls: type[ToolContext], *args: object, **kwargs: object
     ) -> ToolContext:
-        tool_context = factory(cls, context, tool_call_id, *args, **kwargs)
+        tool_context = factory(cls, *args, **kwargs)
         span = get_current_span()
         # Custom tools build their context before opening a function span.
         if span is not None and isinstance(span.span_data, FunctionSpanData):
-            sink(span.span_id, tool_call_id)
+            sink(span.span_id, tool_context.tool_call_id)
 
         return tool_context
 
