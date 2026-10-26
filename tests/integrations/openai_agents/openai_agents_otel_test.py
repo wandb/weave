@@ -17,7 +17,7 @@ from unittest.mock import Mock
 
 import httpx
 import pytest
-from agents import Agent, Runner, function_tool
+from agents import Agent, RunContextWrapper, Runner, function_tool
 from agents.models.openai_responses import OpenAIResponsesModel
 from agents.tool_context import ToolContext
 from agents.tracing import (
@@ -33,6 +33,7 @@ from agents.tracing import (
     Trace,
     TracingProcessor,
     TurnSpanData,
+    function_span,
     generation_span,
     get_trace_provider,
     response_span,
@@ -53,6 +54,7 @@ import weave
 from weave.conversation import agent_name_override
 from weave.integrations.integration_utilities import op_name_from_ref
 from weave.integrations.openai.openai_sdk import get_openai_patcher
+from weave.integrations.openai_agents._tool_call_ids import install_tool_call_id_hook
 from weave.integrations.openai_agents.otel_processor import (
     WeaveOtelTracingProcessor,
     _iso_to_ns,
@@ -1177,7 +1179,7 @@ def test_undo_patch_is_noop_when_not_patched() -> None:
 def test_patcher_survives_tool_call_id_hook_failures(
     monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
 ) -> None:
-    """A missing hook still installs tracing; a failed install restores the factory."""
+    """A missing hook still installs tracing, a failed install restores the factory, and a failing sink keeps the tool running."""
     caplog.set_level("WARNING")
     factory = inspect.getattr_static(ToolContext, "from_agent_context")
 
@@ -1217,6 +1219,36 @@ def test_patcher_survives_tool_call_id_hook_failures(
             "ToolContext.from_agent_context is not a classmethod in this "
             "openai-agents version; execute_tool spans will not carry "
             "gen_ai.tool.call.id.",
+        )
+    ]
+    assert inspect.getattr_static(ToolContext, "from_agent_context") is factory
+
+    def broken_sink(span_id: str, call_id: str) -> None:
+        raise RuntimeError("sink closed")
+
+    caplog.clear()
+    original_provider = get_trace_provider()
+    set_trace_provider(DefaultTraceProvider())
+    undo = install_tool_call_id_hook(broken_sink)
+    try:
+        with trace("hook"), function_span("lookup"):
+            tool_context = ToolContext.from_agent_context(
+                RunContextWrapper(context=None),
+                "call_a",
+                tool_name="lookup",
+                tool_arguments="{}",
+            )
+    finally:
+        assert undo is not None
+        undo()
+        set_trace_provider(original_provider)
+
+    assert tool_context.tool_call_id == "call_a"
+    assert caplog.record_tuples == [
+        (
+            "weave.integrations.openai_agents._tool_call_ids",
+            logging.ERROR,
+            "Failed to record the openai_agents tool call id",
         )
     ]
     assert inspect.getattr_static(ToolContext, "from_agent_context") is factory

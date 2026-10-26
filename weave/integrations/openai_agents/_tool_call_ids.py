@@ -37,10 +37,14 @@ def install_tool_call_id_hook(sink: ToolCallIdSink) -> Callable[[], None] | None
         cls: type[ToolContext], *args: object, **kwargs: object
     ) -> ToolContext:
         tool_context = factory(cls, *args, **kwargs)
-        span = get_current_span()
-        # Custom tools build their context before opening a function span.
-        if span is not None and isinstance(span.span_data, FunctionSpanData):
-            sink(span.span_id, tool_context.tool_call_id)
+        try:
+            span = get_current_span()
+            # Custom tools build their context before opening a function span.
+            if span is not None and isinstance(span.span_data, FunctionSpanData):
+                sink(span.span_id, tool_context.tool_call_id)
+        except Exception:
+            # Losing the call id must never fail the customer's tool call.
+            logger.exception("Failed to record the openai_agents tool call id")
 
         return tool_context
 
