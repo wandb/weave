@@ -13,6 +13,8 @@ from collections.abc import Callable
 from agents.tool_context import ToolContext
 from agents.tracing import FunctionSpanData, get_current_span
 
+from weave.trace.util import log_once
+
 logger = logging.getLogger(__name__)
 
 _FACTORY_NAME = "from_agent_context"
@@ -42,9 +44,13 @@ def install_tool_call_id_hook(sink: ToolCallIdSink) -> Callable[[], None] | None
             # Custom tools build their context before opening a function span.
             if span is not None and isinstance(span.span_data, FunctionSpanData):
                 sink(span.span_id, tool_context.tool_call_id)
-        except Exception:
+        except Exception as exc:
             # Losing the call id must never fail the customer's tool call.
-            logger.exception("Failed to record the openai_agents tool call id")
+            log_once(
+                logger.error,
+                f"Failed to record the openai_agents tool call id for "
+                f"{tool_context.tool_name}: {exc!r}",
+            )
 
         return tool_context
 
