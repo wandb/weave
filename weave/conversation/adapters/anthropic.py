@@ -20,11 +20,16 @@ def usage_from_anthropic(message: AnthropicMessage) -> Usage:
     """Extract usage from an Anthropic Messages API ``Message``.
 
     Anthropic types the cache fields as ``Optional[int]``; ``None`` is
-    equivalent to zero for our purposes.
+    equivalent to zero for our purposes. Include cache tokens in the gross
+    input count, matching Weave's usage convention.
     """
     usage = message.usage
     return Usage(
-        input_tokens=usage.input_tokens,
+        input_tokens=(
+            usage.input_tokens
+            + (usage.cache_read_input_tokens or 0)
+            + (usage.cache_creation_input_tokens or 0)
+        ),
         output_tokens=usage.output_tokens,
         cache_creation_input_tokens=usage.cache_creation_input_tokens or 0,
         cache_read_input_tokens=usage.cache_read_input_tokens or 0,
