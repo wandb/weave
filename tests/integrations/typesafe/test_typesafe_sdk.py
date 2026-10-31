@@ -2,13 +2,28 @@
 
 from __future__ import annotations
 
+import array
 import asyncio
+import dataclasses
+import enum
 import json
-from collections.abc import Awaitable, Callable, Generator, Sequence
+from collections import UserList, deque
+from collections.abc import (
+    Awaitable,
+    Callable,
+    Generator,
+    Iterable,
+    Iterator,
+    Mapping,
+    Sequence,
+)
 from datetime import datetime
 from decimal import Decimal
+from functools import cached_property
 from importlib.metadata import version
-from typing import Any
+from types import MappingProxyType
+from typing import Any, NamedTuple
+from unittest.mock import MagicMock
 from uuid import UUID
 
 import httpx2
@@ -19,7 +34,17 @@ from opentelemetry.sdk.trace import TracerProvider as SDKTracerProvider
 from opentelemetry.sdk.trace.export import SimpleSpanProcessor
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
 from opentelemetry.trace import NonRecordingSpan, SpanContext, TraceFlags
-from pydantic import BaseModel
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    PrivateAttr,
+    SerializerFunctionWrapHandler,
+    computed_field,
+    field_serializer,
+    model_serializer,
+)
+from pydantic.dataclasses import dataclass as pydantic_dataclass
 from typesafe_sdk import (
     AsyncTypeSafeClient,
     Image,
@@ -39,6 +64,7 @@ from weave.integrations.typesafe.typesafe_sdk import (
     set_capture_content,
 )
 from weave.trace.settings import override_settings
+from weave.trace.vals import WeaveDict, WeaveList
 
 _SECRET = "SECRET_BODY_xyz"
 _EMAIL = "alice@example.com"
@@ -165,6 +191,323 @@ def _chat(exporter: InMemorySpanExporter) -> Any:
     return chats[0]
 
 
+def _letters() -> Iterator[str]:
+    yield "a"
+    yield "b"
+
+
+def _sent(state: Any, questions: Any = None, **kwargs: Any) -> dict[str, Any]:
+    seen: dict[str, Any] = {}
+
+    def handler(request: httpx2.Request) -> httpx2.Response:
+        seen.update(json.loads(request.content))
+        return _response()
+
+    _client(handler).system_one(state, questions or _questions(), **kwargs)
+    return seen
+
+
+class _AnyValue(BaseModel):
+    value: Any
+
+
+class _IterableRows(BaseModel):
+    rows: Iterable[str]
+
+
+class _ExtraRows(BaseModel):
+    model_config = ConfigDict(extra="allow")
+
+
+@dataclasses.dataclass
+class _DataclassRows:
+    rows: Any
+
+
+@dataclasses.dataclass
+class _DataclassDict(dict):
+    rows: Any
+
+
+@dataclasses.dataclass
+class _DataclassList(list):
+    rows: Any
+
+
+@dataclasses.dataclass
+class _DataclassSet(set):
+    rows: Any
+
+
+def _enum_with_an_iterator_value() -> dict[str, Any]:
+    letters = enum.Enum("_Letters", {"ROWS": _letters()})
+    return {"rows": letters.ROWS}
+
+
+class _ComputedFromPrivate(BaseModel):
+    _source: Any = PrivateAttr(default=None)
+
+    @computed_field
+    @property
+    def rows(self) -> list[str]:
+        return list(self._source)
+
+
+def _computed_from_private() -> _ComputedFromPrivate:
+    value = _ComputedFromPrivate()
+    value._source = _letters()
+    return value
+
+
+class _FieldSerializerFromExcluded(BaseModel):
+    source: Iterable[str] = Field(exclude=True)
+    label: str = "rows:"
+
+    @field_serializer("label")
+    def _label(self, label: str) -> str:
+        return label + ",".join(self.source)
+
+
+class _ModelSerializerFromExcluded(BaseModel):
+    source: Iterable[str] = Field(exclude=True)
+
+    @model_serializer(mode="wrap")
+    def _rows(self, handler: SerializerFunctionWrapHandler) -> dict[str, Any]:
+        return {**handler(self), "rows": list(self.source)}
+
+
+class _CachedRows(BaseModel):
+    data: list[str]
+
+    @computed_field
+    @cached_property
+    def rows(self) -> Any:
+        return iter(self.data)
+
+
+def _cached_rows() -> _CachedRows:
+    value = _CachedRows(data=["a", "b"])
+    _ = value.rows
+    return value
+
+
+class _RowsKey(BaseModel):
+    model_config = ConfigDict(frozen=True)
+    source: Iterable[str] = Field(exclude=True, repr=False)
+
+    @computed_field
+    @property
+    def rows(self) -> list[str]:
+        return list(self.source)
+
+
+class _ComputedFromExcludedKeys(BaseModel):
+    source: dict[Any, int] = Field(exclude=True)
+
+    @computed_field
+    @property
+    def rows(self) -> list[str]:
+        return [row for key in self.source for row in key]
+
+
+class _InnerSource(BaseModel):
+    source: Iterable[str] = Field(exclude=True)
+
+
+class _ComputedFromInnerExcluded(BaseModel):
+    inner: _InnerSource
+
+    @computed_field
+    @property
+    def rows(self) -> list[str]:
+        return list(self.inner.source)
+
+
+class _SharedSource(BaseModel):
+    wrapped: _ComputedFromInnerExcluded
+    plain: _InnerSource
+
+
+def _shared_source() -> _SharedSource:
+    inner = _InnerSource(source=["a", "b"])
+    return _SharedSource(wrapped=_ComputedFromInnerExcluded(inner=inner), plain=inner)
+
+
+class _CountingField:
+    def __get__(self, instance: Any, owner: Any = None) -> int:
+        if instance is None:
+            return 0
+        instance.reads += 1
+        return instance.reads
+
+    def __set__(self, instance: Any, value: int) -> None:
+        instance.reads = value
+
+
+@dataclasses.dataclass
+class _CountedRead:
+    count: int = _CountingField()
+
+
+class _CountingSet(frozenset):
+    def __iter__(self) -> Iterator[int]:
+        self.reads = getattr(self, "reads", 0) + 1
+        return iter([self.reads])
+
+
+class _Cursor(Sequence[Any], Iterator[Any]):
+    def __init__(self, rows: list[Any]) -> None:
+        self._rows = rows
+        self._cursor = iter(rows)
+
+    def __getitem__(self, index: int) -> Any:
+        return self._rows[index]
+
+    def __len__(self) -> int:
+        return len(self._rows)
+
+    def __iter__(self) -> _Cursor:
+        return self
+
+    def __next__(self) -> Any:
+        return next(self._cursor)
+
+
+class _ExcludedRows(BaseModel):
+    rows: Any = Field(default=None, exclude=True)
+    x: int = 1
+
+
+class _PlainCachedRows(BaseModel):
+    x: int = 1
+
+    @cached_property
+    def rows(self) -> Iterator[str]:
+        return _letters()
+
+
+def _plain_cached_rows() -> _PlainCachedRows:
+    value = _PlainCachedRows()
+    _ = value.rows
+    return value
+
+
+class _RaisingDict(dict):
+    def __getitem__(self, key: Any) -> Any:
+        raise AssertionError
+
+    def __iter__(self) -> Iterator[Any]:
+        raise AssertionError
+
+    def keys(self) -> Any:
+        raise AssertionError
+
+    def values(self) -> Any:
+        raise AssertionError
+
+    def items(self) -> Any:
+        raise AssertionError
+
+
+class _RaisingList(list):
+    def __getitem__(self, index: Any) -> Any:
+        raise AssertionError
+
+    def __iter__(self) -> Iterator[Any]:
+        raise AssertionError
+
+
+class _RaisingLenFrozenset(frozenset):
+    def __len__(self) -> int:
+        raise AssertionError
+
+
+@pydantic_dataclass
+class _PydanticDataclassExcluded:
+    rows: Iterable[str] = Field(exclude=True)
+    x: int = 1
+
+
+class _PrivateValue(BaseModel):
+    x: int = 1
+    _value: Any = PrivateAttr(default=None)
+
+
+class _PrivateValueWithComputedField(_PrivateValue):
+    @computed_field
+    @property
+    def double(self) -> int:
+        return self.x * 2
+
+
+class _Pair(BaseModel):
+    a: int
+    b: int
+
+
+class _Point(NamedTuple):
+    x: int
+    y: int
+
+
+class _StandardContainers(BaseModel):
+    rows: list[int]
+    pair: tuple[int, int]
+    tags: set[int]
+    frozen: frozenset[int]
+    queue: deque[int]
+    names: dict[str, int]
+
+
+@dataclasses.dataclass(slots=True)
+class _SlottedRows:
+    rows: list[str]
+
+
+@pydantic_dataclass(slots=True)
+class _SlottedComputed:
+    x: int
+
+    @computed_field
+    @property
+    def double(self) -> int:
+        return self.x * 2
+
+
+class _MappingModel(BaseModel, Mapping[str, int]):
+    x: int = 1
+
+    def __getitem__(self, key: str) -> int:
+        return {"x": self.x}[key]
+
+    def __iter__(self) -> Iterator[str]:
+        return iter(["x"])
+
+    def __len__(self) -> int:
+        return 1
+
+
+def _with_private(model: _PrivateValue, value: Any) -> _PrivateValue:
+    model._value = value
+    return model
+
+
+def _self_referencing() -> _PrivateValue:
+    model = _PrivateValueWithComputedField()
+    model._value = model
+    return model
+
+
+class _LabelsAnswer(BaseModel):
+    labels: Iterable[str]
+
+
+class _LabelsResponse(BaseModel):
+    model: str
+    usage: dict[str, int]
+    answers: dict[str, _LabelsAnswer]
+
+
 def test_system_one_records_one_chat_span_under_a_synthetic_turn(
     otel_spans: InMemorySpanExporter,
 ) -> None:
@@ -283,6 +626,26 @@ def test_image_is_recorded_as_its_reference(otel_spans: InMemorySpanExporter) ->
     ]
 
 
+@pytest.mark.parametrize(
+    "make_buffer",
+    [
+        pytest.param(lambda data: array.array("B", data), id="array"),
+        pytest.param(bytearray, id="bytearray"),
+    ],
+)
+def test_image_from_a_buffer_is_recorded_as_its_reference(
+    otel_spans: InMemorySpanExporter, make_buffer: Callable[[bytes], Any]
+) -> None:
+    image = Image(make_buffer(b"\x89PNG\r\n\x1a\nimage-bytes"))
+    _client(lambda request: _response()).system_one({"photo": image}, _questions())
+    assert _messages(_chat(otel_spans), "gen_ai.input.messages") == [
+        {
+            "role": "user",
+            "parts": [{"type": "text", "content": json.dumps({"photo": str(image)})}],
+        }
+    ]
+
+
 def test_generator_state_reaches_the_sdk_unconsumed(
     otel_spans: InMemorySpanExporter,
 ) -> None:
@@ -295,6 +658,263 @@ def test_generator_state_reaches_the_sdk_unconsumed(
     _client(handler).system_one((row for row in ("a", "b")), _questions())
 
     assert seen["state"] == ["a", "b"]
+    assert "gen_ai.input.messages" not in _attrs(_chat(otel_spans))
+
+
+@pytest.mark.parametrize(
+    ("make_state", "sent"),
+    [
+        pytest.param(
+            lambda: _IterableRows(rows=["a", "b"]),
+            {"rows": ["a", "b"]},
+            id="pydantic-iterable-field",
+        ),
+        pytest.param(
+            lambda: _ExtraRows(rows=_letters()), {"rows": ["a", "b"]}, id="extra-field"
+        ),
+        pytest.param(
+            lambda: _DataclassRows(rows=iter(["a", "b"])),
+            {"rows": ["a", "b"]},
+            id="dataclass-field",
+        ),
+        pytest.param(
+            lambda: _AnyValue(value=_DataclassDict(rows=_letters())),
+            {"value": {"rows": ["a", "b"]}},
+            id="dataclass-that-is-also-a-dict",
+        ),
+        pytest.param(
+            lambda: _AnyValue(value=_DataclassList(rows=_letters())),
+            {"value": {"rows": ["a", "b"]}},
+            id="dataclass-that-is-also-a-list",
+        ),
+        pytest.param(
+            lambda: _AnyValue(value=_DataclassSet(rows=_letters())),
+            {"value": {"rows": ["a", "b"]}},
+            id="dataclass-that-is-also-a-set",
+        ),
+        pytest.param(
+            _enum_with_an_iterator_value, {"rows": ["a", "b"]}, id="enum-value"
+        ),
+        pytest.param(
+            _computed_from_private,
+            {"rows": ["a", "b"]},
+            id="computed-field-over-private-attribute",
+        ),
+        pytest.param(
+            lambda: _FieldSerializerFromExcluded(source=["a", "b"]),
+            {"label": "rows:a,b"},
+            id="field-serializer-over-excluded-field",
+        ),
+        pytest.param(
+            lambda: _ModelSerializerFromExcluded(source=["a", "b"]),
+            {"rows": ["a", "b"]},
+            id="model-serializer-over-excluded-field",
+        ),
+        pytest.param(
+            _cached_rows,
+            {"data": ["a", "b"], "rows": ["a", "b"]},
+            id="cached-computed-field",
+        ),
+        pytest.param(
+            lambda: _ComputedFromExcludedKeys(source={iter(["a", "b"]): 1}),
+            {"rows": ["a", "b"]},
+            id="computed-field-over-excluded-dict-keys",
+        ),
+        pytest.param(
+            lambda: _AnyValue(value={_RowsKey(source=["a", "b"]): 1}),
+            {"value": {"rows=['a', 'b']": 1}},
+            id="model-key-with-a-computed-field",
+        ),
+        pytest.param(
+            _shared_source,
+            {"wrapped": {"inner": {}, "rows": ["a", "b"]}, "plain": {}},
+            id="inner-model-shared-with-a-computed-field",
+        ),
+        pytest.param(
+            lambda: _AnyValue(value={"rows": _letters()}),
+            {"value": {"rows": ["a", "b"]}},
+            id="dict-in-a-model",
+        ),
+        pytest.param(
+            lambda: _Cursor(["a", "b"]), ["a", "b"], id="sequence-and-iterator"
+        ),
+        pytest.param(_CountedRead, {"count": 1}, id="dataclass-descriptor-field"),
+        pytest.param(
+            lambda: _AnyValue(value=_CountingSet({0})),
+            {"value": [1]},
+            id="set-subclass-with-its-own-iter",
+        ),
+        pytest.param(
+            lambda: _AnyValue(value=UserList(["a", "b"])),
+            {"value": ["a", "b"]},
+            id="user-container-in-a-model",
+        ),
+        pytest.param(
+            lambda: _AnyValue(value=MappingProxyType({"rows": "a"})),
+            {"value": {"rows": "a"}},
+            id="user-mapping-in-a-model",
+        ),
+    ],
+)
+def test_state_that_encoding_could_change_is_sent_as_is_and_not_recorded(
+    otel_spans: InMemorySpanExporter,
+    make_state: Callable[[], Any],
+    sent: Any,
+) -> None:
+    assert _sent(make_state())["state"] == sent
+    attrs = _attrs(_chat(otel_spans))
+    assert "gen_ai.input.messages" not in attrs
+    assert json.loads(attrs["typesafe.questions"]) == [
+        {"id": "billing", "instructions": "Is this about billing?", "type": "noul"}
+    ]
+
+
+@pytest.mark.parametrize(
+    ("make_state", "sent"),
+    [
+        pytest.param(
+            lambda: _ExcludedRows(rows=_letters()), {"x": 1}, id="excluded-iterator"
+        ),
+        pytest.param(_plain_cached_rows, {"x": 1}, id="plain-cached-property-iterator"),
+        pytest.param(
+            lambda: _PydanticDataclassExcluded(rows=["a"]),
+            {"x": 1},
+            id="pydantic-dataclass-excluded-iterator",
+        ),
+        pytest.param(
+            lambda: _with_private(_PrivateValueWithComputedField(), _DataclassRows),
+            {"x": 1, "double": 2},
+            id="private-class",
+        ),
+        pytest.param(
+            _self_referencing, {"x": 1, "double": 2}, id="private-self-reference"
+        ),
+        pytest.param(
+            lambda: _with_private(_PrivateValue(), _letters()),
+            {"x": 1},
+            id="private-iterator-nothing-reads",
+        ),
+        pytest.param(
+            lambda: _SlottedRows(rows=["a"]), {"rows": ["a"]}, id="slots-dataclass"
+        ),
+        pytest.param(
+            lambda: _SlottedComputed(x=1),
+            {"x": 1, "double": 2},
+            id="slots-dataclass-with-a-computed-field",
+        ),
+        pytest.param(_MappingModel, {"x": 1}, id="model-that-is-also-a-mapping"),
+        pytest.param(
+            lambda: _AnyValue(value=_Point(1, 2)), {"value": [1, 2]}, id="namedtuple"
+        ),
+        pytest.param(
+            lambda: _AnyValue(
+                value={
+                    "row": WeaveDict({"k": 1}, server=MagicMock()),
+                    "rows": WeaveList(["a"], server=MagicMock()),
+                }
+            ),
+            {"value": {"row": {"k": 1}, "rows": ["a"]}},
+            id="weave-values-in-a-model",
+        ),
+        pytest.param(
+            lambda: _AnyValue(
+                value={
+                    "row": _RaisingDict(k=1),
+                    "rows": _RaisingList(["a"]),
+                    "tags": _RaisingLenFrozenset({"b"}),
+                }
+            ),
+            {"value": {"row": {"k": 1}, "rows": ["a"], "tags": ["b"]}},
+            id="container-subclasses-whose-methods-raise",
+        ),
+        pytest.param(
+            lambda: _StandardContainers(
+                rows=[1],
+                pair=(2, 3),
+                tags={4},
+                frozen=frozenset({5}),
+                queue=deque([6]),
+                names={"k": 7},
+            ),
+            {
+                "rows": [1],
+                "pair": [2, 3],
+                "tags": [4],
+                "frozen": [5],
+                "queue": [6],
+                "names": {"k": 7},
+            },
+            id="standard-containers-in-a-model",
+        ),
+        pytest.param(
+            lambda: _Pair.model_construct(a=1), {"a": 1}, id="model-construct-unset"
+        ),
+    ],
+)
+def test_iterator_free_state_is_recorded_as_sent(
+    otel_spans: InMemorySpanExporter,
+    make_state: Callable[[], Any],
+    sent: Any,
+) -> None:
+    assert _sent(make_state())["state"] == sent
+    content = json.dumps(sent, sort_keys=True)
+    assert _messages(_chat(otel_spans), "gen_ai.input.messages") == [
+        {"role": "user", "parts": [{"type": "text", "content": content}]}
+    ]
+
+
+@pytest.mark.parametrize(
+    ("make_request", "sent"),
+    [
+        pytest.param(
+            lambda: {
+                "questions": {
+                    "billing": {
+                        "type": "noul",
+                        "instructions": _IterableRows(rows=["a", "b"]),
+                    }
+                }
+            },
+            {"billing": {"type": "noul", "instructions": {"rows": ["a", "b"]}}},
+            id="model-in-a-question",
+        ),
+        pytest.param(
+            lambda: {
+                "extra_body": {
+                    "questions": _Cursor([{"type": "noul", "instructions": "Yes?"}])
+                }
+            },
+            [{"type": "noul", "instructions": "Yes?"}],
+            id="sequence-and-iterator",
+        ),
+    ],
+)
+def test_questions_that_encoding_could_change_are_sent_as_is_and_not_recorded(
+    otel_spans: InMemorySpanExporter,
+    make_request: Callable[[], dict[str, Any]],
+    sent: Any,
+) -> None:
+    assert _sent("hello", **make_request())["questions"] == sent
+    chat = _chat(otel_spans)
+    assert "typesafe.questions" not in _attrs(chat)
+    assert _messages(chat, "gen_ai.input.messages") == [
+        {"role": "user", "parts": [{"type": "text", "content": "hello"}]}
+    ]
+
+
+def test_response_model_iterator_stays_with_the_caller(
+    otel_spans: InMemorySpanExporter,
+) -> None:
+    body = _ok_body(answers={"billing": {"labels": ["x", "y"]}})
+    client = _client(lambda request: _response(body=body))
+
+    result = client.system_one("hello", _questions(), response_model=_LabelsResponse)
+
+    assert list(result.answers["billing"].labels) == ["x", "y"]
+    attrs = _attrs(_chat(otel_spans))
+    assert "gen_ai.output.messages" not in attrs
+    assert attrs["gen_ai.usage.input_tokens"] == 11
+    assert attrs["gen_ai.response.model"] == "jev-1.13.0"
 
 
 def test_datetime_uuid_and_decimal_state_is_recorded_as_sent(
