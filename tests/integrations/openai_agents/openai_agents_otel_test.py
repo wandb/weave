@@ -1562,12 +1562,12 @@ async def test_execute_tool_spans_carry_the_model_call_id(
         _attrs(_by_name(spans, "chat ")[0])["gen_ai.output.messages"]
     )[0]["parts"]
 
-    results = {
-        _attrs(s)["gen_ai.tool.call.id"]: _attrs(s)["gen_ai.tool.call.result"]
+    results = sorted(
+        (_attrs(s)["gen_ai.tool.call.id"], _attrs(s)["gen_ai.tool.call.result"])
         for s in tool_spans
-    }
+    )
 
-    assert results == {"call_a": "call_a", "call_b": "call_b"}
+    assert results == [("call_a", "call_a"), ("call_b", "call_b")]
     assert [part["id"] for part in requests] == ["call_a", "call_b"]
     assert inspect.getattr_static(ToolContext, "from_agent_context") is factory
 
