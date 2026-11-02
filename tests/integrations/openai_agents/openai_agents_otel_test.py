@@ -832,13 +832,16 @@ def test_processor_cleanup(
     agent_span.ended_at = None
     agent_span.error = None
     processor.on_span_start(agent_span)
+    processor.record_tool_call_id("span_x", "call_x")
     assert "span_x" in processor._span_otel
+    assert processor._tool_call_ids == {"span_x": "call_x"}
 
     # force_flush ends any open spans and clears dicts.
     processor.force_flush()
     assert processor._span_otel == {}
     assert processor._span_tokens == {}
     assert processor._conversation_ids == {}
+    assert processor._tool_call_ids == {}
 
     # shutdown is idempotent when state is already empty.
     processor.shutdown()
@@ -992,10 +995,12 @@ def test_on_trace_end_sweeps_leftover_spans(
     leaked_span.ended_at = None
     leaked_span.error = None
     processor.on_span_start(leaked_span)
+    processor.record_tool_call_id("span_leaked", "call_leaked")
     # Deliberately do NOT call on_span_end — simulate an abrupt failure where
     # the SDK ends the trace without closing the span.
 
     assert "span_leaked" in processor._span_otel
+    assert "span_leaked" in processor._tool_call_ids
     assert "span_leaked" in processor._span_tokens
     assert "span_leaked" in processor._trace_spans["trace_leak"]
 
@@ -1004,6 +1009,7 @@ def test_on_trace_end_sweeps_leftover_spans(
     # Trace-scoped state is cleared; the leaked span got ended.
     assert "span_leaked" not in processor._span_otel
     assert "span_leaked" not in processor._span_tokens
+    assert "span_leaked" not in processor._tool_call_ids
     assert "trace_leak" not in processor._trace_spans
     assert "trace_leak" not in processor._conversation_ids
 
