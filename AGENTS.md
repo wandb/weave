@@ -638,6 +638,14 @@ deterministic.
   aware. Round-trip equality holds for what `box` produced, not for a naive
   input.
 
+### Recording TypeSafe state without consuming it
+
+- The TypeSafe integration encodes the state and questions for the span before
+  the SDK sends them, and the answers before the caller reads them. A pydantic
+  `Iterable[...]` field holds a lazy iterator that `model_dump(mode="json")`
+  uses up, so `_jsonable()` checks values first and leaves that state, those
+  questions or those answers off the span.
+
 ### Python Conversation Turn messages
 
 - `Turn.messages` stores input messages, while `Turn.output_messages` stores
