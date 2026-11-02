@@ -16,7 +16,12 @@ import {
   withAssets,
 } from '@typesafe-ai/sdk';
 
-import {Conversation, getCurrentTurn, Turn} from '../../genai';
+import {
+  Conversation,
+  getCurrentConversation,
+  getCurrentTurn,
+  Turn,
+} from '../../genai';
 import {
   findSpan,
   setupExporterPerTest,
@@ -105,6 +110,12 @@ class TestContextManager implements ContextManager {
   disable(): this {
     this.storage.disable();
     return this;
+  }
+}
+
+class JsonRows extends Array<string> {
+  toJSON() {
+    return ['subclass'];
   }
 }
 
@@ -317,6 +328,88 @@ describe('TypeSafe systemOne spans', () => {
     ]);
   });
 
+  test('state is recorded as JSON.stringify sends it', async () => {
+    let sent: unknown;
+    const client = wrapTypeSafe(
+      clientWith(async (_url, init) => {
+        sent = JSON.parse(String(init?.body)).state;
+        return jsonResponse(okBody());
+      })
+    );
+    const cases: [unknown, unknown][] = [
+      [Object.assign(['raw'], {toJSON: () => ['sent']}), ['sent']],
+      [
+        Object.assign(['self'], {
+          toJSON(this: string[]) {
+            return this;
+          },
+        }),
+        ['self'],
+      ],
+      [
+        {row: {toJSON: (key: string) => ({key, toJSON: () => 'twice'})}},
+        {row: {key: 'row'}},
+      ],
+      [{toJSON: (key: string) => ({root: key})}, {root: 'state'}],
+      [
+        {call: Object.assign(() => 1, {toJSON: () => 'called'})},
+        {call: 'called'},
+      ],
+      [{toJSON: () => JsonRows.from(['a'])}, ['a']],
+      [[{toJSON: (key: string) => key}], ['0']],
+      [
+        {a: null, b: [null]},
+        {a: null, b: [null]},
+      ],
+      [
+        new Proxy(['a', 'b'], {
+          get: (target, key) =>
+            key === 'length' ? 1.5 : Reflect.get(target, key),
+        }),
+        ['a'],
+      ],
+      [
+        Object.assign(['a', 'b'], {
+          *[Symbol.iterator](this: string[]) {
+            while (this.length) {
+              yield this.shift();
+            }
+          },
+        }),
+        ['a', 'b'],
+      ],
+      [
+        Object.assign(['a', 'b'], {
+          *[Symbol.iterator](this: string[]) {
+            for (let index = this.length - 1; index >= 0; index--) {
+              yield this[index];
+            }
+          },
+        }),
+        ['a', 'b'],
+      ],
+    ];
+    for (const [state, expected] of cases) {
+      getExporter().reset();
+      await client.systemOne({
+        state: state as any,
+        questions,
+        model: 'jev-latest',
+      });
+      expect(sent).toEqual(expected);
+      const input = JSON.parse(
+        String(
+          findSpan(spans(), 'chat jev-latest').attributes[
+            'gen_ai.input.messages'
+          ]
+        )
+      );
+      expect(input).toEqual([
+        {role: 'user', parts: [{type: 'text', content: JSON.stringify(sent)}]},
+      ]);
+    }
+  });
+
   test('an unencodable state does not open a turn', async () => {
     const fetch = jest.fn(async () => jsonResponse(okBody()));
     const client = wrapTypeSafe(clientWith(fetch));
@@ -495,6 +588,57 @@ describe('TypeSafe systemOne spans', () => {
     expect(called).toBe(false);
     await expect(mapped).resolves.toBe('jev-1.13.0');
     expect(called).toBe(true);
+  });
+
+  test('code inside the call still sees the caller turn and conversation', async () => {
+    let seenTurn: unknown;
+    let seenConversation: unknown;
+    const client = wrapTypeSafe(
+      clientWith(async () => {
+        seenTurn = getCurrentTurn();
+        seenConversation = getCurrentConversation();
+        return jsonResponse(okBody());
+      })
+    );
+    const conversation = Conversation.create({conversationId: 'c-4'});
+    await client.systemOne({state: 'hello', questions, model: 'jev-latest'});
+    expect(seenConversation).toBe(conversation);
+    expect(seenTurn).toBeInstanceOf(Turn);
+    const turn = conversation.startTurn({agentName: 'app'});
+    await client.systemOne({state: 'hello', questions, model: 'jev-latest'});
+    expect(seenTurn).toBe(turn);
+    expect(seenConversation).toBe(conversation);
+    turn.end();
+    conversation.end();
+  });
+
+  test('ending the conversation during a call keeps the call span', async () => {
+    let release = () => {};
+    const gate = new Promise<void>(resolve => {
+      release = resolve;
+    });
+    const client = wrapTypeSafe(
+      clientWith(async () => {
+        await gate;
+        return jsonResponse(okBody());
+      })
+    );
+    const conversation = Conversation.create({conversationId: 'c-3'});
+    const call = client.systemOne({
+      state: 'hello',
+      questions,
+      model: 'jev-latest',
+    });
+    conversation.end();
+    release();
+    await call;
+
+    const chat = findSpan(spans(), 'chat jev-latest');
+    const turn = findSpan(spans(), 'invoke_agent typesafe SDK');
+    expect(chat.parentSpanId).toBe(turn.spanContext().spanId);
+    expect(turn.attributes['gen_ai.conversation.id']).toBe('c-3');
+    expect(chat.attributes['gen_ai.usage.output_tokens']).toBe(4);
+    expect(chat.attributes['gen_ai.output.messages']).toBeDefined();
   });
 
   test('parallel calls get separate turns', async () => {
