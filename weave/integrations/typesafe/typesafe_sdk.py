@@ -11,6 +11,7 @@ from __future__ import annotations
 import array
 import collections
 import enum
+import functools
 import importlib
 import inspect
 import json
@@ -187,7 +188,8 @@ def _effective_body(
 
 _LEAF_TYPES = (type(None), bool, int, float, str, bytes, bytearray)
 # Buffers (an Image holds one once sent) and classes hold no iterator.
-_UNWALKED_TYPES = (*_LEAF_TYPES, memoryview, array.array, type)
+# Modules are not walked either: their __dict__ is every global.
+_UNWALKED_TYPES = (*_LEAF_TYPES, memoryview, array.array, type, types.ModuleType)
 
 
 class _UnsafeToEncode(Exception):
@@ -215,6 +217,48 @@ def _stored_or_none(value: Any, name: str) -> Any:
         return None
 
 
+@functools.lru_cache(maxsize=256)
+def _class_attributes(cls: type) -> tuple[tuple[str, ...], tuple[Any, ...]]:
+    """Return the cached_property names and the declared slots of ``cls``."""
+    cached: list[str] = []
+    slots: list[Any] = []
+    for klass in cls.__mro__:
+        namespace = vars(klass)
+        for name, attribute in namespace.items():
+            if isinstance(attribute, functools.cached_property):
+                cached.append(name)
+            # Only declared slots: functions keep internals such as __globals__ in
+            # member descriptors too.
+            elif "__slots__" in namespace and isinstance(
+                attribute, types.MemberDescriptorType
+            ):
+                slots.append(attribute)
+    return tuple(cached), tuple(slots)
+
+
+def _stored_attributes(value: Any) -> list[Any]:
+    """Return what ``value`` stores; raise if a cached_property is unset."""
+    cls: type = type(value)
+    cached, slots = _class_attributes(cls)
+    own: Mapping[str, Any] = {}
+    # Without an instance __dict__, the lookup could run a __dict__ property.
+    if cls.__dictoffset__:
+        try:
+            own = object.__getattribute__(value, "__dict__")  # noqa: PLC2801
+        except AttributeError:
+            pass
+    # Its first read stores what the encoder computes, and the SDK gets that.
+    if any(name not in own for name in cached):
+        raise _UnsafeToEncode
+    stored = list(own.values())
+    for slot in slots:
+        try:
+            stored.append(slot.__get__(value, cls))
+        except AttributeError:
+            continue
+    return stored
+
+
 def _may_read_excluded(value: Any) -> bool:
     # A computed field or custom serializer can read any field, excluded or not.
     decorators = getattr(type(value), "__pydantic_decorators__", None)
@@ -229,6 +273,8 @@ def _children(value: Any, reads_excluded: bool) -> list[Any]:
     """Return what encoding ``value`` reads; raise if walking it runs user code."""
     if isinstance(value, enum.Enum):
         return [value.value]
+    # A computed field or custom serializer can read any attribute.
+    attributes = _stored_attributes(value) if reads_excluded else []
     model_fields = getattr(type(value), "__pydantic_fields__", None)
     if model_fields is not None:
         names = [
@@ -236,25 +282,18 @@ def _children(value: Any, reads_excluded: bool) -> list[Any]:
             for name, info in model_fields.items()
             if reads_excluded or not info.exclude
         ]
-        private = None
-        if reads_excluded:
-            # A cached_property under a computed field is stored in __dict__.
-            try:
-                own = object.__getattribute__(value, "__dict__")  # noqa: PLC2801
-            except AttributeError:
-                own = {}
-            names += [name for name in own if name not in model_fields]
-            private = _stored_or_none(value, "__pydantic_private__")
         extra = _stored_or_none(value, "__pydantic_extra__")
         # model_construct() can leave a field unset; the encoder skips it too.
+        # Private attributes are among the attributes: a slot of BaseModel.
         return [
             *(_stored_or_none(value, name) for name in names),
             *(extra.values() if isinstance(extra, dict) else ()),
-            *(private.values() if isinstance(private, dict) else ()),
+            *attributes,
         ]
     if is_dataclass(value):
-        return [_stored(value, field.name) for field in fields(value)]
+        return [*(_stored(value, field.name) for field in fields(value)), *attributes]
     # The encoder reads dict, list and tuple items directly, even in a subclass.
+    # Their attributes are not walked: WeaveDict and WeaveList keep a server there.
     if isinstance(value, dict):
         return [*dict.keys(value), *dict.values(value)]
     for stored in (list, tuple):
@@ -266,7 +305,7 @@ def _children(value: Any, reads_excluded: bool) -> list[Any]:
             return list(iterated.__iter__(value))  # noqa: PLC2801
     if isinstance(value, (Mapping, Sequence, AbstractSet)):
         raise _UnsafeToEncode
-    return []
+    return attributes
 
 
 def _contains_iterator(value: Any) -> bool:
@@ -447,7 +486,8 @@ def _open_trace(
         model_name = body.get("model")
         if not isinstance(model_name, str):
             model_name = ""
-        # Encode before any span opens, so a rejected state leaves no turn.
+        # Encode before any span opens, so state that fails to encode leaves no
+        # turn. Unsafe state is not encoded; an SDK error on it lands on the span.
         state_message = _state_message(body.get("state")) if capture else None
         questions_json = _questions_json(body.get("questions")) if capture else None
         turn = _started_turn()

@@ -21,7 +21,8 @@ from datetime import datetime
 from decimal import Decimal
 from functools import cached_property
 from importlib.metadata import version
-from types import MappingProxyType
+from pathlib import PurePosixPath
+from types import MappingProxyType, SimpleNamespace
 from typing import Any, NamedTuple
 from unittest.mock import MagicMock
 from uuid import UUID
@@ -211,6 +212,13 @@ class _AnyValue(BaseModel):
     value: Any
 
 
+class _AnyValueWithComputedField(_AnyValue):
+    @computed_field
+    @property
+    def n(self) -> int:
+        return 1
+
+
 class _IterableRows(BaseModel):
     rows: Iterable[str]
 
@@ -259,6 +267,71 @@ def _computed_from_private() -> _ComputedFromPrivate:
     return value
 
 
+class _ComputedFromPrivateObject(BaseModel):
+    _source: Any = PrivateAttr(default=None)
+
+    @computed_field
+    @property
+    def rows(self) -> list[str]:
+        return list(self._source.rows)
+
+
+def _computed_from_private_object(source: Any) -> _ComputedFromPrivateObject:
+    value = _ComputedFromPrivateObject()
+    value._source = source
+    return value
+
+
+class _SlottedSource:
+    __slots__ = ("rows",)
+
+    def __init__(self) -> None:
+        self.rows = _letters()
+
+
+class _SlottedWithDictProperty:
+    __slots__ = ()
+
+    @property
+    def __dict__(self) -> dict[str, Any]:  # type: ignore[override]
+        return {"rows": _letters()}
+
+
+class _ListWithSource(list):
+    def __init__(self) -> None:
+        super().__init__()
+        self.rows = _letters()
+
+
+class _ListWithCachedRows(list):
+    @cached_property
+    def rows(self) -> Iterator[str]:
+        return _letters()
+
+
+class _DictWithSource(dict):
+    def __init__(self) -> None:
+        super().__init__()
+        self.rows = _letters()
+
+
+@dataclasses.dataclass
+class _DataclassWithSource:
+    x: int = 1
+
+    def __post_init__(self) -> None:
+        self.source = _letters()
+
+
+class _ComputedFromDataclassAttribute(BaseModel):
+    inner: Any
+
+    @computed_field
+    @property
+    def rows(self) -> list[str]:
+        return list(self.inner.source)
+
+
 class _FieldSerializerFromExcluded(BaseModel):
     source: Iterable[str] = Field(exclude=True)
     label: str = "rows:"
@@ -289,6 +362,21 @@ def _cached_rows() -> _CachedRows:
     value = _CachedRows(data=["a", "b"])
     _ = value.rows
     return value
+
+
+class _InheritedCachedRows(_CachedRows):
+    pass
+
+
+class _CachedSource(BaseModel):
+    @cached_property
+    def source(self) -> Iterator[str]:
+        return _letters()
+
+    @computed_field
+    @property
+    def rows(self) -> list[str]:
+        return list(self.source)
 
 
 class _RowsKey(BaseModel):
@@ -701,6 +789,26 @@ def test_generator_state_reaches_the_sdk_unconsumed(
             id="computed-field-over-private-attribute",
         ),
         pytest.param(
+            lambda: _computed_from_private_object(SimpleNamespace(rows=_letters())),
+            {"rows": ["a", "b"]},
+            id="computed-field-over-a-private-object",
+        ),
+        pytest.param(
+            lambda: _computed_from_private_object(_SlottedSource()),
+            {"rows": ["a", "b"]},
+            id="computed-field-over-a-slotted-object",
+        ),
+        pytest.param(
+            lambda: _computed_from_private_object(_ListWithCachedRows()),
+            {"rows": ["a", "b"]},
+            id="computed-field-over-an-unread-cached-property-of-a-list",
+        ),
+        pytest.param(
+            lambda: _ComputedFromDataclassAttribute(inner=_DataclassWithSource()),
+            {"inner": {"x": 1}, "rows": ["a", "b"]},
+            id="computed-field-over-a-dataclass-attribute",
+        ),
+        pytest.param(
             lambda: _FieldSerializerFromExcluded(source=["a", "b"]),
             {"label": "rows:a,b"},
             id="field-serializer-over-excluded-field",
@@ -714,6 +822,21 @@ def test_generator_state_reaches_the_sdk_unconsumed(
             _cached_rows,
             {"data": ["a", "b"], "rows": ["a", "b"]},
             id="cached-computed-field",
+        ),
+        pytest.param(
+            lambda: _CachedRows(data=["a", "b"]),
+            {"data": ["a", "b"], "rows": ["a", "b"]},
+            id="unread-cached-computed-field",
+        ),
+        pytest.param(
+            lambda: _InheritedCachedRows(data=["a", "b"]),
+            {"data": ["a", "b"], "rows": ["a", "b"]},
+            id="unread-inherited-cached-computed-field",
+        ),
+        pytest.param(
+            _CachedSource,
+            {"rows": ["a", "b"]},
+            id="computed-field-over-an-unread-cached-property",
         ),
         pytest.param(
             lambda: _ComputedFromExcludedKeys(source={iter(["a", "b"]): 1}),
@@ -790,6 +913,35 @@ def test_state_that_encoding_could_change_is_sent_as_is_and_not_recorded(
             _self_referencing, {"x": 1, "double": 2}, id="private-self-reference"
         ),
         pytest.param(
+            lambda: _with_private(
+                _PrivateValueWithComputedField(), SimpleNamespace(rows=["a"])
+            ),
+            {"x": 1, "double": 2},
+            id="private-object",
+        ),
+        pytest.param(
+            lambda: _with_private(_PrivateValueWithComputedField(), json),
+            {"x": 1, "double": 2},
+            id="private-module",
+        ),
+        pytest.param(
+            lambda: _with_private(_PrivateValueWithComputedField(), UUID(int=1)),
+            {"x": 1, "double": 2},
+            id="private-slotted-value",
+        ),
+        pytest.param(
+            lambda: _with_private(_PrivateValueWithComputedField(), PurePosixPath("a")),
+            {"x": 1, "double": 2},
+            id="private-value-with-unset-slots",
+        ),
+        pytest.param(
+            lambda: _with_private(
+                _PrivateValueWithComputedField(), _SlottedWithDictProperty()
+            ),
+            {"x": 1, "double": 2},
+            id="private-slotted-value-with-a-dict-property",
+        ),
+        pytest.param(
             lambda: _with_private(_PrivateValue(), _letters()),
             {"x": 1},
             id="private-iterator-nothing-reads",
@@ -815,6 +967,36 @@ def test_state_that_encoding_could_change_is_sent_as_is_and_not_recorded(
             ),
             {"value": {"row": {"k": 1}, "rows": ["a"]}},
             id="weave-values-in-a-model",
+        ),
+        pytest.param(
+            lambda: _AnyValueWithComputedField(
+                value={
+                    "row": WeaveDict({"k": 1}, server=MagicMock()),
+                    "rows": WeaveList(["a"], server=MagicMock()),
+                }
+            ),
+            {"value": {"row": {"k": 1}, "rows": ["a"]}, "n": 1},
+            id="weave-values-in-a-model-with-a-computed-field",
+        ),
+        pytest.param(
+            lambda: _AnyValueWithComputedField(value=_ListWithSource()),
+            {"value": [], "n": 1},
+            id="list-subclass-attribute-in-a-model-with-a-computed-field",
+        ),
+        pytest.param(
+            lambda: _AnyValueWithComputedField(value=_DictWithSource()),
+            {"value": {}, "n": 1},
+            id="dict-subclass-attribute-in-a-model-with-a-computed-field",
+        ),
+        pytest.param(
+            _DataclassWithSource, {"x": 1}, id="dataclass-attribute-nothing-reads"
+        ),
+        pytest.param(
+            lambda: _with_private(
+                _PrivateValueWithComputedField(), typesafe_integration._jsonable
+            ),
+            {"x": 1, "double": 2},
+            id="private-function",
         ),
         pytest.param(
             lambda: _AnyValue(
