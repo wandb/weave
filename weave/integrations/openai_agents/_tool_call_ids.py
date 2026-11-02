@@ -46,10 +46,11 @@ def install_tool_call_id_hook(sink: ToolCallIdSink) -> Callable[[], None] | None
                 sink(span.span_id, tool_context.tool_call_id)
         except Exception as exc:
             # Losing the call id must never fail the customer's tool call.
+            # Key on the exception type: older `ToolContext`s have no `tool_name`.
             log_once(
                 logger.error,
-                f"Failed to record the openai_agents tool call id for "
-                f"{tool_context.tool_name}: {exc!r}",
+                "Failed to record the openai_agents tool call id: "
+                f"{type(exc).__name__}",
             )
 
         return tool_context

@@ -1252,9 +1252,8 @@ def test_patcher_survives_tool_call_id_hook_failures(
         (
             "weave.integrations.openai_agents._tool_call_ids",
             logging.ERROR,
-            "Failed to record the openai_agents tool call id for lookup: "
-            "RuntimeError('sink closed') (subsequent messages of this type "
-            "will be suppressed)",
+            "Failed to record the openai_agents tool call id: RuntimeError "
+            "(subsequent messages of this type will be suppressed)",
         )
     ]
     assert inspect.getattr_static(ToolContext, "from_agent_context") is factory
