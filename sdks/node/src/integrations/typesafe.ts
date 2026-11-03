@@ -130,8 +130,9 @@ function sortValue(value: unknown, key: string): unknown {
     // plain array, so an Array subclass's toJSON does not run again.
     // Read the length once and truncate it, as JSON.stringify does.
     const length = Math.trunc(json.length);
-    // No array is longer. The SDK's JSON.stringify rejects such a value too.
-    if (length > 2 ** 32 - 1) {
+    // V8 cannot stringify an array near 2 ** 28 items (its strings hold under
+    // 2 ** 29 characters, two per item), so give up well before that.
+    if (length > 2 ** 27) {
       throw new RangeError('Invalid array length');
     }
     const items: unknown[] = [];

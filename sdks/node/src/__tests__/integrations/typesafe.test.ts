@@ -410,29 +410,32 @@ describe('TypeSafe systemOne spans', () => {
     }
   });
 
-  test('an array proxy with an impossible length fails as the SDK does', async () => {
-    const fetch = jest.fn(async () => jsonResponse(okBody()));
-    const client = wrapTypeSafe(clientWith(fetch));
-    let reads = 0;
-    const state = new Proxy(['a'], {
-      get: (target, key) => {
-        if (key === 'length') {
-          return Infinity;
-        }
-        if (typeof key === 'string' && /^\d+$/.test(key)) {
-          reads++;
-        }
-        return Reflect.get(target, key);
-      },
-    });
-    await expect(
-      client.systemOne({state: state as any, questions})
-    ).rejects.toThrow(RangeError);
-    // Like the SDK's JSON.stringify, the span walk reads no index.
-    expect(reads).toBe(0);
-    expect(spans()).toHaveLength(0);
-    expect(fetch).toHaveBeenCalledTimes(0);
-  });
+  test.each([Infinity, 2 ** 28 + 100])(
+    'an array proxy with length %d fails as the SDK does',
+    async length => {
+      const fetch = jest.fn(async () => jsonResponse(okBody()));
+      const client = wrapTypeSafe(clientWith(fetch));
+      let reads = 0;
+      const state = new Proxy(['a'], {
+        get: (target, key) => {
+          if (key === 'length') {
+            return length;
+          }
+          if (typeof key === 'string' && /^\d+$/.test(key)) {
+            reads++;
+          }
+          return Reflect.get(target, key);
+        },
+      });
+      await expect(
+        client.systemOne({state: state as any, questions})
+      ).rejects.toThrow(RangeError);
+      // Like the SDK's JSON.stringify, the span walk reads no index.
+      expect(reads).toBe(0);
+      expect(spans()).toHaveLength(0);
+      expect(fetch).toHaveBeenCalledTimes(0);
+    }
+  );
 
   test('an unencodable state does not open a turn', async () => {
     const fetch = jest.fn(async () => jsonResponse(okBody()));
