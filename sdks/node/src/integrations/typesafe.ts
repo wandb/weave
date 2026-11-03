@@ -130,6 +130,10 @@ function sortValue(value: unknown, key: string): unknown {
     // plain array, so an Array subclass's toJSON does not run again.
     // Read the length once and truncate it, as JSON.stringify does.
     const length = Math.trunc(json.length);
+    // No array is longer. The SDK's JSON.stringify rejects such a value too.
+    if (length > 2 ** 32 - 1) {
+      throw new RangeError('Invalid array length');
+    }
     const items: unknown[] = [];
     for (let index = 0; index < length; index++) {
       items.push(sortValue(json[index], String(index)));
