@@ -14,6 +14,10 @@ Since 2026-10-13 the trace server runs from wandb/core, in `services/weave-trace
 
 ## Python Import Rules
 
+Importing Weave must preserve the caller's process-wide locale. Grid integer
+formatting uses the current `LC_NUMERIC` settings without initializing the locale;
+fresh-process regression tests live in `tests/trace/test_grid.py`.
+
 **IMPORTANT: Always place imports at the top of Python files.**
 
 - All imports must be at the module level (top of the file), not inside functions or methods.
