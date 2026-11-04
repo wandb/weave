@@ -200,10 +200,11 @@ def _auto_summarize(data: list, *, unscored: int) -> dict[str, Any] | None:
                     unscored=unscored,
                 )
             ) is not None:
-                if k in summary:
-                    result.update(summary)
-                else:
-                    result[k] = summary
+                # Always nest the summary under its key. Merging it into the
+                # parent (result.update) corrupts the summary when a nested
+                # dict repeats the parent key: sibling scores overwrite each
+                # other and the result depends on dict insertion order.
+                result[k] = summary
         if not result:
             return None
         return result
