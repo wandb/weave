@@ -1,85 +1,176 @@
 interactions:
 - request:
-    body: '{"messages": [{"role": "user", "content": "What is the capital of France?"}],
-      "model": "llama3.1-8b"}'
+    body: ''
     headers:
-      accept:
+      Accept:
       - application/json
-      accept-encoding:
-      - gzip, deflate, br
-      connection:
+      Accept-Encoding:
+      - gzip, deflate
+      Connection:
       - keep-alive
-      content-length:
-      - '101'
-      content-type:
-      - application/json
-      host:
+      Host:
       - api.cerebras.ai
-      user-agent:
-      - Cerebras/Python 0.6.0
-      x-stainless-arch:
+      User-Agent:
+      - Cerebras/Python 1.59.0
+      X-Stainless-Arch:
       - arm64
-      x-stainless-async:
+      X-Stainless-Async:
       - 'false'
-      x-stainless-lang:
+      X-Stainless-Lang:
       - python
-      x-stainless-os:
+      X-Stainless-OS:
       - MacOS
-      x-stainless-package-version:
-      - 0.6.0
-      x-stainless-runtime:
+      X-Stainless-Package-Version:
+      - 1.59.0
+      X-Stainless-Runtime:
       - CPython
-      x-stainless-runtime-version:
-      - 3.11.9
+      X-Stainless-Runtime-Version:
+      - 3.12.13
+      x-stainless-read-timeout:
+      - '1'
+      x-stainless-retry-count:
+      - '0'
+    method: GET
+    uri: https://api.cerebras.ai/v1/tcp_warming
+  response:
+    body:
+      string: !!binary |
+        H4sIAAAAAAAA/0WQ3UrEQAyF7/sUh73RhaUPIAhCpaCCLGzvt9Np1g7MTuok49K3N9Wid4F8OT/p
+        piDI9FlIFDYOFNIHhJJiWKAToaFMQ3aCJnIZcXp+gzJuLl9RZixcMrrmCM8pkdfACcJ26PR3t2kL
+        biFGTO6LEPlGdtS1XV29XFYMI6c7NVGzVUt0wBzJCVkQRb9bzcyj+bPYPeDiolCP+3ce6fW0B2f0
+        K3dWP5//wzy2G3dcdOK0R0g/rdYaRonm4pVzXVWtKVw5E5xIEHXJ02FF1HlFEVghKfPMWZ/89pLa
+        heobVLYS+UEBAAA=
+    headers:
+      CF-RAY:
+      - a4ecf3625cdedab4-LAX
+      Connection:
+      - keep-alive
+      Content-Encoding:
+      - gzip
+      Content-Type:
+      - text/plain; charset=utf-8
+      Date:
+      - Fri, 23 Oct 2026 01:25:56 GMT
+      Server:
+      - cloudflare
+      Transfer-Encoding:
+      - chunked
+      alt-svc:
+      - h3=":443"; ma=86400
+      cf-cache-status:
+      - DYNAMIC
+      referrer-policy:
+      - strict-origin-when-cross-origin
+      strict-transport-security:
+      - max-age=15552000; includeSubDomains; preload
+      x-content-type-options:
+      - nosniff
+    status:
+      code: 200
+      message: OK
+- request:
+    body: '{"model":"gpt-oss-120b","messages":[{"role":"user","content":"What is the
+      capital of France?"}],"seed":0,"temperature":0}'
+    headers:
+      Accept:
+      - application/json
+      Accept-Encoding:
+      - gzip, deflate
+      Connection:
+      - keep-alive
+      Content-Length:
+      - '121'
+      Content-Type:
+      - application/json
+      Host:
+      - api.cerebras.ai
+      User-Agent:
+      - Cerebras/Python 1.59.0
+      X-Stainless-Arch:
+      - arm64
+      X-Stainless-Async:
+      - 'false'
+      X-Stainless-Lang:
+      - python
+      X-Stainless-OS:
+      - MacOS
+      X-Stainless-Package-Version:
+      - 1.59.0
+      X-Stainless-Runtime:
+      - CPython
+      X-Stainless-Runtime-Version:
+      - 3.12.13
+      x-stainless-read-timeout:
+      - '60'
+      x-stainless-retry-count:
+      - '0'
     method: POST
     uri: https://api.cerebras.ai/v1/chat/completions
   response:
     body:
-      string: '{"id":"chatcmpl-48b9a448-c1cc-4a11-9686-76dd8e744e02","choices":[{"finish_reason":"stop","index":0,"message":{"content":"The
-        capital of France is Paris.","role":"assistant"}}],"created":1724146768,"model":"llama3.1-8b","system_fingerprint":"fp_70185065a4","object":"chat.completion","usage":{"prompt_tokens":17,"completion_tokens":8,"total_tokens":25},"time_info":{"queue_time":6.615e-05,"prompt_time":0.0015992892857142858,"completion_time":0.004536781714285715,"total_time":0.02078700065612793,"created":1724146768}}'
+      string: !!binary |
+        H4sIAAAAAAAA/31Ry47UMBD8FcvHURLZzjsXbpxXAokDiyLH7iRmM3GwPSxolH+nM2TCLqzwsbqq
+        urp8pUbThqpRBnVeplh0KpepgrgrtY4zyLq40kUWQ8FV1vM65UrSCPnWKPC0+XylvZmNH1sH0tsZ
+        vXywC1LMrOEHbVhEz+C9HIA2V6rsHGAOyPo4AlFyMUFOxPbkvZOzAmI8OZ0epDP+dErQ5LepmYdd
+        cfHgiPRPviGP9BOG3hThLat3j5R8CE6aYQy9dc/SaSJn/wyuIbcFCXlw9rvRsMO3dXbCmFR6b3yQ
+        mHNdv+CxmCIA1sTLWpS8KvMCj7IaJuQOS4it9zEXrEMH/9MHOLfYyQBuceZ2a7+0smZV3adKQS7K
+        uoSyzgXSbfcVVNg/IFEWvwCCwRojerl3Fiwe1gb7BDMWznmGiQ7igWfsDbjVEKSZ/GYjcfeCZ7SL
+        A23UKzHbmt6S/Ge8f8QBCr5GdHG4MhxYmf0FvQygpBrR/zBdUR/MGVoz9/ZG+LfnJON1wUQd0W8X
+        uEC78VGaMJayCjtk9f6q/M/mg8OrgrFt8rKY+5SnohQiS6N7wfeBSIs0xfVZzVCeV8W6/gL1WwDq
+        JgMAAA==
     headers:
-      Alt-Svc:
-      - h3=":443"; ma=86400
+      CF-RAY:
+      - a4ecf363183fdab4-LAX
       Connection:
       - keep-alive
+      Content-Encoding:
+      - gzip
       Content-Type:
       - application/json
       Date:
-      - Tue, 20 Aug 2024 09:39:28 GMT
+      - Fri, 23 Oct 2026 01:25:56 GMT
+      Server:
+      - cloudflare
       Transfer-Encoding:
       - chunked
-      Via:
-      - 1.1 e90132d2777b51acfb2fd86213866952.cloudfront.net (CloudFront)
-      X-Amz-Cf-Id:
-      - 5UD2_0bkNmZIqCzFZQJ51eWJpqqn_3TUueEW8n82e3VCib6M6Lf-Cg==
-      X-Amz-Cf-Pop:
-      - CDG52-P5
-      X-Amzn-Trace-Id:
-      - root=1-66c46450-1702385454adf3b15962ddd9;sampled=1;lineage=822f479c:0
-      X-Cache:
-      - Miss from cloudfront
-      x-amzn-Remapped-content-length:
-      - '518'
-      x-amzn-Remapped-date:
-      - Tue, 20 Aug 2024 09:39:03 GMT
-      x-amzn-Remapped-server:
-      - uvicorn
-      x-amzn-RequestId:
-      - 86a3b877-20d0-44cf-85ec-6a29da1bdc94
+      alt-svc:
+      - h3=":443"; ma=86400
+      cf-cache-status:
+      - DYNAMIC
+      inference-id:
+      - chatcmpl-2bc5a3ce-b7dd-4e4b-8d64-e61c4f1931ca
+      referrer-policy:
+      - strict-origin-when-cross-origin
+      strict-transport-security:
+      - max-age=15552000; includeSubDomains; preload
+      x-content-type-options:
+      - nosniff
       x-ratelimit-limit-requests-day:
-      - '28800'
-      x-ratelimit-limit-tokens-minute:
+      - '1440000'
+      x-ratelimit-limit-requests-hour:
       - '60000'
+      x-ratelimit-limit-requests-minute:
+      - '1000'
+      x-ratelimit-limit-tokens-day:
+      - '1440000000'
+      x-ratelimit-limit-tokens-hour:
+      - '60000000'
+      x-ratelimit-limit-tokens-minute:
+      - '1000000'
       x-ratelimit-remaining-requests-day:
-      - '28800'
+      - '1439999'
+      x-ratelimit-remaining-requests-hour:
+      - '59999'
+      x-ratelimit-remaining-requests-minute:
+      - '999'
+      x-ratelimit-remaining-tokens-day:
+      - '1439983609'
+      x-ratelimit-remaining-tokens-hour:
+      - '179983609'
       x-ratelimit-remaining-tokens-minute:
-      - '59975'
-      x-ratelimit-reset-requests-day:
-      - '51631.72441959381'
-      x-ratelimit-reset-tokens-minute:
-      - '31.724419593811035'
+      - '983609'
       x-request-id:
-      - 5UD2_0bkNmZIqCzFZQJ51eWJpqqn_3TUueEW8n82e3VCib6M6Lf-Cg==
+      - a4ecf363183fdab4-LAX
     status:
       code: 200
       message: OK
