@@ -19,7 +19,8 @@ class CallUsageParams(TypedDict, total=False):
     """If true, include cost calculations in the usage."""
 
     limit: int
-    """Maximum number of calls to process across all traces.
+    """Maximum calls per aggregation batch.
 
-    Acts as a safety limit to prevent unbounded memory usage.
+    Larger batches are split by trace; a single trace exceeding this limit returns
+    an error, never partial usage.
     """

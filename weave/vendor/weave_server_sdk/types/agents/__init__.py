@@ -5,8 +5,10 @@ from __future__ import annotations
 from .span_query_params import SpanQueryParams as SpanQueryParams
 from .span_stats_params import SpanStatsParams as SpanStatsParams
 from .trace_chat_params import TraceChatParams as TraceChatParams
+from .span_exists_params import SpanExistsParams as SpanExistsParams
 from .span_query_response import SpanQueryResponse as SpanQueryResponse
 from .span_stats_response import SpanStatsResponse as SpanStatsResponse
+from .span_exists_response import SpanExistsResponse as SpanExistsResponse
 from .conversation_chat_params import ConversationChatParams as ConversationChatParams
 from .conversation_spans_params import ConversationSpansParams as ConversationSpansParams
 from .agent_version_query_params import AgentVersionQueryParams as AgentVersionQueryParams

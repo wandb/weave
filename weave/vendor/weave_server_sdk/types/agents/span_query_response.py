@@ -271,6 +271,10 @@ class Span(BaseModel):
 
     input_tokens: Optional[int] = None
 
+    main_agent_id: Optional[str] = None
+
+    main_agent_name: Optional[str] = None
+
     object_refs: List[str]
 
     operation_name: Optional[str] = None
@@ -321,6 +325,8 @@ class Span(BaseModel):
 
     response_model: Optional[str] = None
 
+    response_time_to_first_chunk: Optional[float] = None
+
     server_address: Optional[str] = None
 
     server_port: Optional[int] = None
@@ -364,6 +370,8 @@ class Span(BaseModel):
     wb_run_step_end: Optional[int] = None
 
     wb_user_id: Optional[str] = None
+
+    workflow_name: Optional[str] = None
 
 
 class SpanQueryResponse(BaseModel):
