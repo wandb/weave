@@ -1,5 +1,7 @@
 # File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
 
+from typing import Optional
+
 from .._models import BaseModel
 
 __all__ = ["ProjectStatsResponse"]
@@ -13,3 +15,5 @@ class ProjectStatsResponse(BaseModel):
     tables_storage_size_bytes: int
 
     trace_storage_size_bytes: int
+
+    spans_storage_size_bytes: Optional[int] = None

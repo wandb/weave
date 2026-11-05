@@ -17,6 +17,13 @@ export class Spans extends APIResource {
   }
 
   /**
+   * Check whether a project has any matching agent spans.
+   */
+  exists(body: SpanExistsParams, options?: RequestOptions): APIPromise<SpanExistsResponse> {
+    return this._client.post('/agents/spans/exists', { body, ...options });
+  }
+
+  /**
    * Query agent spans, either as raw rows or grouped aggregates.
    */
   query(body: SpanQueryParams, options?: RequestOptions): APIPromise<SpanQueryResponse> {
@@ -57,6 +64,10 @@ export namespace SpanCustomAttrsSchemaResponse {
 
     value_type: 'string' | 'int' | 'float' | 'bool';
   }
+}
+
+export interface SpanExistsResponse {
+  exists: boolean;
 }
 
 /**
@@ -291,6 +302,10 @@ export namespace SpanQueryResponse {
 
     input_tokens: number | null;
 
+    main_agent_id: string | null;
+
+    main_agent_name: string | null;
+
     object_refs: Array<string>;
 
     operation_name: string | null;
@@ -341,6 +356,8 @@ export namespace SpanQueryResponse {
 
     response_model: string | null;
 
+    response_time_to_first_chunk: number | null;
+
     server_address: string | null;
 
     server_port: number | null;
@@ -384,6 +401,8 @@ export namespace SpanQueryResponse {
     wb_run_step_end: number | null;
 
     wb_user_id: string | null;
+
+    workflow_name: string | null;
   }
 
   export namespace Span {
@@ -484,6 +503,60 @@ export interface SpanCustomAttrsSchemaParams {
 }
 
 export namespace SpanCustomAttrsSchemaParams {
+  export interface Query {
+    /**
+     * Logical AND. All conditions must evaluate to true.
+     *
+     * Example:
+     * ` { "$and": [ {"$eq": [{"$getField": "op_name"}, {"$literal": "predict"}]}, {"$gt": [{"$getField": "summary.usage.tokens"}, {"$literal": 1000}]} ] } `
+     */
+    $expr:
+      | Shared.AndOperation
+      | Shared.OrOperation
+      | Shared.NotOperation
+      | Shared.EqOperation
+      | Shared.GtOperation
+      | Query.LtOperation
+      | Shared.GteOperation
+      | Query.LteOperation
+      | Shared.InOperation
+      | Shared.ContainsOperation;
+  }
+
+  export namespace Query {
+    /**
+     * Less than comparison.
+     *
+     * Example:
+     * ` { "$lt": [{"$getField": "summary.usage.tokens"}, {"$literal": 100}] } `
+     */
+    export interface LtOperation {
+      $lt: Array<unknown>;
+    }
+
+    /**
+     * Less than or equal comparison.
+     *
+     * Example:
+     * ` { "$lte": [{"$getField": "summary.usage.tokens"}, {"$literal": 100}] } `
+     */
+    export interface LteOperation {
+      $lte: Array<unknown>;
+    }
+  }
+}
+
+export interface SpanExistsParams {
+  project_id: string;
+
+  query?: SpanExistsParams.Query | null;
+
+  started_after?: string | null;
+
+  started_before?: string | null;
+}
+
+export namespace SpanExistsParams {
   export interface Query {
     /**
      * Logical AND. All conditions must evaluate to true.
@@ -1373,9 +1446,11 @@ export namespace SpanStatsParams {
 export declare namespace Spans {
   export {
     type SpanCustomAttrsSchemaResponse as SpanCustomAttrsSchemaResponse,
+    type SpanExistsResponse as SpanExistsResponse,
     type SpanQueryResponse as SpanQueryResponse,
     type SpanStatsResponse as SpanStatsResponse,
     type SpanCustomAttrsSchemaParams as SpanCustomAttrsSchemaParams,
+    type SpanExistsParams as SpanExistsParams,
     type SpanQueryParams as SpanQueryParams,
     type SpanStatsParams as SpanStatsParams,
   };

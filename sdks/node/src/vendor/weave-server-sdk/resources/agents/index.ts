@@ -23,9 +23,11 @@ export {
 export {
   Spans,
   type SpanCustomAttrsSchemaResponse,
+  type SpanExistsResponse,
   type SpanQueryResponse,
   type SpanStatsResponse,
   type SpanCustomAttrsSchemaParams,
+  type SpanExistsParams,
   type SpanQueryParams,
   type SpanStatsParams,
 } from './spans';

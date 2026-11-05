@@ -105,7 +105,9 @@ def build_evaluation():
 
 
 @pytest.mark.asyncio
-async def test_evaluation_performance(client: WeaveClient):
+async def test_evaluation_performance(client: WeaveClient, ensure_project):
+    # Concurrent first writes to a missing project race its upsert and can 403.
+    ensure_project("test_evaluation_performance")
     client.project = "test_evaluation_performance"
     evaluation, predict = build_evaluation()
 
