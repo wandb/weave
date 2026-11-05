@@ -4,6 +4,17 @@ All notable changes to the Weave TypeScript SDK will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.16.11] - 2026-11-05
+
+### Changed
+
+- Refresh the vendored trace-server client to the current trace-server API. ([#7970](https://github.com/wandb/weave/pull/7970))
+
+### Fixed
+
+- Record the state and answers of a TypeSafe `systemOne` call the way the SDK sends them. `toJSON` now runs once per value with its key, as in `JSON.stringify`, so an array with its own `toJSON` is no longer recorded raw. Code inside the call, such as a custom `fetch`, now sees the caller's turn and conversation. ([#8087](https://github.com/wandb/weave/pull/8087))
+
+
 ## [0.16.10] - 2026-10-22
 
 ### Added
