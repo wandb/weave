@@ -203,6 +203,46 @@ def _openai_chunk_has_content(chunk: ChatCompletionChunk) -> bool:
     return False
 
 
+def _tool_call_slot(
+    tool_calls: list[dict], tool_call_delta: ChoiceDeltaToolCall
+) -> int:
+    # Servers like Gemini send each call whole and without an index: a new id, or a new name on a named call, starts a new call.
+    if tool_call_delta.index is not None:
+        return tool_call_delta.index
+    if not tool_calls:
+        return 0
+    if tool_call_delta.id and tool_call_delta.id != tool_calls[-1].get("id"):
+        return len(tool_calls)
+    function = tool_call_delta.function
+    if not tool_call_delta.id and function and function.name:
+        if tool_calls[-1]["function"]["name"]:
+            return len(tool_calls)
+    return len(tool_calls) - 1
+
+
+def _merge_tool_call_delta(
+    tool_calls: list[dict], tool_call_delta: ChoiceDeltaToolCall
+) -> None:
+    slot = _tool_call_slot(tool_calls, tool_call_delta)
+    while slot > len(tool_calls) - 1:
+        tool_calls.append(
+            ChoiceDeltaToolCall(
+                index=len(tool_calls),
+                function=ChoiceDeltaToolCallFunction(name=None, arguments=""),
+            ).model_dump()
+        )
+    tool_call = tool_calls[slot]
+    if tool_call_delta.id is not None:
+        tool_call["id"] = tool_call_delta.id
+    if tool_call_delta.type is not None:
+        tool_call["type"] = tool_call_delta.type
+    if tool_call_delta.function is not None:
+        if tool_call_delta.function.name is not None:
+            tool_call["function"]["name"] = tool_call_delta.function.name
+        if tool_call_delta.function.arguments is not None:
+            tool_call["function"]["arguments"] += tool_call_delta.function.arguments
+
+
 def openai_accumulator(
     acc: ChatCompletionChunk | None,
     value: ChatCompletionChunk,
@@ -270,46 +310,10 @@ def openai_accumulator(
             if chunk_choice.delta.tool_calls:
                 if choice["delta"]["tool_calls"] is None:
                     choice["delta"]["tool_calls"] = []
-                    tool_call_delta = chunk_choice.delta.tool_calls[
-                        0
-                    ]  # when streaming, we get one
-                    choice["delta"]["tool_calls"].append(  # type: ignore
-                        ChoiceDeltaToolCall(
-                            id=tool_call_delta.id,
-                            index=tool_call_delta.index,
-                            function=ChoiceDeltaToolCallFunction(
-                                name=tool_call_delta.function.name,  # type: ignore
-                                arguments="",
-                            ),
-                            type=tool_call_delta.type,
-                        )
+                for tool_call_delta in chunk_choice.delta.tool_calls:
+                    _merge_tool_call_delta(
+                        choice["delta"]["tool_calls"], tool_call_delta
                     )
-                else:
-                    tool_call_delta = chunk_choice.delta.tool_calls[0]
-                    if tool_call_delta.index > len(choice["delta"]["tool_calls"]) - 1:
-                        choice["delta"]["tool_calls"].append(
-                            ChoiceDeltaToolCall(
-                                index=tool_call_delta.index,
-                                function=ChoiceDeltaToolCallFunction(
-                                    name=None,
-                                    arguments="",
-                                ),
-                            ).model_dump()
-                        )
-                    tool_call = choice["delta"]["tool_calls"][tool_call_delta.index]
-                    if tool_call_delta.id is not None:
-                        tool_call["id"] = tool_call_delta.id
-                    if tool_call_delta.type is not None:
-                        tool_call["type"] = tool_call_delta.type
-                    if tool_call_delta.function is not None:
-                        if tool_call_delta.function.name is not None:
-                            tool_call["function"]["name"] = (
-                                tool_call_delta.function.name
-                            )
-                        if tool_call_delta.function.arguments is not None:
-                            tool_call["function"]["arguments"] += (
-                                tool_call_delta.function.arguments
-                            )
 
         return acc_choices
 
