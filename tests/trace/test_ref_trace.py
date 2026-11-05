@@ -116,3 +116,53 @@ def test_ref_immutable(weave_active):
 
     with pytest.raises(FrozenInstanceError):
         ref.val = 2
+
+
+@pytest.mark.parametrize(
+    "uri",
+    [
+        "weave://docs/getting-started",
+        "weave:///entity/project",
+        "weave:///entity/project/object",
+        "weave:///entity/project/table",
+        "weave:///entity/project/call",
+        "weave:///entity/project/op",
+        "weave:///entity/project/dashboard/x",
+    ],
+)
+def test_parse_uri_raises_value_error_for_invalid_uris(uri):
+    from weave.trace.refs import Ref
+
+    with pytest.raises(ValueError):
+        Ref.parse_uri(uri)
+
+
+@pytest.mark.parametrize(
+    "uri",
+    [
+        "weave://docs/getting-started",
+        "weave:///entity/project",
+        "weave:///entity/project/object",
+        "weave:///entity/project/dashboard/x",
+    ],
+)
+def test_maybe_parse_uri_returns_none_for_invalid_uris(uri):
+    from weave.trace.refs import Ref
+
+    assert Ref.maybe_parse_uri(uri) is None
+
+
+@pytest.mark.parametrize(
+    "uri",
+    [
+        "weave://docs/getting-started",
+        "weave:///entity/project",
+        "weave:///entity/project/object",
+        "weave:///entity/project/dashboard/x",
+    ],
+)
+def test_from_json_keeps_invalid_weave_looking_strings(uri):
+    from weave.trace.serialization.serialize import from_json
+
+    assert from_json({"output": uri}, "entity/project", None) == {"output": uri}
+    assert from_json(uri, "entity/project", None) == uri
