@@ -117,11 +117,20 @@ def extract_model_name_from_inference_profile_arn(profile_arn: str) -> str:
               and the model from the first profile is used.
 
     Returns:
-        The extracted model name (e.g. "amazon.nova-lite-v1:0")
+        The extracted model name used for cost lookup. System-defined profile ARNs
+        already end with the profile ID (e.g. "us.openai.gpt-6-astra"), which matches
+        cost_checkpoint rows; application profiles still resolve via GetInferenceProfile.
     """
+    profile_id = profile_arn.rsplit("/", maxsplit=1)[-1]
+
+    # System-defined inference profiles already end with the ID that cost tables key on.
+    # Looking them up returns the bare foundation model ID, which misses profile-only
+    # priced rows (e.g. GPT-6 Astra) and adds a GetInferenceProfile round-trip per call.
+    if ":application-inference-profile/" not in profile_arn:
+        return profile_id
+
     try:
         aws_region_name = os.environ.get("AWS_REGION_NAME")
-        profile_id = profile_arn.rsplit("/", maxsplit=1)[-1]
         bedrock_client = boto3.client("bedrock", region_name=aws_region_name)
 
         response = bedrock_client.get_inference_profile(
@@ -137,8 +146,7 @@ def extract_model_name_from_inference_profile_arn(profile_arn: str) -> str:
         return model_id  # noqa: TRY300
     except Exception:
         # Fallback to simple inference profile if the application inference profile format fails
-        model_part = profile_arn.rsplit("/", maxsplit=1)[-1]
-        model_name = re.sub(r"^[a-z]{2}\.", "", model_part)
+        model_name = re.sub(r"^[a-z]{2}\.", "", profile_id)
         return model_name
 
 
