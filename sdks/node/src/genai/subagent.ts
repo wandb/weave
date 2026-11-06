@@ -28,6 +28,7 @@ import {
   ATTR_GEN_AI_SYSTEM_INSTRUCTIONS,
   WEAVE_GENAI_TRACER_NAME,
 } from './semconv';
+import {serializeMessages} from './serialize';
 import {Tool, type ToolInit} from './tool';
 import type {Message} from './types';
 
@@ -254,13 +255,13 @@ export class SubAgent extends SpanBase {
     if (this._inputMessages.length > 0) {
       this.span.setAttribute(
         ATTR_GEN_AI_INPUT_MESSAGES,
-        JSON.stringify(this._inputMessages)
+        serializeMessages(this._inputMessages)
       );
     }
     if (this._outputMessages.length > 0) {
       this.span.setAttribute(
         ATTR_GEN_AI_OUTPUT_MESSAGES,
-        JSON.stringify(this._outputMessages)
+        serializeMessages(this._outputMessages)
       );
     }
     if (this._systemInstructions.length > 0) {

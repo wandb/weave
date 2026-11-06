@@ -125,7 +125,7 @@ describe('Turn', () => {
           "gen_ai.agent.name": "weather-bot",
           "gen_ai.agent.version": "1.4.2",
           "gen_ai.operation.name": "invoke_agent",
-          "gen_ai.output.messages": "[{"role":"assistant","content":"It is sunny."}]",
+          "gen_ai.output.messages": "[{"role":"assistant","parts":[{"type":"text","content":"It is sunny."}]}]",
           "gen_ai.system_instructions": "[{"type":"text","content":"Be helpful"}]",
         },
         "endTime": "<timestamp>",

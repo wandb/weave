@@ -128,7 +128,7 @@ describe('Claude Agent SDK — query() patch', () => {
     const invoke = findSpan(spans, INVOKE);
     expect(
       JSON.parse(invoke.attributes[ATTR_GEN_AI_INPUT_MESSAGES] as string)
-    ).toEqual([{role: 'user', content: 'hi there'}]);
+    ).toEqual([{role: 'user', parts: [{type: 'text', content: 'hi there'}]}]);
     expect(spans.some(s => s.name === 'chat claude-x')).toBe(true);
   });
 
@@ -231,13 +231,21 @@ describe('Claude Agent SDK — query() patch', () => {
     ).toEqual([
       {
         conversationId: 'sess-multi',
-        input: [{role: 'user', content: 'first question'}],
-        output: [{role: 'assistant', content: 'result-1'}],
+        input: [
+          {role: 'user', parts: [{type: 'text', content: 'first question'}]},
+        ],
+        output: [
+          {role: 'assistant', parts: [{type: 'text', content: 'result-1'}]},
+        ],
       },
       {
         conversationId: 'sess-multi',
-        input: [{role: 'user', content: 'second question'}],
-        output: [{role: 'assistant', content: 'result-2'}],
+        input: [
+          {role: 'user', parts: [{type: 'text', content: 'second question'}]},
+        ],
+        output: [
+          {role: 'assistant', parts: [{type: 'text', content: 'result-2'}]},
+        ],
       },
     ]);
   });
@@ -294,7 +302,7 @@ describe('Claude Agent SDK — query() patch', () => {
     const root = findSpan(getExporter().getFinishedSpans(), INVOKE);
     expect(
       JSON.parse(root.attributes[ATTR_GEN_AI_INPUT_MESSAGES] as string)
-    ).toEqual([{role: 'user', content: 'sent later'}]);
+    ).toEqual([{role: 'user', parts: [{type: 'text', content: 'sent later'}]}]);
   });
 
   test('records a streamed base64 image prompt and groups resumed queries as separate turns', async () => {
@@ -373,7 +381,7 @@ describe('Claude Agent SDK — query() patch', () => {
           {
             type: 'blob',
             content: imageBase64,
-            mimeType: 'image/png',
+            mime_type: 'image/png',
             modality: 'image',
           },
           {type: 'text', content: 'Describe this image.'},
@@ -382,7 +390,12 @@ describe('Claude Agent SDK — query() patch', () => {
     ]);
     expect(
       JSON.parse(turns[1].attributes[ATTR_GEN_AI_INPUT_MESSAGES] as string)
-    ).toEqual([{role: 'user', content: 'Now summarize the image.'}]);
+    ).toEqual([
+      {
+        role: 'user',
+        parts: [{type: 'text', content: 'Now summarize the image.'}],
+      },
+    ]);
     expect(
       turns.map(turn => turn.attributes[ATTR_GEN_AI_CONVERSATION_ID])
     ).toEqual(['sess-image', 'sess-image']);
@@ -529,10 +542,12 @@ describe('Claude Agent SDK — query() patch', () => {
       )!;
       expect(
         JSON.parse(root.attributes[ATTR_GEN_AI_INPUT_MESSAGES] as string)
-      ).toEqual([{role: 'user', content: prompt}]);
+      ).toEqual([{role: 'user', parts: [{type: 'text', content: prompt}]}]);
       expect(
         JSON.parse(root.attributes[ATTR_GEN_AI_OUTPUT_MESSAGES] as string)
-      ).toEqual([{role: 'assistant', content: `done-${suffix}`}]);
+      ).toEqual([
+        {role: 'assistant', parts: [{type: 'text', content: `done-${suffix}`}]},
+      ]);
 
       const children = spans.filter(
         span => span.parentSpanId === root.spanContext().spanId
