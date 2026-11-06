@@ -392,7 +392,12 @@ class Tool(_SpanBase):
     _ended: bool = PrivateAttr(default=False)
 
     def _build_attrs(
-        self, *, conversation_id: str, include_content: bool
+        self,
+        *,
+        conversation_id: str,
+        include_content: bool,
+        user_id: str = "",
+        user_email: str = "",
     ) -> dict[str, Any]:
         """Build the full OTel attribute dict for this tool span.
 
@@ -413,6 +418,8 @@ class Tool(_SpanBase):
         attrs = execute_tool_attributes(
             tool_name=self.name,
             conversation_id=conversation_id,
+            user_id=user_id,
+            user_email=user_email,
             tool_call_arguments=arguments,
             tool_call_result=result,
             tool_call_id=self.tool_call_id,
@@ -436,6 +443,8 @@ class Tool(_SpanBase):
         conversation = get_current_conversation()
         attrs = self._build_attrs(
             conversation_id=conversation.conversation_id if conversation else "",
+            user_id=conversation.user_id if conversation else "",
+            user_email=conversation.user_email if conversation else "",
             include_content=conversation.include_content if conversation else True,
         )
         self._end_otel_span(attrs, end_time_ns=_to_ns(self.ended_at))
@@ -666,7 +675,12 @@ class LLM(_SpanBase):
         return self
 
     def _build_attrs(
-        self, *, conversation_id: str, include_content: bool
+        self,
+        *,
+        conversation_id: str,
+        include_content: bool,
+        user_id: str = "",
+        user_email: str = "",
     ) -> dict[str, Any]:
         """Build the full OTel attribute dict for this chat span.
 
@@ -711,6 +725,8 @@ class LLM(_SpanBase):
             model=self.model,
             provider_name=self.provider_name,
             conversation_id=conversation_id,
+            user_id=user_id,
+            user_email=user_email,
             input_messages=input_messages,
             output_messages=output_messages,
             media_attachments=media_attachments,
@@ -743,6 +759,8 @@ class LLM(_SpanBase):
         conversation = get_current_conversation()
         attrs = self._build_attrs(
             conversation_id=conversation.conversation_id if conversation else "",
+            user_id=conversation.user_id if conversation else "",
+            user_email=conversation.user_email if conversation else "",
             include_content=conversation.include_content if conversation else True,
         )
 
@@ -929,7 +947,13 @@ class SubAgent(_SpanBase):
         return self
 
     def _build_attrs(
-        self, *, conversation_id: str, conversation_name: str, include_content: bool
+        self,
+        *,
+        conversation_id: str,
+        conversation_name: str,
+        include_content: bool,
+        user_id: str = "",
+        user_email: str = "",
     ) -> dict[str, Any]:
         """Build the full OTel attribute dict for this sub-agent span.
 
@@ -967,6 +991,8 @@ class SubAgent(_SpanBase):
             agent_name=self.name,
             model=self.model,
             conversation_id=conversation_id,
+            user_id=user_id,
+            user_email=user_email,
             conversation_name=conversation_name,
             input_messages=input_messages,
             output_messages=output_messages,
@@ -996,6 +1022,8 @@ class SubAgent(_SpanBase):
         conversation = get_current_conversation()
         attrs = self._build_attrs(
             conversation_id=conversation.conversation_id if conversation else "",
+            user_id=conversation.user_id if conversation else "",
+            user_email=conversation.user_email if conversation else "",
             conversation_name=conversation.conversation_name if conversation else "",
             include_content=conversation.include_content if conversation else True,
         )
@@ -1211,7 +1239,13 @@ class Turn(_SpanBase):
         return self
 
     def _build_attrs(
-        self, *, conversation_id: str, conversation_name: str, include_content: bool
+        self,
+        *,
+        conversation_id: str,
+        conversation_name: str,
+        include_content: bool,
+        user_id: str = "",
+        user_email: str = "",
     ) -> dict[str, Any]:
         """Build the full OTel attribute dict for this turn span.
 
@@ -1239,6 +1273,8 @@ class Turn(_SpanBase):
         attrs = invoke_agent_attributes(
             agent_name=self.agent_name,
             conversation_id=conversation_id,
+            user_id=user_id,
+            user_email=user_email,
             conversation_name=conversation_name,
             model=self.model,
             input_messages=messages,
@@ -1261,6 +1297,8 @@ class Turn(_SpanBase):
         conversation = get_current_conversation()
         attrs = self._build_attrs(
             conversation_id=conversation.conversation_id if conversation else "",
+            user_id=conversation.user_id if conversation else "",
+            user_email=conversation.user_email if conversation else "",
             conversation_name=conversation.conversation_name if conversation else "",
             include_content=conversation.include_content if conversation else True,
         )
@@ -1315,6 +1353,9 @@ class Conversation(BaseModel):
 
     conversation_id: str = ""
     conversation_name: str = ""
+    # End user on whose behalf the agent runs; emitted as user.id / user.email.
+    user_id: str = ""
+    user_email: str = ""
     # Conversation-level defaults each turn inherits (its own value wins).
     # system_instructions is excluded — it varies per turn.
     agent_name: str = ""
@@ -1428,6 +1469,8 @@ def start_conversation(
     model: str = "",
     conversation_id: str = "",
     conversation_name: str = "",
+    user_id: str = "",
+    user_email: str = "",
     include_content: bool = True,
     continue_parent_trace: bool = False,
     attributes: Attributes = None,
@@ -1446,6 +1489,8 @@ def start_conversation(
         model=model,
         conversation_id=conversation_id,
         conversation_name=conversation_name,
+        user_id=user_id,
+        user_email=user_email,
         include_content=include_content,
         continue_parent_trace=continue_parent_trace,
         attributes=attributes or {},
@@ -1653,6 +1698,8 @@ def _attrs_for_span(
     conversation_id: str,
     conversation_name: str,
     include_content: bool,
+    user_id: str = "",
+    user_email: str = "",
 ) -> tuple[str, dict[str, Any]]:
     """Build (otel_span_name, attribute_dict) for a child span.
 
@@ -1661,16 +1708,24 @@ def _attrs_for_span(
     """
     if isinstance(span, LLM):
         return _span_name("chat", span.model), span._build_attrs(
-            conversation_id=conversation_id, include_content=include_content
+            conversation_id=conversation_id,
+            include_content=include_content,
+            user_id=user_id,
+            user_email=user_email,
         )
     if isinstance(span, Tool):
         return _span_name("execute_tool", span.name), span._build_attrs(
-            conversation_id=conversation_id, include_content=include_content
+            conversation_id=conversation_id,
+            include_content=include_content,
+            user_id=user_id,
+            user_email=user_email,
         )
     return _span_name("invoke_agent", span.name), span._build_attrs(
         conversation_id=conversation_id,
         conversation_name=conversation_name,
         include_content=include_content,
+        user_id=user_id,
+        user_email=user_email,
     )
 
 
@@ -1680,6 +1735,8 @@ def _emit_turn(
     conversation_id: str,
     conversation_name: str,
     include_content: bool,
+    user_id: str = "",
+    user_email: str = "",
     attributes: Attributes = None,
 ) -> LogResult:
     """Emit one fully-built ``Turn`` (and its child spans) to OTel.
@@ -1701,6 +1758,8 @@ def _emit_turn(
         conversation_id=conversation_id,
         conversation_name=conversation_name,
         include_content=include_content,
+        user_id=user_id,
+        user_email=user_email,
     )
     if attributes:
         turn_attrs.update(attributes)
@@ -1721,6 +1780,8 @@ def _emit_turn(
         name, attrs = _attrs_for_span(
             child,
             conversation_id=conversation_id,
+            user_id=user_id,
+            user_email=user_email,
             conversation_name=conversation_name,
             include_content=include_content,
         )
@@ -1747,6 +1808,8 @@ def log_turn(
     conversation_id: str,
     agent_name: str = "",
     conversation_name: str = "",
+    user_id: str = "",
+    user_email: str = "",
     model: str = "",
     agent_id: str = "",
     agent_description: str = "",
@@ -1809,6 +1872,8 @@ def log_turn(
         conversation_id=conversation_id,
         conversation_name=conversation_name,
         include_content=include_content,
+        user_id=user_id,
+        user_email=user_email,
         attributes=attributes,
     )
 
@@ -1818,6 +1883,8 @@ def log_conversation(
     turns: list[Turn],
     conversation_id: str = "",
     conversation_name: str = "",
+    user_id: str = "",
+    user_email: str = "",
     agent_name: str = "",
     model: str = "",
     agent_id: str = "",
@@ -1865,6 +1932,8 @@ def log_conversation(
             conversation_id=sid,
             conversation_name=conversation_name,
             include_content=include_content,
+            user_id=user_id,
+            user_email=user_email,
             attributes=attributes,
         )
         trace_ids.extend(result.trace_ids)

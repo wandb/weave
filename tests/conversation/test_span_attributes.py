@@ -20,6 +20,7 @@ from weave.conversation.conversation import (
     Turn,
     log_conversation,
     log_turn,
+    start_conversation,
 )
 
 # (class_label, factory, otel_span_name) — span_name is the full emitted name
@@ -286,3 +287,95 @@ def test_no_conversation_attributes_by_default(
             pass
     span = _only_span(otel_spans.get_finished_spans(), "invoke_agent bot")
     assert "weave.integration.name" not in (span.attributes or {})
+
+
+# ---------------------------------------------------------------------------
+# User identity (user.id / user.email on every span)
+# ---------------------------------------------------------------------------
+
+
+def test_user_identity_on_every_streaming_span(
+    otel_spans: InMemorySpanExporter,
+) -> None:
+    with Conversation(
+        conversation_id="convo-user-streaming",
+        user_id="user-123",
+        user_email="ada@example.com",
+    ) as conversation:
+        turn = conversation.start_turn(agent_name="bot")
+        with turn:
+            with turn.start_llm(model="gpt-4o"):
+                pass
+            with turn.start_tool(name="Edit"):
+                pass
+            with turn.start_subagent(name="researcher"):
+                pass
+    spans = otel_spans.get_finished_spans()
+    assert sorted(span.name for span in spans) == [
+        "chat gpt-4o",
+        "execute_tool Edit",
+        "invoke_agent bot",
+        "invoke_agent researcher",
+    ]
+    for span in spans:
+        assert span.attributes["user.id"] == "user-123"
+        assert span.attributes["user.email"] == "ada@example.com"
+
+
+def test_start_conversation_accepts_user_identity(
+    otel_spans: InMemorySpanExporter,
+) -> None:
+    conversation = start_conversation(
+        conversation_id="convo-user-start", user_id="user-123", user_email="a@b.co"
+    )
+    with conversation.start_turn(agent_name="bot"):
+        pass
+    conversation.end()
+    span = _only_span(otel_spans.get_finished_spans(), "invoke_agent bot")
+    assert span.attributes["user.id"] == "user-123"
+    assert span.attributes["user.email"] == "a@b.co"
+
+
+def test_user_identity_on_every_batch_span(
+    otel_spans: InMemorySpanExporter,
+) -> None:
+    log_turn(
+        conversation_id="convo-user-batch",
+        agent_name="bot",
+        user_id="user-123",
+        user_email="ada@example.com",
+        spans=[LLM(model="gpt-4o"), Tool(name="Edit"), SubAgent(name="researcher")],
+    )
+    spans = otel_spans.get_finished_spans()
+    assert len(spans) == 4
+    for span in spans:
+        assert span.attributes["user.id"] == "user-123"
+        assert span.attributes["user.email"] == "ada@example.com"
+
+
+def test_user_identity_on_every_log_conversation_span(
+    otel_spans: InMemorySpanExporter,
+) -> None:
+    log_conversation(
+        turns=[
+            Turn(agent_name="bot", spans=[LLM(model="gpt-4o")]),
+            Turn(agent_name="bot", spans=[Tool(name="Edit")]),
+        ],
+        conversation_id="convo-user-log-conversation",
+        user_id="user-123",
+        user_email="ada@example.com",
+    )
+    spans = otel_spans.get_finished_spans()
+    assert len(spans) == 4
+    for span in spans:
+        assert span.attributes["user.id"] == "user-123"
+        assert span.attributes["user.email"] == "ada@example.com"
+
+
+def test_no_user_identity_by_default(otel_spans: InMemorySpanExporter) -> None:
+    with Conversation(conversation_id="convo-user-default") as conversation:
+        with conversation.start_turn(agent_name="bot"):
+            pass
+    span = _only_span(otel_spans.get_finished_spans(), "invoke_agent bot")
+    assert "user.id" not in span.attributes
+    assert "user.email" not in span.attributes
