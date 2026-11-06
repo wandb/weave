@@ -396,7 +396,7 @@ describe('GenAI', () => {
             "gen_ai.provider.name": "some-provider",
             "gen_ai.request.model": "some-model",
             "gen_ai.response.finish_reasons": [
-              "tool_calls",
+              "tool_call",
             ],
             "gen_ai.response.id": "chatcmpl-t1-plan",
             "gen_ai.response.model": "gpt-4o-mini",
@@ -470,7 +470,7 @@ describe('GenAI', () => {
             "gen_ai.provider.name": "some-provider",
             "gen_ai.request.model": "some-model",
             "gen_ai.response.finish_reasons": [
-              "tool_calls",
+              "tool_call",
             ],
             "gen_ai.response.id": "chatcmpl-t2-plan",
             "gen_ai.response.model": "gpt-4o-mini",
@@ -558,7 +558,7 @@ describe('GenAI', () => {
             "gen_ai.provider.name": "some-provider",
             "gen_ai.request.model": "some-model",
             "gen_ai.response.finish_reasons": [
-              "tool_calls",
+              "tool_call",
             ],
             "gen_ai.response.id": "chatcmpl-t3-plan",
             "gen_ai.response.model": "gpt-4o-mini",

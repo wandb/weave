@@ -36,6 +36,7 @@ from opentelemetry import trace as otel_trace
 from opentelemetry.trace import StatusCode
 from pydantic import PrivateAttr
 
+from weave.conversation.adapters.openai import finish_reasons_from_openai_responses
 from weave.conversation.agent_context import resolve_agent_name
 from weave.conversation.conversation_otel import (
     execute_tool_attributes,
@@ -448,6 +449,14 @@ class OTelStateExporter(StateExporter):
             [Message(role="assistant", parts=out_parts)] if out_parts else []
         )
 
+        status_details = response.get("status_details")
+        incomplete_reason = (
+            status_details.get("reason") if isinstance(status_details, dict) else None
+        )
+        finish_reasons = finish_reasons_from_openai_responses(
+            response.get("status"), incomplete_reason, output_messages
+        )
+
         attrs = llm_attributes(
             model=model,
             provider_name=_PROVIDER_NAME,
@@ -457,6 +466,7 @@ class OTelStateExporter(StateExporter):
             usage=self._build_usage(output_dict),
             response_id=response_id or "",
             response_model=model,
+            finish_reasons=finish_reasons,
             output_type="speech" if has_audio else "text",
             request_temperature=_safe_float((session or {}).get("temperature")),
             request_max_tokens=_safe_int(

@@ -8,6 +8,7 @@ import {
 
 import type {ChildSpanContext} from './common';
 import {getGenaiState} from './context';
+import {normalizeFinishReason} from './finishReasons';
 import {getWeaveTracer} from './provider';
 import {
   SpanBase,
@@ -382,7 +383,7 @@ export class LLM extends SpanBase {
     if (this._finishReasons.length > 0) {
       this.span.setAttribute(
         ATTR_GEN_AI_RESPONSE_FINISH_REASONS,
-        this._finishReasons
+        this._finishReasons.map(normalizeFinishReason)
       );
     }
     if (this._outputType) {

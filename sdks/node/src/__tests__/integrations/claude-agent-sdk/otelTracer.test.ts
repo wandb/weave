@@ -419,7 +419,7 @@ describe('Claude Agent SDK — OTel tracer', () => {
     expect(chat.attributes[ATTR_GEN_AI_REQUEST_MODEL]).toBe('claude-x');
     expect(chat.attributes[ATTR_GEN_AI_CONVERSATION_ID]).toBe('sess-1');
     expect(chat.attributes[ATTR_GEN_AI_RESPONSE_FINISH_REASONS]).toEqual([
-      'tool_use',
+      'tool_call',
     ]);
     expect(chat.parentSpanId).toBe(invoke.spanContext().spanId);
     expect(

@@ -420,11 +420,12 @@ def test_response_span_emits_chat_with_messages(
     output_item.model_dump.return_value = {
         "role": "assistant",
         "content": [{"type": "output_text", "text": "Hi!"}],
-        "finish_reason": "stop",
     }
     response = Mock()
     response.id = "resp_42"
     response.model = "gpt-4o"
+    response.status = "completed"
+    response.incomplete_details = None
     response.output = [output_item]
     usage = Mock()
     usage.input_tokens = 5
@@ -474,6 +475,81 @@ def test_response_span_emits_chat_with_messages(
             "parts": [{"type": "text", "content": "Hi!"}],
         }
     ]
+
+
+@pytest.mark.parametrize(
+    ("status", "incomplete_reason", "expected"),
+    [
+        ("completed", None, ("tool_call", "stop")),
+        ("incomplete", "max_output_tokens", ("tool_call", "length")),
+        ("incomplete", "content_filter", ("tool_call", "content_filter")),
+        ("failed", None, ("tool_call", "error")),
+    ],
+)
+def test_response_span_emits_one_finish_reason_per_output_message(
+    client: WeaveClient,
+    otel_spans: InMemorySpanExporter,
+    status: str,
+    incomplete_reason: str | None,
+    expected: tuple[str, ...],
+) -> None:
+    """Finish reasons line up with ``gen_ai.output.messages``, one per message."""
+    processor = WeaveOtelTracingProcessor()
+
+    trace = Mock(spec=Trace)
+    trace.trace_id = "trace_fr"
+    trace.name = "wf"
+    trace.group_id = None
+    processor.on_trace_start(trace)
+
+    tool_call_item = Mock()
+    tool_call_item.model_dump.return_value = {
+        "type": "function_call",
+        "call_id": "call_1",
+        "name": "get_weather",
+        "arguments": '{"city": "Tokyo"}',
+    }
+    message_item = Mock()
+    message_item.model_dump.return_value = {
+        "type": "message",
+        "role": "assistant",
+        "content": [{"type": "output_text", "text": "Tokyo is sunny."}],
+    }
+    response = Mock()
+    response.id = "resp_fr"
+    response.model = "gpt-4o"
+    response.status = status
+    response.incomplete_details = (
+        Mock(reason=incomplete_reason) if incomplete_reason is not None else None
+    )
+    response.output = [tool_call_item, message_item]
+    response.usage = None
+
+    response_data = Mock(spec=ResponseSpanData)
+    response_data.__class__ = ResponseSpanData
+    response_data.input = "Weather in Tokyo?"
+    response_data.response = response
+    response_data.usage = None
+
+    response_span = Mock(spec=Span)
+    response_span.trace_id = "trace_fr"
+    response_span.span_id = "span_fr"
+    response_span.parent_id = None
+    response_span.span_data = response_data
+    response_span.started_at = None
+    response_span.ended_at = None
+    response_span.error = None
+    processor.on_span_start(response_span)
+    processor.on_span_end(response_span)
+    processor.on_trace_end(trace)
+
+    chat = next(
+        s for s in otel_spans.get_finished_spans() if s.name == "chat gpt-4o"
+    )
+    attrs = _attrs(chat)
+    output_messages = json.loads(attrs["gen_ai.output.messages"])
+    assert [m["role"] for m in output_messages] == ["assistant", "assistant"]
+    assert attrs["gen_ai.response.finish_reasons"] == expected
 
 
 def test_generation_span_emits_chat_with_messages(
