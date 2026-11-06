@@ -6,11 +6,14 @@ from weave.scorers import (
 )
 
 
+@pytest.mark.trace_server
 @pytest.mark.parametrize(
     ("output", "target", "expected_result"),
     [
         ("Morgan", "Hello my name is Morgan", True),
         ("Alice", "Hello my name is Bob", False),
+        ("", "Hello my name is Morgan", False),
+        ("", "", False),
     ],
 )
 def test_string_match_scorer(output, target, expected_result):
