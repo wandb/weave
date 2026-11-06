@@ -261,8 +261,7 @@ class TestOnlyFlushingWeaveClient(weave_client.WeaveClient):
 
     @project.setter
     def project(self, name: str) -> None:
-        # Concurrent first writes to a missing project race its upsert and can 403,
-        # so create it first; the fixture's initial project already exists.
+        # First writes to a missing project race its upsert and 403: create it first.
         if "_project" in self.__dict__ and name != self._project:
             project_creator.ensure_project_exists(self.entity, name)
         self._project = name
