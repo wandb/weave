@@ -14,6 +14,7 @@ from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanE
 from opentelemetry.trace import NoOpTracerProvider, StatusCode
 
 from weave.conversation.adapters.openai import (
+    finish_reasons_from_openai_responses,
     message_from_openai_responses_input,
     reasoning_from_openai_responses,
     usage_from_openai_responses,
@@ -522,6 +523,51 @@ class TestLLMAttributes:
     def test_multiple_finish_reasons(self) -> None:
         attrs = llm_attributes(model="gpt-4o", finish_reasons=["stop", "length"])
         assert attrs["gen_ai.response.finish_reasons"] == ["stop", "length"]
+
+    def test_finish_reasons_normalized(self) -> None:
+        attrs = llm_attributes(
+            model="gpt-4o",
+            finish_reasons=["end_turn", "max_tokens", "toolUse", "STOP", "custom"],
+        )
+        assert attrs["gen_ai.response.finish_reasons"] == [
+            "stop",
+            "length",
+            "tool_call",
+            "stop",
+            "custom",
+        ]
+
+
+class TestFinishReasonsFromOpenAIResponses:
+    def test_completed_response_has_one_reason_per_message(self) -> None:
+        messages = [
+            Message(role="assistant", parts=[ToolCallPart(name="f", id="c1")]),
+            Message(role="tool", content="result", tool_call_id="c1"),
+            Message(role="assistant", content="done"),
+        ]
+        assert finish_reasons_from_openai_responses("completed", None, messages) == [
+            "tool_call",
+            "stop",
+            "stop",
+        ]
+
+    def test_incomplete_response_marks_last_message(self) -> None:
+        messages = [
+            Message(role="assistant", content="a"),
+            Message(role="assistant", content="b"),
+        ]
+        assert finish_reasons_from_openai_responses(
+            "incomplete", "max_output_tokens", messages
+        ) == ["stop", "length"]
+
+    def test_failed_response_marks_last_message(self) -> None:
+        messages = [Message(role="assistant", content="partial")]
+        assert finish_reasons_from_openai_responses("failed", None, messages) == [
+            "error"
+        ]
+
+    def test_no_output_messages(self) -> None:
+        assert finish_reasons_from_openai_responses("completed", None, []) == []
 
 
 # ---------------------------------------------------------------------------

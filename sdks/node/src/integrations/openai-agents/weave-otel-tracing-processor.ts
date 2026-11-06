@@ -7,6 +7,7 @@ import {
   trace as otelTrace,
 } from '@opentelemetry/api';
 
+import {finishReasonsFromResponses} from '../../genai/finishReasons';
 import {getWeaveTracer} from '../../genai/provider';
 import {
   serializeInputMessages,
@@ -36,6 +37,7 @@ import {
   ATTR_GEN_AI_REQUEST_STOP_SEQUENCES,
   ATTR_GEN_AI_REQUEST_TEMPERATURE,
   ATTR_GEN_AI_REQUEST_TOP_P,
+  ATTR_GEN_AI_RESPONSE_FINISH_REASONS,
   ATTR_GEN_AI_RESPONSE_ID,
   ATTR_GEN_AI_RESPONSE_MODEL,
   ATTR_GEN_AI_TOOL_CALL_ARGUMENTS,
@@ -233,6 +235,11 @@ function responseChatAttrs(spanData: ResponseSpanData): Attributes {
       [ATTR_GEN_AI_OUTPUT_MESSAGES]: serializeOutputMessages(
         messages,
         reasoning
+      ),
+      [ATTR_GEN_AI_RESPONSE_FINISH_REASONS]: finishReasonsFromResponses(
+        response.status,
+        response.incomplete_details?.reason,
+        messages
       ),
       ...responseUsageAttrs(response.usage),
     };

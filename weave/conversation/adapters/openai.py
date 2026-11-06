@@ -14,6 +14,8 @@ Public functions:
   Responses ``Response``. Tolerates missing ``usage`` and missing
   ``input_tokens_details`` / ``output_tokens_details`` (both can be
   ``None`` for streamed / partial responses).
+- ``finish_reasons_from_openai_responses(status, incomplete_reason, messages)``
+  — one finish reason per output message for a Responses ``Response``.
 """
 
 from __future__ import annotations
@@ -21,6 +23,13 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 
 from weave.conversation.conversation import _publish_media_content
+from weave.conversation.conversation_otel import (
+    FINISH_REASON_ERROR,
+    FINISH_REASON_STOP,
+    FINISH_REASON_TOOL_CALL,
+    message_has_tool_call,
+    normalize_finish_reason,
+)
 from weave.conversation.types import (
     MediaAttachment,
     Message,
@@ -35,6 +44,7 @@ if TYPE_CHECKING:
     from openai.types.responses import Response
 
 __all__ = [
+    "finish_reasons_from_openai_responses",
     "message_from_openai_responses_input",
     "reasoning_from_openai_responses",
     "usage_from_openai_responses",
@@ -231,3 +241,27 @@ def _url_to_attachment(url: str) -> MediaAttachment:
         return MediaAttachment(ref=ref_uri, modality="image", mime_type=mime_type)
     ref_uri = _publish_media_content(content="", uri=url, file_id="", mime_type="")
     return MediaAttachment(ref=ref_uri, modality="image", mime_type="")
+
+
+def finish_reasons_from_openai_responses(
+    status: str | None,
+    incomplete_reason: str | None,
+    output_messages: list[Message],
+) -> list[str]:
+    """Return one finish reason per output message of a Responses API call.
+
+    Each message ends with ``tool_call`` when it requests tools and ``stop``
+    otherwise. An ``incomplete`` or ``failed`` response replaces the last
+    message's reason with ``incomplete_details.reason`` or ``error``.
+    """
+    reasons = [
+        FINISH_REASON_TOOL_CALL if message_has_tool_call(m) else FINISH_REASON_STOP
+        for m in output_messages
+    ]
+    if not reasons:
+        return reasons
+    if status == "incomplete" and incomplete_reason:
+        reasons[-1] = normalize_finish_reason(incomplete_reason)
+    elif status == "failed":
+        reasons[-1] = FINISH_REASON_ERROR
+    return reasons

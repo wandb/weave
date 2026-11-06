@@ -90,6 +90,11 @@ import type {
 } from '@google/genai';
 import {getGlobalClient} from '../clientApi';
 import state from '../state';
+import {
+  FINISH_REASON_STOP,
+  FINISH_REASON_TOOL_CALL,
+  normalizeFinishReason,
+} from '../genai/finishReasons';
 import {getWeaveTracer} from '../genai/provider';
 import {
   ATTR_ERROR_TYPE,
@@ -359,11 +364,19 @@ function contentsToInputMessages(
   }));
 }
 
-function finishReasonString(finishReason: string | null | undefined): string {
-  if (finishReason == null) {
+/** Normalized finish reason, or an empty string when the response has none. */
+function finishReasonString(llmResponse: AdkLlmResponse): string {
+  if (llmResponse.finishReason == null) {
     return '';
   }
-  return finishReason.toLowerCase();
+  const normalized = normalizeFinishReason(llmResponse.finishReason);
+  // Gemini reports STOP when the model ends its turn on a function call.
+  const hasFunctionCall = (llmResponse.content?.parts ?? []).some(
+    part => part.functionCall != null
+  );
+  return normalized === FINISH_REASON_STOP && hasFunctionCall
+    ? FINISH_REASON_TOOL_CALL
+    : normalized;
 }
 
 function contentToOutputMessage(content: AdkContent): Record<string, unknown> {
@@ -504,7 +517,7 @@ function setLlmResponseAttributes(
   span: OtelSpan,
   llmResponse: AdkLlmResponse
 ): void {
-  const finishReason = finishReasonString(llmResponse.finishReason);
+  const finishReason = finishReasonString(llmResponse);
   if (finishReason) {
     span.setAttribute(ATTR_GEN_AI_RESPONSE_FINISH_REASONS, [finishReason]);
   }

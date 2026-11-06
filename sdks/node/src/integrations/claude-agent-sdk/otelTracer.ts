@@ -539,7 +539,7 @@ export class ClaudeAgentOtelTracer {
           ? {outputMessages: [{role: 'assistant', parts}]}
           : {}),
         ...(model ? {responseModel: model} : {}),
-        ...(msg.message.stop_reason
+        ...(parts.length > 0 && msg.message.stop_reason
           ? {finishReasons: [msg.message.stop_reason]}
           : {}),
       });
