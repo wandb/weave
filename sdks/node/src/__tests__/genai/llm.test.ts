@@ -76,10 +76,10 @@ describe('LLM (via Turn.startLLM)', () => {
     const llmSpan = findSpan(getExporter().getFinishedSpans(), 'chat gpt-4o');
     expect(
       JSON.parse(llmSpan.attributes[ATTR_GEN_AI_INPUT_MESSAGES] as string)
-    ).toEqual([{role: 'user', content: 'hi'}]);
+    ).toEqual([{role: 'user', parts: [{type: 'text', content: 'hi'}]}]);
     expect(
       JSON.parse(llmSpan.attributes[ATTR_GEN_AI_OUTPUT_MESSAGES] as string)
-    ).toEqual([{role: 'assistant', content: 'hello'}]);
+    ).toEqual([{role: 'assistant', parts: [{type: 'text', content: 'hello'}]}]);
     expect(llmSpan.attributes[ATTR_GEN_AI_USAGE_INPUT_TOKENS]).toBe(10);
     expect(llmSpan.attributes[ATTR_GEN_AI_USAGE_OUTPUT_TOKENS]).toBe(5);
     expect(llmSpan.attributes[ATTR_GEN_AI_USAGE_TOTAL_TOKENS]).toBe(17);
@@ -122,7 +122,9 @@ describe('LLM (via Turn.startLLM)', () => {
       const llmSpan = findSpan(getExporter().getFinishedSpans(), 'chat gpt-4o');
       expect(
         JSON.parse(llmSpan.attributes[ATTR_GEN_AI_OUTPUT_MESSAGES] as string)
-      ).toEqual([{role: 'assistant', content: 'Hello!'}]);
+      ).toEqual([
+        {role: 'assistant', parts: [{type: 'text', content: 'Hello!'}]},
+      ]);
     });
 
     it('each output() call adds its own assistant message', () => {
@@ -137,8 +139,8 @@ describe('LLM (via Turn.startLLM)', () => {
         llmSpan.attributes[ATTR_GEN_AI_OUTPUT_MESSAGES] as string
       );
       expect(messages).toEqual([
-        {role: 'assistant', content: 'first'},
-        {role: 'assistant', content: 'second'},
+        {role: 'assistant', parts: [{type: 'text', content: 'first'}]},
+        {role: 'assistant', parts: [{type: 'text', content: 'second'}]},
       ]);
     });
 
@@ -196,7 +198,7 @@ describe('LLM (via Turn.startLLM)', () => {
         {
           type: 'blob',
           content: 'base64data',
-          mimeType: 'audio/mp3',
+          mime_type: 'audio/mp3',
           modality: 'audio',
         },
       ]);
@@ -236,9 +238,9 @@ describe('LLM (via Turn.startLLM)', () => {
       expect(messages[0].parts).toEqual([
         {
           type: 'file',
-          fileId: 'f-123',
+          file_id: 'f-123',
           modality: 'document',
-          mimeType: 'application/pdf',
+          mime_type: 'application/pdf',
         },
       ]);
     });

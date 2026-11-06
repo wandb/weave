@@ -223,7 +223,7 @@ function taskNotification(opts: {
 }
 
 const outputMessagesJson = (content: string): string =>
-  JSON.stringify([{role: 'assistant', content}]);
+  JSON.stringify([{role: 'assistant', parts: [{type: 'text', content}]}]);
 
 function userPrompt(opts: {
   content: string;
@@ -400,10 +400,17 @@ describe('Claude Agent SDK — OTel tracer', () => {
     expect(invoke.attributes['claude_agent_sdk.usage.cost_usd']).toBe(0.01);
     expect(
       JSON.parse(invoke.attributes[ATTR_GEN_AI_INPUT_MESSAGES] as string)
-    ).toEqual([{role: 'user', content: 'What is the weather in Tokyo?'}]);
+    ).toEqual([
+      {
+        role: 'user',
+        parts: [{type: 'text', content: 'What is the weather in Tokyo?'}],
+      },
+    ]);
     expect(
       JSON.parse(invoke.attributes[ATTR_GEN_AI_OUTPUT_MESSAGES] as string)
-    ).toEqual([{role: 'assistant', content: 'It is sunny.'}]);
+    ).toEqual([
+      {role: 'assistant', parts: [{type: 'text', content: 'It is sunny.'}]},
+    ]);
 
     const chatSpans = spans.filter(
       s =>
@@ -432,8 +439,8 @@ describe('Claude Agent SDK — OTel tracer', () => {
           {type: 'text', content: 'Let me check.'},
           {
             type: 'tool_call',
-            toolCallId: 't1',
-            toolName: 'Bash',
+            id: 't1',
+            name: 'Bash',
             arguments: '{"command":"ls"}',
           },
         ],
@@ -531,13 +538,24 @@ describe('Claude Agent SDK — OTel tracer', () => {
     ).toEqual([
       {
         conversationId: 'sess-multi',
-        input: [{role: 'user', content: 'first question'}],
-        output: [{role: 'assistant', content: 'first result'}],
+        input: [
+          {role: 'user', parts: [{type: 'text', content: 'first question'}]},
+        ],
+        output: [
+          {role: 'assistant', parts: [{type: 'text', content: 'first result'}]},
+        ],
       },
       {
         conversationId: 'sess-multi',
-        input: [{role: 'user', content: 'second question'}],
-        output: [{role: 'assistant', content: 'second result'}],
+        input: [
+          {role: 'user', parts: [{type: 'text', content: 'second question'}]},
+        ],
+        output: [
+          {
+            role: 'assistant',
+            parts: [{type: 'text', content: 'second result'}],
+          },
+        ],
       },
     ]);
     expect(roots[0].spanContext().traceId).not.toBe(
@@ -636,13 +654,23 @@ describe('Claude Agent SDK — OTel tracer', () => {
     );
     expect(
       JSON.parse(subagent.attributes[ATTR_GEN_AI_INPUT_MESSAGES] as string)
-    ).toEqual([{role: 'user', content: 'Find how subagent forwarding works.'}]);
+    ).toEqual([
+      {
+        role: 'user',
+        parts: [{type: 'text', content: 'Find how subagent forwarding works.'}],
+      },
+    ]);
     expect(
       JSON.parse(subagent.attributes[ATTR_GEN_AI_OUTPUT_MESSAGES] as string)
     ).toEqual([
       {
         role: 'assistant',
-        content: 'Set forwardSubagentText to include nested text.',
+        parts: [
+          {
+            type: 'text',
+            content: 'Set forwardSubagentText to include nested text.',
+          },
+        ],
       },
     ]);
     expect({
@@ -673,8 +701,8 @@ describe('Claude Agent SDK — OTel tracer', () => {
           {type: 'text', content: 'I will read the relevant file.'},
           {
             type: 'tool_call',
-            toolCallId: 'read-1',
-            toolName: 'Read',
+            id: 'read-1',
+            name: 'Read',
             arguments: '{"file_path":"sdk.d.ts"}',
           },
         ],
@@ -796,12 +824,22 @@ describe('Claude Agent SDK — OTel tracer', () => {
     ).toEqual([
       {
         name: 'doc-reader',
-        output: [{role: 'assistant', content: 'docs complete'}],
+        output: [
+          {
+            role: 'assistant',
+            parts: [{type: 'text', content: 'docs complete'}],
+          },
+        ],
         parentSpanId: root.spanContext().spanId,
       },
       {
         name: 'type-reader',
-        output: [{role: 'assistant', content: 'types complete'}],
+        output: [
+          {
+            role: 'assistant',
+            parts: [{type: 'text', content: 'types complete'}],
+          },
+        ],
         parentSpanId: root.spanContext().spanId,
       },
     ]);
@@ -957,7 +995,9 @@ describe('Claude Agent SDK — OTel tracer', () => {
           ],
         ],
         errorType: undefined,
-        inputMessages: [{role: 'user', content: 'Return ALPHA_OK'}],
+        inputMessages: [
+          {role: 'user', parts: [{type: 'text', content: 'Return ALPHA_OK'}]},
+        ],
         kind: SpanKind.INTERNAL,
         model: 'claude-haiku',
         name: 'alpha-verifier',
@@ -981,7 +1021,9 @@ describe('Claude Agent SDK — OTel tracer', () => {
           ],
         ],
         errorType: undefined,
-        inputMessages: [{role: 'user', content: 'Return BETA_OK'}],
+        inputMessages: [
+          {role: 'user', parts: [{type: 'text', content: 'Return BETA_OK'}]},
+        ],
         kind: SpanKind.INTERNAL,
         model: 'claude-haiku',
         name: 'beta-verifier',
@@ -1072,15 +1114,27 @@ describe('Claude Agent SDK — OTel tracer', () => {
     ).toEqual([
       {
         agentName: 'claude_agent_sdk',
-        inputMessages: [{role: 'user', content: 'delegate'}],
-        outputMessages: [{role: 'assistant', content: 'launched'}],
+        inputMessages: [
+          {role: 'user', parts: [{type: 'text', content: 'delegate'}]},
+        ],
+        outputMessages: [
+          {role: 'assistant', parts: [{type: 'text', content: 'launched'}]},
+        ],
         parentSpanId: undefined,
       },
       {
         agentName: 'late-worker',
-        inputMessages: [{role: 'user', content: 'Finish in the background'}],
+        inputMessages: [
+          {
+            role: 'user',
+            parts: [{type: 'text', content: 'Finish in the background'}],
+          },
+        ],
         outputMessages: [
-          {role: 'assistant', content: 'Background work finished'},
+          {
+            role: 'assistant',
+            parts: [{type: 'text', content: 'Background work finished'}],
+          },
         ],
         parentSpanId: root.spanContext().spanId,
       },

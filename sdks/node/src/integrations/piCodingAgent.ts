@@ -51,6 +51,8 @@ import {
 } from '@opentelemetry/api';
 
 import {getWeaveTracer} from '../genai/provider';
+import {type SerializableMessage, serializeMessages} from '../genai/serialize';
+import type {MessagePart} from '../genai/types';
 import {
   ATTR_ERROR_TYPE,
   ATTR_GEN_AI_AGENT_NAME,
@@ -123,21 +125,8 @@ const TRACER_NAME = 'pi-coding-agent';
 // in wandb/core)
 // ---------------------------------------------------------------------------
 
-type WeaveMessagePart =
-  | {type: 'text'; content: string}
-  | {type: 'reasoning'; content: string}
-  | {
-      type: 'tool_call';
-      toolCallId: string;
-      toolName: string;
-      arguments?: string;
-    };
-
-interface WeaveMessage {
-  role: string;
-  content?: string;
-  parts?: WeaveMessagePart[];
-}
+type WeaveMessagePart = MessagePart;
+type WeaveMessage = SerializableMessage;
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -367,7 +356,7 @@ export class PiCodingAgentOtelAdapter {
       }
       this.invokeAgentSpan.setAttribute(
         ATTR_GEN_AI_INPUT_MESSAGES,
-        JSON.stringify([{role: 'user', content: event.prompt}])
+        serializeMessages([{role: 'user', content: event.prompt}])
       );
     }
   };
@@ -383,7 +372,7 @@ export class PiCodingAgentOtelAdapter {
       const assistantMessages = event.messages.filter(isAssistant);
       if (assistantMessages.length > 0) {
         this.invokeAgentSpan.setAttributes({
-          [ATTR_GEN_AI_OUTPUT_MESSAGES]: JSON.stringify(
+          [ATTR_GEN_AI_OUTPUT_MESSAGES]: serializeMessages(
             assistantMessages.map(mapPiMessage)
           ),
           [ATTR_GEN_AI_RESPONSE_FINISH_REASONS]: assistantMessages.map(
@@ -454,7 +443,7 @@ export class PiCodingAgentOtelAdapter {
     if (inputMessages.length > 0) {
       this.chatSpan.setAttribute(
         ATTR_GEN_AI_INPUT_MESSAGES,
-        JSON.stringify(inputMessages)
+        serializeMessages(inputMessages)
       );
     }
   };
@@ -484,7 +473,7 @@ export class PiCodingAgentOtelAdapter {
         if (this.captureContent) {
           this.chatSpan.setAttribute(
             ATTR_GEN_AI_OUTPUT_MESSAGES,
-            JSON.stringify([mapPiMessage(event.message)])
+            serializeMessages([mapPiMessage(event.message)])
           );
         }
 

@@ -186,7 +186,9 @@ describe('TypeSafe systemOne spans', () => {
     );
     expect(
       JSON.parse(String(chat.attributes['gen_ai.input.messages']))
-    ).toEqual([{role: 'user', content: 'I was charged twice.'}]);
+    ).toEqual([
+      {role: 'user', parts: [{type: 'text', content: 'I was charged twice.'}]},
+    ]);
     expect(
       JSON.parse(String(chat.attributes['gen_ai.output.messages']))
     ).toEqual([
@@ -242,7 +244,12 @@ describe('TypeSafe systemOne spans', () => {
     ]);
     expect(
       JSON.parse(String(second.attributes['gen_ai.input.messages']))
-    ).toEqual([{role: 'user', content: `Compare ${String(photo)}.`}]);
+    ).toEqual([
+      {
+        role: 'user',
+        parts: [{type: 'text', content: `Compare ${String(photo)}.`}],
+      },
+    ]);
     expect(JSON.parse(String(second.attributes['typesafe.questions']))).toEqual(
       [
         {
@@ -276,7 +283,7 @@ describe('TypeSafe systemOne spans', () => {
     const shown = findSpan(spans(), 'chat jev-latest');
     expect(
       JSON.parse(String(shown.attributes['gen_ai.input.messages']))
-    ).toEqual([{role: 'user', content: 'visible'}]);
+    ).toEqual([{role: 'user', parts: [{type: 'text', content: 'visible'}]}]);
   });
 
   test('a later wrap updates capture for the same client', async () => {

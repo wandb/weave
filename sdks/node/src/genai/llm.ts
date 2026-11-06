@@ -35,6 +35,12 @@ import {
   ATTR_GEN_AI_USAGE_TOTAL_TOKENS,
   WEAVE_GENAI_TRACER_NAME,
 } from './semconv';
+import {
+  toWireMessages,
+  toWirePart,
+  type WireMessage,
+  type WirePart,
+} from './serialize';
 import {SubAgent, type SubAgentInit} from './subagent';
 import {Tool, type ToolInit} from './tool';
 import type {Message, MessagePart, Modality, Reasoning, Usage} from './types';
@@ -307,40 +313,37 @@ export class LLM extends SpanBase {
       );
     }
 
+    const inputMessages = toWireMessages(this.inputMessages);
+    const outputMessages = toWireMessages(this.outputMessages);
+
     // Fold reasoning into the last assistant message as a ReasoningPart so
     // the wire format matches the Python SDK (which serializes reasoning
     // inside gen_ai.output.messages, not as a separate attribute).
     if (this.reasoning?.content) {
-      const parts = this._ensureLastAssistantParts();
-      parts.push({type: 'reasoning', content: this.reasoning.content});
+      lastMessageParts(outputMessages, 'assistant', true).push({
+        type: 'reasoning',
+        content: this.reasoning.content,
+      });
     }
 
-    // Throw staged media attachments onto the last user message in `inputMessages`.
+    // Throw staged media attachments onto the last message in `inputMessages`.
     if (this._mediaAttachments.length > 0) {
-      const parts = this._ensureLastInputParts();
+      const parts = lastMessageParts(inputMessages, 'user', false);
       for (const m of this._mediaAttachments) {
-        let part: MessagePart;
-        if ('content' in m) {
-          part = {type: 'blob', ...m};
-        } else if ('uri' in m) {
-          part = {type: 'uri', ...m};
-        } else {
-          part = {type: 'file', ...m};
-        }
-        parts.push(part);
+        parts.push(toWirePart(mediaPart(m)));
       }
     }
 
-    if (this.inputMessages.length > 0) {
+    if (inputMessages.length > 0) {
       this.span.setAttribute(
         ATTR_GEN_AI_INPUT_MESSAGES,
-        JSON.stringify(this.inputMessages)
+        JSON.stringify(inputMessages)
       );
     }
-    if (this.outputMessages.length > 0) {
+    if (outputMessages.length > 0) {
       this.span.setAttribute(
         ATTR_GEN_AI_OUTPUT_MESSAGES,
-        JSON.stringify(this.outputMessages)
+        JSON.stringify(outputMessages)
       );
     }
 
@@ -395,43 +398,33 @@ export class LLM extends SpanBase {
       state.llm = null;
     }
   }
-
-  // ---------------------------------------------------------------------------
-  // Private helpers
-  // ---------------------------------------------------------------------------
-
-  /** Return the parts array of the last assistant message, creating both the
-   *  message and the parts array if needed. If the existing assistant message
-   *  has a `content` string but no parts, promote that content to a TextPart
-   *  so subsequent appends compose cleanly. */
-  private _ensureLastAssistantParts(): MessagePart[] {
-    let last = this.outputMessages[this.outputMessages.length - 1];
-    if (last === undefined || last.role !== 'assistant') {
-      last = {role: 'assistant'};
-      this.outputMessages.push(last);
-    }
-    return ensureParts(last);
-  }
-
-  /** Same as above, but for the last input message (creating a user message
-   *  if `inputMessages` is empty). Media parts attach here. */
-  private _ensureLastInputParts(): MessagePart[] {
-    let last = this.inputMessages[this.inputMessages.length - 1];
-    if (last === undefined) {
-      last = {role: 'user'};
-      this.inputMessages.push(last);
-    }
-    return ensureParts(last);
-  }
 }
 
-function ensureParts(msg: Message): MessagePart[] {
-  if (msg.parts === undefined) {
-    msg.parts = [];
-    if (msg.content !== undefined) {
-      msg.parts.push({type: 'text', content: msg.content});
-      msg.content = undefined;
-    }
+/**
+ * Return the parts of the last message in `messages`, appending an empty
+ * `role` message first when the list is empty or (with `requireRole`) when
+ * the last message has a different role.
+ */
+function lastMessageParts(
+  messages: WireMessage[],
+  role: string,
+  requireRole: boolean
+): WirePart[] {
+  let last = messages[messages.length - 1];
+  if (last === undefined || (requireRole && last.role !== role)) {
+    last = {role, parts: []};
+    messages.push(last);
   }
-  return msg.parts;
+  return last.parts;
+}
+
+/** Map an `attachMedia` option object onto its message part. */
+function mediaPart(m: AttachMediaOpts): MessagePart {
+  if ('content' in m) {
+    return {type: 'blob', ...m};
+  }
+  if ('uri' in m) {
+    return {type: 'uri', ...m};
+  }
+  return {type: 'file', ...m};
 }
