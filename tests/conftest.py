@@ -261,12 +261,8 @@ class TestOnlyFlushingWeaveClient(weave_client.WeaveClient):
 
     @project.setter
     def project(self, name: str) -> None:
-        # Tests switch the client to projects that do not exist yet. The first
-        # writes to such a project race to create it on the server, and the
-        # losing request gets `403 Project not found`. Create the project through
-        # the W&B API first, like the `ensure_project` fixture, so `client.server`
-        # sees no extra calls. The initial assignment in `WeaveClient.__init__`
-        # is skipped: the fixture's project already exists.
+        # Concurrent first writes to a missing project race its upsert and can 403,
+        # so create it first; the fixture's initial project already exists.
         if "_project" in self.__dict__ and name != self._project:
             project_creator.ensure_project_exists(self.entity, name)
         self._project = name
