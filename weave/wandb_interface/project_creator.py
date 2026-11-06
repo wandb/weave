@@ -145,15 +145,19 @@ def _ensure_project_exists(entity_name: str, project_name: str) -> dict[str, str
         )
     except Exception as e:
         exception = e
-        # Another client may have created the project since the lookup above.
-        try:
-            project_response = _call_wandb_api_with_retry(
-                api.project, entity_name, project_name
-            )
-        except Exception:
-            project_response = None
-        if project_response is not None and project_response.get("project") is not None:
-            return _format_project_result(project_response["project"])
+        # The upsert loses to a parallel client creating the same project.
+        if isinstance(e, TransportQueryError) and not _is_permission_denied(e):
+            try:
+                project_response = _call_wandb_api_with_retry(
+                    api.project, entity_name, project_name
+                )
+            except Exception:
+                project_response = None
+            if (
+                project_response is not None
+                and project_response.get("project") is not None
+            ):
+                return _format_project_result(project_response["project"])
 
     if (
         project_response is not None

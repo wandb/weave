@@ -170,6 +170,26 @@ def test_ensure_project_exists_permission_denied(mock_api_with_no_project):
     assert mock_api_with_no_project.upsert_project.call_count == 1
 
 
+def test_ensure_project_exists_upsert_lost_to_parallel_create(
+    mock_api_with_no_project,
+):
+    """A concurrent client created the project first: use it, no error logged."""
+    mock_api_with_no_project.project.side_effect = [
+        None,
+        {"project": {"name": "test_project"}},
+    ]
+    mock_api_with_no_project.upsert_project.side_effect = TransportQueryError(
+        "Duplicate entry 'test_project-5' for key 'ix_projects_name_entity_id'",
+        errors=[{"message": "Duplicate entry", "path": ["upsertModel"]}],
+    )
+
+    result = ensure_project_exists("test_entity", "test_project")
+
+    assert result == {"project_name": "test_project"}
+    assert mock_api_with_no_project.project.call_count == 2
+    assert mock_api_with_no_project.upsert_project.call_count == 1
+
+
 @pytest.mark.disable_logging_error_check
 def test_ensure_project_exists_comm_error(mock_api_with_no_project):
     """Test project creation with communication error."""
