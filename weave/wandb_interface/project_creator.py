@@ -145,7 +145,7 @@ def _ensure_project_exists(entity_name: str, project_name: str) -> dict[str, str
         )
     except Exception as e:
         exception = e
-        # The upsert loses to a parallel client creating the same project.
+        # The upsert may lose to a parallel client creating the same project.
         if isinstance(e, TransportQueryError) and not _is_permission_denied(e):
             try:
                 project_response = _call_wandb_api_with_retry(

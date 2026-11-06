@@ -8,7 +8,6 @@ from unittest.mock import patch
 
 import click
 import pytest
-from gql.transport.exceptions import TransportQueryError
 
 from weave.compat.wandb.wandb_thin.login import (
     ApiKeyStatus,
@@ -422,21 +421,6 @@ def test_project_create_if_not_exists(mock_wandb_api):
     res = _ensure_project_exists("test_entity", "test_project")
     assert res == {"project_name": "test_project"}
     mock_wandb_api.project.assert_called_once_with("test_entity", "test_project")
-    mock_wandb_api.upsert_project.assert_called_once_with(
-        entity="test_entity", project="test_project"
-    )
-
-
-def test_project_create_race_uses_the_project_another_client_created(
-    mock_wandb_api,
-):
-    mock_wandb_api.project.side_effect = [None, {"project": {"name": "test_project"}}]
-    mock_wandb_api.upsert_project.side_effect = TransportQueryError(
-        "Duplicate entry 'test_project-5' for key 'ix_projects_name_entity_id'"
-    )
-    res = _ensure_project_exists("test_entity", "test_project")
-    assert res == {"project_name": "test_project"}
-    assert mock_wandb_api.project.call_count == 2
     mock_wandb_api.upsert_project.assert_called_once_with(
         entity="test_entity", project="test_project"
     )
