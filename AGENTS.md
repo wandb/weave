@@ -160,6 +160,8 @@ integrations emit has to read those integrations' own state instead — the
 agents SDK keeps its current span in its own AsyncLocalStorage, and the ADK
 plugin keeps a map of open tool spans.
 
+Node SDK code that writes `gen_ai.input.messages` or `gen_ai.output.messages` passes SDK `Message` objects through `serializeMessages` in `sdks/node/src/genai/serialize.ts`, the counterpart of Python's `_message_to_parts`; do not `JSON.stringify` them directly, or camelCase fields such as `toolCallId` reach the wire.
+
 If `sdks/node/node_modules` is missing, run `pnpm install --frozen-lockfile` in `sdks/node` first. Do not use `npm install`; this SDK is pinned to pnpm.
 
 ## Python Testing Guidelines
