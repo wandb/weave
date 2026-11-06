@@ -1336,9 +1336,8 @@ class TestErrorRecording:
 
 class TestContinueParentTrace:
     """Verifies the ``continue_parent_trace`` knob nests turns inside an
-    outer trace instead of starting a fresh one. Mirrors the case where the
-    application is already instrumented (e.g. fastapi/django) and weave is
-    invoked inside an existing request span.
+    enclosing agent's trace, and never under a non-agent trace root such as
+    an instrumented fastapi/django request span.
     """
 
     def test_default_starts_new_trace_even_under_outer_span(
@@ -1357,13 +1356,14 @@ class TestContinueParentTrace:
         assert len(turn_spans) == 1
         assert turn_spans[0].context.trace_id != outer_trace_id
 
-    def test_continue_parent_trace_nests_turn_under_outer_span(
+    def test_continue_parent_trace_starts_new_trace_under_non_agent_span(
         self, otel_spans: InMemorySpanExporter
     ) -> None:
+        # The outer request span is not an agent span, so it must not become
+        # the trace root: the turn starts its own trace.
         tracer = otel_trace.get_tracer("test.outer")
         with tracer.start_as_current_span("outer-request") as outer:
             outer_trace_id = outer.get_span_context().trace_id
-            outer_span_id = outer.get_span_context().span_id
             with start_conversation(agent_name="bot", continue_parent_trace=True) as s:
                 with s.start_turn() as turn:
                     pass
@@ -1371,10 +1371,77 @@ class TestContinueParentTrace:
         spans = otel_spans.get_finished_spans()
         turn_spans = [sp for sp in spans if sp.name == "invoke_agent bot"]
         assert len(turn_spans) == 1
-        # Same trace and Turn parents under the outer request span
-        assert turn_spans[0].context.trace_id == outer_trace_id
-        assert turn_spans[0].parent is not None
-        assert turn_spans[0].parent.span_id == outer_span_id
+        assert turn_spans[0].context.trace_id != outer_trace_id
+        assert turn_spans[0].parent is None
+
+    def test_continue_parent_trace_nests_turn_under_outer_agent_tool(
+        self, otel_spans: InMemorySpanExporter
+    ) -> None:
+        # An agent invoked from another agent's tool joins the outer trace,
+        # which stays rooted at the outer agent's invoke_agent span.
+        tracer = otel_trace.get_tracer("test.outer")
+        with tracer.start_as_current_span("outer-request"):
+            with start_conversation(agent_name="outer") as outer_convo:
+                with outer_convo.start_turn() as outer_turn:
+                    with outer_turn.start_tool(name="delegate"):
+                        with start_conversation(
+                            agent_name="inner", continue_parent_trace=True
+                        ) as inner_convo:
+                            with inner_convo.start_turn():
+                                pass
+
+        spans = otel_spans.get_finished_spans()
+        outer_span = next(sp for sp in spans if sp.name == "invoke_agent outer")
+        tool_span = next(sp for sp in spans if sp.name == "execute_tool delegate")
+        inner_span = next(sp for sp in spans if sp.name == "invoke_agent inner")
+        assert outer_span.parent is None
+        assert inner_span.context.trace_id == outer_span.context.trace_id
+        assert inner_span.parent is not None
+        assert inner_span.parent.span_id == tool_span.context.span_id
+
+    def test_continue_parent_trace_nests_under_foreign_span_inside_agent(
+        self, otel_spans: InMemorySpanExporter
+    ) -> None:
+        # Spans other instrumentation opens inside a turn inherit the marker,
+        # so a nested turn still joins the agent-rooted trace.
+        tracer = otel_trace.get_tracer("test.outer")
+        with start_conversation(agent_name="outer") as outer_convo:
+            with outer_convo.start_turn():
+                with tracer.start_as_current_span("http-call") as http_call:
+                    with start_conversation(
+                        agent_name="inner", continue_parent_trace=True
+                    ) as inner_convo:
+                        with inner_convo.start_turn():
+                            pass
+
+        spans = otel_spans.get_finished_spans()
+        outer_span = next(sp for sp in spans if sp.name == "invoke_agent outer")
+        inner_span = next(sp for sp in spans if sp.name == "invoke_agent inner")
+        assert inner_span.context.trace_id == outer_span.context.trace_id
+        assert inner_span.parent is not None
+        assert inner_span.parent.span_id == http_call.get_span_context().span_id
+
+    def test_continue_parent_trace_nests_under_threaded_child_after_exit(
+        self, otel_spans: InMemorySpanExporter
+    ) -> None:
+        # A tool threaded from the turn but entered after the turn exits still
+        # carries the agent-trace marker through its explicit parent context.
+        with start_conversation(agent_name="outer") as outer_convo:
+            with outer_convo.start_turn() as outer_turn:
+                tool = outer_turn.start_tool(name="late")
+            with tool:
+                with start_conversation(
+                    agent_name="inner", continue_parent_trace=True
+                ) as inner_convo:
+                    with inner_convo.start_turn():
+                        pass
+
+        spans = otel_spans.get_finished_spans()
+        tool_span = next(sp for sp in spans if sp.name == "execute_tool late")
+        inner_span = next(sp for sp in spans if sp.name == "invoke_agent inner")
+        assert inner_span.context.trace_id == tool_span.context.trace_id
+        assert inner_span.parent is not None
+        assert inner_span.parent.span_id == tool_span.context.span_id
 
 
 class TestStartTimeFromLogicalConstruction:
@@ -1620,13 +1687,12 @@ class TestLogTurn:
         attrs = dict(sa_spans[0].attributes or {})
         assert "gen_ai.system_instructions" not in attrs
 
-    def test_continue_parent_trace_nests_under_outer_span(
+    def test_continue_parent_trace_starts_new_trace_under_non_agent_span(
         self, otel_spans: InMemorySpanExporter
     ) -> None:
         tracer = otel_trace.get_tracer("test.outer")
         with tracer.start_as_current_span("outer-request") as outer:
             outer_trace_id = outer.get_span_context().trace_id
-            outer_span_id = outer.get_span_context().span_id
             log_turn(
                 conversation_id="convo-4",
                 agent_name="bot",
@@ -1638,8 +1704,30 @@ class TestLogTurn:
         spans = otel_spans.get_finished_spans()
         turn_spans = [sp for sp in spans if sp.name == "invoke_agent bot"]
         assert len(turn_spans) == 1
-        assert turn_spans[0].context.trace_id == outer_trace_id
-        assert turn_spans[0].parent.span_id == outer_span_id
+        assert turn_spans[0].context.trace_id != outer_trace_id
+        assert turn_spans[0].parent is None
+
+    def test_continue_parent_trace_nests_under_outer_agent_tool(
+        self, otel_spans: InMemorySpanExporter
+    ) -> None:
+        with start_conversation(agent_name="outer") as outer_convo:
+            with outer_convo.start_turn() as outer_turn:
+                with outer_turn.start_tool(name="delegate"):
+                    log_turn(
+                        conversation_id="convo-4b",
+                        agent_name="bot",
+                        started_at=_ts(0),
+                        ended_at=_ts(1),
+                        continue_parent_trace=True,
+                    )
+
+        spans = otel_spans.get_finished_spans()
+        outer_span = next(sp for sp in spans if sp.name == "invoke_agent outer")
+        tool_span = next(sp for sp in spans if sp.name == "execute_tool delegate")
+        turn_span = next(sp for sp in spans if sp.name == "invoke_agent bot")
+        assert turn_span.context.trace_id == outer_span.context.trace_id
+        assert turn_span.parent is not None
+        assert turn_span.parent.span_id == tool_span.context.span_id
 
     def test_default_starts_new_trace_under_outer_span(
         self, otel_spans: InMemorySpanExporter
@@ -1829,7 +1917,29 @@ class TestLogConversation:
         assert result.conversation_id != ""
         assert len(result.conversation_id) == 36
 
-    def test_continue_parent_trace_keeps_all_under_outer(
+    def test_continue_parent_trace_keeps_all_under_outer_agent(
+        self, otel_spans: InMemorySpanExporter
+    ) -> None:
+        with start_conversation(agent_name="outer") as outer_convo:
+            with outer_convo.start_turn():
+                log_conversation(
+                    conversation_id="convo-nested",
+                    turns=[
+                        Turn(agent_name="bot", started_at=_ts(0), ended_at=_ts(1)),
+                        Turn(agent_name="bot", started_at=_ts(2), ended_at=_ts(3)),
+                    ],
+                    continue_parent_trace=True,
+                )
+        spans = otel_spans.get_finished_spans()
+        outer_span = next(sp for sp in spans if sp.name == "invoke_agent outer")
+        turn_spans = [sp for sp in spans if sp.name == "invoke_agent bot"]
+        assert len(turn_spans) == 2
+        for sp in turn_spans:
+            assert sp.context.trace_id == outer_span.context.trace_id
+            assert sp.parent is not None
+            assert sp.parent.span_id == outer_span.context.span_id
+
+    def test_continue_parent_trace_starts_new_traces_under_non_agent_span(
         self, otel_spans: InMemorySpanExporter
     ) -> None:
         tracer = otel_trace.get_tracer("test.outer")
@@ -1847,7 +1957,8 @@ class TestLogConversation:
         turn_spans = [sp for sp in spans if sp.name == "invoke_agent bot"]
         assert len(turn_spans) == 2
         for sp in turn_spans:
-            assert sp.context.trace_id == outer_trace_id
+            assert sp.context.trace_id != outer_trace_id
+            assert sp.parent is None
 
     def test_propagates_children_from_each_turn(
         self, otel_spans: InMemorySpanExporter

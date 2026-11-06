@@ -60,6 +60,14 @@ try:
 except ImportError:
     _OTEL_AVAILABLE = False
 
+# Marks a context whose trace is rooted at an invoke_agent span from this SDK;
+# the value is that trace's id.
+_AGENT_TRACE_KEY = (
+    otel_context.create_key("weave.conversation.agent_trace_id")
+    if _OTEL_AVAILABLE
+    else ""
+)
+
 if TYPE_CHECKING:
     from opentelemetry.context import Context as _OTelContext
     from opentelemetry.context import Token as _OTelToken
@@ -154,6 +162,8 @@ class _SpanBase(BaseModel):
 
     _otel_span: _OTelSpan | None = PrivateAttr(default=None)
     _otel_token: _OTelToken | None = PrivateAttr(default=None)
+    # Trace id of this span's trace when that trace is rooted at an agent span.
+    _agent_trace_id: int | None = PrivateAttr(default=None)
     # Explicit OTel parent context, set by a parent span's ``start_llm`` /
     # ``start_tool`` / ``start_subagent`` factories (see ``_thread_otel_context``)
     # on the children they create so those children nest under the parent's span
@@ -169,7 +179,18 @@ class _SpanBase(BaseModel):
         ambient OTel context, matching the bare ``LLM()`` / ``Tool()`` path.
         """
         if self._otel_span is not None:
-            child._parent_otel_context = otel_trace.set_span_in_context(self._otel_span)
+            child._parent_otel_context = self._own_otel_context()
+
+    def _own_otel_context(self) -> _OTelContext:
+        """Build an OTel context whose current span is this span.
+
+        Carries the agent-trace marker so turns started underneath can tell the
+        trace is already rooted at an agent span (see ``_is_agent_rooted``).
+        """
+        ctx = otel_trace.set_span_in_context(self._otel_span)
+        if self._agent_trace_id is not None:
+            ctx = otel_context.set_value(_AGENT_TRACE_KEY, self._agent_trace_id, ctx)
+        return ctx
 
     def _start_otel_span(
         self,
@@ -178,6 +199,7 @@ class _SpanBase(BaseModel):
         new_trace: bool = False,
         start_time_ns: int | None = None,
         set_current: bool = True,
+        is_agent: bool = False,
     ) -> None:
         """Create an OTel span and attach it to the current context.
 
@@ -192,6 +214,10 @@ class _SpanBase(BaseModel):
 
         ``set_current=False`` starts the span without pushing it onto the
         ambient OTel context stack — see ``SubAgent.start``.
+
+        ``is_agent`` marks an invoke_agent span: when it has no parent it roots
+        the trace, and the contexts it hands out record that (see
+        ``_is_agent_rooted``).
         """
         if not _OTEL_AVAILABLE or should_disable_weave():
             return
@@ -203,11 +229,15 @@ class _SpanBase(BaseModel):
             kwargs["context"] = self._parent_otel_context
         elif new_trace:
             kwargs["context"] = Context()
+        parent_ctx = kwargs.get("context")
+        if parent_ctx is None:
+            parent_ctx = otel_context.get_current()
         self._otel_span = tracer.start_span(name, **kwargs)
+        trace_id = self._otel_span.get_span_context().trace_id
+        if _is_agent_rooted(parent_ctx) or (is_agent and not _has_parent(parent_ctx)):
+            self._agent_trace_id = trace_id
         if set_current:
-            self._otel_token = otel_context.attach(
-                otel_trace.set_span_in_context(self._otel_span)
-            )
+            self._otel_token = otel_context.attach(self._own_otel_context())
         # Stamp the active conversation's attributes on every span. Read from the
         # conversation contextvar (not OTel context) so they reach the root turn
         # span too, which starts in a fresh OTel Context to force a new trace.
@@ -1019,6 +1049,7 @@ class SubAgent(_SpanBase):
             _span_name("invoke_agent", self.name),
             start_time_ns=_to_ns(self.started_at),
             set_current=set_current,
+            is_agent=True,
         )
         return self
 
@@ -1047,9 +1078,11 @@ class Turn(_SpanBase):
 
     By default each turn starts its own OTel trace (``continue_parent_trace=False``)
     so the Agents tab shows one trace per turn. Set ``continue_parent_trace=True``
-    on the Conversation (or directly on the Turn) when an outer trace is already
-    active and you want the agent invocation to nest inside it — e.g. inside
-    a fastapi-instrumented request.
+    on the Conversation (or directly on the Turn) to nest the turn inside an
+    enclosing agent's trace — e.g. an agent invoked from another agent's tool.
+    The turn joins the ambient trace only when that trace is rooted at an
+    agent span from this SDK; under any other span (e.g. a fastapi request
+    span) it still starts a new trace, so the trace root is always an agent.
     """
 
     agent_name: str = ""
@@ -1284,8 +1317,9 @@ class Turn(_SpanBase):
         )
         self._start_otel_span(
             _span_name("invoke_agent", self.agent_name),
-            new_trace=not self.continue_parent_trace,
+            new_trace=not _should_continue_trace(self.continue_parent_trace),
             start_time_ns=start_ns,
+            is_agent=True,
         )
         return self
 
@@ -1307,8 +1341,8 @@ class Conversation(BaseModel):
     ``continue_parent_trace`` controls trace isolation for the turns this
     conversation creates. Default ``False`` means each turn starts its own OTel
     trace (the right choice for the standalone Agents tab view). Set ``True``
-    when the application has an outer trace (e.g. a fastapi-instrumented
-    request) that should contain the agent invocation.
+    to nest turns inside an enclosing agent's trace; see ``Turn`` for when the
+    ambient trace is joined.
     """
 
     model_config = ConfigDict(protected_namespaces=())
@@ -1592,6 +1626,37 @@ def _format_span_id(span_id: int) -> str:
     return format(span_id, "016x")
 
 
+def _has_parent(ctx: _OTelContext) -> bool:
+    """Return whether a span started in ``ctx`` would have a parent span."""
+    return otel_trace.get_current_span(ctx).get_span_context().is_valid
+
+
+def _is_agent_rooted(ctx: _OTelContext) -> bool:
+    """Return whether ``ctx``'s current span is in a trace rooted at an agent span.
+
+    Only agent spans from this SDK (and contexts derived from them, including
+    spans other instrumentation starts underneath) carry the marker.
+    """
+    span_context = otel_trace.get_current_span(ctx).get_span_context()
+    return (
+        span_context.is_valid
+        and otel_context.get_value(_AGENT_TRACE_KEY, ctx) == span_context.trace_id
+    )
+
+
+def _should_continue_trace(continue_parent_trace: bool) -> bool:
+    """Decide whether a turn's invoke_agent span joins the ambient trace.
+
+    A turn joins only when ``continue_parent_trace`` is set and the ambient
+    trace is already rooted at an agent span, so a trace root is always an
+    agent span. Under any other ambient span (e.g. an HTTP request span) the
+    turn starts a new trace.
+    """
+    if not _OTEL_AVAILABLE or not continue_parent_trace:
+        return False
+    return _is_agent_rooted(otel_context.get_current())
+
+
 def _emit_span_now(
     name: str,
     *,
@@ -1705,7 +1770,9 @@ def _emit_turn(
     if attributes:
         turn_attrs.update(attributes)
 
-    parent_ctx = Context() if not turn.continue_parent_trace else None
+    parent_ctx = (
+        None if _should_continue_trace(turn.continue_parent_trace) else Context()
+    )
     turn_span = _emit_span_now(
         _span_name("invoke_agent", turn.agent_name),
         parent_ctx=parent_ctx,
