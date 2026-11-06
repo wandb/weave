@@ -543,9 +543,7 @@ def test_response_span_emits_one_finish_reason_per_output_message(
     processor.on_span_end(response_span)
     processor.on_trace_end(trace)
 
-    chat = next(
-        s for s in otel_spans.get_finished_spans() if s.name == "chat gpt-4o"
-    )
+    chat = next(s for s in otel_spans.get_finished_spans() if s.name == "chat gpt-4o")
     attrs = _attrs(chat)
     output_messages = json.loads(attrs["gen_ai.output.messages"])
     assert [m["role"] for m in output_messages] == ["assistant", "assistant"]
