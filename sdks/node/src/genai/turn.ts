@@ -8,6 +8,7 @@ import {
   trace,
 } from '@opentelemetry/api';
 
+import {userAttributes} from './common';
 import {getGenaiState} from './context';
 import {LLM, type LLMInit} from './llm';
 import {getWeaveTracer} from './provider';
@@ -48,6 +49,13 @@ export interface TurnInit extends SpanInitBase {
    * set here for a rootless `startTurn({ attributes })` with no conversation.
    */
   attributes?: Attributes;
+  /**
+   * End-user identity set on this turn and every child span as `user.id` /
+   * `user.email`. Normally inherited from the conversation; set here for a
+   * rootless `startTurn()` or to override the conversation's values.
+   */
+  userId?: string;
+  userEmail?: string;
 }
 
 type Opts = {
@@ -104,6 +112,8 @@ type Opts = {
 export class Turn extends SpanBase {
   private _context: Context;
   private _conversationId: string;
+  private _userId: string;
+  private _userEmail: string;
   private _agentId: string;
   private _agentName: string;
   private _agentDescription: string;
@@ -126,6 +136,8 @@ export class Turn extends SpanBase {
     super(opts.span);
     this._context = opts.context;
     this._conversationId = opts.conversationId;
+    this._userId = opts.userId;
+    this._userEmail = opts.userEmail;
     this._agentId = opts.agentId;
     this._agentName = opts.agentName;
     this._agentDescription = opts.agentDescription;
@@ -159,6 +171,8 @@ export class Turn extends SpanBase {
       span,
       context: trace.setSpan(ROOT_CONTEXT, span),
       conversationId: opts.conversationId ?? '',
+      userId: opts.userId ?? '',
+      userEmail: opts.userEmail ?? '',
       model: opts.model ?? '',
       agentName: opts.agentName ?? '',
       messages,
@@ -178,6 +192,8 @@ export class Turn extends SpanBase {
       ...opts,
       parentContext: this._context,
       conversationId: this._conversationId,
+      userId: this._userId,
+      userEmail: this._userEmail,
       attributes: this._attributes,
     });
   }
@@ -188,6 +204,8 @@ export class Turn extends SpanBase {
       ...opts,
       parentContext: this._context,
       conversationId: this._conversationId,
+      userId: this._userId,
+      userEmail: this._userEmail,
       attributes: this._attributes,
     });
   }
@@ -198,6 +216,8 @@ export class Turn extends SpanBase {
       ...opts,
       parentContext: this._context,
       conversationId: this._conversationId,
+      userId: this._userId,
+      userEmail: this._userEmail,
       attributes: this._attributes,
     });
   }
@@ -279,6 +299,7 @@ export class Turn extends SpanBase {
     if (this._conversationId) {
       this.span.setAttribute(ATTR_GEN_AI_CONVERSATION_ID, this._conversationId);
     }
+    this.span.setAttributes(userAttributes(this._userId, this._userEmail));
     if (this._agentId) {
       this.span.setAttribute(ATTR_GEN_AI_AGENT_ID, this._agentId);
     }
