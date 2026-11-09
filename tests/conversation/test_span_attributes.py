@@ -328,12 +328,29 @@ def test_start_conversation_accepts_user_identity(
     conversation = start_conversation(
         conversation_id="convo-user-start", user_id="user-123", user_email="a@b.co"
     )
-    with conversation.start_turn(agent_name="bot"):
-        pass
+    with conversation.start_turn(agent_name="bot") as turn:
+        with turn.start_llm(model="gpt-4o"):
+            pass
+        with turn.start_tool(name="Edit"):
+            pass
+        with turn.start_subagent(name="researcher") as subagent:
+            with subagent.start_llm(model="gpt-4o-mini"):
+                pass
+            with subagent.start_tool(name="Read"):
+                pass
     conversation.end()
-    span = _only_span(otel_spans.get_finished_spans(), "invoke_agent bot")
-    assert span.attributes["user.id"] == "user-123"
-    assert span.attributes["user.email"] == "a@b.co"
+    spans = otel_spans.get_finished_spans()
+    assert sorted(span.name for span in spans) == [
+        "chat gpt-4o",
+        "chat gpt-4o-mini",
+        "execute_tool Edit",
+        "execute_tool Read",
+        "invoke_agent bot",
+        "invoke_agent researcher",
+    ]
+    for span in spans:
+        assert span.attributes["user.id"] == "user-123"
+        assert span.attributes["user.email"] == "a@b.co"
 
 
 def test_user_identity_on_every_batch_span(
