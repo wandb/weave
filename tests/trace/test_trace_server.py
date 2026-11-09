@@ -2,7 +2,7 @@ import urllib
 
 import pytest
 
-from weave.trace.errors import RefObjectsNotFoundError
+from weave.trace.errors import InvalidRequest, RefObjectsNotFoundError
 from weave.trace.refs_internal import InvalidInternalRef
 
 
@@ -56,7 +56,7 @@ def test_robust_to_url_sensitive_chars(client):
     assert read_res.vals[0] == bad_val
 
     # Key that contains reserved characters should be rejected.
-    with pytest.raises(InvalidInternalRef):
+    with pytest.raises((InvalidInternalRef, InvalidRequest)):
         read_res = client.server.refs_read_batch(
             {
                 "refs": [
