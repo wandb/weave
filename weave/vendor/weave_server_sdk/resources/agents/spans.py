@@ -18,9 +18,10 @@ from ..._response import (
     async_to_streamed_response_wrapper,
 )
 from ..._base_client import make_request_options
-from ...types.agents import span_query_params, span_stats_params, span_custom_attrs_schema_params
+from ...types.agents import span_query_params, span_stats_params, span_exists_params, span_custom_attrs_schema_params
 from ...types.agents.span_query_response import SpanQueryResponse
 from ...types.agents.span_stats_response import SpanStatsResponse
+from ...types.agents.span_exists_response import SpanExistsResponse
 from ...types.agents.span_custom_attrs_schema_response import SpanCustomAttrsSchemaResponse
 
 __all__ = ["SpansResource", "AsyncSpansResource"]
@@ -91,6 +92,49 @@ class SpansResource(SyncAPIResource):
                 extra_headers=extra_headers, extra_query=extra_query, extra_body=extra_body, timeout=timeout
             ),
             cast_to=SpanCustomAttrsSchemaResponse,
+        )
+
+    def exists(
+        self,
+        *,
+        project_id: str,
+        query: Optional[span_exists_params.Query] | Omit = omit,
+        started_after: Union[str, datetime, None] | Omit = omit,
+        started_before: Union[str, datetime, None] | Omit = omit,
+        # Use the following arguments if you need to pass additional parameters to the API that aren't available via kwargs.
+        # The extra values given here take precedence over values defined on the client or passed to this method.
+        extra_headers: Headers | None = None,
+        extra_query: Query | None = None,
+        extra_body: Body | None = None,
+        timeout: float | httpx.Timeout | None | NotGiven = not_given,
+    ) -> SpanExistsResponse:
+        """
+        Check whether a project has any matching agent spans.
+
+        Args:
+          extra_headers: Send extra headers
+
+          extra_query: Add additional query parameters to the request
+
+          extra_body: Add additional JSON properties to the request
+
+          timeout: Override the client-level default timeout for this request, in seconds
+        """
+        return self._post(
+            "/agents/spans/exists",
+            body=maybe_transform(
+                {
+                    "project_id": project_id,
+                    "query": query,
+                    "started_after": started_after,
+                    "started_before": started_before,
+                },
+                span_exists_params.SpanExistsParams,
+            ),
+            options=make_request_options(
+                extra_headers=extra_headers, extra_query=extra_query, extra_body=extra_body, timeout=timeout
+            ),
+            cast_to=SpanExistsResponse,
         )
 
     def query(
@@ -291,6 +335,49 @@ class AsyncSpansResource(AsyncAPIResource):
             cast_to=SpanCustomAttrsSchemaResponse,
         )
 
+    async def exists(
+        self,
+        *,
+        project_id: str,
+        query: Optional[span_exists_params.Query] | Omit = omit,
+        started_after: Union[str, datetime, None] | Omit = omit,
+        started_before: Union[str, datetime, None] | Omit = omit,
+        # Use the following arguments if you need to pass additional parameters to the API that aren't available via kwargs.
+        # The extra values given here take precedence over values defined on the client or passed to this method.
+        extra_headers: Headers | None = None,
+        extra_query: Query | None = None,
+        extra_body: Body | None = None,
+        timeout: float | httpx.Timeout | None | NotGiven = not_given,
+    ) -> SpanExistsResponse:
+        """
+        Check whether a project has any matching agent spans.
+
+        Args:
+          extra_headers: Send extra headers
+
+          extra_query: Add additional query parameters to the request
+
+          extra_body: Add additional JSON properties to the request
+
+          timeout: Override the client-level default timeout for this request, in seconds
+        """
+        return await self._post(
+            "/agents/spans/exists",
+            body=await async_maybe_transform(
+                {
+                    "project_id": project_id,
+                    "query": query,
+                    "started_after": started_after,
+                    "started_before": started_before,
+                },
+                span_exists_params.SpanExistsParams,
+            ),
+            options=make_request_options(
+                extra_headers=extra_headers, extra_query=extra_query, extra_body=extra_body, timeout=timeout
+            ),
+            cast_to=SpanExistsResponse,
+        )
+
     async def query(
         self,
         *,
@@ -429,6 +516,9 @@ class SpansResourceWithRawResponse:
         self.custom_attrs_schema = to_raw_response_wrapper(
             spans.custom_attrs_schema,
         )
+        self.exists = to_raw_response_wrapper(
+            spans.exists,
+        )
         self.query = to_raw_response_wrapper(
             spans.query,
         )
@@ -443,6 +533,9 @@ class AsyncSpansResourceWithRawResponse:
 
         self.custom_attrs_schema = async_to_raw_response_wrapper(
             spans.custom_attrs_schema,
+        )
+        self.exists = async_to_raw_response_wrapper(
+            spans.exists,
         )
         self.query = async_to_raw_response_wrapper(
             spans.query,
@@ -459,6 +552,9 @@ class SpansResourceWithStreamingResponse:
         self.custom_attrs_schema = to_streamed_response_wrapper(
             spans.custom_attrs_schema,
         )
+        self.exists = to_streamed_response_wrapper(
+            spans.exists,
+        )
         self.query = to_streamed_response_wrapper(
             spans.query,
         )
@@ -473,6 +569,9 @@ class AsyncSpansResourceWithStreamingResponse:
 
         self.custom_attrs_schema = async_to_streamed_response_wrapper(
             spans.custom_attrs_schema,
+        )
+        self.exists = async_to_streamed_response_wrapper(
+            spans.exists,
         )
         self.query = async_to_streamed_response_wrapper(
             spans.query,

@@ -26,6 +26,7 @@ from weave.trace_server_bindings.remote_http_trace_server import (
     RemoteHTTPTraceServer,
 )
 from weave.vendor.weave_server_sdk import DefaultHttpxClient
+from weave.wandb_interface import project_creator
 
 pytest_plugins = ["tests.conftest_lib.http_trace_server"]
 
@@ -253,6 +254,17 @@ class TestOnlyFlushingWeaveClient(weave_client.WeaveClient):
 
     def set_autoflush(self, value: bool):
         self._autoflush = value
+
+    @property
+    def project(self) -> str:
+        return self._project
+
+    @project.setter
+    def project(self, name: str) -> None:
+        # First writes to a missing project race its upsert and 403: create it first.
+        if "_project" in self.__dict__ and name != self._project:
+            project_creator.ensure_project_exists(self.entity, name)
+        self._project = name
 
     def __getattribute__(self, name):
         self_super = super()

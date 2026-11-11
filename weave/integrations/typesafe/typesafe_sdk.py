@@ -8,13 +8,19 @@ TypeSafe instrumentor; pick one.
 
 from __future__ import annotations
 
+import array
+import collections
+import enum
+import functools
 import importlib
 import inspect
 import json
 import logging
 import os
+import types
 from collections.abc import Iterator, Mapping, Sequence
-from dataclasses import dataclass
+from collections.abc import Set as AbstractSet
+from dataclasses import dataclass, fields, is_dataclass
 from typing import Any
 
 from opentelemetry import trace as otel_trace
@@ -180,22 +186,181 @@ def _effective_body(
     return body
 
 
+_LEAF_TYPES = (type(None), bool, int, float, str, bytes, bytearray)
+# Buffers (an Image holds one once sent) and classes hold no iterator.
+# Modules are not walked either: their __dict__ is every global.
+_UNWALKED_TYPES = (*_LEAF_TYPES, memoryview, array.array, type, types.ModuleType)
+
+
+class _UnsafeToEncode(Exception):
+    """Encoding this value for a span could read data the SDK still needs."""
+
+
+def _stored(value: Any, name: str) -> Any:
+    # Read the stored value without running a getter.
+    try:
+        return object.__getattribute__(value, "__dict__")[name]  # noqa: PLC2801
+    except (AttributeError, KeyError):
+        pass
+    attribute = inspect.getattr_static(value, name)
+    if isinstance(attribute, types.MemberDescriptorType):
+        return attribute.__get__(value, type(value))
+    if not hasattr(type(attribute), "__get__"):
+        return attribute
+    raise _UnsafeToEncode
+
+
+def _stored_or_none(value: Any, name: str) -> Any:
+    try:
+        return _stored(value, name)
+    except AttributeError:
+        return None
+
+
+@functools.lru_cache(maxsize=256)
+def _class_attributes(cls: type) -> tuple[tuple[str, ...], tuple[Any, ...]]:
+    """Return the cached_property names and the declared slots of ``cls``."""
+    cached: list[str] = []
+    slots: list[Any] = []
+    for klass in cls.__mro__:
+        namespace = vars(klass)
+        for name, attribute in namespace.items():
+            if isinstance(attribute, functools.cached_property):
+                cached.append(name)
+            # Only declared slots: functions keep internals such as __globals__ in
+            # member descriptors too.
+            elif "__slots__" in namespace and isinstance(
+                attribute, types.MemberDescriptorType
+            ):
+                slots.append(attribute)
+    return tuple(cached), tuple(slots)
+
+
+def _stored_attributes(value: Any) -> list[Any]:
+    """Return what ``value`` stores; raise if a cached_property is unset."""
+    cls: type = type(value)
+    cached, slots = _class_attributes(cls)
+    own: Mapping[str, Any] = {}
+    # Without an instance __dict__, the lookup could run a __dict__ property.
+    if cls.__dictoffset__:
+        try:
+            own = object.__getattribute__(value, "__dict__")  # noqa: PLC2801
+        except AttributeError:
+            pass
+    # Its first read stores what the encoder computes, and the SDK gets that.
+    if any(name not in own for name in cached):
+        raise _UnsafeToEncode
+    stored = list(own.values())
+    for slot in slots:
+        try:
+            stored.append(slot.__get__(value, cls))
+        except AttributeError:
+            continue
+    return stored
+
+
+def _may_read_excluded(value: Any) -> bool:
+    # A computed field or custom serializer can read any field, excluded or not.
+    decorators = getattr(type(value), "__pydantic_decorators__", None)
+    return decorators is not None and bool(
+        decorators.computed_fields
+        or decorators.field_serializers
+        or decorators.model_serializers
+    )
+
+
+def _children(value: Any, reads_excluded: bool) -> list[Any]:
+    """Return what encoding ``value`` reads; raise if walking it runs user code."""
+    if isinstance(value, enum.Enum):
+        return [value.value]
+    # A computed field or custom serializer can read any attribute.
+    attributes = _stored_attributes(value) if reads_excluded else []
+    model_fields = getattr(type(value), "__pydantic_fields__", None)
+    if model_fields is not None:
+        names = [
+            name
+            for name, info in model_fields.items()
+            if reads_excluded or not info.exclude
+        ]
+        extra = _stored_or_none(value, "__pydantic_extra__")
+        # model_construct() can leave a field unset; the encoder skips it too.
+        # Private attributes are among the attributes: a slot of BaseModel.
+        return [
+            *(_stored_or_none(value, name) for name in names),
+            *(extra.values() if isinstance(extra, dict) else ()),
+            *attributes,
+        ]
+    if is_dataclass(value):
+        return [*(_stored(value, field.name) for field in fields(value)), *attributes]
+    # The encoder reads dict, list and tuple items directly, even in a subclass.
+    # Their attributes are not walked: WeaveDict and WeaveList keep a server there.
+    if isinstance(value, dict):
+        return [*dict.keys(value), *dict.values(value)]
+    for stored in (list, tuple):
+        if isinstance(value, stored):
+            return list(stored.__iter__(value))  # noqa: PLC2801
+    # Sets and deques are iterated, so a subclass must keep the base __iter__.
+    for iterated in (set, frozenset, collections.deque):
+        if isinstance(value, iterated) and type(value).__iter__ is iterated.__iter__:
+            return list(iterated.__iter__(value))  # noqa: PLC2801
+    if isinstance(value, (Mapping, Sequence, AbstractSet)):
+        raise _UnsafeToEncode
+    return attributes
+
+
+def _contains_iterator(value: Any) -> bool:
+    # An explicit stack needs no depth limit.
+    seen: set[tuple[int, bool]] = set()
+    stack: list[tuple[Any, bool]] = [(value, False)]
+    while stack:
+        item, reads_excluded = stack.pop()
+        if isinstance(item, _UNWALKED_TYPES):
+            continue
+        if isinstance(item, Iterator):
+            return True
+        reads_excluded = reads_excluded or _may_read_excluded(item)
+        if (id(item), reads_excluded) in seen:
+            continue
+        seen.add((id(item), reads_excluded))
+        stack.extend(
+            (child, reads_excluded) for child in _children(item, reads_excluded)
+        )
+    return False
+
+
+def _is_unsafe(value: Any) -> bool:
+    try:
+        return _contains_iterator(value)
+    except Exception:
+        return True
+
+
 def _jsonable(value: Any) -> Any:
+    # Leaves need no check. Exact types only: a str subclass can define model_dump().
+    if type(value) in _LEAF_TYPES:
+        return to_jsonable_python(value)
+    # Before the Sequence branch: reading an iterator would leave the SDK an empty one.
+    if isinstance(value, Iterator):
+        raise _UnsafeToEncode
     if hasattr(value, "model_dump"):
+        if _is_unsafe(value):
+            raise _UnsafeToEncode
         return value.model_dump(mode="json")
     if isinstance(value, Mapping):
         return {str(key): _jsonable(item) for key, item in value.items()}
     # The SDK accepts any Sequence and encodes it as a JSON array.
     if isinstance(value, Sequence) and not isinstance(value, (str, bytes, bytearray)):
         return [_jsonable(item) for item in value]
-    # Reading an iterator here would leave the SDK an empty one.
-    if isinstance(value, Iterator):
-        return value
+    if _is_unsafe(value):
+        raise _UnsafeToEncode
     return to_jsonable_python(value)
 
 
-def _state_message(state: Any) -> Message:
-    value = _jsonable(state)
+def _state_message(state: Any) -> Message | None:
+    try:
+        value = _jsonable(state)
+    except _UnsafeToEncode:
+        return None
     if isinstance(value, str):
         return Message(role="user", content=value)
     return Message(
@@ -212,17 +377,25 @@ def _question_wire(question: Any) -> dict[str, Any]:
 
 
 def _questions_json(questions: Any) -> str | None:
-    if isinstance(questions, Mapping):
-        items = [
-            {"id": key, **_question_wire(question)}
-            for key, question in questions.items()
-        ]
-    elif isinstance(questions, Sequence) and not isinstance(questions, (str, bytes)):
-        items = [
-            {"id": index, **_question_wire(question)}
-            for index, question in enumerate(questions)
-        ]
-    else:
+    # As in _jsonable(), before the Sequence branch.
+    if isinstance(questions, Iterator):
+        return None
+    try:
+        if isinstance(questions, Mapping):
+            items = [
+                {"id": key, **_question_wire(question)}
+                for key, question in questions.items()
+            ]
+        elif isinstance(questions, Sequence) and not isinstance(
+            questions, (str, bytes)
+        ):
+            items = [
+                {"id": index, **_question_wire(question)}
+                for index, question in enumerate(questions)
+            ]
+        else:
+            return None
+    except _UnsafeToEncode:
         return None
     raw = json.dumps(items)
     if should_redact_pii():
@@ -236,9 +409,14 @@ def _answers_message(result: Any) -> Message | None:
         answers = result.get("answers")
     if answers is None:
         return None
+    try:
+        encoded = _jsonable(answers)
+    except _UnsafeToEncode:
+        # A custom response_model can hold an iterator the caller still reads.
+        return None
     return Message(
         role="assistant",
-        parts=[TextPart(content=json.dumps(_jsonable(answers), sort_keys=True))],
+        parts=[TextPart(content=json.dumps(encoded, sort_keys=True))],
     )
 
 
@@ -308,7 +486,8 @@ def _open_trace(
         model_name = body.get("model")
         if not isinstance(model_name, str):
             model_name = ""
-        # Encode before any span opens, so a rejected state leaves no turn.
+        # Encode before any span opens, so state that fails to encode leaves no
+        # turn. Unsafe state is not encoded; an SDK error on it lands on the span.
         state_message = _state_message(body.get("state")) if capture else None
         questions_json = _questions_json(body.get("questions")) if capture else None
         turn = _started_turn()

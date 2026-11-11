@@ -23,6 +23,7 @@ import {
   Turn,
   type Usage,
 } from '../genai';
+import {getGenaiState} from '../genai/context';
 import {ATTR_ERROR_TYPE, ATTR_GEN_AI_RESPONSE_ID} from '../genai/semconv';
 import {asOtelAttributes, libraryIntegration} from './integrationMetadata';
 import {
@@ -112,31 +113,48 @@ function modelName(client: any, request: any): string {
   return typeof requested === 'string' ? requested : '';
 }
 
-function sortValue(value: unknown): unknown {
-  if (Array.isArray(value)) {
-    return value.map(sortValue);
+function sortValue(value: unknown, key: string): unknown {
+  // Like JSON.stringify: toJSON runs once per value, with its key, also on
+  // arrays and functions. A Date otherwise becomes {}.
+  const toJSON =
+    value !== null && (typeof value === 'object' || typeof value === 'function')
+      ? (value as {toJSON?: unknown}).toJSON
+      : undefined;
+  const json = typeof toJSON === 'function' ? toJSON.call(value, key) : value;
+  // JSON.stringify writes no function, so its own toJSON must not run later.
+  if (typeof json === 'function') {
+    return undefined;
   }
-  if (!value || typeof value !== 'object') {
-    return value;
+  if (Array.isArray(json)) {
+    // By index, as JSON.stringify reads it: an own iterator is user code. A
+    // plain array, so an Array subclass's toJSON does not run again.
+    // Read the length once and truncate it, as JSON.stringify does.
+    const length = Math.trunc(json.length);
+    // V8 cannot stringify an array near 2 ** 28 items (its strings hold under
+    // 2 ** 29 characters, two per item), so give up well before that.
+    if (length > 2 ** 27) {
+      throw new RangeError('Invalid array length');
+    }
+    const items: unknown[] = [];
+    for (let index = 0; index < length; index++) {
+      items.push(sortValue(json[index], String(index)));
+    }
+    return items;
   }
-  // JSON.stringify calls toJSON. A Date otherwise becomes {}.
-  const toJSON = (value as {toJSON?: unknown}).toJSON;
-  if (typeof toJSON === 'function') {
-    return sortValue(toJSON.call(value));
+  if (!json || typeof json !== 'object') {
+    return json;
   }
   const sorted: Record<string, unknown> = {};
-  for (const key of Object.keys(value as Record<string, unknown>).sort()) {
-    const item = (value as Record<string, unknown>)[key];
-    if (item !== undefined) {
-      sorted[key] = sortValue(item);
-    }
+  for (const name of Object.keys(json).sort()) {
+    sorted[name] = sortValue((json as Record<string, unknown>)[name], name);
   }
   return sorted;
 }
 
 function stateMessage(state: unknown): Message {
   // An image or withAssets text is recorded as its string form.
-  const value = sortValue(state);
+  // The SDK sends the state as the request body's `state` key.
+  const value = sortValue(state, 'state');
   if (typeof value === 'string') {
     return {role: 'user', content: value};
   }
@@ -185,7 +203,9 @@ function answersMessage(body: unknown): Message | undefined {
   }
   return {
     role: 'assistant',
-    parts: [{type: 'text', content: JSON.stringify(sortValue(answers))}],
+    parts: [
+      {type: 'text', content: JSON.stringify(sortValue(answers, 'answers'))},
+    ],
   };
 }
 
@@ -535,9 +555,19 @@ function traceCall(
 ): unknown {
   const parent = activeTurn();
   // runIsolated clears the conversation, so read it before that call.
-  const conversation = parent ? undefined : getCurrentConversation();
+  const conversation = getCurrentConversation();
   return runIsolated(() => {
-    const trace = openTrace(client, request, parent, conversation);
+    // Code inside the call, such as a custom fetch, still sees the caller's
+    // turn and conversation.
+    const scope = getGenaiState();
+    scope.turn = parent ?? null;
+    scope.conversation = conversation ?? null;
+    const trace = openTrace(
+      client,
+      request,
+      parent,
+      parent ? undefined : conversation
+    );
     if (!trace) {
       return Reflect.apply(original, client, [request, options]);
     }
