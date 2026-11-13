@@ -11,7 +11,7 @@ import boto3
 import weave
 from weave.integrations.integration_metadata import library_integration
 from weave.trace.call import Call
-from weave.trace.op import _add_accumulator, _IteratorWrapper
+from weave.trace.op import _add_accumulator, _SyncIteratorWrapper
 
 if TYPE_CHECKING:
     from botocore.client import BaseClient
@@ -449,7 +449,7 @@ def create_stream_wrapper(
         op.name = name  # type: ignore
         op._set_on_finish_handler(bedrock_on_finish_converse)
 
-        class BedrockIteratorWrapper(_IteratorWrapper):
+        class BedrockIteratorWrapper(_SyncIteratorWrapper):
             def get(self, key: str, default: Any = None) -> Any:
                 """Delegate 'get' method to the response object."""
                 if key == "stream":

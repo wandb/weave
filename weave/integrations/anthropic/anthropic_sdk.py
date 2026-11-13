@@ -1,8 +1,7 @@
 from __future__ import annotations
 
-import asyncio
 import importlib
-from collections.abc import AsyncIterator, Callable, Coroutine, Iterator
+from collections.abc import AsyncIterator, Callable, Iterator
 from functools import wraps
 from typing import TYPE_CHECKING, Any
 
@@ -30,7 +29,12 @@ from weave.integrations.integration_utilities import should_use_accumulator
 from weave.integrations.patcher import MultiPatcher, NoOpPatcher, SymbolPatcher
 from weave.trace.autopatch import IntegrationSettings, OpSettings
 from weave.trace.call import Call
-from weave.trace.op import _add_accumulator, _IteratorWrapper
+from weave.trace.op import (
+    _add_accumulator,
+    _AsyncIteratorWrapper,
+    _IteratorWrapperBase,
+    _SyncIteratorWrapper,
+)
 
 if TYPE_CHECKING:
     from anthropic.lib.streaming import MessageStream
@@ -168,8 +172,8 @@ def create_wrapper_async(settings: OpSettings) -> Callable[[Callable], Callable]
 ## This part of the code is for dealing with the other way
 ## of streaming, by calling Messages.stream
 ## this has 2 options: event based or text based.
-## This code handles both cases by patching the _IteratorWrapper
-## and adding a text_stream property to it.
+## This code handles both cases by subclassing the sync and async iterator wrappers
+## and adding a text_stream property to each.
 
 
 def anthropic_stream_accumulator(
@@ -183,7 +187,7 @@ def anthropic_stream_accumulator(
     return acc
 
 
-class AnthropicIteratorWrapper(_IteratorWrapper):
+class _AnthropicIteratorWrapperBase(_IteratorWrapperBase):
     def __getattr__(self, name: str) -> Any:
         """Delegate all other attributes to the wrapped iterator."""
         if name in {
@@ -198,55 +202,51 @@ class AnthropicIteratorWrapper(_IteratorWrapper):
             return object.__getattribute__(self, name)
         return getattr(self._iterator_or_ctx_manager, name)
 
-    def __stream_text__(self) -> Iterator[str] | AsyncIterator[str]:  # noqa: PLW3201
-        if isinstance(self._iterator_or_ctx_manager, AsyncIterator):
-            return self.__async_stream_text__()
-        else:
-            return self.__sync_stream_text__()
-
-    def __sync_stream_text__(self) -> Iterator[str]:  # type: ignore  # noqa: PLW3201
-        for chunk in self:  # type: ignore
-            if chunk.type == "content_block_delta" and chunk.delta.type == "text_delta":  # type: ignore
-                yield chunk.delta.text  # type: ignore
-
-    async def __async_stream_text__(self) -> AsyncIterator[str]:  # type: ignore  # noqa: PLW3201
-        async for chunk in self:  # type: ignore
-            if chunk.type == "content_block_delta" and chunk.delta.type == "text_delta":  # type: ignore
-                yield chunk.delta.text  # type: ignore
-
-    @property
-    def text_stream(self) -> Iterator[str] | AsyncIterator[str]:
-        return self.__stream_text__()
-
     def _feed_message_to_accumulator(self, message: Message) -> None:
         self._on_yield(MessageStopEvent(type="message_stop", message=message))
         self._call_on_close_once()
 
-    def get_final_message(self) -> Message | Coroutine[Any, Any, Message]:
-        underlying = self._iterator_or_ctx_manager.get_final_message  # type: ignore
-        if asyncio.iscoroutinefunction(underlying):
 
-            async def _async() -> Message:
-                message = await underlying()
-                self._feed_message_to_accumulator(message)
-                return message
+class AnthropicIteratorWrapper(_AnthropicIteratorWrapperBase, _SyncIteratorWrapper):
+    def __stream_text__(self) -> Iterator[str]:  # noqa: PLW3201
+        for chunk in self:
+            if chunk.type == "content_block_delta" and chunk.delta.type == "text_delta":
+                yield chunk.delta.text
 
-            return _async()
-        message = underlying()
+    @property
+    def text_stream(self) -> Iterator[str]:
+        return self.__stream_text__()
+
+    def get_final_message(self) -> Message:
+        message = self._iterator_or_ctx_manager.get_final_message()  # type: ignore
         self._feed_message_to_accumulator(message)
         return message
 
-    def get_final_text(self) -> str | Coroutine[Any, Any, str]:
-        underlying_text = self._iterator_or_ctx_manager.get_final_text  # type: ignore
-        if asyncio.iscoroutinefunction(underlying_text):
-
-            async def _async() -> str:
-                await self.get_final_message()  # type: ignore[misc]
-                return await underlying_text()
-
-            return _async()
+    def get_final_text(self) -> str:
         self.get_final_message()
-        return underlying_text()
+        return self._iterator_or_ctx_manager.get_final_text()  # type: ignore
+
+
+class AnthropicAsyncIteratorWrapper(
+    _AnthropicIteratorWrapperBase, _AsyncIteratorWrapper
+):
+    async def __stream_text__(self) -> AsyncIterator[str]:  # noqa: PLW3201
+        async for chunk in self:
+            if chunk.type == "content_block_delta" and chunk.delta.type == "text_delta":
+                yield chunk.delta.text
+
+    @property
+    def text_stream(self) -> AsyncIterator[str]:
+        return self.__stream_text__()
+
+    async def get_final_message(self) -> Message:
+        message = await self._iterator_or_ctx_manager.get_final_message()  # type: ignore
+        self._feed_message_to_accumulator(message)
+        return message
+
+    async def get_final_text(self) -> str:
+        await self.get_final_message()
+        return await self._iterator_or_ctx_manager.get_final_text()  # type: ignore
 
 
 def create_stream_wrapper(settings: OpSettings) -> Callable[[Callable], Callable]:
@@ -258,7 +258,8 @@ def create_stream_wrapper(settings: OpSettings) -> Callable[[Callable], Callable
             op,  # type: ignore
             make_accumulator=lambda _: anthropic_stream_accumulator,
             should_accumulate=lambda _: True,
-            iterator_wrapper=AnthropicIteratorWrapper,  # type: ignore
+            iterator_wrapper=AnthropicIteratorWrapper,
+            async_iterator_wrapper=AnthropicAsyncIteratorWrapper,
         )
 
     return wrapper
