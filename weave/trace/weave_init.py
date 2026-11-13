@@ -435,12 +435,12 @@ def init_weave_disabled(
 ) -> weave_client.WeaveClient:
     """Initialize a dummy client that does nothing.
 
-    This is used when the program is execuring with Weave disabled.
+    This is used when the program is executing with Weave disabled.
 
     Note: as currently implemented, any explicit calls to client.{X} will
     likely fail, since the user is not authenticated. The purpose of
     disabling weave is to disable _tracing_. Programs that attempt to
-    make requests (eg. publishing, fetching, querying) while disabled
+    make requests (eg. fetching, querying) while disabled
     will fail.
     """
     current_client = weave_client_context.get_weave_client()
@@ -455,6 +455,7 @@ def init_weave_disabled(
         postprocess_inputs=postprocess_inputs,
         postprocess_output=postprocess_output,
         attributes=attributes,
+        _disabled=True,
     )
 
     weave_client_context.set_weave_client_global(client)

@@ -537,9 +537,11 @@ class WeaveClient:
         postprocess_output: PostprocessOutputFunc | None = None,
         attributes: dict[str, Any] | None = None,
         api_key: str | None = None,
+        _disabled: bool = False,
     ):
         self.entity = entity
         self.project = project
+        self._disabled = _disabled
         self.server = server
         self.postprocess_inputs = postprocess_inputs
         self.postprocess_output = postprocess_output
@@ -579,7 +581,7 @@ class WeaveClient:
 
         self._wal: WALManager | None = None
         self._wal_pending_call_ids: set[str] = set()
-        if settings.should_enable_wal():
+        if not self._disabled and settings.should_enable_wal():
             if settings.should_disable_wal_sender():
                 self._wal = WALManager(self.entity, self.project, api_key=api_key)
                 logger.debug("WAL enabled (sender disabled): %s", self._wal.wal_dir)
@@ -594,7 +596,8 @@ class WeaveClient:
                 logger.debug("WAL enabled: %s", self._wal.wal_dir)
 
         # No-op when the feature flag is off (returns immediately).
-        self._warm_project_id_resolver()
+        if not self._disabled:
+            self._warm_project_id_resolver()
 
     def _on_wal_send(self, record_type: str, record: dict) -> None:
         """Callback fired by the WAL sender after a record reaches the server."""
