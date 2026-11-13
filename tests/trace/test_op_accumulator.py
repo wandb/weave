@@ -349,6 +349,130 @@ async def test_add_accumulator_wraps_stream_by_its_protocol(
     assert [value async for value in async_stream] == [1]
 
 
+class _ClosableStream:
+    def __init__(self, events):
+        self._events = events
+
+    def close(self):
+        self._events.append("close")
+
+
+class _AsyncClosableStream:
+    def __init__(self, events):
+        self._events = events
+
+    async def close(self):
+        self._events.append("close")
+
+    async def __aenter__(self):
+        self._events.append("enter")
+        return self
+
+    async def __aexit__(self, exc_type, exc, exc_tb, /):
+        self._events.append("exit")
+        self.exit_args = (exc_type, exc, exc_tb)
+
+
+@pytest.mark.parametrize(
+    ("wrapper_class", "make_stream", "expected"),
+    [
+        (_SyncIteratorWrapper, _ClosableStream, ["finish", "close", "close"]),
+        (_DualIteratorWrapper, _ClosableStream, ["finish", "close", "close"]),
+        (_DualIteratorWrapper, lambda events: _SyncAndAsyncIterable(), ["finish"]),
+    ],
+    ids=["sync", "dual", "dual-without-close"],
+)
+def test_iterator_wrapper_close_closes_the_stream(wrapper_class, make_stream, expected):
+    events = []
+    wrapper = wrapper_class(
+        make_stream(events),
+        lambda value: None,
+        lambda error: None,
+        lambda: events.append("finish"),
+    )
+
+    wrapper.close()
+    # The stream is closed again even though the call has already finished.
+    wrapper.close()
+
+    assert events == expected
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("wrapper_class", "make_stream", "expected"),
+    [
+        (_AsyncIteratorWrapper, _AsyncClosableStream, ["finish", "close", "close"]),
+        (_DualIteratorWrapper, _AsyncClosableStream, ["finish", "close", "close"]),
+        (_AsyncIteratorWrapper, lambda events: _async_numbers(), ["finish"]),
+    ],
+    ids=["async", "dual", "async-without-close"],
+)
+async def test_iterator_wrapper_close_awaits_the_stream_close(
+    wrapper_class, make_stream, expected
+):
+    events = []
+    wrapper = wrapper_class(
+        make_stream(events),
+        lambda value: None,
+        lambda error: None,
+        lambda: events.append("finish"),
+    )
+
+    await wrapper.close()
+    # The stream is closed again even though the call has already finished.
+    await wrapper.close()
+
+    assert events == expected
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("make_stream", "close_inside", "expected"),
+    [
+        (_AsyncClosableStream, False, ["enter", "exit", "finish"]),
+        (_AsyncClosableStream, True, ["enter", "finish", "close", "exit"]),
+        (lambda events: _async_context_manager(), False, ["finish"]),
+    ],
+    ids=["exit", "close-inside", "without-exit"],
+)
+async def test_async_iterator_wrapper_exit_exits_the_stream(
+    make_stream, close_inside, expected
+):
+    events = []
+    wrapper = _AsyncIteratorWrapper(
+        make_stream(events),
+        lambda value: None,
+        lambda error: None,
+        lambda: events.append("finish"),
+    )
+
+    async with wrapper:
+        if close_inside:
+            await wrapper.close()
+
+    assert events == expected
+
+
+@pytest.mark.asyncio
+async def test_async_iterator_wrapper_exit_passes_the_error_to_the_stream():
+    events = []
+    stream = _AsyncClosableStream(events)
+    wrapper = _AsyncIteratorWrapper(
+        stream,
+        lambda value: None,
+        events.append,
+        lambda: events.append("finish"),
+    )
+
+    with pytest.raises(DummyTestException) as raised:
+        async with wrapper:
+            raise DummyTestException("FAILURE!")
+
+    assert events == ["enter", raised.value, "exit"]
+    assert stream.exit_args == (DummyTestException, raised.value, raised.tb)
+
+
 @pytest.mark.disable_logging_error_check
 def test_resilience_to_accumulator_make_accumulator_errors(weave_active, log_collector):
     def do_test():
