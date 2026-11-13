@@ -1588,9 +1588,6 @@ class _IteratorWrapperBase(Generic[V]):
     def __del__(self) -> None:
         self._call_on_close_once()
 
-    def close(self) -> None:
-        self._call_on_close_once()
-
     def __getattr__(self, name: str) -> Any:
         """Delegate all other attributes to the wrapped iterator."""
         if name in {
@@ -1644,6 +1641,11 @@ class _SyncIteratorWrapper(_IteratorWrapperBase[V]):
             raise
         else:
             return value
+
+    def close(self) -> None:
+        self._call_on_close_once()
+        if hasattr(self._iterator_or_ctx_manager, "close"):
+            self._iterator_or_ctx_manager.close()
 
     def __enter__(self) -> Self:
         if hasattr(self._iterator_or_ctx_manager, "__enter__"):
@@ -1708,6 +1710,11 @@ class _AsyncIteratorWrapper(_IteratorWrapperBase[V]):
         else:
             return value
 
+    async def close(self) -> None:
+        self._call_on_close_once()
+        if hasattr(self._iterator_or_ctx_manager, "close"):
+            await self._iterator_or_ctx_manager.close()
+
     async def __aenter__(self) -> Self:
         if hasattr(
             self._iterator_or_ctx_manager, "__aenter__"
@@ -1725,11 +1732,22 @@ class _AsyncIteratorWrapper(_IteratorWrapperBase[V]):
     ) -> None:
         if exc_type and isinstance(exc_value, Exception):
             self._call_on_error_once(exc_value)
+        if hasattr(self._iterator_or_ctx_manager, "__aexit__"):
+            await self._iterator_or_ctx_manager.__aexit__(
+                exc_type, exc_value, traceback
+            )
         self._call_on_close_once()
 
 
 class _DualIteratorWrapper(_SyncIteratorWrapper[V], _AsyncIteratorWrapper[V]):
     """Wraps a stream that supports both protocols itself, or neither."""
+
+    def close(self) -> Any:
+        # The wrapped close() may return a coroutine; return it for the caller to await.
+        self._call_on_close_once()
+        if hasattr(self._iterator_or_ctx_manager, "close"):
+            return self._iterator_or_ctx_manager.close()
+        return None
 
 
 _SYNC_STREAM_ATTRS = ("__iter__", "__enter__")
