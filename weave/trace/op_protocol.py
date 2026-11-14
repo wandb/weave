@@ -78,11 +78,8 @@ class Op(Protocol[P, R]):
         self: Op[Concatenate[Any, P2], R], instance: object, owner: type
     ) -> Op[P2, R]: ...
 
-    # __call__: Callable[..., Any]
-    @overload
+    # A permissive fallback overload would hide invalid calls to the wrapped function.
     def __call__(self, *args: P.args, **kwargs: P.kwargs) -> R: ...
-    @overload
-    def __call__(self, *args: Any, **kwargs: Any) -> Any: ...  # pyright: ignore[reportOverlappingOverload]
 
     __self__: Any
 
