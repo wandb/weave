@@ -1,6 +1,9 @@
+import enum
+import logging
 from dataclasses import dataclass
 
 from pydantic import BaseModel
+from pydantic_core import to_jsonable_python
 
 import weave
 from weave.trace.object_record import pydantic_object_record
@@ -387,3 +390,23 @@ def test_stable_repr_strips_memory_addresses() -> None:
 
     # Reprs without a memory address pass through unchanged.
     assert stable_repr("no address here") == "'no address here'"
+
+
+class Color(enum.Enum):
+    RED = "red"
+
+
+def test_to_json_writes_a_dict_key_pydantic_cannot_serialize_as_its_text() -> None:
+    # A dict keyed by an object pydantic cannot serialize, like logging.PlaceHolder.loggerMap
+    # ({Logger: None}), which dictify reaches from any object holding a logger: to_json passed
+    # the keys through, and sending the call start failed with PydanticSerializationError.
+    logger = logging.getLogger("weave.test.dict_key")
+    encoded = to_json({logger: None, "plain": 1}, "entity/project", None)
+    assert to_jsonable_python(encoded) == {repr(logger): None, "plain": 1}
+
+
+def test_to_json_keeps_dict_keys_pydantic_can_serialize() -> None:
+    value = {"s": 1, 2: 2, 1.5: 3, None: 4, (1, 2): 6, Color.RED: 7, b"x": 8}
+    encoded = to_json(value, "entity/project", None)
+    assert encoded == value
+    assert [type(k) for k in encoded] == [type(k) for k in value]
