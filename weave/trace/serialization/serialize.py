@@ -161,23 +161,27 @@ def _encode_container(
 
 
 def _encode_dict_key(key: Any) -> Any:
-    """Return a dict key that `to_jsonable_python` can write.
+    """Return a dict key that `to_jsonable_python` and `json.dumps` can write.
 
     Values are encoded by `to_json`, keys were passed through as they are, so a
     dict keyed by an arbitrary object failed later, when the payload was sent:
     `PydanticSerializationError: Unable to serialize unknown type`. One such dict
     is `logging.PlaceHolder.loggerMap`, keyed by `logging.Logger`, which
-    `dictify` reaches from any object that holds a logger. Keys pydantic can
-    write (str, numbers, None, enums, tuples, bytes, ...) are left unchanged;
-    any other key becomes its `stringify` text.
+    `dictify` reaches from any object that holds a logger.
+
+    str, int, float, bool and None are left unchanged. Any other key becomes the
+    text pydantic writes for it (`(1, 2)` -> `"1,2"`, `b"x"` -> `"x"`, an enum ->
+    its value), so the call payload is the same as before and `canonical_json`
+    (`json.dumps`) accepts it too; a key pydantic cannot write becomes its
+    `stringify` text. Keys with the same text merge and the last value wins, as
+    in pydantic's own key encoding; a logger's text carries its name.
     """
     if key is None or isinstance(key, (str, int, float, bool)):
         return key
     try:
-        to_jsonable_python(key)
+        return next(iter(to_jsonable_python({key: None})))
     except Exception:
         return stringify(key)
-    return key
 
 
 def _encode_pydantic_schema(
