@@ -20,7 +20,7 @@ jobs:
       contents: read
       packages: write
       id-token: write
-    runs-on: ubuntu-latest-8-cores
+    runs-on: ubuntu-26.04-8-cores
     env:
       MAX_ATTEMPTS: 3
       CORE_DIR: core

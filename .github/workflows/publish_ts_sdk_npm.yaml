@@ -18,7 +18,7 @@ on:
 jobs:
   publish-typescript-sdk:
     name: Publish TypeScript SDK to npm
-    runs-on: ubuntu-8core
+    runs-on: ubuntu-26.04-8-cores
     timeout-minutes: 15
     environment:
       name: release
