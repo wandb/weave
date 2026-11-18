@@ -1,4 +1,5 @@
 import enum
+import json
 import logging
 from dataclasses import dataclass
 
@@ -7,6 +8,7 @@ from pydantic_core import to_jsonable_python
 
 import weave
 from weave.trace.object_record import pydantic_object_record
+from weave.trace.serialization.digest import canonical_json
 from weave.trace.serialization.serialize import (
     dictify,
     is_pydantic_model_class,
@@ -405,8 +407,29 @@ def test_to_json_writes_a_dict_key_pydantic_cannot_serialize_as_its_text() -> No
     assert to_jsonable_python(encoded) == {repr(logger): None, "plain": 1}
 
 
-def test_to_json_keeps_dict_keys_pydantic_can_serialize() -> None:
-    value = {"s": 1, 2: 2, 1.5: 3, None: 4, (1, 2): 6, Color.RED: 7, b"x": 8}
+def test_to_json_writes_other_dict_keys_as_pydantic_does() -> None:
+    # str, int, float, bool and None keys stay; others become the text pydantic writes
+    # for them, so the call payload is unchanged and json.dumps (weave.publish) accepts them.
+    value = {"s": 1, 2: 2, 1.5: 3, None: 4, True: 5, (1, 2): 6, Color.RED: 7, b"x": 8}
     encoded = to_json(value, "entity/project", None)
-    assert encoded == value
-    assert [type(k) for k in encoded] == [type(k) for k in value]
+    assert encoded == {
+        "s": 1,
+        2: 2,
+        1.5: 3,
+        None: 4,
+        True: 5,
+        "1,2": 6,
+        "red": 7,
+        "x": 8,
+    }
+    assert to_jsonable_python(encoded) == to_jsonable_python(value)
+    assert json.loads(canonical_json(encoded)) == {
+        "s": 1,
+        "2": 2,
+        "1.5": 3,
+        "null": 4,
+        "true": 5,
+        "1,2": 6,
+        "red": 7,
+        "x": 8,
+    }
