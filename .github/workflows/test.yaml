@@ -101,7 +101,7 @@ jobs:
       contents: read
       packages: write
       id-token: write
-    runs-on: ubuntu-latest-8-cores
+    runs-on: ubuntu-26.04-8-cores
     strategy:
       matrix:
         python-version-major: ["3"]
