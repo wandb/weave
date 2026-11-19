@@ -1,6 +1,7 @@
 """Tests for trace server version checking."""
 
 from collections.abc import AsyncIterator, Iterator
+from pathlib import Path
 from unittest import mock
 
 import httpx
@@ -8,6 +9,7 @@ import pytest
 from PIL import Image
 
 import weave
+from weave.durability import wal_manager
 from weave.trace import weave_init
 from weave.trace.context import weave_client_context
 from weave.trace.init_message import check_min_trace_server_version
@@ -23,7 +25,9 @@ MIN_SERVER_VERSION = "1.0.0"
 @pytest.mark.asyncio
 @pytest.mark.trace_server
 @pytest.mark.parametrize("disabled_by", ["client_version", "server_version", "setting"])
-async def test_init_disabled_blocks_writes_and_can_reenable(monkeypatch, disabled_by):
+async def test_init_disabled_blocks_writes_and_can_reenable(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, disabled_by: str
+) -> None:
     server_info = {
         "min_required_weave_python_version": "0.0.0",
         "trace_server_version": MIN_SERVER_VERSION,
@@ -50,6 +54,12 @@ async def test_init_disabled_blocks_writes_and_can_reenable(monkeypatch, disable
         lambda **kwargs: httpx.Client(transport=httpx.MockTransport(transport)),
     )
     monkeypatch.setenv("WF_TRACE_SERVER_URL", TEST_SERVER_URL)
+    monkeypatch.setenv("WEAVE_IMPLICITLY_PATCH_INTEGRATIONS", "false")
+    monkeypatch.setenv("WEAVE_USE_SERVER_CACHE", "false")
+    monkeypatch.setenv("WEAVE_ENABLE_WAL", "true")
+    monkeypatch.setenv("WEAVE_DISABLE_WAL_SENDER", "false")
+    wal_root = tmp_path / "wal"
+    monkeypatch.setattr(wal_manager, "WAL_ROOT", str(wal_root))
     monkeypatch.setattr(weave_init, "MIN_TRACE_SERVER_VERSION", MIN_SERVER_VERSION)
     monkeypatch.setattr(
         weave_init, "get_wandb_auth_context", lambda: ApiKeyCredentials("test-key")
@@ -59,10 +69,11 @@ async def test_init_disabled_blocks_writes_and_can_reenable(monkeypatch, disable
     monkeypatch.setattr(
         weave_init.init_message, "print_init_message", lambda *args, **kwargs: None
     )
+    ensure_project = mock.Mock(return_value={"project_name": "test-project"})
     monkeypatch.setattr(
         remote_http_trace_server.project_creator,
         "ensure_project_exists",
-        lambda *args: {"project_name": "test-project"},
+        ensure_project,
     )
     monkeypatch.setattr(weave_client_context, "_global_weave_client", None)
 
@@ -84,6 +95,10 @@ async def test_init_disabled_blocks_writes_and_can_reenable(monkeypatch, disable
 
     try:
         client = weave.init("test-entity/test-project")
+        init_paths = [call.args[0].url.path for call in transport.call_args_list]
+        assert init_paths == ([] if disabled_by == "setting" else ["/server_info"])
+        ensure_project.assert_not_called()
+        assert not wal_root.exists()
         monkeypatch.delenv("WEAVE_DISABLED", raising=False)
         transport.reset_mock()
         assert increment(2) == 3
@@ -103,6 +118,7 @@ async def test_init_disabled_blocks_writes_and_can_reenable(monkeypatch, disable
 
         server_info["min_required_weave_python_version"] = "0.0.0"
         server_info["trace_server_version"] = MIN_SERVER_VERSION
+        monkeypatch.setenv("WEAVE_ENABLE_WAL", "false")
         client = weave.init("test-entity/test-project")
         transport.reset_mock()
         assert increment(4) == 5
@@ -120,7 +136,17 @@ async def test_init_disabled_blocks_writes_and_can_reenable(monkeypatch, disable
             call_endpoint,
         }
     finally:
+        client = weave.get_client()
         weave.finish()
+        if client is not None and isinstance(
+            client.server, remote_http_trace_server.RemoteHTTPTraceServer
+        ):
+            for processor in (
+                client.server.get_call_processor(),
+                client.server.get_feedback_processor(),
+            ):
+                if processor is not None:
+                    processor.stop_accepting_new_work_and_flush_queue()
 
 
 class TestCheckMinTraceServerVersion:
