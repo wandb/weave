@@ -12,6 +12,7 @@ from weave.trace import weave_init
 from weave.trace.context import weave_client_context
 from weave.trace.init_message import check_min_trace_server_version
 from weave.trace.refs import ObjectRef
+from weave.trace.settings import should_use_calls_complete
 from weave.trace_server_bindings import remote_http_trace_server
 from weave.wandb_interface.auth import ApiKeyCredentials
 
@@ -95,10 +96,15 @@ def test_init_disabled_blocks_writes_and_can_reenable(monkeypatch, disabled_by):
         assert asyncio.run(increment_async(4)) == 5
         client.flush()
         paths = {call.args[0].url.path for call in transport.call_args_list}
+        call_endpoint = (
+            "/v2/test-entity/test-project/calls/complete"
+            if should_use_calls_complete()
+            else "/call/upsert_batch"
+        )
         assert paths == {
             "/obj/create",
             "/file/create",
-            "/v2/test-entity/test-project/calls/complete",
+            call_endpoint,
         }
     finally:
         weave.finish()
