@@ -1,9 +1,12 @@
 import atexit
+import contextlib
+import enum
 import gc
 import subprocess
 import sys
 import textwrap
 import weakref
+from collections.abc import Iterator
 
 import pytest
 
@@ -13,7 +16,10 @@ from weave.trace.context import call_context
 from weave.trace.context.tests_context import raise_on_captured_errors
 from weave.trace.op import (
     _add_accumulator,
-    _IteratorWrapper,
+    _AsyncIteratorWrapper,
+    _DualIteratorWrapper,
+    _select_iterator_wrapper,
+    _SyncIteratorWrapper,
 )
 
 
@@ -39,7 +45,7 @@ def test_finished_iterator_wrappers_do_not_leak_atexit_callbacks():
     # Warm up weakref.finalize so its one process-level exit hook is already
     # reflected in the baseline. The regression was one new atexit callback per
     # stream, not the stdlib's single finalizer exit hook.
-    warmup_wrapper = _IteratorWrapper(
+    warmup_wrapper = _SyncIteratorWrapper(
         iter([1]), lambda value: None, lambda error: None, on_close
     )
     warmup_wrapper.close()
@@ -52,7 +58,7 @@ def test_finished_iterator_wrappers_do_not_leak_atexit_callbacks():
     close_count = 0
 
     for _ in range(iterator_wrapper_leak_repro_count):
-        wrapper = _IteratorWrapper(
+        wrapper = _SyncIteratorWrapper(
             iter([1]), lambda value: None, lambda error: None, on_close
         )
         assert list(wrapper) == [1]
@@ -79,7 +85,7 @@ def test_unfinished_iterator_wrapper_does_not_keep_wrapper_alive():
         nonlocal close_count
         close_count += 1
 
-    wrapper = _IteratorWrapper(
+    wrapper = _SyncIteratorWrapper(
         iter([1]), lambda value: None, lambda error: None, on_close
     )
     wrapper_ref = weakref.ref(wrapper)
@@ -104,7 +110,7 @@ def test_process_exit_finalizer_is_idempotent_for_unfinished_iterator_wrapper():
         nonlocal close_count
         close_count += 1
 
-    wrapper = _IteratorWrapper(
+    wrapper = _SyncIteratorWrapper(
         iter([1]), lambda value: None, lambda error: None, on_close
     )
 
@@ -128,18 +134,18 @@ def test_process_exit_closes_unfinished_iterator_wrapper(tmp_path):
         import sys
         from pathlib import Path
 
-        from weave.trace.op import _IteratorWrapper
+        from weave.trace.op import _SyncIteratorWrapper
 
         # This test is specifically about weakref.finalize/atexit wiring, not
         # the normal GC ``__del__`` cleanup path.
-        _IteratorWrapper.__del__ = lambda self: None
+        _SyncIteratorWrapper.__del__ = lambda self: None
 
         marker_path = Path(sys.argv[1])
 
         def on_close():
             marker_path.write_text("closed", encoding="utf-8")
 
-        wrapper = _IteratorWrapper(iter([1]), lambda value: None, lambda error: None, on_close)
+        wrapper = _SyncIteratorWrapper(iter([1]), lambda value: None, lambda error: None, on_close)
         """
     )
 
@@ -152,6 +158,195 @@ def test_process_exit_closes_unfinished_iterator_wrapper(tmp_path):
 
     assert completed.returncode == 0, completed.stderr
     assert marker_path.read_text(encoding="utf-8") == "closed"
+
+
+async def _async_numbers():
+    yield 1
+
+
+@contextlib.contextmanager
+def _context_manager():
+    yield iter([1])
+
+
+@contextlib.asynccontextmanager
+async def _async_context_manager():
+    yield _async_numbers()
+
+
+class _IteratorSubclass(Iterator):
+    def __next__(self):
+        raise StopIteration
+
+
+class _Color(enum.Enum):
+    RED = 1
+
+
+class _SyncAndAsyncIterable:
+    def __iter__(self):
+        return self
+
+    def __aiter__(self):
+        return self
+
+
+class _RaisingGetattrMeta(type):
+    def __getattr__(cls, name):
+        raise KeyError(name)
+
+
+class _IterableWithRaisingGetattr(metaclass=_RaisingGetattrMeta):
+    def __iter__(self):
+        return self
+
+    def __getattr__(self, name):
+        raise KeyError(name)
+
+
+class _GetattrProxy:
+    def __init__(self, stream):
+        self._stream = stream
+
+    def __getattr__(self, name):
+        return getattr(self._stream, name)
+
+
+@pytest.mark.parametrize(
+    ("value", "expected"),
+    [
+        pytest.param(iter([1]), _SyncIteratorWrapper, id="iterator"),
+        pytest.param(_IteratorSubclass(), _SyncIteratorWrapper, id="inherited-iter"),
+        pytest.param({"stream": iter([1])}, _SyncIteratorWrapper, id="dict"),
+        pytest.param(_context_manager(), _SyncIteratorWrapper, id="context-manager"),
+        pytest.param(
+            _IterableWithRaisingGetattr(), _SyncIteratorWrapper, id="raising-getattr"
+        ),
+        pytest.param(
+            _GetattrProxy(iter([1])), _DualIteratorWrapper, id="getattr-proxy"
+        ),
+        pytest.param(_async_numbers(), _AsyncIteratorWrapper, id="async-generator"),
+        pytest.param(
+            _async_context_manager(), _AsyncIteratorWrapper, id="async-context-manager"
+        ),
+        pytest.param(_SyncAndAsyncIterable(), _DualIteratorWrapper, id="both"),
+        pytest.param(object(), _DualIteratorWrapper, id="neither"),
+        pytest.param(_Color.RED, _DualIteratorWrapper, id="enum-member"),
+    ],
+)
+def test_select_iterator_wrapper(value, expected):
+    selected = _select_iterator_wrapper(
+        value, _SyncIteratorWrapper, _AsyncIteratorWrapper
+    )
+    assert selected is expected
+
+
+_STREAM_PROTOCOL_METHODS = (
+    "__iter__",
+    "__next__",
+    "__enter__",
+    "__exit__",
+    "__aiter__",
+    "__anext__",
+    "__aenter__",
+    "__aexit__",
+)
+
+
+@pytest.mark.parametrize(
+    ("wrapper_class", "expected"),
+    [
+        (_SyncIteratorWrapper, {"__iter__", "__next__", "__enter__", "__exit__"}),
+        (
+            _AsyncIteratorWrapper,
+            {"__aiter__", "__anext__", "__aenter__", "__aexit__"},
+        ),
+        (_DualIteratorWrapper, set(_STREAM_PROTOCOL_METHODS)),
+    ],
+)
+def test_iterator_wrapper_has_only_its_protocols(wrapper_class, expected):
+    methods = {
+        name for name in _STREAM_PROTOCOL_METHODS if hasattr(wrapper_class, name)
+    }
+    assert methods == expected
+
+
+@pytest.mark.asyncio
+async def test_op_accumulator_wraps_stream_by_its_protocol(weave_active):
+    @weave.op(accumulator=lambda *args, **kwargs: {})
+    def stream_op(is_async: bool):
+        return _async_numbers() if is_async else iter([1])
+
+    sync_stream = stream_op(False)
+    assert type(sync_stream) is _SyncIteratorWrapper
+    assert list(sync_stream) == [1]
+
+    async_stream = stream_op(True)
+    assert type(async_stream) is _AsyncIteratorWrapper
+    assert [value async for value in async_stream] == [1]
+
+
+@pytest.mark.asyncio
+async def test_async_op_accumulates_async_and_traced_sync_streams(client):
+    @weave.op(accumulator=lambda acc, value: (acc or []) + [value])
+    def inner():
+        return iter([1, 2])
+
+    @weave.op(accumulator=lambda acc, value: (acc or []) + [value])
+    async def outer(traced: bool):
+        return inner() if traced else _async_numbers()
+
+    assert list(await outer(True)) == [1, 2]
+    assert [value async for value in await outer(False)] == [1]
+
+    calls = list(client.get_calls())
+    assert [call.output for call in calls] == [[1, 2], [1, 2], [1]]
+
+
+class _CustomSyncWrapper(_SyncIteratorWrapper):
+    pass
+
+
+class _CustomAsyncWrapper(_AsyncIteratorWrapper):
+    pass
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("wrapper_kwargs", "sync_class", "async_class"),
+    [
+        pytest.param({}, _SyncIteratorWrapper, _AsyncIteratorWrapper, id="default"),
+        pytest.param(
+            {
+                "iterator_wrapper": _CustomSyncWrapper,
+                "async_iterator_wrapper": _CustomAsyncWrapper,
+            },
+            _CustomSyncWrapper,
+            _CustomAsyncWrapper,
+            id="custom",
+        ),
+    ],
+)
+async def test_add_accumulator_wraps_stream_by_its_protocol(
+    weave_active, wrapper_kwargs, sync_class, async_class
+):
+    @weave.op
+    def stream_op(is_async: bool):
+        return _async_numbers() if is_async else iter([1])
+
+    _add_accumulator(
+        stream_op,
+        make_accumulator=lambda inputs: lambda acc, value: value,
+        **wrapper_kwargs,
+    )
+
+    sync_stream = stream_op(False)
+    assert type(sync_stream) is sync_class
+    assert list(sync_stream) == [1]
+
+    async_stream = stream_op(True)
+    assert type(async_stream) is async_class
+    assert [value async for value in async_stream] == [1]
 
 
 @pytest.mark.disable_logging_error_check

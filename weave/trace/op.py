@@ -553,7 +553,6 @@ def _call_sync_func(
                 output,
                 op._accumulator,
                 finish,
-                _IteratorWrapper,
             )
 
         # Original behavior: if no handler and no accumulator for an iterator,
@@ -675,14 +674,13 @@ async def _call_async_func(
 
         if (
             op._accumulator
-            and isinstance(output, AsyncIterator)
+            and isinstance(output, (AsyncIterator, _IteratorWrapperBase))
             and not isinstance(output, (str, bytes))
         ):
             return _build_iterator_from_accumulator_for_op(
                 output,
                 op._accumulator,
                 finish,
-                _IteratorWrapper,
             )
         else:
             finish(output)
@@ -1518,7 +1516,7 @@ def _call_on_close_for_wrapper_ref(wrapper_ref: weakref.ReferenceType) -> None:
         wrapper._call_on_close_once()
 
 
-class _IteratorWrapper(Generic[V]):
+class _IteratorWrapperBase(Generic[V]):
     """This class wraps an iterator object allowing hooks to be added to the lifecycle of the iterator. It is likely
     that this class will be helpful in other contexts and might be moved to a more general location in the future.
     """
@@ -1587,10 +1585,31 @@ class _IteratorWrapper(Generic[V]):
             self._on_finished_called = True
             self._detach_process_exit_finalizer()
 
-    def __iter__(self) -> _IteratorWrapper:
+    def __del__(self) -> None:
+        self._call_on_close_once()
+
+    def close(self) -> None:
+        self._call_on_close_once()
+
+    def __getattr__(self, name: str) -> Any:
+        """Delegate all other attributes to the wrapped iterator."""
+        if name in {
+            "_iterator_or_ctx_manager",
+            "_on_yield",
+            "_on_error",
+            "_on_close",
+            "_on_finished_called",
+            "_call_on_error_once",
+        }:
+            return object.__getattribute__(self, name)
+        return getattr(self._iterator_or_ctx_manager, name)
+
+
+class _SyncIteratorWrapper(_IteratorWrapperBase[V]):
+    def __iter__(self) -> Self:
         return self
 
-    def __next__(self) -> Generator[None, None, V]:
+    def __next__(self) -> V:
         if not hasattr(self._iterator_or_ctx_manager, "__next__"):
             try:
                 # This is kept as a type ignore because the `google-generativeai` pkg seems
@@ -1626,10 +1645,32 @@ class _IteratorWrapper(Generic[V]):
         else:
             return value
 
-    def __aiter__(self) -> _IteratorWrapper:
+    def __enter__(self) -> Self:
+        if hasattr(self._iterator_or_ctx_manager, "__enter__"):
+            # let's enter the context manager to get the stream iterator
+            self._iterator_or_ctx_manager = self._iterator_or_ctx_manager.__enter__()
         return self
 
-    async def __anext__(self) -> Generator[None, None, V]:
+    def __exit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_value: BaseException | None,
+        traceback: types.TracebackType | None,
+    ) -> None:
+        if exc_type and isinstance(exc_value, Exception):
+            self._call_on_error_once(exc_value)
+        if hasattr(
+            self._iterator_or_ctx_manager, "__exit__"
+        ):  # case where is a context mngr
+            self._iterator_or_ctx_manager.__exit__(exc_type, exc_value, traceback)
+        self._call_on_close_once()
+
+
+class _AsyncIteratorWrapper(_IteratorWrapperBase[V]):
+    def __aiter__(self) -> Self:
+        return self
+
+    async def __anext__(self) -> V:
         if not hasattr(self._iterator_or_ctx_manager, "__anext__"):
             try:
                 # This is kept as a type ignore because the `google-generativeai` pkg seems
@@ -1667,45 +1708,6 @@ class _IteratorWrapper(Generic[V]):
         else:
             return value
 
-    def __del__(self) -> None:
-        self._call_on_close_once()
-
-    def close(self) -> None:
-        self._call_on_close_once()
-
-    def __getattr__(self, name: str) -> Any:
-        """Delegate all other attributes to the wrapped iterator."""
-        if name in {
-            "_iterator_or_ctx_manager",
-            "_on_yield",
-            "_on_error",
-            "_on_close",
-            "_on_finished_called",
-            "_call_on_error_once",
-        }:
-            return object.__getattribute__(self, name)
-        return getattr(self._iterator_or_ctx_manager, name)
-
-    def __enter__(self) -> Self:
-        if hasattr(self._iterator_or_ctx_manager, "__enter__"):
-            # let's enter the context manager to get the stream iterator
-            self._iterator_or_ctx_manager = self._iterator_or_ctx_manager.__enter__()
-        return self
-
-    def __exit__(
-        self,
-        exc_type: type[BaseException] | None,
-        exc_value: BaseException | None,
-        traceback: types.TracebackType | None,
-    ) -> None:
-        if exc_type and isinstance(exc_value, Exception):
-            self._call_on_error_once(exc_value)
-        if hasattr(
-            self._iterator_or_ctx_manager, "__exit__"
-        ):  # case where is a context mngr
-            self._iterator_or_ctx_manager.__exit__(exc_type, exc_value, traceback)
-        self._call_on_close_once()
-
     async def __aenter__(self) -> Self:
         if hasattr(
             self._iterator_or_ctx_manager, "__aenter__"
@@ -1726,17 +1728,40 @@ class _IteratorWrapper(Generic[V]):
         self._call_on_close_once()
 
 
+class _DualIteratorWrapper(_SyncIteratorWrapper[V], _AsyncIteratorWrapper[V]):
+    """Wraps a stream that supports both protocols itself, or neither."""
+
+
+_SYNC_STREAM_ATTRS = ("__iter__", "__enter__")
+_ASYNC_STREAM_ATTRS = ("__aiter__", "__aenter__")
+
+
+def _select_iterator_wrapper(
+    value: Any,
+    sync_wrapper: type[_SyncIteratorWrapper],
+    async_wrapper: type[_AsyncIteratorWrapper],
+) -> type[_IteratorWrapperBase]:
+    # Look in the class dicts, as `for` and `with` do, so no `__getattr__` runs.
+    mro = type(value).__mro__
+    is_sync = any(attr in vars(cls) for cls in mro for attr in _SYNC_STREAM_ATTRS)
+    is_async = any(attr in vars(cls) for cls in mro for attr in _ASYNC_STREAM_ATTRS)
+    if is_sync and not is_async:
+        return sync_wrapper
+    if is_async and not is_sync:
+        return async_wrapper
+    return _DualIteratorWrapper
+
+
 def _build_iterator_from_accumulator_for_op(
     value: Iterator[V] | AsyncIterator[V],
     accumulator: Callable,
     on_finish: FinishCallbackType,
-    iterator_wrapper: type[_IteratorWrapper] = _IteratorWrapper,
-) -> _IteratorWrapper:
+) -> _IteratorWrapperBase:
     return _build_iterator_from_accumulator_for_op_impl(
         value,
         accumulator,
         on_finish,
-        iterator_wrapper,
+        _select_iterator_wrapper(value, _SyncIteratorWrapper, _AsyncIteratorWrapper),
     )
 
 
@@ -1746,7 +1771,8 @@ def _add_accumulator(
     *,
     should_accumulate: Callable[[dict], bool] | None = None,
     on_finish_post_processor: Callable[[Any], Any] | None = None,
-    iterator_wrapper: type[_IteratorWrapper] = _IteratorWrapper,
+    iterator_wrapper: type[_SyncIteratorWrapper] = _SyncIteratorWrapper,
+    async_iterator_wrapper: type[_AsyncIteratorWrapper] = _AsyncIteratorWrapper,
 ) -> Op:
     """This is to be used internally only - specifically designed for integrations with streaming libraries.
 
@@ -1778,5 +1804,9 @@ def _add_accumulator(
         make_accumulator,
         should_accumulate=should_accumulate,
         on_finish_post_processor=on_finish_post_processor,
-        iterator_wrapper=iterator_wrapper,
+        select_iterator_wrapper=partial(
+            _select_iterator_wrapper,
+            sync_wrapper=iterator_wrapper,
+            async_wrapper=async_iterator_wrapper,
+        ),
     )

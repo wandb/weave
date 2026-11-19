@@ -62,7 +62,7 @@ def _add_accumulator(
     *,
     should_accumulate: Callable[[dict], bool] | None = None,
     on_finish_post_processor: Callable[[Any], Any] | None = None,
-    iterator_wrapper: type[Any],
+    select_iterator_wrapper: Callable[[Any], type[Any]],
 ) -> Op:
     def on_output(
         value: Iterator[V] | AsyncIterator[V],
@@ -76,7 +76,7 @@ def _add_accumulator(
                 value,
                 accumulator,
                 on_finish,
-                iterator_wrapper,
+                select_iterator_wrapper(value),
             )
         else:
             on_finish(value, None)
