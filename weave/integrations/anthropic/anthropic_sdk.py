@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import importlib
+import json
 from collections.abc import AsyncIterator, Callable, Coroutine, Iterator
 from functools import wraps
 from typing import TYPE_CHECKING, Any
@@ -11,12 +12,16 @@ from anthropic.types import (
     Message,
     MessageStreamEvent,
     RawContentBlockDeltaEvent,
+    RawContentBlockStartEvent,
+    RawContentBlockStopEvent,
     RawMessageDeltaEvent,
     TextBlock,
     Usage,
 )
 from anthropic.types.beta import (
     BetaRawContentBlockDeltaEvent,
+    BetaRawContentBlockStartEvent,
+    BetaRawContentBlockStopEvent,
     BetaRawMessageDeltaEvent,
     BetaRawMessageStopEvent,
 )
@@ -74,6 +79,47 @@ def anthropic_on_finish(
     model_usage["input_tokens"] = input_tokens + cache_read + cache_creation
 
 
+def _apply_content_block_delta(acc: Message, value: Any) -> None:
+    delta = value.delta
+    content: list[Any] = acc.content
+    if value.index >= len(content):
+        if hasattr(delta, "text"):
+            if content and getattr(content[-1], "type", None) == "text":
+                content[-1].text += delta.text
+            else:
+                content.append(TextBlock(type="text", text=delta.text))
+        return
+    block = content[value.index]
+    if delta.type == "text_delta":
+        block.text += delta.text
+    elif delta.type == "input_json_delta":
+        if not isinstance(block.input, str):
+            block.input = ""
+        block.input += delta.partial_json
+    elif delta.type == "thinking_delta":
+        block.thinking += delta.thinking
+    elif delta.type == "signature_delta":
+        block.signature = delta.signature
+    elif delta.type == "citations_delta":
+        block.citations = [*(block.citations or []), delta.citation]
+
+
+def _finish_content_block(acc: Message, index: int) -> None:
+    if index >= len(acc.content):
+        return
+    block: Any = acc.content[index]
+    raw_input = getattr(block, "input", None)
+    if not isinstance(raw_input, str):
+        return
+    if not raw_input:
+        block.input = {}
+        return
+    try:
+        block.input = json.loads(raw_input)
+    except json.JSONDecodeError:
+        pass
+
+
 def anthropic_accumulator(
     acc: Message | None,
     value: MessageStreamEvent,
@@ -104,14 +150,12 @@ def anthropic_accumulator(
     if hasattr(value, "message") and value.message.usage is not None:
         acc.usage.input_tokens += value.message.usage.input_tokens
 
-    # Accumulate the content if it's a ContentBlockDeltaEvent
-    if isinstance(
-        value, (RawContentBlockDeltaEvent, BetaRawContentBlockDeltaEvent)
-    ) and hasattr(value.delta, "text"):
-        if acc.content and isinstance(acc.content[-1], TextBlock):
-            acc.content[-1].text += value.delta.text
-        else:
-            acc.content.append(TextBlock(type="text", text=value.delta.text))
+    if isinstance(value, (RawContentBlockStartEvent, BetaRawContentBlockStartEvent)):
+        acc.content.append(value.content_block.model_copy(deep=True))
+    elif isinstance(value, (RawContentBlockDeltaEvent, BetaRawContentBlockDeltaEvent)):
+        _apply_content_block_delta(acc, value)
+    elif isinstance(value, (RawContentBlockStopEvent, BetaRawContentBlockStopEvent)):
+        _finish_content_block(acc, value.index)
 
     # Handle MessageDeltaEvent for stop_reason and stop_sequence
     if isinstance(value, (RawMessageDeltaEvent, BetaRawMessageDeltaEvent)):
