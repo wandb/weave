@@ -153,10 +153,13 @@ def _encode_container(
     if isinstance(obj, (list, tuple)):
         return [to_json(v, project_id, client, use_dictify) for v in obj]
     if isinstance(obj, dict):
-        return {
-            _encode_dict_key(k): to_json(v, project_id, client, use_dictify)
-            for k, v in obj.items()
-        }
+        encoded: dict[Any, Any] = {}
+        for key, value in obj.items():
+            encoded_key = _encode_dict_key(key)
+            # Keep the last position for keys that Pydantic later treats as equal.
+            encoded.pop(encoded_key, None)
+            encoded[encoded_key] = to_json(value, project_id, client, use_dictify)
+        return encoded
     return _MISS
 
 
