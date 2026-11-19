@@ -415,7 +415,7 @@ def is_tracing_setting_disabled() -> bool:
     if client is None:
         log_once(logger.warning, UNINITIALIZED_MSG)
         return True
-    if client._disabled:
+    if client.is_disabled:
         return True
     if not get_tracing_enabled():
         return True

@@ -599,6 +599,11 @@ class WeaveClient:
         if not self._disabled:
             self._warm_project_id_resolver()
 
+    @property
+    def is_disabled(self) -> bool:
+        """Return whether this client was initialized as disabled."""
+        return self._disabled
+
     def _on_wal_send(self, record_type: str, record: dict) -> None:
         """Callback fired by the WAL sender after a record reaches the server."""
         if record_type != "call_start" or not should_print_call_link():

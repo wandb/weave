@@ -213,7 +213,7 @@ def publish(
         save_name = obj.__class__.__name__
 
     client = weave_client_context.get_weave_client()
-    if should_disable_weave() or (client is not None and client._disabled):
+    if should_disable_weave() or (client is not None and client.is_disabled):
         return weave_client.ObjectRef(
             entity="DISABLED",
             project="DISABLED",
