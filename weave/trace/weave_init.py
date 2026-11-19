@@ -31,6 +31,7 @@ from weave.trace_server_bindings.caching_middleware_trace_server import (
     CachingMiddlewareTraceServer,
 )
 from weave.trace_server_bindings.client_interface import TraceServerClientInterface
+from weave.trace_server_bindings.remote_http_trace_server import RemoteHTTPTraceServer
 from weave.trace_server_version import MIN_TRACE_SERVER_VERSION
 from weave.version import VERSION
 from weave.wandb_interface.auth import (
@@ -357,8 +358,22 @@ def init_weave(
         wandb_run_id = f"{entity_name}/{project_name}/{wb_run_context.run_id}"
         check_wandb_run_matches(wandb_run_id, entity_name, project_name)
 
-    remote_server = init_weave_get_server(credentials)
+    remote_server = init_weave_get_server(credentials, should_batch=False)
     server_info = _get_server_info(remote_server)
+    trace_server_url = env.weave_trace_server_url()
+    if not init_message.check_min_weave_version(
+        server_info.min_required_weave_python_version, trace_server_url
+    ):
+        return init_weave_disabled()
+
+    if not init_message.check_min_trace_server_version(
+        server_info.trace_server_version,
+        MIN_TRACE_SERVER_VERSION,
+        trace_server_url,
+    ):
+        return init_weave_disabled()
+
+    remote_server.start_batching()
     server: TraceServerClientInterface = remote_server
     if use_server_cache():
         server = CachingMiddlewareTraceServer.from_env(server)
@@ -393,22 +408,6 @@ def init_weave(
 
         track_pii_redaction_enabled(username or "unknown", entity_name, project_name)
 
-    min_required_version = server_info.min_required_weave_python_version
-    trace_server_version = server_info.trace_server_version
-    trace_server_url = env.weave_trace_server_url()
-    if not init_message.check_min_weave_version(min_required_version, trace_server_url):
-        return init_weave_disabled()
-    if not init_message.check_min_trace_server_version(
-        trace_server_version,
-        MIN_TRACE_SERVER_VERSION,
-        trace_server_url,
-    ):
-        return init_weave_disabled()
-
-    # Configure Conversation SDK OTel tracing using the same server credentials.
-    # Placed after the version checks so a disabled init never installs a
-    # global TracerProvider that would keep exporting spans to an
-    # incompatible server.
     _setup_conversation_tracing(entity_name, project_name, credentials)
 
     init_message.print_init_message(
@@ -435,12 +434,12 @@ def init_weave_disabled(
 ) -> weave_client.WeaveClient:
     """Initialize a dummy client that does nothing.
 
-    This is used when the program is execuring with Weave disabled.
+    This is used when the program is executing with Weave disabled.
 
     Note: as currently implemented, any explicit calls to client.{X} will
     likely fail, since the user is not authenticated. The purpose of
     disabling weave is to disable _tracing_. Programs that attempt to
-    make requests (eg. publishing, fetching, querying) while disabled
+    make requests (eg. fetching, querying) while disabled
     will fail.
     """
     current_client = weave_client_context.get_weave_client()
@@ -455,6 +454,7 @@ def init_weave_disabled(
         postprocess_inputs=postprocess_inputs,
         postprocess_output=postprocess_output,
         attributes=attributes,
+        _disabled=True,
     )
 
     weave_client_context.set_weave_client_global(client)
@@ -464,11 +464,7 @@ def init_weave_disabled(
 def init_weave_get_server(
     credentials: WandbCredentials | None = None,
     should_batch: bool = True,
-) -> TraceServerClientInterface:
-    from weave.trace_server_bindings.remote_http_trace_server import (
-        RemoteHTTPTraceServer,
-    )
-
+) -> RemoteHTTPTraceServer:
     if not should_use_stainless_server():
         log_once(
             logger.warning,

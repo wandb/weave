@@ -302,8 +302,8 @@ class RemoteHTTPTraceServer(TraceServerClientInterface):
         extra_headers: dict[str, str] | None = None,
     ):
         self.trace_server_url = trace_server_url.rstrip("/")
-        self.should_batch = should_batch
-        self.use_calls_complete = should_use_calls_complete() and should_batch
+        self.should_batch = False
+        self.use_calls_complete = False
         self.call_processor: AsyncBatchProcessor | CallBatchProcessor | None = None
         self.feedback_processor: AsyncBatchProcessor | None = None
         self.remote_request_bytes_limit = remote_request_bytes_limit
@@ -313,25 +313,34 @@ class RemoteHTTPTraceServer(TraceServerClientInterface):
         )
         self._rebuild_client()
 
+        if should_batch:
+            self.start_batching()
+
+    def start_batching(self) -> None:
+        """Start write processors before publishing the client to callers."""
         if self.should_batch:
-            if self.use_calls_complete:
-                self.call_processor = CallBatchProcessor(
-                    complete_processor_fn=self._flush_calls_complete,
-                    eager_processor_fn=self._flush_calls_eager,
-                    max_queue_size=max_calls_queue_size(),
-                    enable_disk_fallback=should_enable_disk_fallback(),
-                )
-            else:
-                self.call_processor = AsyncBatchProcessor(
-                    self._flush_calls,
-                    max_queue_size=max_calls_queue_size(),
-                    enable_disk_fallback=should_enable_disk_fallback(),
-                )
-            self.feedback_processor = AsyncBatchProcessor(
-                self._flush_feedback,
+            return
+
+        self.use_calls_complete = should_use_calls_complete()
+        if self.use_calls_complete:
+            self.call_processor = CallBatchProcessor(
+                complete_processor_fn=self._flush_calls_complete,
+                eager_processor_fn=self._flush_calls_eager,
                 max_queue_size=max_calls_queue_size(),
                 enable_disk_fallback=should_enable_disk_fallback(),
             )
+        else:
+            self.call_processor = AsyncBatchProcessor(
+                self._flush_calls,
+                max_queue_size=max_calls_queue_size(),
+                enable_disk_fallback=should_enable_disk_fallback(),
+            )
+        self.feedback_processor = AsyncBatchProcessor(
+            self._flush_feedback,
+            max_queue_size=max_calls_queue_size(),
+            enable_disk_fallback=should_enable_disk_fallback(),
+        )
+        self.should_batch = True
 
     def ensure_project_exists(
         self, entity: str, project: str
