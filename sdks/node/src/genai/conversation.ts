@@ -44,6 +44,18 @@ export interface ConversationInit {
   conversationId?: string;
 
   /**
+   * ID of the end user the agent acts for. Propagated to every span under
+   * this conversation as `user.id`.
+   */
+  userId?: string;
+
+  /**
+   * Email of the end user the agent acts for. Propagated to every span under
+   * this conversation as `user.email`.
+   */
+  userEmail?: string;
+
+  /**
    * Custom attributes propagated to every span the conversation emits.
    *
    * A key here that collides with a span's own `gen_ai.*` / `weave.*`
@@ -59,6 +71,8 @@ type Opts = {
   agentName: string;
   model: string;
   conversationId: string;
+  userId: string;
+  userEmail: string;
   attributes: Attributes;
   agentId: string;
   agentDescription: string;
@@ -74,6 +88,8 @@ export class Conversation {
 
   private _model: string;
   private _conversationId: string;
+  private _userId: string;
+  private _userEmail: string;
   private _agentId: string;
   private _agentName: string;
   private _agentDescription: string;
@@ -84,6 +100,8 @@ export class Conversation {
   private constructor(opts: Opts) {
     this._model = opts.model;
     this._conversationId = opts.conversationId;
+    this._userId = opts.userId;
+    this._userEmail = opts.userEmail;
     this._attributes = opts.attributes;
     this._agentId = opts.agentId;
     this._agentName = opts.agentName;
@@ -101,6 +119,14 @@ export class Conversation {
 
   public get conversationId() {
     return this._conversationId;
+  }
+
+  public get userId() {
+    return this._userId;
+  }
+
+  public get userEmail() {
+    return this._userEmail;
   }
 
   public get attributes() {
@@ -126,6 +152,8 @@ export class Conversation {
       agentDescription: opts.agentDescription ?? '',
       agentVersion: opts.agentVersion ?? '',
       conversationId: opts.conversationId ?? opts.sessionId ?? uuidv7(),
+      userId: opts.userId ?? '',
+      userEmail: opts.userEmail ?? '',
       attributes: opts.attributes ?? {},
     });
     state.conversation = conversation;
@@ -162,6 +190,8 @@ export class Conversation {
       agentDescription: opts.agentDescription ?? this._agentDescription,
       agentVersion: opts.agentVersion ?? this._agentVersion,
       conversationId: this._conversationId,
+      userId: opts.userId ?? this._userId,
+      userEmail: opts.userEmail ?? this._userEmail,
       // Turn inherits the conversation's attributes; a per-turn key wins.
       attributes: opts.attributes
         ? {...this._attributes, ...opts.attributes}

@@ -162,6 +162,8 @@ def invoke_agent_attributes(
     *,
     agent_name: str,
     conversation_id: str = "",
+    user_id: str = "",
+    user_email: str = "",
     conversation_name: str = "",
     provider_name: str = "",
     model: str = "",
@@ -185,6 +187,10 @@ def invoke_agent_attributes(
     }
     if conversation_id:
         attrs["gen_ai.conversation.id"] = conversation_id
+    if user_id:
+        attrs["user.id"] = user_id
+    if user_email:
+        attrs["user.email"] = user_email
     if conversation_name:
         attrs["gen_ai.conversation.name"] = conversation_name
     if provider_name:
@@ -218,6 +224,8 @@ def llm_attributes(
     model: str,
     provider_name: str = "",
     conversation_id: str = "",
+    user_id: str = "",
+    user_email: str = "",
     input_messages: list[Message] | None = None,
     output_messages: list[Message] | None = None,
     media_attachments: list[MediaAttachment] | None = None,
@@ -250,6 +258,10 @@ def llm_attributes(
     }
     if conversation_id:
         attrs["gen_ai.conversation.id"] = conversation_id
+    if user_id:
+        attrs["user.id"] = user_id
+    if user_email:
+        attrs["user.email"] = user_email
     if provider_name:
         attrs["gen_ai.provider.name"] = provider_name
     if response_id:
@@ -317,6 +329,8 @@ def execute_tool_attributes(
     *,
     tool_name: str,
     conversation_id: str = "",
+    user_id: str = "",
+    user_email: str = "",
     tool_call_arguments: str = "",
     tool_call_result: str = "",
     tool_call_id: str = "",
@@ -331,6 +345,10 @@ def execute_tool_attributes(
     }
     if conversation_id:
         attrs["gen_ai.conversation.id"] = conversation_id
+    if user_id:
+        attrs["user.id"] = user_id
+    if user_email:
+        attrs["user.email"] = user_email
     if tool_call_id:
         attrs["gen_ai.tool.call.id"] = tool_call_id
     if tool_call_arguments:

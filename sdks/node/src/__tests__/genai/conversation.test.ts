@@ -1,6 +1,8 @@
 import {
   ATTR_GEN_AI_AGENT_NAME,
   ATTR_GEN_AI_CONVERSATION_ID,
+  ATTR_USER_EMAIL,
+  ATTR_USER_ID,
 } from '../../genai/semconv';
 import {Conversation, Session} from '../../genai/conversation';
 
@@ -137,5 +139,58 @@ describe('Conversation', () => {
         "startTime": "<timestamp>",
       }
     `);
+  });
+
+  it('propagates userId / userEmail as user.id / user.email to every span', () => {
+    const conversation = Conversation.create({
+      agentName: 'bot',
+      conversationId: 'c-user',
+      userId: 'user-123',
+      userEmail: 'ada@example.com',
+    });
+    const turn = conversation.startTurn();
+    const llm = turn.startLLM({model: 'gpt-4o'});
+    llm.startTool({name: 'nested'}).end();
+    llm.end();
+    turn.startTool({name: 'Edit'}).end();
+    const subagent = turn.startSubagent({name: 'researcher'});
+    subagent.startLLM({model: 'gpt-4o-mini'}).end();
+    subagent.end();
+    turn.end();
+    conversation.end();
+
+    const spans = getExporter().getFinishedSpans();
+    expect(spans.map(span => span.name).sort()).toEqual([
+      'chat gpt-4o',
+      'chat gpt-4o-mini',
+      'execute_tool Edit',
+      'execute_tool nested',
+      'invoke_agent bot',
+      'invoke_agent researcher',
+    ]);
+    for (const span of spans) {
+      expect(span.attributes[ATTR_USER_ID]).toBe('user-123');
+      expect(span.attributes[ATTR_USER_EMAIL]).toBe('ada@example.com');
+    }
+  });
+
+  it('a turn-level userId overrides the conversation value', () => {
+    const conversation = Conversation.create({userId: 'conv-user'});
+    conversation.startTurn({agentName: 'bot', userId: 'turn-user'}).end();
+    conversation.end();
+
+    const span = findSpan(getExporter().getFinishedSpans(), 'invoke_agent bot');
+    expect(span.attributes[ATTR_USER_ID]).toBe('turn-user');
+    expect(span.attributes[ATTR_USER_EMAIL]).toBeUndefined();
+  });
+
+  it('emits no user attributes by default', () => {
+    const conversation = Conversation.create({});
+    conversation.startTurn({agentName: 'bot'}).end();
+    conversation.end();
+
+    const span = findSpan(getExporter().getFinishedSpans(), 'invoke_agent bot');
+    expect(span.attributes[ATTR_USER_ID]).toBeUndefined();
+    expect(span.attributes[ATTR_USER_EMAIL]).toBeUndefined();
   });
 });
