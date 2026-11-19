@@ -426,6 +426,10 @@ def should_skip_tracing_for_op(op: Op) -> bool:
     return not op._tracing_enabled
 
 
+def _should_skip_op_wrapper(op: Op) -> bool:
+    return is_tracing_setting_disabled() or should_skip_tracing_for_op(op)
+
+
 def _should_sample_traces(op: Op) -> bool:
     if call_context.get_current_call():
         return False  # Don't sample traces for child calls
@@ -475,7 +479,7 @@ def _call_sync_func(
     call = placeholder_call()
 
     # Handle all of the possible cases where we would skip tracing.
-    if is_tracing_setting_disabled() or should_skip_tracing_for_op(op):
+    if _should_skip_op_wrapper(op):
         res = func(*args, **kwargs)
         call.output = res
         return res, call
@@ -606,7 +610,7 @@ async def _call_async_func(
     call = placeholder_call()
 
     # Handle all of the possible cases where we would skip tracing.
-    if is_tracing_setting_disabled() or should_skip_tracing_for_op(op):
+    if _should_skip_op_wrapper(op):
         res = await func(*args, **kwargs)
         call.output = res
         return res, call
@@ -733,7 +737,7 @@ def _call_sync_gen(
     call = placeholder_call()
 
     # Handle all of the possible cases where we would skip tracing.
-    if should_skip_tracing_for_op(op):
+    if _should_skip_op_wrapper(op):
         gen = func(*args, **kwargs)
         call.output = gen
         return gen, call
@@ -954,7 +958,7 @@ def _call_async_gen(
     call = placeholder_call()
 
     # Handle all of the possible cases where we would skip tracing.
-    if should_skip_tracing_for_op(op):
+    if _should_skip_op_wrapper(op):
         gen = func(*args, **kwargs)
         call.output = gen
         return gen, call

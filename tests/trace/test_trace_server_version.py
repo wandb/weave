@@ -1,6 +1,6 @@
 """Tests for trace server version checking."""
 
-import asyncio
+from collections.abc import AsyncIterator, Iterator
 from unittest import mock
 
 import httpx
@@ -20,9 +20,10 @@ TEST_SERVER_URL = "https://test.trace.server"
 MIN_SERVER_VERSION = "1.0.0"
 
 
+@pytest.mark.asyncio
 @pytest.mark.trace_server
 @pytest.mark.parametrize("disabled_by", ["client_version", "server_version", "setting"])
-def test_init_disabled_blocks_writes_and_can_reenable(monkeypatch, disabled_by):
+async def test_init_disabled_blocks_writes_and_can_reenable(monkeypatch, disabled_by):
     server_info = {
         "min_required_weave_python_version": "0.0.0",
         "trace_server_version": MIN_SERVER_VERSION,
@@ -73,12 +74,24 @@ def test_init_disabled_blocks_writes_and_can_reenable(monkeypatch, disabled_by):
     async def increment_async(value: int) -> int:
         return value + 1
 
+    @weave.op
+    def generate() -> Iterator[int]:
+        yield 3
+
+    @weave.op
+    async def generate_async() -> AsyncIterator[int]:
+        yield 3
+
     try:
         client = weave.init("test-entity/test-project")
         monkeypatch.delenv("WEAVE_DISABLED", raising=False)
         transport.reset_mock()
         assert increment(2) == 3
-        assert asyncio.run(increment_async(2)) == 3
+        assert await increment_async(2) == 3
+        values = list(generate())
+        async_values = [value async for value in generate_async()]
+        assert values == async_values == [3]
+        assert [type(value) for value in values + async_values] == [int, int]
         ref = weave.publish(
             Image.new("RGB", (1, 1)), name="image", tags=["test"], aliases=["test"]
         )
@@ -93,7 +106,7 @@ def test_init_disabled_blocks_writes_and_can_reenable(monkeypatch, disabled_by):
         client = weave.init("test-entity/test-project")
         transport.reset_mock()
         assert increment(4) == 5
-        assert asyncio.run(increment_async(4)) == 5
+        assert await increment_async(4) == 5
         client.flush()
         paths = {call.args[0].url.path for call in transport.call_args_list}
         call_endpoint = (
