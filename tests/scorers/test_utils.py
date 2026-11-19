@@ -6,6 +6,8 @@ import torch
 from pydantic import BaseModel
 from torch import Tensor
 
+from weave.scorers import utils as scorer_utils
+from weave.scorers.default_models import MODEL_PATHS
 from weave.scorers.utils import (
     download_model_from_huggingface_hub,
     download_model_from_wandb,
@@ -169,3 +171,51 @@ def test_load_hf_model_weights_with_wandb_artifact():
     )
     assert os.path.exists(result_path)
     assert os.path.isdir(result_path)
+
+
+@pytest.fixture
+def fake_model_downloads(monkeypatch):
+    monkeypatch.setattr(
+        scorer_utils,
+        "download_model_from_huggingface_hub",
+        lambda model_name: f"hf-hub/{model_name}",
+    )
+    monkeypatch.setattr(
+        scorer_utils,
+        "download_model_from_wandb",
+        lambda artifact_path: f"wandb-artifact/{artifact_path}",
+    )
+
+
+@pytest.mark.trace_server
+def test_load_local_model_weights_prefers_local_dir_over_default(
+    tmp_path, fake_model_downloads
+):
+    result_path = load_local_model_weights(
+        model_name_or_path=str(tmp_path),
+        default_model=MODEL_PATHS["bias_scorer"],
+    )
+    assert result_path == str(tmp_path)
+
+
+@pytest.mark.trace_server
+def test_load_local_model_weights_prefers_wandb_artifact_over_default(
+    fake_model_downloads,
+):
+    result_path = load_local_model_weights(
+        model_name_or_path=TINY_MODEL_PATHS["bias_scorer"],
+        default_model=MODEL_PATHS["bias_scorer"],
+    )
+    assert result_path == f"wandb-artifact/{TINY_MODEL_PATHS['bias_scorer']}"
+
+
+@pytest.mark.trace_server
+@pytest.mark.parametrize("model_name_or_path", ["", MODEL_PATHS["bias_scorer"]])
+def test_load_local_model_weights_downloads_default_from_hf_hub(
+    model_name_or_path, fake_model_downloads
+):
+    result_path = load_local_model_weights(
+        model_name_or_path=model_name_or_path,
+        default_model=MODEL_PATHS["bias_scorer"],
+    )
+    assert result_path == f"hf-hub/{MODEL_PATHS['bias_scorer']}"
