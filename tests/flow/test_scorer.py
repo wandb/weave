@@ -1,11 +1,376 @@
+import asyncio
+import json
+import math
+from fractions import Fraction
 from unittest.mock import MagicMock
 
 import pytest
 from pydantic import BaseModel
 
-from weave.flow.scorer import Scorer, auto_summarize
-from weave.trace.object_record import ObjectRecord
+import weave
+from weave.flow.scorer import Scorer, apply_scorer_async, auto_summarize
+from weave.trace.box import BoxedFloat, BoxedInt, BoxedStr
+from weave.trace.object_record import ObjectRecord, pydantic_object_record
+from weave.trace.objectify import maybe_objectify, register_object
 from weave.trace.vals import WeaveDict, WeaveObject
+
+
+@weave.op
+def _binary_correct(output):
+    return output
+
+
+def _bayes_scorer(**kwargs):
+    return weave.BayesAtNScorer(
+        scorer=_binary_correct,
+        question_ids=["q0", "q1"],
+        trial_ids=[0, 1],
+        **kwargs,
+    )
+
+
+def _trial_rows(outcomes):
+    return [
+        {"question_id": f"q{question}", "trial_id": trial, "correct": value}
+        for question, values in enumerate(outcomes)
+        for trial, value in enumerate(values)
+    ]
+
+
+@pytest.mark.trace_server
+@pytest.mark.parametrize(
+    ("outcomes", "variance"),
+    [([[0, 0], [1, 1]], Fraction(3, 160)), ([[0, 1], [0, 1]], Fraction(1, 40))],
+)
+def test_bayes_at_n_preserves_question_posteriors(outcomes, variance):
+    scorer = _bayes_scorer()
+    expected = {"posterior_mean": 0.5, "posterior_sd": math.sqrt(variance)}
+    assert scorer.summarize(_trial_rows(outcomes)) == pytest.approx(expected)
+    assert scorer.summarize(list(reversed(_trial_rows(outcomes)))) == pytest.approx(
+        expected
+    )
+
+
+@pytest.mark.trace_server
+@pytest.mark.parametrize("correct", [False, True])
+def test_bayes_at_n_one_trial(correct):
+    scorer = weave.BayesAtNScorer(
+        scorer=_binary_correct, question_ids=["q0"], trial_ids=[0]
+    )
+    assert scorer.summarize(_trial_rows([[correct]])) == pytest.approx(
+        {
+            "posterior_mean": float(Fraction(2 if correct else 1, 3)),
+            "posterior_sd": math.sqrt(Fraction(1, 18)),
+        }
+    )
+
+
+@pytest.mark.trace_server
+def test_bayes_at_n_representative_cohort():
+    outcomes = [[0, 1, 1, 0, 1], [1, 1, 1, 1, 1], [0, 0, 0, 0, 0]]
+    means = [Fraction(4, 7), Fraction(6, 7), Fraction(1, 7)]
+    variances = [Fraction(12, 392), Fraction(6, 392), Fraction(6, 392)]
+    scorer = weave.BayesAtNScorer(
+        scorer=_binary_correct,
+        question_ids=["q0", "q1", "q2"],
+        trial_ids=list(range(5)),
+    )
+    assert scorer.summarize(_trial_rows(outcomes)) == pytest.approx(
+        {
+            "posterior_mean": float(sum(means) / 3),
+            "posterior_sd": math.sqrt(sum(variances)) / 3,
+        }
+    )
+
+
+@pytest.mark.trace_server
+@pytest.mark.parametrize("bad", [0.0, 0.5, 1.0, float("nan"), "C", None, {}, []])
+@pytest.mark.asyncio
+async def test_bayes_at_n_rejects_nonbinary_grades(bad):
+    with pytest.raises(ValueError, match="bool or integer 0/1"):
+        await _bayes_scorer().score(
+            output=bad, question_id="q0", trial_id=0, scorer_inputs={}
+        )
+
+
+@pytest.mark.trace_server
+@pytest.mark.parametrize(
+    "rows",
+    [
+        [],
+        _trial_rows([[0, 0]]),
+        _trial_rows([[0], [1, 1]]),
+        _trial_rows([[0, 0], [1, 1]]) + _trial_rows([[0]]),
+        _trial_rows([[0, 0], [1, 1]])[:-1] + [{}],
+        _trial_rows([[0, 0], [1, 1]])[:-1] + _trial_rows([[0]]),
+        _trial_rows([[0, 0], [1, 1]])[:-1]
+        + [{"question_id": "other", "trial_id": 1, "correct": 1}],
+        _trial_rows([[0, 0], [1, 1]])[:-1]
+        + [{"question_id": "q1", "trial_id": 2, "correct": 1}],
+        _trial_rows([[0, 0], [1, 1]])[:-1]
+        + [{"question_id": "q1", "trial_id": 1, "correct": 0.5}],
+    ],
+)
+def test_bayes_at_n_rejects_incomplete_or_invalid_cohorts(rows):
+    with pytest.raises(ValueError, match="Bayes|Score|bool"):
+        _bayes_scorer().summarize(rows)
+
+
+@pytest.mark.trace_server
+@pytest.mark.parametrize("ids", [[], [1, 1], [True], [1.5], [None]])
+@pytest.mark.parametrize("field", ["question_ids", "trial_ids"])
+def test_bayes_at_n_validates_declared_ids(ids, field):
+    kwargs = {"question_ids": [1], "trial_ids": [0], field: ids}
+    with pytest.raises(ValueError, match="validation error"):
+        weave.BayesAtNScorer(scorer=_binary_correct, **kwargs)
+
+
+@pytest.mark.trace_server
+@pytest.mark.asyncio
+async def test_bayes_at_n_preserves_typed_ids_and_json_results():
+    scorer = weave.BayesAtNScorer(
+        scorer=_binary_correct, question_ids=[1, "1"], trial_ids=[1, "1"]
+    )
+    rows = [
+        await scorer.score(output=q == t, question_id=q, trial_id=t, scorer_inputs={})
+        for q in [1, "1"]
+        for t in [1, "1"]
+    ]
+    loaded = json.loads(json.dumps(rows))
+    assert loaded == [
+        {"question_id": 1, "trial_id": 1, "correct": True},
+        {"question_id": 1, "trial_id": "1", "correct": False},
+        {"question_id": "1", "trial_id": 1, "correct": False},
+        {"question_id": "1", "trial_id": "1", "correct": True},
+    ]
+    assert scorer.summarize(loaded) == pytest.approx(
+        {"posterior_mean": 0.5, "posterior_sd": math.sqrt(Fraction(1, 40))}
+    )
+    restored = weave.BayesAtNScorer.model_validate(scorer.model_dump())
+    assert restored.summarize(loaded) == scorer.summarize(loaded)
+
+
+@register_object
+class _MappedBinaryScorer(weave.Scorer):
+    @weave.op
+    async def score(self, *, output, expected):
+        await asyncio.sleep(0)
+        return {"passed": output == expected}
+
+
+@pytest.mark.trace_server
+@pytest.mark.asyncio
+async def test_bayes_at_n_preserves_wrapped_scorer_mapping_and_async():
+    wrapped = _MappedBinaryScorer(column_map={"expected": "answer"})
+    scorer = weave.BayesAtNScorer(
+        scorer=wrapped,
+        question_ids=["q"],
+        trial_ids=[0],
+        column_map={
+            "question_id": "qid",
+            "trial_id": "tid",
+            "scorer_inputs": "grading",
+        },
+        score_key="passed",
+    )
+    result = await apply_scorer_async(
+        scorer, {"qid": "q", "tid": 0, "grading": {"answer": "yes"}}, "yes"
+    )
+    assert result.result == {"question_id": "q", "trial_id": 0, "correct": True}
+
+
+@pytest.mark.trace_server
+@pytest.mark.parametrize("output", [{}, {"passed": 0.5}, True])
+@pytest.mark.asyncio
+async def test_bayes_at_n_validates_selected_score_key(output):
+    with pytest.raises(ValueError, match="score_key|bool or integer"):
+        await _bayes_scorer(score_key="passed").score(
+            output=output, question_id="q0", trial_id=0, scorer_inputs={}
+        )
+
+
+@pytest.mark.trace_server
+@pytest.mark.asyncio
+@pytest.mark.parametrize("bad", [None, [], 1])
+async def test_bayes_at_n_requires_explicit_scorer_inputs(bad):
+    with pytest.raises(TypeError, match="scorer_inputs must be a dictionary"):
+        await _bayes_scorer().score(
+            output=True, question_id="q0", trial_id=0, scorer_inputs=bad
+        )
+
+
+class _InputsMappedBinaryScorer(weave.Scorer):
+    @weave.op
+    def score(self, *, output, inputs):
+        return output == inputs
+
+
+@pytest.mark.trace_server
+@pytest.mark.asyncio
+async def test_bayes_at_n_preserves_reserved_grader_names():
+    cases = [
+        (
+            _InputsMappedBinaryScorer(column_map={"inputs": "answer"}),
+            {"answer": "yes"},
+            None,
+        ),
+        (
+            _MappedBinaryScorer(column_map={"expected": "output"}),
+            {"output": "yes"},
+            "passed",
+        ),
+    ]
+    for wrapped, payload, key in cases:
+        scorer = weave.BayesAtNScorer(
+            scorer=wrapped, question_ids=["q"], trial_ids=[0], score_key=key
+        )
+        row = {"question_id": "q", "trial_id": 0, "scorer_inputs": payload}
+        result = await apply_scorer_async(scorer, row, "yes")
+        assert result.result == {"question_id": "q", "trial_id": 0, "correct": True}
+        assert row == {"question_id": "q", "trial_id": 0, "scorer_inputs": payload}
+
+
+@weave.op
+async def _async_correct(output, expected):
+    await asyncio.sleep(0)
+    return output == expected
+
+
+@pytest.mark.trace_server
+@pytest.mark.asyncio
+async def test_bayes_at_n_wraps_async_function_scorer():
+    scorer = weave.BayesAtNScorer(
+        scorer=_async_correct, question_ids=["q"], trial_ids=[0]
+    )
+    result = await apply_scorer_async(
+        scorer,
+        {"question_id": "q", "trial_id": 0, "scorer_inputs": {"expected": "yes"}},
+        "yes",
+    )
+    assert result.result == {"question_id": "q", "trial_id": 0, "correct": True}
+
+
+@weave.op
+async def _trial_model(question_id, trial_id):
+    await asyncio.sleep(0.001 if trial_id == 0 else 0)
+    return question_id == "q1"
+
+
+@pytest.mark.trace_server
+@pytest.mark.asyncio
+async def test_bayes_at_n_public_evaluation_and_repeat_run():
+    scorer = _bayes_scorer()
+    evaluation = weave.Evaluation(
+        dataset=[
+            {"question_id": q, "trial_id": t, "scorer_inputs": {}}
+            for q in ["q0", "q1"]
+            for t in [0, 1]
+        ],
+        scorers=[scorer],
+        trials=1,
+    )
+    for _ in range(2):
+        summary = await evaluation.evaluate(_trial_model)
+        assert summary["BayesAtNScorer"] == pytest.approx(
+            {"posterior_mean": 0.5, "posterior_sd": math.sqrt(Fraction(3, 160))}
+        )
+
+
+@pytest.mark.trace_server
+@pytest.mark.asyncio
+async def test_bayes_at_n_empty_evaluation_has_no_posterior_result():
+    evaluation = weave.Evaluation(
+        dataset=[{"question_id": "q0", "trial_id": 0}],
+        scorers=[_bayes_scorer()],
+        trials=0,
+    )
+    assert await evaluation.evaluate(_trial_model) == {}
+
+
+@pytest.mark.trace_server
+@pytest.mark.asyncio
+async def test_bayes_at_n_accepts_native_boxed_scalars():
+    scorer = weave.BayesAtNScorer(
+        scorer=_binary_correct, question_ids=["q0"], trial_ids=[0]
+    )
+    row = await scorer.score(
+        output=BoxedInt(1),
+        question_id=BoxedStr("q0"),
+        trial_id=BoxedInt(0),
+        scorer_inputs={},
+    )
+    assert row == {"question_id": "q0", "trial_id": 0, "correct": True}
+    assert type(row["question_id"]) is str
+    assert type(row["trial_id"]) is int
+    boxed_row = {
+        "question_id": BoxedStr("q0"),
+        "trial_id": BoxedInt(0),
+        "correct": BoxedInt(1),
+    }
+    assert scorer.summarize([boxed_row]) == pytest.approx(
+        {"posterior_mean": 2 / 3, "posterior_sd": math.sqrt(Fraction(1, 18))}
+    )
+    with pytest.raises(ValueError, match="bool or integer 0/1"):
+        await scorer.score(
+            output=BoxedFloat(1.0),
+            question_id=BoxedStr("q0"),
+            trial_id=BoxedInt(0),
+            scorer_inputs={},
+        )
+
+
+@pytest.mark.trace_server
+@pytest.mark.asyncio
+async def test_bayes_at_n_native_object_record_round_trip():
+    wrapped = _MappedBinaryScorer(column_map={"expected": "answer"})
+    scorer = weave.BayesAtNScorer(
+        scorer=wrapped, question_ids=["q0"], trial_ids=[0], score_key="passed"
+    )
+    attributes = pydantic_object_record(scorer).__dict__.copy()
+    attributes["scorer"] = _make_weave_object(
+        pydantic_object_record(wrapped).__dict__.copy()
+    )
+    restored = maybe_objectify(_make_weave_object(attributes))
+    assert isinstance(restored, weave.BayesAtNScorer)
+    result = await apply_scorer_async(
+        restored,
+        {"question_id": "q0", "trial_id": 0, "scorer_inputs": {"answer": "yes"}},
+        "yes",
+    )
+    assert result.result == {"question_id": "q0", "trial_id": 0, "correct": True}
+    assert restored.summarize([result.result]) == pytest.approx(
+        {"posterior_mean": 2 / 3, "posterior_sd": math.sqrt(Fraction(1, 18))}
+    )
+
+
+@pytest.mark.trace_server
+@pytest.mark.parametrize(
+    "failure", ["model", "scorer", "duplicate", "missing", "trials"]
+)
+@pytest.mark.asyncio
+async def test_bayes_at_n_public_evaluation_rejects_invalid_runs(failure):
+    @weave.op
+    async def model(question_id, trial_id):
+        if failure == "model" and question_id == "q1":
+            raise RuntimeError("failed generation")
+        return None if failure == "scorer" and question_id == "q1" else True
+
+    dataset = [
+        {"question_id": q, "trial_id": t, "scorer_inputs": {}}
+        for q in ["q0", "q1"]
+        for t in [0, 1]
+    ]
+    if failure == "duplicate":
+        dataset[-1] = dataset[0].copy()
+    elif failure == "missing":
+        dataset = dataset[:2]
+    evaluation = weave.Evaluation(
+        dataset=dataset,
+        scorers=[_bayes_scorer()],
+        trials=2 if failure == "trials" else 1,
+    )
+    with pytest.raises(ValueError, match="cohort|pair|scored result"):
+        await evaluation.evaluate(model)
 
 
 class NestedParams(BaseModel):

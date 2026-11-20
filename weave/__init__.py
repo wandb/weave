@@ -86,6 +86,7 @@ from weave.dataset.dataset import Dataset
 from weave.evaluation.eval import Evaluation
 from weave.evaluation.eval_imperative import EvaluationLogger
 from weave.flow.annotation_spec import AnnotationSpec
+from weave.flow.bayes_at_n import BayesAtNScorer
 from weave.flow.model import Model
 from weave.flow.monitor import ClassifierMonitor, Monitor
 from weave.flow.saved_view import SavedView
@@ -111,6 +112,7 @@ __all__ = [
     "AgentState",
     "AnnotationSpec",
     "Audio",
+    "BayesAtNScorer",
     "ClassifierMonitor",
     "Content",
     "Conversation",
