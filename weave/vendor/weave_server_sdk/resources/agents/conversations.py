@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Union
+from typing import Union, Iterable, Optional
 from datetime import datetime
 
 import httpx
@@ -54,6 +54,7 @@ class ConversationsResource(SyncAPIResource):
         include_model_tool_calls: bool | Omit = omit,
         limit: int | Omit = omit,
         offset: int | Omit = omit,
+        sort_by: Optional[Iterable[conversation_chat_params.SortBy]] | Omit = omit,
         # Use the following arguments if you need to pass additional parameters to the API that aren't available via kwargs.
         # The extra values given here take precedence over values defined on the client or passed to this method.
         extra_headers: Headers | None = None,
@@ -72,8 +73,12 @@ class ConversationsResource(SyncAPIResource):
 
           limit: Maximum number of conversation turns to return.
 
-          offset: Number of most-recent turns to skip. Results are returned in chronological order
-              within the selected page.
+          offset: Number of turns to skip in the requested sort order. When `sort_by` is omitted,
+              results are returned in chronological order within the selected page.
+
+          sort_by: Controls how turns are sorted and paginated. Only `started_at` is supported.
+              When omitted, the endpoint selects the most recent `limit` turns and returns
+              them in ascending `started_at` order.
 
           extra_headers: Send extra headers
 
@@ -93,6 +98,7 @@ class ConversationsResource(SyncAPIResource):
                     "include_model_tool_calls": include_model_tool_calls,
                     "limit": limit,
                     "offset": offset,
+                    "sort_by": sort_by,
                 },
                 conversation_chat_params.ConversationChatParams,
             ),
@@ -175,6 +181,7 @@ class AsyncConversationsResource(AsyncAPIResource):
         include_model_tool_calls: bool | Omit = omit,
         limit: int | Omit = omit,
         offset: int | Omit = omit,
+        sort_by: Optional[Iterable[conversation_chat_params.SortBy]] | Omit = omit,
         # Use the following arguments if you need to pass additional parameters to the API that aren't available via kwargs.
         # The extra values given here take precedence over values defined on the client or passed to this method.
         extra_headers: Headers | None = None,
@@ -193,8 +200,12 @@ class AsyncConversationsResource(AsyncAPIResource):
 
           limit: Maximum number of conversation turns to return.
 
-          offset: Number of most-recent turns to skip. Results are returned in chronological order
-              within the selected page.
+          offset: Number of turns to skip in the requested sort order. When `sort_by` is omitted,
+              results are returned in chronological order within the selected page.
+
+          sort_by: Controls how turns are sorted and paginated. Only `started_at` is supported.
+              When omitted, the endpoint selects the most recent `limit` turns and returns
+              them in ascending `started_at` order.
 
           extra_headers: Send extra headers
 
@@ -214,6 +225,7 @@ class AsyncConversationsResource(AsyncAPIResource):
                     "include_model_tool_calls": include_model_tool_calls,
                     "limit": limit,
                     "offset": offset,
+                    "sort_by": sort_by,
                 },
                 conversation_chat_params.ConversationChatParams,
             ),

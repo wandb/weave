@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
-from typing_extensions import Required, TypedDict
+from typing import Iterable, Optional
+from typing_extensions import Literal, Required, TypedDict
 
-__all__ = ["ConversationChatParams"]
+__all__ = ["ConversationChatParams", "SortBy"]
 
 
 class ConversationChatParams(TypedDict, total=False):
@@ -26,7 +27,23 @@ class ConversationChatParams(TypedDict, total=False):
     """Maximum number of conversation turns to return."""
 
     offset: int
-    """Number of most-recent turns to skip.
+    """Number of turns to skip in the requested sort order.
 
-    Results are returned in chronological order within the selected page.
+    When `sort_by` is omitted, results are returned in chronological order within
+    the selected page.
     """
+
+    sort_by: Optional[Iterable[SortBy]]
+    """Controls how turns are sorted and paginated.
+
+    Only `started_at` is supported. When omitted, the endpoint selects the most
+    recent `limit` turns and returns them in ascending `started_at` order.
+    """
+
+
+class SortBy(TypedDict, total=False):
+    """Sort specification for agent query endpoints."""
+
+    field: Required[str]
+
+    direction: Literal["asc", "desc"]

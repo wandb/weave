@@ -632,6 +632,11 @@ export interface SpanQueryParams {
   started_after?: string | null;
 
   started_before?: string | null;
+
+  /**
+   * Filter conversations by live tag assignments.
+   */
+  tag_filter?: SpanQueryParams.TagFilter | null;
 }
 
 export namespace SpanQueryParams {
@@ -992,6 +997,21 @@ export namespace SpanQueryParams {
     field: string;
 
     direction?: 'asc' | 'desc';
+  }
+
+  /**
+   * Filter conversations by live tag assignments.
+   */
+  export interface TagFilter {
+    /**
+     * Include conversations with a live assignment of any listed tag.
+     */
+    tag_ids: Array<string>;
+
+    /**
+     * Drop conversations with a live assignment of any listed tag.
+     */
+    exclude?: boolean;
   }
 }
 

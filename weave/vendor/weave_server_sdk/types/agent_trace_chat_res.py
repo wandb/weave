@@ -243,6 +243,8 @@ class AgentTraceChatRes(BaseModel):
 
     provider: Optional[str] = None
 
+    root_operation_name: Optional[str] = None
+
     root_span_name: Optional[str] = None
 
     started_at: Optional[datetime] = None

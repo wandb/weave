@@ -42,6 +42,7 @@ __all__ = [
     "SignalFilters",
     "SignalFiltersRating",
     "SortBy",
+    "TagFilter",
 ]
 
 
@@ -77,6 +78,9 @@ class SpanQueryParams(TypedDict, total=False):
     started_after: Annotated[Union[str, datetime, None], PropertyInfo(format="iso8601")]
 
     started_before: Annotated[Union[str, datetime, None], PropertyInfo(format="iso8601")]
+
+    tag_filter: Optional[TagFilter]
+    """Filter conversations by live tag assignments."""
 
 
 class CustomAttrColumn(TypedDict, total=False):
@@ -403,6 +407,16 @@ class SortBy(TypedDict, total=False):
     field: Required[str]
 
     direction: Literal["asc", "desc"]
+
+
+class TagFilter(TypedDict, total=False):
+    """Filter conversations by live tag assignments."""
+
+    tag_ids: Required[SequenceNotStr[str]]
+    """Include conversations with a live assignment of any listed tag."""
+
+    exclude: bool
+    """Drop conversations with a live assignment of any listed tag."""
 
 
 from ..shared_params.or_operation import OrOperation
