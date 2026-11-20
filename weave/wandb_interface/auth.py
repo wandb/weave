@@ -8,12 +8,17 @@ import os
 import threading
 import time
 from abc import ABC, abstractmethod
-from collections.abc import Generator
+from collections.abc import Generator, Mapping
 from datetime import datetime, timedelta, timezone
+from http import HTTPStatus
 from pathlib import Path
-from typing import Any
+from typing import TypedDict
 
 import httpx
+from requests import PreparedRequest, Response
+from requests.cookies import RequestsCookieJar
+from requests.utils import rewind_body
+from typing_extensions import Unpack
 
 from weave.compat.wandb.wandb_thin.errors import AuthenticationError
 from weave.trace import env
@@ -40,6 +45,9 @@ class WandbCredentials(ABC):
     @abstractmethod
     def wal_seed(self) -> str: ...
 
+    @abstractmethod
+    def invalidate(self, token: str) -> None: ...
+
     def httpx_auth(self) -> httpx.Auth:
         return _WandbHttpxAuth(self)
 
@@ -63,6 +71,9 @@ class ApiKeyCredentials(WandbCredentials):
     def wal_seed(self) -> str:
         return self.api_key
 
+    def invalidate(self, token: str) -> None:
+        """Keep the configured API key."""
+
 
 class IdentityTokenCredentials(WandbCredentials):
     def __init__(
@@ -76,6 +87,7 @@ class IdentityTokenCredentials(WandbCredentials):
         self.credentials_file = credentials_file
         self._lock = threading.Lock()
         self._cached_access_token: tuple[str, datetime] | None = None
+        self._rejected_file_token: str | None = None
         self._credentials_write_warning_emitted = False
         self._exchange_failure: tuple[float, str] | None = None
 
@@ -87,6 +99,19 @@ class IdentityTokenCredentials(WandbCredentials):
 
     def wal_seed(self) -> str:
         return f"{self.base_url}\0{self.token_file.expanduser().resolve()}"
+
+    def invalidate(self, token: str) -> None:
+        with self._lock:
+            if self._cached_access_token and self._cached_access_token[0] == token:
+                self._cached_access_token = None
+            try:
+                self._drop_cached_token_from_file(token)
+            except OSError:
+                # Keep a rejected on-disk token out of the in-process cache.
+                entry = self._read_credentials_entry()
+                if entry.get("access_token") == token:
+                    self._rejected_file_token = token
+                self._warn_credentials_write_failed()
 
     def access_token(self) -> str:
         with self._lock:
@@ -111,13 +136,7 @@ class IdentityTokenCredentials(WandbCredentials):
             try:
                 self._write_cached_token(token, expires_at)
             except OSError:
-                if not self._credentials_write_warning_emitted:
-                    logger.warning(
-                        "Unable to persist W&B access token to %s; "
-                        "using in-process caching",
-                        self.credentials_file,
-                    )
-                    self._credentials_write_warning_emitted = True
+                self._warn_credentials_write_failed()
             return token
 
     def _read_cached_token(self) -> str | None:
@@ -127,20 +146,10 @@ class IdentityTokenCredentials(WandbCredentials):
                 return cached_token
             self._cached_access_token = None
 
-        try:
-            data = json.loads(self.credentials_file.read_text(encoding="utf-8"))
-        except (FileNotFoundError, json.JSONDecodeError, OSError):
-            return None
-
-        if not isinstance(data, dict):
-            return None
-        all_credentials = data.get("credentials")
-        if not isinstance(all_credentials, dict):
-            return None
-        credentials = all_credentials.get(self.base_url)
-        if not isinstance(credentials, dict):
-            return None
+        credentials = self._read_credentials_entry()
         token = credentials.get("access_token")
+        if token == self._rejected_file_token:
+            return None
         expires_at_value = credentials.get("expires_at")
         if not isinstance(token, str) or not isinstance(expires_at_value, str):
             return None
@@ -201,15 +210,8 @@ class IdentityTokenCredentials(WandbCredentials):
         return token, datetime.now(timezone.utc) + timedelta(seconds=expires_in)
 
     def _write_cached_token(self, token: str, expires_at: datetime) -> None:
-        data: dict[str, Any] = {"credentials": {}}
-        try:
-            existing = json.loads(self.credentials_file.read_text(encoding="utf-8"))
-            if isinstance(existing, dict):
-                data = existing
-        except (FileNotFoundError, json.JSONDecodeError, OSError):
-            pass
-
-        credentials = data.setdefault("credentials", {})
+        data = self._read_credentials_file()
+        credentials = data.get("credentials")
         if not isinstance(credentials, dict):
             credentials = {}
             data["credentials"] = credentials
@@ -219,7 +221,53 @@ class IdentityTokenCredentials(WandbCredentials):
                 EXPIRES_AT_FORMAT
             ),
         }
+        self._replace_credentials_file(data)
+        self._rejected_file_token = None
 
+    def _drop_cached_token_from_file(self, token: str) -> None:
+        data = self._read_credentials_file()
+        entries = data.get("credentials")
+        if not isinstance(entries, dict):
+            return
+        entry = entries.get(self.base_url)
+        if not isinstance(entry, dict):
+            return
+        if entry.get("access_token") != token:
+            return
+
+        del entries[self.base_url]
+        self._replace_credentials_file(data)
+
+    def _read_credentials_entry(self) -> dict[str, object]:
+        entries = self._read_credentials_file().get("credentials")
+        if not isinstance(entries, dict):
+            return {}
+        entry = entries.get(self.base_url)
+        if not isinstance(entry, dict):
+            return {}
+
+        return entry
+
+    def _read_credentials_file(self) -> dict[str, object]:
+        try:
+            data = json.loads(self.credentials_file.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, OSError):
+            return {}
+        if not isinstance(data, dict):
+            return {}
+
+        return data
+
+    def _warn_credentials_write_failed(self) -> None:
+        if self._credentials_write_warning_emitted:
+            return
+        logger.warning(
+            "Unable to persist W&B access token to %s; using in-process caching",
+            self.credentials_file,
+        )
+        self._credentials_write_warning_emitted = True
+
+    def _replace_credentials_file(self, data: dict[str, object]) -> None:
         self.credentials_file.parent.mkdir(parents=True, exist_ok=True)
         temporary_file = self.credentials_file.with_name(
             f".{self.credentials_file.name}.{os.getpid()}.{threading.get_ident()}.tmp"
@@ -238,21 +286,79 @@ class IdentityTokenCredentials(WandbCredentials):
 class _WandbHttpxAuth(httpx.Auth):
     def __init__(self, credentials: WandbCredentials) -> None:
         self._credentials = credentials
+        self.requires_request_body = isinstance(credentials, IdentityTokenCredentials)
 
     def auth_flow(
         self, request: httpx.Request
     ) -> Generator[httpx.Request, httpx.Response, None]:
+        authorization = self._credentials.authorization_header()
+        request.headers["Authorization"] = authorization
+        response = yield request
+        if response.status_code != HTTPStatus.UNAUTHORIZED:
+            return
+        if not isinstance(self._credentials, IdentityTokenCredentials):
+            return
+        if response.request.headers.get("Authorization") != authorization:
+            return
+
+        self._credentials.invalidate(authorization.removeprefix("Bearer "))
         request.headers["Authorization"] = self._credentials.authorization_header()
         yield request
+
+
+class _RequestsSendOptions(TypedDict, total=False):
+    stream: bool
+    timeout: float | tuple[float, float] | tuple[float, None] | None
+    verify: bool | str
+    cert: bytes | str | tuple[bytes | str, bytes | str] | None
+    proxies: Mapping[str, str] | None
 
 
 class _WandbRequestsAuth:
     def __init__(self, credentials: WandbCredentials) -> None:
         self._credentials = credentials
 
-    def __call__(self, request: Any) -> Any:
-        request.headers["Authorization"] = self._credentials.authorization_header()
+    def __call__(self, request: PreparedRequest) -> PreparedRequest:
+        authorization = self._credentials.authorization_header()
+        request.headers["Authorization"] = authorization
+        if isinstance(self._credentials, IdentityTokenCredentials):
+            retry = functools.partial(
+                self._retry_unauthorized, authorization=authorization
+            )
+            request.hooks["response"].append(retry)
+
         return request
+
+    def _retry_unauthorized(
+        self,
+        response: Response,
+        *,
+        authorization: str,
+        **kwargs: Unpack[_RequestsSendOptions],
+    ) -> Response:
+        if response.status_code != HTTPStatus.UNAUTHORIZED:
+            return response
+        if response.request.headers.get("Authorization") != authorization:
+            return response
+
+        self._credentials.invalidate(authorization.removeprefix("Bearer "))
+        request = response.request.copy()
+        if getattr(request, "_body_position", None) is not None:
+            rewind_body(request)
+
+        _ = response.content
+        response.close()
+        cookies = getattr(request, "_cookies", None)
+        if isinstance(cookies, RequestsCookieJar):
+            cookies.update(response.cookies)
+            request.headers.pop("Cookie", None)
+            request.prepare_cookies(cookies)
+        request.headers["Authorization"] = self._credentials.authorization_header()
+        # Adapter sends bypass response hooks, so the retry cannot recurse.
+        retry = response.connection.send(request, **kwargs)
+        retry.history.append(response)
+
+        return retry
 
 
 @functools.cache

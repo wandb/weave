@@ -352,21 +352,22 @@ class RemoteHTTPTraceServer(TraceServerClientInterface):
         self._rebuild_client()
 
     def _rebuild_client(self) -> None:
+        # DefaultHttpxClient keeps the vendor's own limits and redirect handling.
+        http_client = DefaultHttpxClient(verify=ssl_verify())
+        if self._credentials is not None:
+            http_client.auth = self._credentials.httpx_auth()
         self._stainless_client = StainlessClient(
             base_url=self.trace_server_url,
             username="",
             password="",
             default_headers=self._compose_headers(),
             timeout=http_timeout(),
-            # DefaultHttpxClient keeps the vendor's own limits and redirect handling.
-            http_client=DefaultHttpxClient(verify=ssl_verify()),
+            http_client=http_client,
         )
 
     def _compose_headers(self, trace_id: str | None = None) -> dict[str, str]:
         headers = self._extra_headers.copy()
         headers[CLIENT_CAPABILITIES_HEADER] = CLIENT_CAPABILITIES
-        if self._credentials is not None:
-            headers["Authorization"] = self._credentials.authorization_header()
         if retry_id := get_current_retry_id():
             headers["X-Weave-Retry-Id"] = retry_id
         if trace_id is not None:
