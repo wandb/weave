@@ -104,3 +104,7 @@ export const WEAVE_INTEGRATION_VERSION = 'weave.integration.version';
 /** Instrumentation-library name passed to `getWeaveTracer` by every emitter
  *  in the GenAI conversation SDK. */
 export const WEAVE_GENAI_TRACER_NAME = 'weave-genai';
+
+// OTel general `user.*` attributes (https://opentelemetry.io/docs/specs/semconv/registry/attributes/user/).
+export const ATTR_USER_ID = 'user.id';
+export const ATTR_USER_EMAIL = 'user.email';
