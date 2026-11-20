@@ -4,14 +4,23 @@ import base64
 import json
 import os
 from datetime import datetime, timedelta, timezone
+from functools import partial
+from io import BytesIO
 from pathlib import Path
 
 import httpx
 import pytest
 import requests
+from requests.adapters import HTTPAdapter
+from urllib3.response import HTTPResponse
 
 from weave.compat.wandb.wandb_thin.errors import AuthenticationError
+from weave.trace_server_bindings import remote_http_trace_server
+from weave.vendor.weave_server_sdk import DefaultHttpxClient
 from weave.wandb_interface import auth
+
+API_URL = "https://api.wandb.test"
+TRACE_URL = "https://trace.wandb.test"
 
 
 def test_api_key_credentials_support_basic_and_bearer_auth() -> None:
@@ -410,21 +419,7 @@ def test_resolve_api_key_and_missing_credentials(
 
 
 def test_httpx_auth_refreshes_authorization_for_each_request() -> None:
-    class RotatingCredentials(auth.WandbCredentials):
-        def __init__(self) -> None:
-            self.request_count = 0
-
-        def authorization_header(self) -> str:
-            self.request_count += 1
-            return f"Bearer token-{self.request_count}"
-
-        def bearer_token(self) -> str:
-            return "unused"
-
-        def wal_seed(self) -> str:
-            return "stable"
-
-    credentials = RotatingCredentials()
+    credentials = _RotatingCredentials()
     received: list[str] = []
 
     def handle(request: httpx.Request) -> httpx.Response:
@@ -442,21 +437,7 @@ def test_httpx_auth_refreshes_authorization_for_each_request() -> None:
 
 
 def test_requests_auth_refreshes_authorization_for_each_request() -> None:
-    class RotatingCredentials(auth.WandbCredentials):
-        def __init__(self) -> None:
-            self.request_count = 0
-
-        def authorization_header(self) -> str:
-            self.request_count += 1
-            return f"Bearer token-{self.request_count}"
-
-        def bearer_token(self) -> str:
-            return "unused"
-
-        def wal_seed(self) -> str:
-            return "stable"
-
-    credentials = RotatingCredentials()
+    credentials = _RotatingCredentials()
     requests_auth = credentials.requests_auth()
     first = requests.Request("GET", "https://trace.wandb.test/server_info").prepare()
     second = requests.Request("GET", "https://trace.wandb.test/server_info").prepare()
@@ -466,3 +447,202 @@ def test_requests_auth_refreshes_authorization_for_each_request() -> None:
 
     assert first.headers["Authorization"] == "Bearer token-1"
     assert second.headers["Authorization"] == "Bearer token-2"
+
+
+@pytest.fixture
+def identity_credentials(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> tuple[auth.IdentityTokenCredentials, list[str]]:
+    token_file = tmp_path / "identity.jwt"
+    token_file.write_text("identity-token", encoding="utf-8")
+    credentials = auth.IdentityTokenCredentials(
+        API_URL, token_file, tmp_path / "credentials.json"
+    )
+    exchanges: list[str] = []
+
+    def exchange(url: str, **kwargs: object) -> httpx.Response:
+        assert url == f"{API_URL}/oidc/token"
+        token = f"token-{len(exchanges) + 1}"
+        exchanges.append(token)
+        return httpx.Response(200, json={"access_token": token, "expires_in": 3600})
+
+    monkeypatch.setattr(auth.httpx, "post", exchange)
+
+    return credentials, exchanges
+
+
+@pytest.mark.parametrize(
+    ("statuses", "expected_tokens"),
+    [
+        ((401, 200), ["token-1", "token-2"]),
+        ((401, 401), ["token-1", "token-2"]),
+        ((403,), ["token-1"]),
+        ((400,), ["token-1"]),
+        ((503,), ["token-1"]),
+    ],
+)
+def test_httpx_identity_auth_retries_only_one_401(
+    identity_credentials: tuple[auth.IdentityTokenCredentials, list[str]],
+    statuses: tuple[int, ...],
+    expected_tokens: list[str],
+) -> None:
+    credentials, exchanges = identity_credentials
+    statuses_to_send = iter(statuses)
+    received: list[tuple[str, bytes]] = []
+
+    def handle(request: httpx.Request) -> httpx.Response:
+        received.append((request.headers["Authorization"], request.content))
+        return httpx.Response(next(statuses_to_send))
+
+    assert credentials.access_token() == "token-1"
+    with httpx.Client(
+        transport=httpx.MockTransport(handle), auth=credentials.httpx_auth()
+    ) as client:
+        response = client.post(TRACE_URL, content=iter([b"payload"]))
+
+    assert response.status_code == statuses[-1]
+    assert received == [(f"Bearer {token}", b"payload") for token in expected_tokens]
+    assert exchanges == expected_tokens
+    assert _cached_access_token(credentials) == expected_tokens[-1]
+
+
+def test_httpx_api_key_does_not_retry_401() -> None:
+    credentials = auth.ApiKeyCredentials("secret")
+    received: list[str] = []
+
+    def handle(request: httpx.Request) -> httpx.Response:
+        received.append(request.headers["Authorization"])
+        return httpx.Response(401)
+
+    with httpx.Client(
+        transport=httpx.MockTransport(handle), auth=credentials.httpx_auth()
+    ) as client:
+        response = client.get(TRACE_URL)
+
+    assert response.status_code == 401
+    assert received == ["Basic YXBpOnNlY3JldA=="]
+
+
+def test_invalidate_preserves_tokens_refreshed_by_another_credentials_instance(
+    identity_credentials: tuple[auth.IdentityTokenCredentials, list[str]],
+) -> None:
+    credentials, exchanges = identity_credentials
+    other = auth.IdentityTokenCredentials(
+        credentials.base_url, credentials.token_file, credentials.credentials_file
+    )
+    assert credentials.access_token() == other.access_token() == "token-1"
+
+    other.invalidate("token-1")
+    assert other.access_token() == "token-2"
+
+    credentials.invalidate("token-1")
+    assert _cached_access_token(credentials) == "token-2"
+    assert credentials.access_token() == "token-2"
+
+    other.invalidate("token-1")
+    credentials.credentials_file.unlink()
+    assert other.access_token() == "token-2"
+    assert exchanges == ["token-1", "token-2"]
+
+
+def test_invalidate_rejects_on_disk_token_when_persistence_fails(
+    identity_credentials: tuple[auth.IdentityTokenCredentials, list[str]],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    credentials, exchanges = identity_credentials
+    assert credentials.access_token() == "token-1"
+
+    def fail_replace(data: dict[str, object]) -> None:
+        raise OSError("read-only filesystem")
+
+    monkeypatch.setattr(credentials, "_replace_credentials_file", fail_replace)
+    credentials.invalidate("token-1")
+    assert credentials.access_token() == "token-2"
+    credentials.invalidate("token-2")
+    assert credentials.access_token() == "token-3"
+    assert _cached_access_token(credentials) == "token-1"
+    assert exchanges == ["token-1", "token-2", "token-3"]
+
+
+@pytest.mark.parametrize("retry_status", [200, 401])
+def test_requests_identity_auth_replays_body_once_on_401(
+    identity_credentials: tuple[auth.IdentityTokenCredentials, list[str]],
+    monkeypatch: pytest.MonkeyPatch,
+    retry_status: int,
+) -> None:
+    credentials, exchanges = identity_credentials
+    received: list[tuple[str, bytes]] = []
+    statuses_to_send = iter([401, retry_status])
+
+    def send(
+        adapter: HTTPAdapter, request: requests.PreparedRequest, **kwargs: object
+    ) -> requests.Response:
+        assert isinstance(request.body, BytesIO)
+        received.append((request.headers["Authorization"], request.body.read()))
+        raw = HTTPResponse(body=BytesIO(b"{}"), status=next(statuses_to_send))
+        return adapter.build_response(request, raw)
+
+    monkeypatch.setattr(HTTPAdapter, "send", send)
+    with requests.Session() as session:
+        session.auth = credentials.requests_auth()
+        response = session.post(TRACE_URL, data=BytesIO(b"payload"))
+
+    assert response.status_code == retry_status
+    assert [prior.status_code for prior in response.history] == [401]
+    assert received == [("Bearer token-1", b"payload"), ("Bearer token-2", b"payload")]
+    assert exchanges == ["token-1", "token-2"]
+    assert _cached_access_token(credentials) == "token-2"
+
+
+def test_trace_server_retries_with_refreshed_identity_token(
+    identity_credentials: tuple[auth.IdentityTokenCredentials, list[str]],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    credentials, exchanges = identity_credentials
+    received: list[tuple[str, str]] = []
+    statuses_to_send = iter([401, 200, 200])
+    server_info = {
+        "min_required_weave_python_version": "0.52.0",
+        "trace_server_version": "1.0.0",
+    }
+
+    def handle(request: httpx.Request) -> httpx.Response:
+        received.append((request.url.path, request.headers["Authorization"]))
+        return httpx.Response(next(statuses_to_send), json=server_info)
+
+    monkeypatch.setattr(
+        remote_http_trace_server,
+        "DefaultHttpxClient",
+        partial(DefaultHttpxClient, transport=httpx.MockTransport(handle)),
+    )
+    server = remote_http_trace_server.RemoteHTTPTraceServer(TRACE_URL)
+    server.set_auth(credentials)
+
+    assert server.server_info().model_dump() == server_info
+    assert server.server_info().model_dump() == server_info
+    assert received == [
+        ("/server_info", "Bearer token-1"),
+        ("/server_info", "Bearer token-2"),
+        ("/server_info", "Bearer token-2"),
+    ]
+    assert exchanges == ["token-1", "token-2"]
+    assert _cached_access_token(credentials) == "token-2"
+
+
+def _cached_access_token(credentials: auth.IdentityTokenCredentials) -> str:
+    data = json.loads(credentials.credentials_file.read_text(encoding="utf-8"))
+    token = data["credentials"][credentials.base_url]["access_token"]
+    assert isinstance(token, str)
+
+    return token
+
+
+class _RotatingCredentials(auth.ApiKeyCredentials):
+    def __init__(self) -> None:
+        super().__init__("unused")
+        self.request_count = 0
+
+    def authorization_header(self) -> str:
+        self.request_count += 1
+
+        return f"Bearer token-{self.request_count}"
