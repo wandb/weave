@@ -196,10 +196,28 @@ export interface ConversationChatParams {
   limit?: number;
 
   /**
-   * Number of most-recent turns to skip. Results are returned in chronological order
-   * within the selected page.
+   * Number of turns to skip in the requested sort order. When `sort_by` is omitted,
+   * results are returned in chronological order within the selected page.
    */
   offset?: number;
+
+  /**
+   * Controls how turns are sorted and paginated. Only `started_at` is supported.
+   * When omitted, the endpoint selects the most recent `limit` turns and returns
+   * them in ascending `started_at` order.
+   */
+  sort_by?: Array<ConversationChatParams.SortBy> | null;
+}
+
+export namespace ConversationChatParams {
+  /**
+   * Sort specification for agent query endpoints.
+   */
+  export interface SortBy {
+    field: string;
+
+    direction?: 'asc' | 'desc';
+  }
 }
 
 export interface ConversationSpansParams {

@@ -156,6 +156,7 @@ class SpansResource(SyncAPIResource):
         sort_by: Optional[Iterable[span_query_params.SortBy]] | Omit = omit,
         started_after: Union[str, datetime, None] | Omit = omit,
         started_before: Union[str, datetime, None] | Omit = omit,
+        tag_filter: Optional[span_query_params.TagFilter] | Omit = omit,
         # Use the following arguments if you need to pass additional parameters to the API that aren't available via kwargs.
         # The extra values given here take precedence over values defined on the client or passed to this method.
         extra_headers: Headers | None = None,
@@ -167,6 +168,8 @@ class SpansResource(SyncAPIResource):
         Query agent spans, either as raw rows or grouped aggregates.
 
         Args:
+          tag_filter: Filter conversations by live tag assignments.
+
           extra_headers: Send extra headers
 
           extra_query: Add additional query parameters to the request
@@ -195,6 +198,7 @@ class SpansResource(SyncAPIResource):
                     "sort_by": sort_by,
                     "started_after": started_after,
                     "started_before": started_before,
+                    "tag_filter": tag_filter,
                 },
                 span_query_params.SpanQueryParams,
             ),
@@ -397,6 +401,7 @@ class AsyncSpansResource(AsyncAPIResource):
         sort_by: Optional[Iterable[span_query_params.SortBy]] | Omit = omit,
         started_after: Union[str, datetime, None] | Omit = omit,
         started_before: Union[str, datetime, None] | Omit = omit,
+        tag_filter: Optional[span_query_params.TagFilter] | Omit = omit,
         # Use the following arguments if you need to pass additional parameters to the API that aren't available via kwargs.
         # The extra values given here take precedence over values defined on the client or passed to this method.
         extra_headers: Headers | None = None,
@@ -408,6 +413,8 @@ class AsyncSpansResource(AsyncAPIResource):
         Query agent spans, either as raw rows or grouped aggregates.
 
         Args:
+          tag_filter: Filter conversations by live tag assignments.
+
           extra_headers: Send extra headers
 
           extra_query: Add additional query parameters to the request
@@ -436,6 +443,7 @@ class AsyncSpansResource(AsyncAPIResource):
                     "sort_by": sort_by,
                     "started_after": started_after,
                     "started_before": started_before,
+                    "tag_filter": tag_filter,
                 },
                 span_query_params.SpanQueryParams,
             ),

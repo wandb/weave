@@ -66,6 +66,8 @@ export interface AgentTraceChatRes {
 
   provider: string | null;
 
+  root_operation_name: string | null;
+
   root_span_name: string | null;
 
   started_at: string | null;
