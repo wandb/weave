@@ -12,7 +12,7 @@ import httpx
 
 # Do not import this module directly, it should only be invoked
 from openai._legacy_response import LegacyAPIResponse
-from openai._response import APIResponse
+from openai._response import APIResponse, AsyncAPIResponse
 from openai.types.chat import ChatCompletion, ChatCompletionChunk
 from openai.types.chat.chat_completion_chunk import (
     ChoiceDeltaFunctionCall,
@@ -111,6 +111,130 @@ def maybe_unwrap_api_response(value: Any) -> Any:
         return maybe_value
 
     return value
+
+
+RAW_RESPONSE_HEADER = "X-Stainless-Raw-Response"
+
+
+def _is_streaming_raw_response(value: Any, inputs: dict) -> bool:
+    """Whether `value` is the raw response `with_streaming_response` returns for a stream.
+
+    `with_streaming_response.create(..., stream=True)` sends
+    `X-Stainless-Raw-Response: stream` and returns an unparsed APIResponse. The
+    caller gets the event stream from `parse()`, so that is where it is traced.
+    """
+    if not isinstance(inputs, dict) or not inputs.get("stream"):
+        return False
+    extra_headers = inputs.get("extra_headers")
+    return (
+        isinstance(extra_headers, Mapping)
+        and extra_headers.get(RAW_RESPONSE_HEADER) == "stream"
+        and isinstance(value, (APIResponse, AsyncAPIResponse))
+    )
+
+
+class _TracedStreamingResponse:
+    """An APIResponse from `with_streaming_response` whose parsed stream is traced.
+
+    Everything except `parse()` and `close()` goes to the real response, so request
+    ids, headers and the raw byte iterators are unchanged. The call finishes when
+    the parsed stream ends, or when the response is closed, whichever comes first.
+    """
+
+    def __init__(
+        self,
+        response: APIResponse | AsyncAPIResponse,
+        trace_stream: Callable[[Any], Any],
+        on_finish: Callable[[Any, BaseException | None], None],
+    ) -> None:
+        self._response = response
+        self._trace_stream = trace_stream
+        self._on_finish = on_finish
+        self._stream: Any = None
+        self._finished = False
+
+    def __getattr__(self, name: str) -> Any:
+        if name == "_response":
+            raise AttributeError(name)
+        return getattr(self._response, name)
+
+    def _traced(self, stream: Any) -> Any:
+        # The SDK caches parse(), so every caller must get the same wrapper.
+        if self._stream is None:
+            self._stream = self._trace_stream(stream)
+        return self._stream
+
+    def _finish(self) -> None:
+        if self._stream is not None:
+            # Ends the call with whatever was accumulated; a no-op once it has ended.
+            self._stream.close()
+        elif not self._finished:
+            self._on_finish(None, None)
+        self._finished = True
+
+    def parse(self, *, to: type | None = None) -> Any:
+        if to is not None:
+            return self._response.parse(to=to)
+        return self._traced(self._response.parse())
+
+    def close(self) -> None:
+        try:
+            self._response.close()
+        finally:
+            self._finish()
+
+
+class _TracedAsyncStreamingResponse(_TracedStreamingResponse):
+    async def parse(self, *, to: type | None = None) -> Any:  # type: ignore[override]
+        if to is not None:
+            return await self._response.parse(to=to)
+        return self._traced(await self._response.parse())
+
+    async def close(self) -> None:  # type: ignore[override]
+        try:
+            await self._response.close()
+        finally:
+            self._finish()
+
+
+def _add_openai_accumulator(
+    op: Op,
+    make_accumulator: Callable[[dict], Callable],
+    *,
+    should_accumulate: Callable[[dict], bool],
+    on_finish_post_processor: Callable[[Any], Any],
+) -> Op:
+    """`_add_accumulator`, plus tracing for streams opened via `with_streaming_response`.
+
+    Without this, the accumulator wraps the raw response itself. Nothing iterates
+    that wrapper, so the call ends with no output, and the SDK's
+    `await response.close()` gets the wrapper's synchronous `close()` and raises
+    `TypeError` without closing the HTTP response.
+    """
+    op = _add_accumulator(
+        op,
+        make_accumulator,
+        should_accumulate=should_accumulate,
+        on_finish_post_processor=on_finish_post_processor,
+    )
+    accumulate = op._on_output_handler
+
+    def on_output(value: Any, on_finish: Callable, inputs: dict) -> Any:
+        if not _is_streaming_raw_response(value, inputs):
+            return accumulate(value, on_finish, inputs)
+        response_cls = (
+            _TracedAsyncStreamingResponse
+            if isinstance(value, AsyncAPIResponse)
+            else _TracedStreamingResponse
+        )
+        return response_cls(
+            value,
+            lambda stream: accumulate(stream, on_finish, inputs),
+            on_finish,
+        )
+
+    op._on_output_handler = on_output
+    return op
 
 
 def openai_on_finish_post_processor(value: ChatCompletionChunk | None) -> dict | None:
@@ -496,7 +620,7 @@ def create_wrapper_sync(settings: OpSettings) -> Callable[[Callable], Callable]:
 
         op._set_on_input_handler(openai_on_input_handler)
         op._set_on_finish_handler(openai_on_finish)
-        return _add_accumulator(
+        return _add_openai_accumulator(
             op,  # type: ignore
             make_accumulator=lambda inputs: (
                 lambda acc, value: openai_accumulator(
@@ -545,7 +669,7 @@ def create_wrapper_async(
         op = weave.op(_add_stream_options(fn), **op_kwargs)
         op._set_on_input_handler(openai_on_input_handler)
         op._set_on_finish_handler(openai_on_finish)
-        traced = _add_accumulator(
+        traced = _add_openai_accumulator(
             op,  # type: ignore
             make_accumulator=lambda inputs: (
                 lambda acc, value: openai_accumulator(
@@ -790,7 +914,7 @@ def create_wrapper_responses_sync(
         op = weave.op(_inner, **op_kwargs)
         op._set_on_input_handler(openai_on_input_handler)
         op._set_on_finish_handler(openai_on_finish)
-        return _add_accumulator(
+        return _add_openai_accumulator(
             op,  # type: ignore
             make_accumulator=lambda inputs: responses_accumulator,
             should_accumulate=should_use_responses_accumulator,
@@ -813,7 +937,7 @@ def create_wrapper_responses_async(
         op = weave.op(_inner, **op_kwargs)
         op._set_on_input_handler(openai_on_input_handler)
         op._set_on_finish_handler(openai_on_finish)
-        traced = _add_accumulator(
+        traced = _add_openai_accumulator(
             op,  # type: ignore
             make_accumulator=lambda inputs: responses_accumulator,
             should_accumulate=should_use_responses_accumulator,

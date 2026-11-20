@@ -1,5 +1,7 @@
+import json
 import os
-from collections.abc import Generator
+from collections.abc import AsyncIterator, Generator
+from typing import Any
 
 import httpx
 import pytest
@@ -1437,3 +1439,264 @@ async def test_openai_responses_tool_calling_async_stream(client: WeaveClient) -
     assert inputs["input"] == "What was a positive news story from today?"
     assert inputs["model"] == "gpt-4o-2024-08-06"
     assert inputs["tools"][0]["type"] == "web_search_preview"
+
+
+# `with_streaming_response` streams arrive as a raw APIResponse whose parse()
+# returns the event stream, so these tests serve SSE from a mock transport.
+STREAMING_RESPONSE_MODEL = "gpt-4o-2024-08-06"
+STREAMING_RESPONSE_REQUEST_ID = "req_streaming_response"
+
+
+def _streamed_response_events(text: str) -> list[dict[str, Any]]:
+    completed = {
+        "id": "resp_streaming",
+        "object": "response",
+        "created_at": 1,
+        "status": "completed",
+        "error": None,
+        "incomplete_details": None,
+        "instructions": None,
+        "max_output_tokens": None,
+        "model": STREAMING_RESPONSE_MODEL,
+        "output": [
+            {
+                "type": "message",
+                "id": "msg_streaming",
+                "status": "completed",
+                "role": "assistant",
+                "content": [{"type": "output_text", "text": text, "annotations": []}],
+            }
+        ],
+        "parallel_tool_calls": True,
+        "previous_response_id": None,
+        "reasoning": {"effort": None, "summary": None},
+        "store": True,
+        "temperature": 1.0,
+        "text": {"format": {"type": "text"}},
+        "tool_choice": "auto",
+        "tools": [],
+        "top_p": 1.0,
+        "truncation": "disabled",
+        "usage": {
+            "input_tokens": 4,
+            "input_tokens_details": {"cached_tokens": 0},
+            "output_tokens": 2,
+            "output_tokens_details": {"reasoning_tokens": 0},
+            "total_tokens": 6,
+        },
+        "user": None,
+        "metadata": {},
+    }
+    created = {**completed, "status": "in_progress", "output": [], "usage": None}
+    return [
+        {"type": "response.created", "sequence_number": 0, "response": created},
+        {
+            "type": "response.output_text.delta",
+            "sequence_number": 1,
+            "item_id": "msg_streaming",
+            "output_index": 0,
+            "content_index": 0,
+            "delta": text,
+        },
+        {"type": "response.completed", "sequence_number": 2, "response": completed},
+    ]
+
+
+def _streamed_chat_chunks(text: str) -> list[dict[str, Any]]:
+    chunk = {
+        "id": "chatcmpl-streaming",
+        "object": "chat.completion.chunk",
+        "created": 1,
+        "model": STREAMING_RESPONSE_MODEL,
+    }
+    return [
+        {
+            **chunk,
+            "choices": [
+                {
+                    "index": 0,
+                    "delta": {"role": "assistant", "content": text},
+                    "finish_reason": None,
+                }
+            ],
+        },
+        {**chunk, "choices": [{"index": 0, "delta": {}, "finish_reason": "stop"}]},
+        {
+            **chunk,
+            "choices": [],
+            "usage": {"prompt_tokens": 4, "completion_tokens": 2, "total_tokens": 6},
+        },
+    ]
+
+
+def _sse(events: list[dict[str, Any]], *, done: bool = False) -> bytes:
+    lines = [f"data: {json.dumps(event)}\n\n" for event in events]
+    if done:
+        lines.append("data: [DONE]\n\n")
+    return "".join(lines).encode()
+
+
+class _ReadErrorAfter(httpx.AsyncByteStream):
+    """Yields one SSE chunk, then fails the way a dropped connection does."""
+
+    def __init__(self, first_chunk: bytes) -> None:
+        self._first_chunk = first_chunk
+
+    async def __aiter__(self) -> AsyncIterator[bytes]:
+        yield self._first_chunk
+        raise httpx.ReadError("connection dropped")
+
+
+def _streaming_response(stream: bytes | httpx.AsyncByteStream) -> httpx.Response:
+    headers = {
+        "content-type": "text/event-stream",
+        "x-request-id": STREAMING_RESPONSE_REQUEST_ID,
+    }
+    if isinstance(stream, bytes):
+        return httpx.Response(200, headers=headers, content=stream)
+    return httpx.Response(200, headers=headers, stream=stream)
+
+
+def _async_openai(stream: bytes | httpx.AsyncByteStream) -> AsyncOpenAI:
+    async def handle(request: httpx.Request) -> httpx.Response:
+        return _streaming_response(stream)
+
+    return AsyncOpenAI(
+        api_key="sk-test",
+        http_client=httpx.AsyncClient(transport=httpx.MockTransport(handle)),
+    )
+
+
+def _sync_openai(stream: bytes) -> OpenAI:
+    def handle(request: httpx.Request) -> httpx.Response:
+        return _streaming_response(stream)
+
+    return OpenAI(
+        api_key="sk-test",
+        http_client=httpx.Client(transport=httpx.MockTransport(handle)),
+    )
+
+
+def _only_call(client: WeaveClient, op_name: str) -> Any:
+    calls = client.get_calls()
+    assert len(calls) == 1
+    call = calls[0]
+    assert op_name_from_ref(call.op_name) == op_name
+    assert call.ended_at is not None
+    return call
+
+
+@pytest.mark.asyncio
+async def test_openai_responses_with_streaming_response_async(
+    client: WeaveClient,
+) -> None:
+    oai = _async_openai(_sse(_streamed_response_events("Hello")))
+
+    async with oai.responses.with_streaming_response.create(
+        model=STREAMING_RESPONSE_MODEL, input="Hi", stream=True
+    ) as raw:
+        assert raw.request_id == STREAMING_RESPONSE_REQUEST_ID
+        stream = await raw.parse()
+        assert await raw.parse() is stream
+        deltas = [
+            event.delta
+            async for event in stream
+            if event.type == "response.output_text.delta"
+        ]
+
+    assert deltas == ["Hello"]
+    assert raw.http_response.is_closed
+
+    call = _only_call(client, "openai.responses.create")
+    assert call.exception is None
+    assert call.output["output"][0]["content"][0]["text"] == "Hello"
+    usage = call.summary["usage"][STREAMING_RESPONSE_MODEL]
+    assert usage["requests"] == 1
+    assert usage["total_tokens"] == 6
+
+
+def test_openai_responses_with_streaming_response_sync(client: WeaveClient) -> None:
+    oai = _sync_openai(_sse(_streamed_response_events("Hello")))
+
+    with oai.responses.with_streaming_response.create(
+        model=STREAMING_RESPONSE_MODEL, input="Hi", stream=True
+    ) as raw:
+        deltas = [
+            event.delta
+            for event in raw.parse()
+            if event.type == "response.output_text.delta"
+        ]
+
+    assert deltas == ["Hello"]
+    assert raw.http_response.is_closed
+
+    call = _only_call(client, "openai.responses.create")
+    assert call.output["output"][0]["content"][0]["text"] == "Hello"
+    assert call.summary["usage"][STREAMING_RESPONSE_MODEL]["total_tokens"] == 6
+
+
+@pytest.mark.asyncio
+async def test_openai_chat_with_streaming_response_async(client: WeaveClient) -> None:
+    oai = _async_openai(_sse(_streamed_chat_chunks("Hello"), done=True))
+
+    async with oai.chat.completions.with_streaming_response.create(
+        model=STREAMING_RESPONSE_MODEL,
+        messages=[{"role": "user", "content": "Hi"}],
+        stream=True,
+    ) as raw:
+        contents = [
+            chunk.choices[0].delta.content
+            async for chunk in await raw.parse()
+            if chunk.choices
+        ]
+
+    assert contents == ["Hello", None]
+    assert raw.http_response.is_closed
+
+    call = _only_call(client, "openai.chat.completions.create")
+    assert call.output["choices"][0]["message"]["content"] == "Hello"
+    assert call.summary["usage"][STREAMING_RESPONSE_MODEL]["total_tokens"] == 6
+
+
+@pytest.mark.asyncio
+async def test_openai_responses_with_streaming_response_keeps_stream_error(
+    client: WeaveClient,
+) -> None:
+    first_event = _sse(_streamed_response_events("Hello")[:1])
+    oai = _async_openai(_ReadErrorAfter(first_event))
+
+    responses: list[Any] = []
+
+    async def consume() -> None:
+        async with oai.responses.with_streaming_response.create(
+            model=STREAMING_RESPONSE_MODEL, input="Hi", stream=True
+        ) as raw:
+            responses.append(raw)
+            async for _event in await raw.parse():
+                pass
+
+    with pytest.raises(httpx.ReadError):
+        await consume()
+
+    assert responses[0].http_response.is_closed
+
+    call = _only_call(client, "openai.responses.create")
+    assert "connection dropped" in call.exception
+
+
+@pytest.mark.asyncio
+async def test_openai_responses_with_streaming_response_closed_unread(
+    client: WeaveClient,
+) -> None:
+    oai = _async_openai(_sse(_streamed_response_events("Hello")))
+
+    async with oai.responses.with_streaming_response.create(
+        model=STREAMING_RESPONSE_MODEL, input="Hi", stream=True
+    ) as raw:
+        pass
+
+    assert raw.http_response.is_closed
+
+    call = _only_call(client, "openai.responses.create")
+    assert call.exception is None
+    assert call.output is None
