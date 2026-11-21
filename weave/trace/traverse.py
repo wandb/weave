@@ -17,7 +17,12 @@ PathElement = str | int
 
 def escape_key(key: str) -> str:
     """Escape special characters in a key for path string representation."""
-    return key.replace(".", "\\.").replace("[", "\\[").replace("]", "\\]")
+    return (
+        key.replace("\\", "\\\\")
+        .replace(".", "\\.")
+        .replace("[", "\\[")
+        .replace("]", "\\]")
+    )
 
 
 class ObjectPath:
@@ -127,7 +132,7 @@ class ObjectPath:
                     raise ValueError("Invalid object access")
                 prev = path_string[i - 1]
                 next_char = path_string[i + 1]
-                if not next_char.isalnum() or not (prev.isalnum() or prev == "]"):
+                if (not key and prev != "]") or next_char in ".[]":
                     raise ValueError("Invalid object access")
                 if key:
                     path.append(key)

@@ -159,3 +159,33 @@ class TestObjectPathGetPaths:
 class TestObjectPathSortPaths:
     def test_sorting(self) -> None:
         assert sort_paths([]) == []
+
+
+@pytest.mark.trace_server
+@pytest.mark.parametrize(
+    "elements",
+    [
+        ["inputs", r"path\to\file"],
+        ["inputs", "trailing\\"],
+        ["inputs", r"slash\.dot"],
+        ["inputs", r"slash\[index]"],
+        ["inputs", "_private", "value"],
+        ["inputs", "key_", "value"],
+        ["inputs", "a.", "value"],
+        ["inputs", "a[", "value"],
+        ["inputs", "-key", "value"],
+        ["inputs", 0, "_private"],
+        ["inputs", "trailing\\", "value"],
+        ["inputs", "]", "value"],
+    ],
+)
+def test_object_path_round_trip_literal_keys(elements: list[str | int]) -> None:
+    path = ObjectPath(elements)
+    assert ObjectPath.parse_str(path.to_str()).elements == elements
+
+
+@pytest.mark.trace_server
+@pytest.mark.parametrize("path", [".", "a.", "a..b", "a.[0]", "a.]", "a[0]..b"])
+def test_object_path_rejects_invalid_separators(path: str) -> None:
+    with pytest.raises(ValueError, match="Invalid object access"):
+        ObjectPath.parse_str(path)
