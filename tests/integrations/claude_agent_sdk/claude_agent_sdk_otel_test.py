@@ -23,7 +23,7 @@ from opentelemetry.trace import SpanKind, StatusCode
 
 import weave.integrations.claude_agent_sdk.otel_integration as claude_agent_sdk_otel_integration
 from tests.integrations.claude_agent_sdk.conftest import ReplayTransport, load_cassette
-from weave.conversation import agent_name_override
+from weave.conversation import Conversation, agent_name_override
 from weave.integrations.claude_agent_sdk.otel_integration import (
     get_claude_agent_sdk_otel_patcher,
 )
@@ -845,12 +845,14 @@ async def test_error_response_otel(otel_spans: InMemorySpanExporter) -> None:
     assert agent_span.status.status_code == StatusCode.ERROR
 
 
-# --- trace nesting: turns nest under the ambient OTel context ---------------
+# --- trace nesting: turns nest only under an enclosing agent's trace --------
 
 
 @pytest.mark.asyncio
-async def test_ambient_trace_nesting_otel(otel_spans: InMemorySpanExporter) -> None:
-    """A turn nests under whatever OTel span is already active."""
+async def test_non_agent_ambient_span_starts_new_trace_otel(
+    otel_spans: InMemorySpanExporter,
+) -> None:
+    """A non-agent ambient span (an app request) never becomes the trace root."""
     tracer = otel_trace.get_tracer("test.app")
     with tracer.start_as_current_span("app.request") as outer_span:
         outer_context = outer_span.get_span_context()
@@ -858,9 +860,30 @@ async def test_ambient_trace_nesting_otel(otel_spans: InMemorySpanExporter) -> N
 
     spans = otel_spans.get_finished_spans()
     agent_span = get_spans_by_op(spans, "invoke_agent")[0]
+    assert agent_span.parent is None
+    assert agent_span.context.trace_id != outer_context.trace_id
+
+
+@pytest.mark.asyncio
+async def test_agent_ambient_trace_nesting_otel(
+    otel_spans: InMemorySpanExporter,
+) -> None:
+    """A query run from an outer agent's tool nests inside that agent's trace."""
+    with Conversation(agent_name="outer") as outer_conversation:
+        with outer_conversation.start_turn() as outer_turn:
+            with outer_turn.start_tool(name="delegate"):
+                await run_query("simple_text_response", "What is 2+2?")
+
+    spans = otel_spans.get_finished_spans()
+    tool_span = next(span for span in spans if span.name == "execute_tool delegate")
+    agent_span = next(
+        span
+        for span in get_spans_by_op(spans, "invoke_agent")
+        if span.name != "invoke_agent outer"
+    )
     assert agent_span.parent is not None
-    assert agent_span.parent.span_id == outer_context.span_id
-    assert agent_span.context.trace_id == outer_context.trace_id
+    assert agent_span.parent.span_id == tool_span.context.span_id
+    assert agent_span.context.trace_id == tool_span.context.trace_id
 
 
 # --- ClaudeSDKClient: one turn per receive_response() ------------------------
