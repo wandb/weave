@@ -1,9 +1,14 @@
+import enum
+import json
+import logging
 from dataclasses import dataclass
 
 from pydantic import BaseModel
+from pydantic_core import to_jsonable_python
 
 import weave
 from weave.trace.object_record import pydantic_object_record
+from weave.trace.serialization.digest import canonical_json
 from weave.trace.serialization.serialize import (
     dictify,
     is_pydantic_model_class,
@@ -387,3 +392,51 @@ def test_stable_repr_strips_memory_addresses() -> None:
 
     # Reprs without a memory address pass through unchanged.
     assert stable_repr("no address here") == "'no address here'"
+
+
+class Color(enum.Enum):
+    RED = "red"
+
+
+def test_to_json_writes_a_dict_key_pydantic_cannot_serialize_as_its_text() -> None:
+    # A dict keyed by an object pydantic cannot serialize, like logging.PlaceHolder.loggerMap
+    # ({Logger: None}), which dictify reaches from any object holding a logger: to_json passed
+    # the keys through, and sending the call start failed with PydanticSerializationError.
+    logger = logging.getLogger("weave.test.dict_key")
+    encoded = to_json({logger: None, "plain": 1}, "entity/project", None)
+    assert to_jsonable_python(encoded) == {repr(logger): None, "plain": 1}
+
+
+def test_to_json_writes_other_dict_keys_as_pydantic_does() -> None:
+    # str, int, float, bool and None keys stay; others become the text pydantic writes
+    # for them, so the call payload is unchanged and json.dumps (weave.publish) accepts them.
+    value = {"s": 1, 2: 2, 1.5: 3, None: 4, True: 5, (1, 2): 6, Color.RED: 7, b"x": 8}
+    encoded = to_json(value, "entity/project", None)
+    assert encoded == {
+        "s": 1,
+        2: 2,
+        1.5: 3,
+        None: 4,
+        True: 5,
+        "1,2": 6,
+        "red": 7,
+        "x": 8,
+    }
+    assert to_jsonable_python(encoded) == to_jsonable_python(value)
+    assert json.loads(canonical_json(encoded)) == {
+        "s": 1,
+        "2": 2,
+        "1.5": 3,
+        "null": 4,
+        "true": 5,
+        "1,2": 6,
+        "red": 7,
+        "x": 8,
+    }
+
+
+def test_to_json_preserves_last_value_for_colliding_dict_keys() -> None:
+    value = {"1": "string", 1: "integer", b"1": "bytes"}
+    encoded = to_json(value, "entity/project", None)
+
+    assert to_jsonable_python(encoded) == {"1": "bytes"}

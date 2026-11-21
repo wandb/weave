@@ -6,6 +6,7 @@ from types import CoroutineType
 from typing import TYPE_CHECKING, Any, Literal, Protocol, TypeAlias, TypedDict
 
 from pydantic import BaseModel
+from pydantic_core import to_jsonable_python
 
 from weave.trace.object_record import ObjectRecord
 from weave.trace.refs import ObjectRef, Ref, TableRef
@@ -152,8 +153,38 @@ def _encode_container(
     if isinstance(obj, (list, tuple)):
         return [to_json(v, project_id, client, use_dictify) for v in obj]
     if isinstance(obj, dict):
-        return {k: to_json(v, project_id, client, use_dictify) for k, v in obj.items()}
+        encoded: dict[Any, Any] = {}
+        for key, value in obj.items():
+            encoded_key = _encode_dict_key(key)
+            # Keep the last position for keys that Pydantic later treats as equal.
+            encoded.pop(encoded_key, None)
+            encoded[encoded_key] = to_json(value, project_id, client, use_dictify)
+        return encoded
     return _MISS
+
+
+def _encode_dict_key(key: Any) -> Any:
+    """Return a dict key that `to_jsonable_python` and `json.dumps` can write.
+
+    Values are encoded by `to_json`, keys were passed through as they are, so a
+    dict keyed by an arbitrary object failed later, when the payload was sent:
+    `PydanticSerializationError: Unable to serialize unknown type`. One such dict
+    is `logging.PlaceHolder.loggerMap`, keyed by `logging.Logger`, which
+    `dictify` reaches from any object that holds a logger.
+
+    str, int, float, bool and None are left unchanged. Any other key becomes the
+    text pydantic writes for it (`(1, 2)` -> `"1,2"`, `b"x"` -> `"x"`, an enum ->
+    its value), so the call payload is the same as before and `canonical_json`
+    (`json.dumps`) accepts it too; a key pydantic cannot write becomes its
+    `stringify` text. Keys with the same text merge and the last value wins, as
+    in pydantic's own key encoding; a logger's text carries its name.
+    """
+    if key is None or isinstance(key, (str, int, float, bool)):
+        return key
+    try:
+        return next(iter(to_jsonable_python({key: None})))
+    except Exception:
+        return stringify(key)
 
 
 def _encode_pydantic_schema(
