@@ -433,3 +433,10 @@ def test_to_json_writes_other_dict_keys_as_pydantic_does() -> None:
         "red": 7,
         "x": 8,
     }
+
+
+def test_to_json_preserves_last_value_for_colliding_dict_keys() -> None:
+    value = {"1": "string", 1: "integer", b"1": "bytes"}
+    encoded = to_json(value, "entity/project", None)
+
+    assert to_jsonable_python(encoded) == {"1": "bytes"}
