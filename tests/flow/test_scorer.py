@@ -222,3 +222,22 @@ def test_auto_summarize_results_unchanged(data, expected):
     A falsy number and a None leaf are real values, not unscored rows.
     """
     assert auto_summarize(data) == expected
+
+
+@pytest.mark.trace_server
+def test_auto_summarize_repeated_nested_keys():
+    """A nested dict that repeats its parent key must stay nested: merging the
+    child summary into the parent lets siblings overwrite each other and makes
+    the result depend on dict insertion order."""
+    rows = [
+        {"quality": {"quality": 0.25, "confidence": 0.75}, "confidence": 0.25},
+        {"quality": {"quality": 0.75, "confidence": 0.75}, "confidence": 0.25},
+    ]
+    expected = {
+        "quality": {"quality": {"mean": 0.5}, "confidence": {"mean": 0.75}},
+        "confidence": {"mean": 0.25},
+    }
+    assert auto_summarize(rows) == expected
+    # same dicts, different insertion order: identical summary
+    rows_reversed = [dict(reversed(list(r.items()))) for r in rows]
+    assert auto_summarize(rows_reversed) == expected
