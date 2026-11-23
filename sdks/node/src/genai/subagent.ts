@@ -6,7 +6,7 @@ import {
   trace,
 } from '@opentelemetry/api';
 
-import type {ChildSpanContext} from './common';
+import {type ChildSpanContext, userAttributes} from './common';
 import {LLM, type LLMInit} from './llm';
 import {getWeaveTracer} from './provider';
 import {
@@ -83,12 +83,16 @@ type Opts = {
   span: Span;
   context: Context;
   conversationId: string;
+  userId: string;
+  userEmail: string;
   attributes: Attributes;
 } & Required<Omit<SubAgentInit, 'startTime'>>;
 
 export class SubAgent extends SpanBase {
   private _context: Context;
   private _conversationId: string;
+  private _userId: string;
+  private _userEmail: string;
   private _name: string;
   private _model: string;
   private _inputMessages: Message[] = [];
@@ -111,6 +115,8 @@ export class SubAgent extends SpanBase {
     super(opts.span);
     this._context = opts.context;
     this._conversationId = opts.conversationId;
+    this._userId = opts.userId;
+    this._userEmail = opts.userEmail;
     this._name = opts.name;
     this._model = opts.model;
     this._systemInstructions = opts.systemInstructions;
@@ -134,6 +140,8 @@ export class SubAgent extends SpanBase {
       name: opts.name,
       model: opts.model ?? '',
       conversationId: opts.conversationId ?? '',
+      userId: opts.userId ?? '',
+      userEmail: opts.userEmail ?? '',
       systemInstructions: opts.systemInstructions ?? [],
       agentId: opts.agentId ?? '',
       agentDescription: opts.agentDescription ?? '',
@@ -148,6 +156,8 @@ export class SubAgent extends SpanBase {
       ...opts,
       parentContext: this._context,
       conversationId: this._conversationId,
+      userId: this._userId,
+      userEmail: this._userEmail,
       attributes: this._attributes,
     });
   }
@@ -158,6 +168,8 @@ export class SubAgent extends SpanBase {
       ...opts,
       parentContext: this._context,
       conversationId: this._conversationId,
+      userId: this._userId,
+      userEmail: this._userEmail,
       attributes: this._attributes,
     });
   }
@@ -168,6 +180,8 @@ export class SubAgent extends SpanBase {
       ...opts,
       parentContext: this._context,
       conversationId: this._conversationId,
+      userId: this._userId,
+      userEmail: this._userEmail,
       attributes: this._attributes,
     });
   }
@@ -239,6 +253,7 @@ export class SubAgent extends SpanBase {
     if (this._conversationId) {
       this.span.setAttribute(ATTR_GEN_AI_CONVERSATION_ID, this._conversationId);
     }
+    this.span.setAttributes(userAttributes(this._userId, this._userEmail));
     if (this._agentId) {
       this.span.setAttribute(ATTR_GEN_AI_AGENT_ID, this._agentId);
     }
