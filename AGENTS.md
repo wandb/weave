@@ -703,6 +703,9 @@ deterministic.
 
 ### Claude Agent SDK token accounting
 
+- The public Conversation SDK `usage_from_anthropic` adapter also normalizes
+  fresh input plus cache-read and cache-creation counts into gross input tokens.
+  Keep the provider's source usage object unchanged.
 - Anthropic reports Claude Agent SDK `input_tokens` as fresh, uncached input
   only. Weave usage requires an inclusive prompt total, with
   `cache_read_input_tokens` and `cache_creation_input_tokens` represented as

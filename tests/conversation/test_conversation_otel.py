@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import time
 from datetime import datetime, timedelta, timezone
+from types import SimpleNamespace
 from typing import Any
 from unittest.mock import patch
 
@@ -13,6 +14,7 @@ from opentelemetry import trace as otel_trace
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
 from opentelemetry.trace import NoOpTracerProvider, StatusCode
 
+from weave.conversation.adapters.anthropic import usage_from_anthropic
 from weave.conversation.adapters.openai import (
     message_from_openai_responses_input,
     reasoning_from_openai_responses,
@@ -2764,3 +2766,85 @@ class TestReasoningFromOpenAIResponses:
         )
         assert result is not None
         assert result.content == "kept\nalso kept"
+
+
+@pytest.mark.trace_server
+class TestAnthropicUsageAdapter:
+    """Synthetic Anthropic usage shapes pass through the public OTel path."""
+
+    @pytest.mark.parametrize("batch", [False, True], ids=["streaming", "batch"])
+    @pytest.mark.parametrize(
+        ("fresh", "read", "write", "output", "gross"),
+        [
+            (3, None, None, 4, 3),
+            (3, 0, 0, 4, 3),
+            (3, 5, None, 4, 8),
+            (3, None, 2, 4, 5),
+            (3, 5, 2, 4, 10),
+            (0, 5, 2, 4, 7),
+            (0, 0, 0, 0, 0),
+        ],
+        ids=[
+            "absent-cache",
+            "zero-cache",
+            "read",
+            "write",
+            "both",
+            "cache-only",
+            "zero",
+        ],
+    )
+    def test_gross_input_usage_emitted(
+        self,
+        otel_spans: InMemorySpanExporter,
+        batch: bool,
+        fresh: int,
+        read: int | None,
+        write: int | None,
+        output: int,
+        gross: int,
+    ) -> None:
+        raw_usage = SimpleNamespace(
+            input_tokens=fresh,
+            output_tokens=output,
+            cache_read_input_tokens=read,
+            cache_creation_input_tokens=write,
+        )
+        original = vars(raw_usage).copy()
+        usage = usage_from_anthropic(SimpleNamespace(usage=raw_usage))  # type: ignore[arg-type]
+        if batch:
+            log_turn(
+                conversation_id="anthropic-usage",
+                agent_name="synthetic",
+                spans=[LLM(model="synthetic", provider_name="anthropic", usage=usage)],
+            )
+        else:
+            _emit_llm_with(
+                otel_spans, model="synthetic", provider_name="anthropic", usage=usage
+            )
+        spans = otel_spans.get_finished_spans()
+        assert len(spans) == 2
+        chat = next(span for span in spans if span.name == "chat synthetic")
+        actual_usage = {
+            key: value
+            for key, value in (chat.attributes or {}).items()
+            if key.startswith("gen_ai.usage.")
+        }
+        expected_usage = {
+            key: value
+            for key, value in {
+                "gen_ai.usage.input_tokens": gross,
+                "gen_ai.usage.output_tokens": output,
+                "gen_ai.usage.cache_read.input_tokens": read,
+                "gen_ai.usage.cache_write.input_tokens": write,
+            }.items()
+            if value
+        }
+        assert actual_usage == expected_usage
+        assert vars(raw_usage) == original
+        assert usage == Usage(
+            input_tokens=gross,
+            output_tokens=output,
+            cache_read_input_tokens=read or 0,
+            cache_creation_input_tokens=write or 0,
+        )
