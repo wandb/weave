@@ -11,6 +11,7 @@ from google.genai.types import (
     CodeExecutionResult,
     Content,
     ExecutableCode,
+    FinishReason,
     GenerateContentConfig,
     GenerateContentResponse,
     GenerateContentResponseUsageMetadata,
@@ -1220,3 +1221,74 @@ def test_wrapper_leaves_recorded_inputs_boxed(client):
     assert type(captured["contents"]) is str
     call = next(iter(client.get_calls()))
     assert call.inputs["contents"].ref.uri() == question.ref.uri()
+
+
+def _stream_chunk(
+    text: str | None = None,
+    finish_reason: FinishReason | None = None,
+    content: bool = True,
+    usage: bool = True,
+) -> GenerateContentResponse:
+    """Helper to create a real streamed GenerateContentResponse chunk."""
+    return GenerateContentResponse(
+        candidates=[
+            Candidate(
+                index=0,
+                content=Content(role="model", parts=[Part(text=text)])
+                if content
+                else None,
+                finish_reason=finish_reason,
+            )
+        ],
+        usage_metadata=GenerateContentResponseUsageMetadata(
+            prompt_token_count=5, candidates_token_count=3, total_token_count=8
+        )
+        if usage
+        else None,
+    )
+
+
+def test_accumulator_takes_finish_reason_from_last_chunk():
+    """Gemini sends finish_reason on the last chunk; the accumulated output keeps it."""
+    acc = None
+    for chunk in [
+        _stream_chunk("Hello"),
+        _stream_chunk(", world", finish_reason=FinishReason.STOP),
+    ]:
+        acc = google_genai_gemini_accumulator(acc, chunk)
+
+    assert acc.candidates[0].content.parts[0].text == "Hello, world"
+    assert acc.candidates[0].finish_reason == FinishReason.STOP
+
+
+def test_accumulator_handles_chunk_without_content():
+    """A chunk with only a finish_reason (e.g. a blocked response) merges without errors."""
+    acc = google_genai_gemini_accumulator(None, _stream_chunk("Hello"))
+    last = _stream_chunk(content=False, finish_reason=FinishReason.SAFETY)
+
+    result = google_genai_gemini_accumulator(acc, last)
+
+    assert result.candidates[0].content.parts[0].text == "Hello"
+    assert result.candidates[0].finish_reason == FinishReason.SAFETY
+
+
+def test_accumulator_handles_first_chunk_without_content():
+    """Content from a later chunk is used when the first chunk had none."""
+    acc = google_genai_gemini_accumulator(None, _stream_chunk(content=False))
+
+    result = google_genai_gemini_accumulator(acc, _stream_chunk("Hello"))
+
+    assert result.candidates[0].content.parts[0].text == "Hello"
+
+
+def test_accumulator_handles_chunks_without_usage_metadata():
+    """usage_metadata only appears on some chunks; missing values are skipped or adopted."""
+    acc = google_genai_gemini_accumulator(None, _stream_chunk("Hello", usage=False))
+
+    acc = google_genai_gemini_accumulator(acc, _stream_chunk(" again", usage=False))
+    assert acc.usage_metadata is None
+    assert acc.candidates[0].content.parts[0].text == "Hello again"
+
+    acc = google_genai_gemini_accumulator(acc, _stream_chunk("!"))
+    assert acc.usage_metadata.prompt_token_count == 5
+    assert acc.usage_metadata.total_token_count == 8
