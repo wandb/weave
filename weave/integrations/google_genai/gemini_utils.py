@@ -118,15 +118,19 @@ def google_genai_gemini_on_finish(
     usage = {model_name: {"requests": 1}}
     summary_update = {"usage": usage}
     if output and hasattr(output, "usage_metadata"):
-        usage_data = {
-            "prompt_tokens": output.usage_metadata.prompt_token_count,
-            "completion_tokens": output.usage_metadata.candidates_token_count,
-            "total_tokens": output.usage_metadata.total_token_count,
-        }
-        # Include thoughts_tokens if available (for thinking models)
         thoughts_token_count = getattr(
             output.usage_metadata, "thoughts_token_count", None
         )
+        completion_tokens = output.usage_metadata.candidates_token_count
+        # Gemini bills thinking as output but leaves it out of candidates_token_count.
+        if thoughts_token_count:
+            completion_tokens = (completion_tokens or 0) + thoughts_token_count
+        usage_data = {
+            "prompt_tokens": output.usage_metadata.prompt_token_count,
+            "completion_tokens": completion_tokens,
+            "total_tokens": output.usage_metadata.total_token_count,
+        }
+        # Include thoughts_tokens if available (for thinking models)
         if thoughts_token_count is not None:
             usage_data["thoughts_tokens"] = thoughts_token_count
         # Map Google's cached_content_token_count to canonical name

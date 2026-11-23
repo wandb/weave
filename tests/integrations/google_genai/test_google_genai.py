@@ -397,7 +397,8 @@ def test_thoughts_token_count_included_in_usage():
     assert "usage" in call.summary
     model_usage = call.summary["usage"]["gemini-2.0-flash-thinking-exp"]
     assert model_usage["prompt_tokens"] == 100
-    assert model_usage["completion_tokens"] == 50
+    # Thinking counts as output, so prompt + completion matches the total.
+    assert model_usage["completion_tokens"] == 100
     assert model_usage["total_tokens"] == 200
     assert model_usage["thoughts_tokens"] == 50
     assert model_usage["requests"] == 1
