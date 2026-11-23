@@ -444,6 +444,64 @@ async def test_async_anthropic_messages_stream_get_final_message(
 @pytest.mark.vcr(
     filter_headers=["authorization", "x-api-key"],
 )
+def test_anthropic_messages_stream_get_final_text(
+    client: weave.trace.weave_client.WeaveClient,
+) -> None:
+    api_key = os.getenv("ANTHROPIC_API_KEY", "DUMMY_API_KEY")
+    anthropic_client = Anthropic(api_key=api_key)
+
+    with anthropic_client.messages.stream(
+        max_tokens=1024,
+        messages=[
+            {
+                "role": "user",
+                "content": "Say hello there!",
+            }
+        ],
+        model=model,
+    ) as stream:
+        text = stream.get_final_text()
+
+    exp = "Hello there!"
+    assert text.strip() == exp
+    calls = list(client.get_calls())
+    assert len(calls) == 1
+    assert calls[0].output.content[0].text.strip() == exp
+
+
+@pytest.mark.vcr(
+    filter_headers=["authorization", "x-api-key"],
+)
+@pytest.mark.asyncio
+async def test_async_anthropic_messages_stream_get_final_text(
+    client: weave.trace.weave_client.WeaveClient,
+) -> None:
+    anthropic_client = AsyncAnthropic(
+        api_key=os.getenv("ANTHROPIC_API_KEY", "DUMMY_API_KEY"),
+    )
+
+    async with anthropic_client.messages.stream(
+        max_tokens=1024,
+        messages=[
+            {
+                "role": "user",
+                "content": "Say hello there!",
+            }
+        ],
+        model=model,
+    ) as stream:
+        text = await stream.get_final_text()
+
+    exp = "Hello there!"
+    assert text.strip() == exp
+    calls = list(client.get_calls())
+    assert len(calls) == 1
+    assert calls[0].output.content[0].text.strip() == exp
+
+
+@pytest.mark.vcr(
+    filter_headers=["authorization", "x-api-key"],
+)
 def test_anthropic_messages_stream_ctx_manager_text(
     client: weave.trace.weave_client.WeaveClient,
 ) -> None:
