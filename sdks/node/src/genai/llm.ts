@@ -6,7 +6,7 @@ import {
   trace,
 } from '@opentelemetry/api';
 
-import type {ChildSpanContext} from './common';
+import {type ChildSpanContext, userAttributes} from './common';
 import {getGenaiState} from './context';
 import {getWeaveTracer} from './provider';
 import {
@@ -124,7 +124,9 @@ export class LLM extends SpanBase {
     public readonly model: string,
     public readonly providerName: string,
     private readonly systemInstructions: string[],
-    private readonly attributes: Attributes
+    private readonly attributes: Attributes,
+    private readonly userId: string,
+    private readonly userEmail: string
   ) {
     super(span);
   }
@@ -150,7 +152,9 @@ export class LLM extends SpanBase {
       opts.model,
       opts.providerName ?? '',
       opts.systemInstructions ?? [],
-      opts.attributes ?? {}
+      opts.attributes ?? {},
+      opts.userId ?? '',
+      opts.userEmail ?? ''
     );
     state.llm = llm;
     return llm;
@@ -263,6 +267,8 @@ export class LLM extends SpanBase {
       ...opts,
       parentContext: this.context,
       conversationId: this.conversationId,
+      userId: this.userId,
+      userEmail: this.userEmail,
       attributes: this.attributes,
     });
   }
@@ -273,6 +279,8 @@ export class LLM extends SpanBase {
       ...opts,
       parentContext: this.context,
       conversationId: this.conversationId,
+      userId: this.userId,
+      userEmail: this.userEmail,
       attributes: this.attributes,
     });
   }
@@ -298,6 +306,7 @@ export class LLM extends SpanBase {
     if (this.conversationId) {
       this.span.setAttribute(ATTR_GEN_AI_CONVERSATION_ID, this.conversationId);
     }
+    this.span.setAttributes(userAttributes(this.userId, this.userEmail));
     if (this.systemInstructions.length > 0) {
       this.span.setAttribute(
         ATTR_GEN_AI_SYSTEM_INSTRUCTIONS,
