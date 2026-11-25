@@ -92,9 +92,10 @@ def _resolve_model_path(
     """Dispatcher to resolve a model path from various sources.
 
     Resolution priority:
-    1. A default model from Hugging Face Hub, if `default_model` is provided.
-    2. A local directory path, if `model_name_or_path` is a valid directory.
-    3. A model from W&B Artifacts, if `model_name_or_path` is provided.
+    1. A local directory path, if `model_name_or_path` is a valid directory.
+    2. A model from W&B Artifacts, if `model_name_or_path` is provided and is
+       not `default_model`.
+    3. A default model from Hugging Face Hub, if `default_model` is provided.
 
     Returns:
         str: The local path to the downloaded model weights.
@@ -102,13 +103,14 @@ def _resolve_model_path(
     Raises:
         ValueError: If neither a model_name_or_path nor a default_model is provided.
     """
+    if os.path.isdir(model_name_or_path):
+        return model_name_or_path
+
+    if model_name_or_path and model_name_or_path != default_model:
+        return str(download_model_from_wandb(model_name_or_path))
+
     if default_model:
         return str(download_model_from_huggingface_hub(default_model))
-
-    if model_name_or_path:
-        if os.path.isdir(model_name_or_path):
-            return model_name_or_path
-        return str(download_model_from_wandb(model_name_or_path))
 
     raise ValueError(
         "No model_name_or_path or no default_model provided, please set one of the two."
