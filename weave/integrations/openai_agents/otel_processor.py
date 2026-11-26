@@ -61,6 +61,7 @@ from opentelemetry.trace import StatusCode
 from opentelemetry.util.types import AttributeValue
 
 from weave.conversation.adapters.openai import (
+    finish_reasons_from_openai_responses,
     message_from_openai_responses_input,
     reasoning_from_openai_responses,
     usage_from_openai_responses,
@@ -254,10 +255,12 @@ def _response_chat_attrs(
             if item.get("type") == "reasoning":
                 reasoning = reasoning_from_openai_responses(item)
                 break
-        for item in output_items:
-            finish = item.get("finish_reason")
-            if isinstance(finish, str) and finish:
-                finish_reasons.append(finish)
+        incomplete = response.incomplete_details
+        finish_reasons = finish_reasons_from_openai_responses(
+            response.status,
+            incomplete.reason if incomplete is not None else None,
+            output_messages,
+        )
 
     return llm_attributes(
         model=model,

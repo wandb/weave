@@ -50,6 +50,7 @@ import {
   trace,
 } from '@opentelemetry/api';
 
+import {normalizeFinishReason} from '../genai/finishReasons';
 import {getWeaveTracer} from '../genai/provider';
 import {
   ATTR_ERROR_TYPE,
@@ -386,8 +387,8 @@ export class PiCodingAgentOtelAdapter {
           [ATTR_GEN_AI_OUTPUT_MESSAGES]: JSON.stringify(
             assistantMessages.map(mapPiMessage)
           ),
-          [ATTR_GEN_AI_RESPONSE_FINISH_REASONS]: assistantMessages.map(
-            msg => msg.stopReason
+          [ATTR_GEN_AI_RESPONSE_FINISH_REASONS]: assistantMessages.map(msg =>
+            normalizeFinishReason(msg.stopReason)
           ),
         });
       }
@@ -472,7 +473,9 @@ export class PiCodingAgentOtelAdapter {
       if (this.chatSpan) {
         this.chatSpan.setAttributes({
           [ATTR_GEN_AI_RESPONSE_MODEL]: event.message.model,
-          [ATTR_GEN_AI_RESPONSE_FINISH_REASONS]: [event.message.stopReason],
+          [ATTR_GEN_AI_RESPONSE_FINISH_REASONS]: [
+            normalizeFinishReason(event.message.stopReason),
+          ],
           [ATTR_GEN_AI_USAGE_INPUT_TOKENS]: usage.input,
           [ATTR_GEN_AI_USAGE_OUTPUT_TOKENS]: usage.output,
           [ATTR_GEN_AI_USAGE_TOTAL_TOKENS]: usage.totalTokens,

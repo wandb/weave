@@ -43,6 +43,11 @@ from google.adk.telemetry._experimental_semconv import (
 from google.genai.types import Content, GenerateContentConfig
 from opentelemetry.trace import Span
 
+from weave.conversation.conversation_otel import (
+    FINISH_REASON_STOP,
+    FINISH_REASON_TOOL_CALL,
+    normalize_finish_reason,
+)
 from weave.integrations.google_adk._semconv import (
     GEN_AI_INPUT_MESSAGES,
     GEN_AI_OUTPUT_MESSAGES,
@@ -174,13 +179,22 @@ def _llm_response_output_message(
 
 
 def _finish_reason_str(llm_response: LlmResponse) -> str:
-    """Lower-cased finish reason, or an empty string when the response has none."""
+    """Normalized finish reason, or an empty string when the response has none."""
     finish_reason = llm_response.finish_reason
     if finish_reason is None:
         return ""
     # `FinishReason` is an Enum; `.value` is the wire form, with `.name`
     # as the fallback for older enum styles.
-    return str(finish_reason.value or finish_reason.name).lower()
+    normalized = normalize_finish_reason(str(finish_reason.value or finish_reason.name))
+    # Gemini reports STOP when the model ends its turn on a function call.
+    content = llm_response.content
+    if (
+        normalized == FINISH_REASON_STOP
+        and content is not None
+        and any(part.function_call is not None for part in content.parts or [])
+    ):
+        return FINISH_REASON_TOOL_CALL
+    return normalized
 
 
 def _tool_definitions(config: GenerateContentConfig) -> list[dict[str, Any]]:

@@ -456,6 +456,7 @@ describe('OpenAI Agents Integration (with WEAVE_USE_OTEL_V2=true)', () => {
       'gen_ai.request.model': 'gpt-4o-mini',
       'gen_ai.response.model': 'gpt-4o-mini',
       'gen_ai.response.id': 'resp-abc',
+      'gen_ai.response.finish_reasons': ['tool_call', 'stop', 'stop'],
       'gen_ai.usage.input_tokens': 12,
       'gen_ai.usage.output_tokens': 7,
       'gen_ai.usage.cache_read.input_tokens': 4,
