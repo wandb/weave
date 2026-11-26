@@ -119,3 +119,29 @@ async def test_evaluate_summary_scorer(summarization_scorer):
     assert result["SummarizationScorer"]["is_entity_dense"]["true_count"] == 2
     assert result["SummarizationScorer"]["is_entity_dense"]["true_fraction"] == 1.0
     assert result["SummarizationScorer"]["summarization_eval_score"]["mean"] == 1.0
+
+
+@pytest.mark.trace_server
+@pytest.mark.asyncio
+@pytest.mark.parametrize("output_text", ["", "   \n"])
+async def test_summarization_scorer_score_empty_output(
+    summarization_scorer, output_text
+):
+    result = await summarization_scorer.score(
+        input="This is the original text.", output=output_text
+    )
+    assert result["entity_density"] == 0.0
+    assert result["is_entity_dense"] is False
+    assert result["summarization_eval_score"] == 1.0
+    assert result["llm_eval_reasoning"] == "This is some reasoning."
+
+
+@pytest.mark.trace_server
+@pytest.mark.asyncio
+async def test_summarization_scorer_score_non_string_output(summarization_scorer):
+    # The judge receives str(output); entity density uses the same text.
+    output = {"summary": "This is the summary."}
+    result = await summarization_scorer.score(
+        input="This is the original text.", output=output
+    )
+    assert result["entity_density"] == 2 / len(str(output).split())
