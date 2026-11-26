@@ -53,6 +53,8 @@ class Ref:
         entity, project, kind = parts[:3]
         remaining = tuple(parts[3:])
         if kind == "table":
+            if not remaining:
+                raise ValueError(f"Invalid URI: {uri}")
             return TableRef(entity=entity, project=project, _digest=remaining[0])
         if kind in {"agent_turn", "agent_conversation", "agent_span"}:
             if len(remaining) != 1:
@@ -72,6 +74,8 @@ class Ref:
                     conversation_id=urllib.parse.unquote(remaining[0]),
                 )
             return AgentSpanRef(entity=entity, project=project, span_id=remaining[0])
+        if kind in {"call", "object", "op"} and not remaining:
+            raise ValueError(f"Invalid URI: {uri}")
         extra = tuple(urllib.parse.unquote(r) for r in remaining[1:])
         if kind == "call":
             return CallRef(
