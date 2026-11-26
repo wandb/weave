@@ -468,7 +468,7 @@ describe('OpenAI Agents Integration (with WEAVE_USE_OTEL_V2=true)', () => {
       `"[{"role":"user","parts":[{"type":"text","content":"What is the weather in Tokyo?"}]}]"`
     );
     expect(resp.attributes['gen_ai.output.messages']).toMatchInlineSnapshot(
-      `"[{"role":"assistant","parts":[{"type":"tool_call","toolName":"get_weather","arguments":"{\\"city\\":\\"Tokyo\\"}"}]},{"role":"tool","parts":[{"type":"tool_result","result":"Tokyo: Sunny, 22C"}]},{"role":"assistant","parts":[{"type":"reasoning","content":"Tokyo is a city in Japan.\\nSunny."},{"type":"text","content":"Tokyo is sunny."}]}]"`
+      `"[{"role":"assistant","parts":[{"type":"tool_call","name":"get_weather","arguments":"{\\"city\\":\\"Tokyo\\"}"}]},{"role":"tool","parts":[{"type":"tool_call_response","response":"Tokyo: Sunny, 22C"}]},{"role":"assistant","parts":[{"type":"reasoning","content":"Tokyo is a city in Japan.\\nSunny."},{"type":"text","content":"Tokyo is sunny."}]}]"`
     );
 
     const gen = spans.find(s => s.name === 'chat gpt-3.5-turbo')!;
@@ -601,6 +601,40 @@ describe('OpenAI Agents Integration (with WEAVE_USE_OTEL_V2=true)', () => {
       custom.attributes['weave.openai_agents.custom.miss']
     ).toBeUndefined();
     expect(custom.attributes['gen_ai.operation.name']).toBeUndefined();
+  });
+
+  test('Responses system and developer input items become system instructions', async () => {
+    await withTrace('Workflow', async () => {
+      await withResponseSpan(async span => {
+        span.spanData._input = [
+          {role: 'system', content: 'Be concise.'},
+          {
+            role: 'developer',
+            content: [{type: 'input_text', text: 'Answer in English.'}],
+          },
+          {role: 'user', content: 'hi'},
+        ];
+        span.spanData._response = {
+          object: 'response',
+          id: 'resp-sys',
+          model: 'gpt-4o-mini',
+          status: 'completed',
+          output: [],
+        };
+      });
+    });
+
+    const spans = await emittedSpans();
+    const resp = spans.find(s => s.name === 'chat gpt-4o-mini')!;
+    expect(
+      JSON.parse(resp.attributes['gen_ai.input.messages'] as string)
+    ).toEqual([{role: 'user', parts: [{type: 'text', content: 'hi'}]}]);
+    expect(
+      JSON.parse(resp.attributes['gen_ai.system_instructions'] as string)
+    ).toEqual([
+      {type: 'text', content: 'Be concise.'},
+      {type: 'text', content: 'Answer in English.'},
+    ]);
   });
 
   test('preserves parent-child relationship', async () => {

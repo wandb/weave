@@ -178,7 +178,7 @@ describe('PiCodingAgentOtelAdapter', () => {
         invoke.attributes['gen_ai.input.messages'] as string
       );
       expect(inputMessages).toEqual([
-        {role: 'user', content: 'what time is it?'},
+        {role: 'user', parts: [{type: 'text', content: 'what time is it?'}]},
       ]);
       const systemInstructions = JSON.parse(
         invoke.attributes['gen_ai.system_instructions'] as string
@@ -334,7 +334,9 @@ describe('PiCodingAgentOtelAdapter', () => {
       const inputMessages = JSON.parse(
         chat.attributes['gen_ai.input.messages'] as string
       );
-      expect(inputMessages).toEqual([{role: 'user', content: 'hello'}]);
+      expect(inputMessages).toEqual([
+        {role: 'user', parts: [{type: 'text', content: 'hello'}]},
+      ]);
     });
 
     it('skips gen_ai.system_instructions when no system messages in context', () => {

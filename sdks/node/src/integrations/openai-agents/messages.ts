@@ -9,6 +9,7 @@ import type OpenAI from 'openai';
 import type {GenerationSpanData, ResponseSpanData} from '@openai/agents';
 import type {Message, MessagePart} from '../../genai';
 import {type MediaPart, urlToMediaPart} from '../../utils/urlToMediaPart';
+import {serializeMessages} from '../../genai/serialize';
 import {withIndex} from '../../utils/withIndex';
 import {findLastIndex} from '../../utils/findLastIndex';
 
@@ -75,6 +76,7 @@ export function hasChatCompletionOutput(
 export function inputFromResponseSpan(spanData: ResponseSpanDataWithInput): {
   messages: Message[];
   attachments: MediaPart[];
+  systemInstructions: string[];
 } {
   if (typeof spanData._input === 'string') {
     return {
@@ -82,10 +84,28 @@ export function inputFromResponseSpan(spanData: ResponseSpanDataWithInput): {
         {role: 'user', parts: [{type: 'text', content: spanData._input}]},
       ],
       attachments: [],
+      systemInstructions: [],
     };
   }
 
-  return parseResponseSpanItems(spanData._input);
+  const systemInstructions: string[] = [];
+  const nonSystemItems: OpenAI.Responses.ResponseInputItem[] = [];
+  for (const item of spanData._input) {
+    if (
+      'role' in item &&
+      'content' in item &&
+      (item.role === 'system' || item.role === 'developer')
+    ) {
+      const text = extractTextContent(item.content);
+      if (text) {
+        systemInstructions.push(text);
+      }
+    } else {
+      nonSystemItems.push(item);
+    }
+  }
+
+  return {...parseResponseSpanItems(nonSystemItems), systemInstructions};
 }
 
 /**
@@ -268,12 +288,12 @@ export function serializeInputMessages(
   }
 
   if (media.length === 0) {
-    return JSON.stringify(messages);
+    return serializeMessages(messages);
   }
 
   const lastUserMessageIdx = findLastIndex(messages, m => m.role === 'user');
   if (lastUserMessageIdx >= 0) {
-    return JSON.stringify(
+    return serializeMessages(
       withIndex(messages, lastUserMessageIdx, {
         ...messages[lastUserMessageIdx],
         parts: [...(messages[lastUserMessageIdx].parts ?? []), ...media],
@@ -281,7 +301,7 @@ export function serializeInputMessages(
     );
   }
 
-  return JSON.stringify(messages);
+  return serializeMessages(messages);
 }
 
 function reasoningTextFromItem(
@@ -329,14 +349,14 @@ export function serializeOutputMessages(
   }
 
   if (!reasoning) {
-    return JSON.stringify(messages);
+    return serializeMessages(messages);
   }
 
   const alreadyHasReasoning = messages.some(
     m => m.parts && m.parts.some(p => p.type === 'reasoning')
   );
   if (alreadyHasReasoning) {
-    return JSON.stringify(messages);
+    return serializeMessages(messages);
   }
 
   const lastAssistantMessageIdx = findLastIndex(
@@ -349,7 +369,7 @@ export function serializeOutputMessages(
       ? lastAssistantMessageIdx
       : messages.length - 1;
 
-  return JSON.stringify(
+  return serializeMessages(
     withIndex(messages, idx, {
       ...messages[idx],
       parts: [

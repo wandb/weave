@@ -38,6 +38,7 @@ import {
   ATTR_GEN_AI_REQUEST_TOP_P,
   ATTR_GEN_AI_RESPONSE_ID,
   ATTR_GEN_AI_RESPONSE_MODEL,
+  ATTR_GEN_AI_SYSTEM_INSTRUCTIONS,
   ATTR_GEN_AI_TOOL_CALL_ARGUMENTS,
   ATTR_GEN_AI_TOOL_CALL_RESULT,
   ATTR_GEN_AI_TOOL_NAME,
@@ -210,7 +211,8 @@ function responseChatAttrs(spanData: ResponseSpanData): Attributes {
   };
 
   if (hasResponsesInput(spanData)) {
-    const {messages, attachments} = inputFromResponseSpan(spanData);
+    const {messages, attachments, systemInstructions} =
+      inputFromResponseSpan(spanData);
 
     attrs = {
       ...attrs,
@@ -219,6 +221,11 @@ function responseChatAttrs(spanData: ResponseSpanData): Attributes {
         attachments
       ),
     };
+    if (systemInstructions.length > 0) {
+      attrs[ATTR_GEN_AI_SYSTEM_INSTRUCTIONS] = JSON.stringify(
+        systemInstructions.map(content => ({type: 'text', content}))
+      );
+    }
   }
 
   if (hasResponsesOutput(spanData)) {
