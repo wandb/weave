@@ -177,6 +177,7 @@ class SummarizationScorer(LLMScorer):
         This method performs two assessments:
           1. Entity Density Evaluation: Extracts entities from the summary and calculates the ratio of extracted entities
              to the total number of words. Determines if the summary is dense enough based on the `entity_density_threshold`.
+             A summary with no words has an entity density of 0.0.
           2. LLM Evaluation: Uses an LLM to assess the quality of the summary, mapping the evaluation ('poor', 'ok', or
              'excellent') to a numerical score.
 
@@ -197,8 +198,10 @@ class SummarizationScorer(LLMScorer):
         )
         result["llm_eval_reasoning"] = llm_eval.think_step_by_step
 
-        summary_words = self._simple_word_tokenize(output)
-        entity_density = len(summary_entities) / len(summary_words)
+        summary_words = self._simple_word_tokenize(str(output))
+        entity_density = (
+            len(summary_entities) / len(summary_words) if summary_words else 0.0
+        )
         result["is_entity_dense"] = entity_density >= self.entity_density_threshold
         result["entity_density"] = entity_density
 
