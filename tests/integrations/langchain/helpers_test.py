@@ -49,6 +49,65 @@ from weave.trace.call import Call
             {"input_tokens": 497, "output_tokens": 6, "total_tokens": 503},
             TokenUsage(prompt_tokens=497, completion_tokens=6, total_tokens=503),
         ),
+        # LangChain Bedrock/Anthropic cache subsets in input_token_details
+        (
+            {
+                "input_tokens": 195,
+                "output_tokens": 20,
+                "total_tokens": 215,
+                "input_token_details": {
+                    "cache_read": 80,
+                    "cache_creation": 15,
+                },
+            },
+            TokenUsage(
+                prompt_tokens=195,
+                completion_tokens=20,
+                total_tokens=215,
+                cache_read_input_tokens=80,
+                cache_creation_input_tokens=15,
+            ),
+        ),
+        # Explicit zero cache counts are meaningful and should be preserved
+        (
+            {
+                "input_tokens": 100,
+                "output_tokens": 20,
+                "total_tokens": 120,
+                "input_token_details": {
+                    "cache_read": 0,
+                    "cache_creation": 0,
+                },
+            },
+            TokenUsage(
+                prompt_tokens=100,
+                completion_tokens=20,
+                total_tokens=120,
+                cache_read_input_tokens=0,
+                cache_creation_input_tokens=0,
+            ),
+        ),
+        # langchain-anthropic TTL cache writes under ephemeral_* keys
+        (
+            {
+                "input_tokens": 4010,
+                "output_tokens": 5,
+                "total_tokens": 4015,
+                "input_token_details": {
+                    "cache_read": 4000,
+                    "cache_creation": 0,
+                    "ephemeral_5m_input_tokens": 10,
+                    "ephemeral_1h_input_tokens": 0,
+                },
+            },
+            TokenUsage(
+                prompt_tokens=4010,
+                completion_tokens=5,
+                total_tokens=4015,
+                cache_read_input_tokens=4000,
+                cache_creation_input_tokens=10,
+            ),
+        ),
         # Empty metadata
         (
             {},
@@ -74,9 +133,7 @@ from weave.trace.call import Call
 def test_normalize_usage_metadata(usage_metadata, expected):
     """Test normalization of usage metadata from different provider formats."""
     result = _normalize_usage_metadata(usage_metadata)
-    assert result.prompt_tokens == expected.prompt_tokens
-    assert result.completion_tokens == expected.completion_tokens
-    assert result.total_tokens == expected.total_tokens
+    assert result == expected
 
 
 @pytest.mark.parametrize(
@@ -232,6 +289,49 @@ def test_find_full_model_name(output, partial_model, expected):
                     "prompt_tokens": 9,
                     "completion_tokens": 7,
                     "total_tokens": 16,
+                }
+            },
+        ),
+        # LangChain Anthropic/Bedrock with prompt-cache details
+        (
+            {
+                "extra": {
+                    "metadata": {
+                        "ls_provider": "anthropic",
+                        "ls_model_name": "claude-sonnet-4-5",
+                        "ls_model_type": "chat",
+                    }
+                },
+                "outputs": {
+                    "generations": [
+                        [
+                            {
+                                "message": {
+                                    "kwargs": {
+                                        "usage_metadata": {
+                                            "input_tokens": 4010,
+                                            "output_tokens": 5,
+                                            "total_tokens": 4015,
+                                            "input_token_details": {
+                                                "cache_read": 4000,
+                                                "cache_creation": 0,
+                                                "ephemeral_5m_input_tokens": 10,
+                                            },
+                                        }
+                                    }
+                                }
+                            }
+                        ]
+                    ]
+                },
+            },
+            {
+                "claude-sonnet-4-5": {
+                    "prompt_tokens": 4010,
+                    "completion_tokens": 5,
+                    "total_tokens": 4015,
+                    "cache_read_input_tokens": 4000,
+                    "cache_creation_input_tokens": 10,
                 }
             },
         ),
