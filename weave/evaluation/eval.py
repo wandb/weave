@@ -292,19 +292,27 @@ class Evaluation(Object):
 
         scores = {}
         if scorers := self.scorers:
+
+            async def _safe_apply_scorer(scorer: Any) -> tuple[str, Any]:
+                scorer_attributes = get_scorer_attributes(scorer)
+                scorer_name = scorer_attributes.scorer_name
+                try:
+                    apply_scorer_result = await model_call.apply_scorer(scorer, example)
+                except (OpCallError, asyncio.CancelledError):
+                    raise
+                except Exception:
+                    logger.warning("Scorer '%s' failed", scorer_name)
+                    traceback.print_exc()
+                    return scorer_name, {}
+                else:
+                    return scorer_name, apply_scorer_result.result
+
             # Run all scorer calls in parallel
-            scorer_tasks = [
-                model_call.apply_scorer(scorer, example) for scorer in scorers
-            ]
+            scorer_tasks = [_safe_apply_scorer(scorer) for scorer in scorers]
             apply_scorer_results = await asyncio.gather(*scorer_tasks)
 
             # Process results and build scores dict
-            for scorer, apply_scorer_result in zip(
-                scorers, apply_scorer_results, strict=False
-            ):
-                result = apply_scorer_result.result
-                scorer_attributes = get_scorer_attributes(scorer)
-                scorer_name = scorer_attributes.scorer_name
+            for scorer_name, result in apply_scorer_results:
                 scores[scorer_name] = result
 
         return {
