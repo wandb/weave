@@ -635,3 +635,41 @@ async def test_summary_counts_rows_the_model_failed_on(weave_active):
         "dict_score": {"correct": {"true_count": 1, "true_fraction": 0.5}},
         "model_latency": {"mean": pytest.approx(0, abs=LATENCY_TOL)},
     }
+
+
+@pytest.mark.asyncio
+async def test_scorer_failure_preserves_output_and_sibling_scores(weave_active):
+    """When one scorer raises an exception, model output and other scorers' scores are preserved."""
+
+    @weave.op
+    def model_predict(input):
+        return {"result": input.upper()}
+
+    @weave.op
+    def good_scorer(output):
+        return {"valid": True}
+
+    @weave.op
+    def failing_scorer(output, input):
+        if input == "bad":
+            raise ValueError("scorer failed on bad input")
+        return {"score": 1.0}
+
+    evaluation = Evaluation(
+        dataset=[{"input": "good"}, {"input": "bad"}],
+        scorers=[good_scorer, failing_scorer],
+    )
+    eval_results = await evaluation.get_eval_results(model_predict)
+    rows = list(eval_results.rows)
+    assert len(rows) == 2
+    # First row: both scorers succeeded
+    assert rows[0]["output"] == {"result": "GOOD"}
+    assert rows[0]["scores"]["good_scorer"] == {"valid": True}
+    assert rows[0]["scores"]["failing_scorer"] == {"score": 1.0}
+    assert "model_latency" in rows[0]
+
+    # Second row: failing_scorer raised, but output, latency, and good_scorer were preserved
+    assert rows[1]["output"] == {"result": "BAD"}
+    assert rows[1]["scores"]["good_scorer"] == {"valid": True}
+    assert rows[1]["scores"]["failing_scorer"] == {}
+    assert "model_latency" in rows[1]
